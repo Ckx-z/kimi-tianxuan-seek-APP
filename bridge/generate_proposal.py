@@ -34,6 +34,7 @@ PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
 
 sys.path.insert(0, str(HERE))
 from search_local_pdfs import search as rag_search, format_results_for_prompt
+from query_graphrag import query as graphrag_query
 
 # ---- 中文格式 ----
 CN_FONT = '宋体'
@@ -137,6 +138,38 @@ def find_reagent(reagents, cas):
     return None
 
 
+def format_graphrag_results(qr):
+    """把 GraphRAG 输出转为可插入 docx 的中文文本"""
+    lines = []
+    lines.append(f'查询: {qr["query"]}')
+    lines.append(f'关键词: {qr["keywords"]}')
+    lines.append(f'命中: {qr["summary"]["n_reactions"]} 反应, {qr["summary"]["n_literatures"]} 文献')
+    lines.append('')
+    lines.append('TOP 5 相关反应:')
+    for i, h in enumerate(qr['reactions'][:5], 1):
+        r = h['data']
+        ald = r.get('aldehyde_name', '?')[:50]
+        ami = r.get('amine_name', '?')[:50]
+        solv = r.get('solvent', '?')[:60]
+        temp = r.get('temperature', '?')
+        outcome = r.get('outcome', '?')
+        score = h['score']
+        lines.append(f'  {i}. [{score}★] {ald} + {ami}')
+        lines.append(f'     溶剂: {solv} | 温度: {temp} | 产物: {outcome}')
+    lines.append('')
+    lines.append('TOP 5 相关文献:')
+    for i, h in enumerate(qr['literatures'][:5], 1):
+        l = h['data']
+        journal = l.get('journal', '?')
+        system = l.get('system', '?')[:80]
+        innovation = l.get('innovation', '?')[:150]
+        score = h['score']
+        lines.append(f'  {i}. [{score}★] [{journal}]')
+        lines.append(f'     体系: {system}')
+        lines.append(f'     创新: {innovation}')
+    return '\n'.join(lines)
+
+
 def load_feedback_db():
     with open(FEEDBACK_DB, encoding='utf-8-sig', newline='') as f:
         return list(csv.DictReader(f))
@@ -196,6 +229,11 @@ def generate(aldehyde_cas, amine_cas, related_failure_id=None,
         'keywords': [target_node_prefix, 'CF3', '膜'],
     })
     rag_text = format_results_for_prompt(rag_results)
+
+    # GraphRAG 检索 (补充 954 篇文献的实体关联)
+    graphrag_query_text = f'{target_node_prefix} {ami["name_short"]} 膜 120°C'
+    graphrag_results = graphrag_query(graphrag_query_text, verbose=False)
+    graphrag_text = format_graphrag_results(graphrag_results)
 
     # ---- 创建文档 ----
     doc = Document()
@@ -469,6 +507,10 @@ def generate(aldehyde_cas, amine_cas, related_failure_id=None,
     # ===== 10. RAG 检索结果 =====
     add_section_heading(doc, '10. RAG 检索结果(生成时刻快照)', level=1)
     add_styled_paragraph(doc, rag_text or '(无匹配)', size=8)
+
+    # ===== 10b. GraphRAG 实体检索结果 =====
+    add_section_heading(doc, '10b. GraphRAG 实体检索 (954 篇文献交叉)', level=1)
+    add_styled_paragraph(doc, graphrag_text or '(无匹配)', size=8)
 
     # ===== 11. 参考文献 =====
     add_section_heading(doc, '11. 参考文献', level=1)

@@ -7,6 +7,10 @@ __pycache__
 # 临时脚本 (用户授权保留 set_api_env.ps1)
 _tmp/
 
+# Word 临时文件
+~$*.docx
+*.tmp
+
 # 编辑器/系统
 .vscode/
 .idea/

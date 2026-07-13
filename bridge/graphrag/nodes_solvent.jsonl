@@ -1,0 +1,709 @@
+{"id": "S-42b879281430", "name": "n-butanol (8:2"}
+{"id": "S-6712713706a1", "name": "缓冲层）"}
+{"id": "S-161c86d9e695", "name": "dry degassed DCM"}
+{"id": "S-6e5e470be6a2", "name": "Acetonitrile"}
+{"id": "S-0311317ec1bf", "name": "水-油两相体系（水相"}
+{"id": "S-c2bae7100068", "name": "4-dioxane"}
+{"id": "S-29b64e312a93", "name": "DCM + aqueous AcOH"}
+{"id": "S-b3b80efe8fb6", "name": "methanol（甲醇）用于标准溶液配制"}
+{"id": "S-e2371393aaf2", "name": "hexamethylene"}
+{"id": "S-1fd62e60db8b", "name": "organic solvent two-phase liquid-liquid interface"}
+{"id": "S-0fd3d75fb0ee", "name": "4 mL)"}
+{"id": "S-02339f074a9b", "name": "mesitylene为均三甲苯）"}
+{"id": "S-9d4433422952", "name": "Dioxane"}
+{"id": "S-f2b5a2191348", "name": "n-butanol (v:v = 1:1"}
+{"id": "S-184c726c6d35", "name": "deionized water"}
+{"id": "S-ab1b32b7724c", "name": "distilled water（蒸馏水）"}
+{"id": "S-491c069aa9f5", "name": "Dba溶于含乙酸的水溶液"}
+{"id": "S-3e36cfe40d32", "name": "C8-IL  + 60 wt% acetic acid aqueous"}
+{"id": "S-69d663b20409", "name": "DMA）"}
+{"id": "S-faa24d11176a", "name": "water（水）"}
+{"id": "S-ebb7abf3bcc9", "name": "ethanol（乙醇）用于合成"}
+{"id": "S-6967bdad9bc5", "name": "sec-butanol"}
+{"id": "S-d09569db494a", "name": "140°C无溶剂加热"}
+{"id": "S-6d7b845758b5", "name": "水相为6 M醋酸水溶液"}
+{"id": "S-91b85c9c35c0", "name": "N-二甲基甲酰胺"}
+{"id": "S-30d00a25956d", "name": "mesitylene (1:1 v"}
+{"id": "S-a02d936a2d29", "name": "详见SI"}
+{"id": "S-552632775e9c", "name": "ACN（acetonitrile"}
+{"id": "S-38e03383db76", "name": "1.9 mL）与正丁醇（n-butanol"}
+{"id": "S-b7c2b77df8de", "name": "2 mL + 2 mL"}
+{"id": "S-7bf7467c893f", "name": "octanoic acid (oil phase"}
+{"id": "S-1cc87ea23a5f", "name": "5-三甲苯）和dioxane（二氧六环）的混合溶剂"}
+{"id": "S-20f99941b82d", "name": "organic phase: n-hexane"}
+{"id": "S-9236d0898071", "name": "acetic acid (2.0%"}
+{"id": "S-4a391f1b62df", "name": "null - UHV on-surface synthesis"}
+{"id": "S-aa5411d51250", "name": "2-dichlorobenzene : n-butanol = 0.3 mL : 0.7 mL (1:2 v"}
+{"id": "S-e555fc29296b", "name": "DMAC"}
+{"id": "S-2012f645a23f", "name": "mesitylene-1"}
+{"id": "S-34984b5cd6c7", "name": "体积比5:10:2）"}
+{"id": "S-9f73ca9ed692", "name": "dichloromethane"}
+{"id": "S-c943df569baf", "name": "正丁醇)"}
+{"id": "S-bace8b3b13d4", "name": "水相溶剂热反应"}
+{"id": "S-d967a32dc639", "name": "环己酮"}
+{"id": "S-dc60c0827408", "name": "n-butanol (0.5 mL"}
+{"id": "S-c164fac09753", "name": "mixed solvent"}
+{"id": "S-2077af99eb4b", "name": "Dioxane（分别测试）"}
+{"id": "S-ca1bfd4ace31", "name": "2-dichlorobenzene（o-DCB"}
+{"id": "S-544d62d098ca", "name": "H2O + n-hexanol (最优: 90% H2O"}
+{"id": "S-746b9b10ca6c", "name": "邻二氯苯"}
+{"id": "S-39b04e334b92", "name": "用于分散Tp）"}
+{"id": "S-eff0985497da", "name": "[acetic acid]_final = 4.0 M)"}
+{"id": "S-3fcc785affcc", "name": "o-dichlorobenzene  + anhydrous ethanol"}
+{"id": "S-2779fcd61cc9", "name": "2-dichlorobenzene (7:3"}
+{"id": "S-f50980f458ff", "name": "DI water"}
+{"id": "S-498e70337d6b", "name": "Tag溶于含乙酸的水溶液"}
+{"id": "S-b3a9c772312a", "name": "HOAc"}
+{"id": "S-8413afd34711", "name": "organic phase)"}
+{"id": "S-1391b2ca3638", "name": "anhydrous 1"}
+{"id": "S-4979096fdb58", "name": "PIP溶液: 去离子水"}
+{"id": "S-38609a28efe1", "name": "V=1"}
+{"id": "S-fc14638618c2", "name": "3 M acetic acid aqueous solution for aqueous phase"}
+{"id": "S-8e39eaf7a84e", "name": "dioxane (v"}
+{"id": "S-3fb6e575b8a5", "name": "aqueous phase  + toluene  — 液-液界面"}
+{"id": "S-d865eaf1989d", "name": "5-trimethylbenzene (V"}
+{"id": "S-714a1e55c651", "name": "氯苯）"}
+{"id": "S-e10e4f537963", "name": "无水乙醇"}
+{"id": "S-a2a3f3820d1c", "name": "9) for organic phase"}
+{"id": "S-b02227e43ac7", "name": "4-dioxane (2:1 v"}
+{"id": "S-c449319867ff", "name": "水-乙酸乙酯界面（推测）"}
+{"id": "S-772dddf9b738", "name": "中间层冰醋酸（催化剂"}
+{"id": "S-f86890c9c193", "name": "4-dioxane + mesitylene"}
+{"id": "S-0e5c99e8a3b4", "name": "isopropanol（异丙醇"}
+{"id": "S-2e73da4fc8c1", "name": "mesitylene（mesitylene"}
+{"id": "S-73e597d2aafd", "name": "ethyl acetate"}
+{"id": "S-b1099b259c6b", "name": "溶剂热条件（具体溶剂未详细说明）"}
+{"id": "S-6417907813c2", "name": "6 M AcOH (1"}
+{"id": "S-a8998314a83f", "name": "4-dioxane and mesitylene"}
+{"id": "S-e555fc29296b", "name": "DMAc"}
+{"id": "S-053fcb8949ea", "name": "THF for polyimine formation"}
+{"id": "S-5212660e2907", "name": "水（LB槽中的亚相）"}
+{"id": "S-9d00ae8369aa", "name": "total 4 mL)"}
+{"id": "S-a9e8a98866c4", "name": "mixtures of mesitylene"}
+{"id": "S-cd6f4196400a", "name": "4-dioxane (1:4"}
+{"id": "S-23a5f398d97c", "name": "Table S2)"}
+{"id": "S-7050a81deada", "name": "N-二甲基乙酰胺"}
+{"id": "S-5193f574d56d", "name": "ZnCl2（熔融状态"}
+{"id": "S-73d302610cfc", "name": "下层)"}
+{"id": "S-4d25beec2bee", "name": "40% acetonitrile"}
+{"id": "S-53e3b68299d1", "name": "solid-liquid two-phase: CH2Cl2"}
+{"id": "S-dfaff31a7cea", "name": "CH3CN"}
+{"id": "S-8a9d2d64e814", "name": "Dimethylformamide"}
+{"id": "S-eeffc5121d96", "name": "乙醇（ethanol）"}
+{"id": "S-afb7d03f7307", "name": "无溶剂固相反应"}
+{"id": "S-333806db24f9", "name": "solid-state (无溶剂"}
+{"id": "S-6c88238195a0", "name": "THF  or n-BuOH"}
+{"id": "S-d89f80258e0f", "name": "1 M acetic acid aqueous for water phase"}
+{"id": "S-1e4bb7e5f633", "name": "4-dioxane (1.2 mL"}
+{"id": "S-0645939c7298", "name": "PBS缓冲液"}
+{"id": "S-0c615d3ea98d", "name": "water phase: aqueous solution containing TAPA)"}
+{"id": "S-e60b82c81050", "name": "4-dioxane (1"}
+{"id": "S-e7b8535e3db3", "name": "去离子水（用于透析）"}
+{"id": "S-bdc30b30dd02", "name": "乙酸乙酯相"}
+{"id": "S-0c77773fbf9b", "name": "邻二氯苯（o-dichlorobenzene）与均三甲苯（mesitylene）混合溶剂（体积比1:1"}
+{"id": "S-56165a5e59f5", "name": "15 mL)"}
+{"id": "S-12ad29d0676b", "name": "具体溶剂见补充材料"}
+{"id": "S-5c50bae99e95", "name": "0.1 mL）混合溶剂"}
+{"id": "S-3e4004ae2c91", "name": "乙腈）"}
+{"id": "S-c05f436d7bd3", "name": "各0.5 mL）"}
+{"id": "S-70424cb3200b", "name": "butanol (均三甲苯"}
+{"id": "S-a94aabf5439e", "name": "water (v"}
+{"id": "S-22765d89148f", "name": "DMF  + 硅油"}
+{"id": "S-f691b4a4d92b", "name": "mixed solvent system"}
+{"id": "S-284052c38413", "name": "水相：6 M 冰醋酸溶液"}
+{"id": "S-6caa47f7b347", "name": "H2O"}
+{"id": "S-859700725733", "name": "2-dichlorobenzene"}
+{"id": "S-4bf8eceb5b48", "name": "有机相: n-hexane"}
+{"id": "S-0979f8909158", "name": "二氯甲烷液-液界面"}
+{"id": "S-373cb6940271", "name": "DCE双相体系"}
+{"id": "S-5aa3a43d2598", "name": "二步晶化溶剂: 正丁醇"}
+{"id": "S-6a4a40a70f21", "name": "H2O (90:10 v"}
+{"id": "S-a6bd27c05171", "name": "dichloromethane  - H2O 双相体系"}
+{"id": "S-c6051dc17be4", "name": "4-二氧六环混合溶剂 (水10 mL + 1"}
+{"id": "S-c44c970a1e98", "name": "H2O (various: dioxane"}
+{"id": "S-f6f2c587e3cb", "name": "Assembly: o-dichlorobenzene  + n-butanol"}
+{"id": "S-1bd32cf4d736", "name": "四氢呋喃（THF）"}
+{"id": "S-c67abb8fc3f0", "name": "二步晶化溶剂: 1"}
+{"id": "S-62708d8bd532", "name": "20 mL)"}
+{"id": "S-6813bf426a0c", "name": "1:1 mesitylene"}
+{"id": "S-3f0b2342af81", "name": "oil-water-oil tri-phase system"}
+{"id": "S-f82ce839a5d8", "name": "4-dioxane + mesitylene (1:1"}
+{"id": "S-bc1c33a4188c", "name": "3 by vol.)"}
+{"id": "S-c9c6c88cd7d0", "name": "pentane"}
+{"id": "S-18358cfe2893", "name": "middle aqueous phase 3 M AcOH"}
+{"id": "S-354e010f4d4f", "name": "2-dichlorobenzene + 1-butanol"}
+{"id": "S-1e584bd91b95", "name": "mesitylene mixed solvent"}
+{"id": "S-9d02816b755a", "name": "N-dimethylformamide（DMF）和ethanol（乙醇）混合溶剂"}
+{"id": "S-88e38b2c6766", "name": "二氧六环"}
+{"id": "S-69a0bdf726ce", "name": "dioxane + water"}
+{"id": "S-3ec0688ef15a", "name": "1 v"}
+{"id": "S-a3dac42cc2d0", "name": "2-dichlorobenzene）"}
+{"id": "S-256829fbea2c", "name": "tetrahydrofuran（四氢呋喃"}
+{"id": "S-f0445f81f5b9", "name": "glycerol"}
+{"id": "S-e43313a48eee", "name": "NMP"}
+{"id": "S-783d13b8bb5c", "name": "aqueous solution"}
+{"id": "S-16875aa2b5ee", "name": "Various"}
+{"id": "S-9167c4a66a7f", "name": "mesitylene (均三甲苯"}
+{"id": "S-8321fe3c3258", "name": "无溶剂"}
+{"id": "S-71b0054c7290", "name": "0.83 mL)"}
+{"id": "S-59031af121fa", "name": "DCM）"}
+{"id": "S-029df666d04d", "name": "正丁醇（n-BuOH）混合溶剂用于COF-Z1"}
+{"id": "S-19ad81583052", "name": "solid-state"}
+{"id": "S-d85a6374b36c", "name": "n-butyl alcohol   or single solvents: CHCl₃"}
+{"id": "S-0776b6a679da", "name": "既是催化剂又是反应介质"}
+{"id": "S-f388ced48b6a", "name": "BuOH"}
+{"id": "S-33ce0a92b308", "name": "二甲基乙酰胺"}
+{"id": "S-f59b857b404d", "name": "n-BuOH 4:1"}
+{"id": "S-0974fc1d1831", "name": "用于溶剂热合成的有机溶剂（具体溶剂未明确提及）"}
+{"id": "S-9d609eaa52f5", "name": "bottom: Tp in organic phase)"}
+{"id": "S-9df469124fa8", "name": "o-DCB (7:3 v"}
+{"id": "S-51dd7e37a57a", "name": "methanol（甲醇）"}
+{"id": "S-cd5085fac037", "name": "DMSO（二甲基亚砜）"}
+{"id": "S-e8dfc7e8a39e", "name": "3 mL anhydrous 1"}
+{"id": "S-4fc3904e4726", "name": "dry DMF"}
+{"id": "S-19038a715f67", "name": "chlorobenzene（仲丁醇"}
+{"id": "S-46bbf69077a8", "name": "interfacial polymerization"}
+{"id": "S-9381de48e97c", "name": "水相（含有PIP和COF分散液）"}
+{"id": "S-8182fd85ba70", "name": "20 mL organic phase)"}
+{"id": "S-607a1bd85e0a", "name": "acetic acid (7:3:1"}
+{"id": "S-cf7aa0e91393", "name": "n-hexane (37 ml"}
+{"id": "S-2e57e6b06f03", "name": "m-xylene（1"}
+{"id": "S-2d3c7ab676ed", "name": "n-butyl alcohol (n-BuOH"}
+{"id": "S-aad49a06ed2d", "name": "1-butanol  + o-dichlorobenzene"}
+{"id": "S-28431feb3307", "name": "dichloromethane（二氯甲烷）"}
+{"id": "S-da774d9e25b9", "name": "methylene chloride"}
+{"id": "S-8eb3483ed0ad", "name": "水相（纯水亚相）"}
+{"id": "S-76ae692d54cd", "name": "仅添加微量水)"}
+{"id": "S-608d7990b6a1", "name": "水相: deionized water"}
+{"id": "S-ff5985318311", "name": "Aqueous phase: deionized water"}
+{"id": "S-aa16cd4072c5", "name": "有机相：TFB苯溶液)"}
+{"id": "S-93e2d649a197", "name": "四氢呋喃(THF"}
+{"id": "S-84ac41d7c57e", "name": "DCM"}
+{"id": "S-78bd05771937", "name": "有机相: 正己烷"}
+{"id": "S-6e5e09d711ef", "name": "water + glacial acetic acid"}
+{"id": "S-d08267872001", "name": "dry dichloromethane"}
+{"id": "S-3a5aed6b06fc", "name": "DCE"}
+{"id": "S-57687e76603c", "name": "5-trimethylbenzene"}
+{"id": "S-0a6835bb6012", "name": "AcOH"}
+{"id": "S-9f8bfa06b71c", "name": "未在主文中明确描述（遵循文献方法"}
+{"id": "S-8604421e5a56", "name": "油相：tridecane"}
+{"id": "S-d33b4378a30d", "name": "有机相"}
+{"id": "S-5e7798571814", "name": "2-二氯苯（1"}
+{"id": "S-5732488584bf", "name": "100 mL"}
+{"id": "S-5788cfe5dd6f", "name": "isopropanol (1"}
+{"id": "S-30cbafc829fc", "name": "未明确提及具体溶剂"}
+{"id": "S-31d69eaac2ef", "name": "50 μL蒸馏水"}
+{"id": "S-b2852ba4a90a", "name": "mesitylene for PDA"}
+{"id": "S-cdaecda35191", "name": "5-三甲基苯"}
+{"id": "S-4e596a814f31", "name": "未明确提及具体溶剂（基于文献该方法遵循已发表文献方法25）"}
+{"id": "S-2fee432617f9", "name": "various solvent combinations screened (Scheme S2"}
+{"id": "S-1d0d7b72568b", "name": "oil-water-oil triphase: bottom phase CH2Cl2"}
+{"id": "S-3d1d990b603a", "name": "chloroform"}
+{"id": "S-adf397b89e19", "name": "dry degassed dichloromethane"}
+{"id": "S-09a9ca082b52", "name": "2-二氯苯 (1:1"}
+{"id": "S-516aa90a2552", "name": "Acetic acid"}
+{"id": "S-01a7925d04a2", "name": "mesitylene (2"}
+{"id": "S-87ae55088bfb", "name": "dioxane: 1"}
+{"id": "S-c298680d40a0", "name": "o-dichlorobenzene and ethanol"}
+{"id": "S-96980d51e192", "name": "pyridine:methanol = 3:1 v"}
+{"id": "S-5087e27f631e", "name": "dimethylacetamide"}
+{"id": "S-cb1e57a54594", "name": "i-PrOH)"}
+{"id": "S-a585188d6386", "name": "org: DCM"}
+{"id": "S-cd0b3c4ef748", "name": "有机层)"}
+{"id": "S-c53a983356b3", "name": "mesitylene + 1"}
+{"id": "S-883ae55a6671", "name": "有机两相）"}
+{"id": "S-5c068625c910", "name": "未明确（溶剂热条件）"}
+{"id": "S-88433a4e9f70", "name": "单相水热法（具体溶剂未明确）"}
+{"id": "S-d6b0054ebc36", "name": "Acetone"}
+{"id": "S-d7b811fa19d7", "name": "PAAm水凝胶"}
+{"id": "S-a08efbff8f19", "name": "4-二氧六环）的混合溶剂"}
+{"id": "S-427caed26564", "name": "p-dioxane:mesitylene (4:1"}
+{"id": "S-1ed5f158e911", "name": "6 M AcOH"}
+{"id": "S-1112e14e1c5c", "name": "二氧六环混合溶剂"}
+{"id": "S-61cb12568834", "name": "not explicitly specified"}
+{"id": "S-8f8565cafd82", "name": "混合溶剂 (1"}
+{"id": "S-03be999a4260", "name": "nBuOH（正丁醇）"}
+{"id": "S-78bef3f1b385", "name": "4-dioxane (1:1"}
+{"id": "S-5a60f1c06b37", "name": "有机相: n-octanoic acid"}
+{"id": "S-79087fb1bc61", "name": "乙酸乙酯"}
+{"id": "S-3746d29e679d", "name": "苯双相体系 (水相：BTA水溶液"}
+{"id": "S-b08e23fb8bbc", "name": "有机相：1"}
+{"id": "S-e1aee5cd2b31", "name": "v) for COF crystallization"}
+{"id": "S-f77936e85d8d", "name": "4-二氧六环混合溶剂（DMAc"}
+{"id": "S-bc6c16a60cea", "name": "water 2侧)"}
+{"id": "S-2d8f6676ab00", "name": "ethanol"}
+{"id": "S-b383c4332db5", "name": "n-butanol : o-dichlorobenzene = 1:1 (v"}
+{"id": "S-97d70f8f5735", "name": "mixed solvents (1"}
+{"id": "S-adc32cf85f93", "name": "dichloromethane  + water"}
+{"id": "S-89259fc0ea4c", "name": "ethanol (1:1"}
+{"id": "S-b025833b27aa", "name": "95:5 v"}
+{"id": "S-46870639111b", "name": "1.8 mL) + n-butanol (n-BuOH"}
+{"id": "S-fb397951d677", "name": "4-dioxane + 3M acetic acid"}
+{"id": "S-ad2273b6ed02", "name": "N-methyl-2-pyrrolidone (NMP"}
+{"id": "S-900e09dd4aba", "name": "邻二氯苯（o-DCB）混合溶剂用于COF-Z2"}
+{"id": "S-de465b12d43d", "name": "dry acetonitrile (ACN"}
+{"id": "S-da3123716f51", "name": "water two-phase)"}
+{"id": "S-537c709077a7", "name": "33 ml"}
+{"id": "S-f954082a68b4", "name": "dioxane（mesitylene: 1"}
+{"id": "S-542a4c2a4b67", "name": "有机相（o-DCB和DMAC混合溶剂用于F-COF）"}
+{"id": "S-3c25208122c6", "name": "混合溶剂（具体比例见SI）"}
+{"id": "S-d555cdb3b557", "name": "1.5 mL)"}
+{"id": "S-af6b850f5d53", "name": "Tp溶于ethyl acetate"}
+{"id": "S-6a065901d0de", "name": "EtOH (5:1 v"}
+{"id": "S-5302b6fbc250", "name": "NaClO4  aqueous solution"}
+{"id": "S-f8a83ac00316", "name": "非极性非配位溶剂"}
+{"id": "S-14aeef0297bc", "name": "o-DCB (1"}
+{"id": "S-7cfd832e9f25", "name": "2 mL)"}
+{"id": "S-21549dd248f6", "name": "电纺丝溶剂未详细描述"}
+{"id": "S-b7522b8dc6e1", "name": "dichlorobenzene + ethanol (1:1"}
+{"id": "S-72388e269a7b", "name": "mesitylene (11.3:1 v"}
+{"id": "S-e07be824370d", "name": "N-dimethylacetamide（DMAc"}
+{"id": "S-84ce19227b46", "name": "Ethyl acetate  + 水相"}
+{"id": "S-d879ba31d8fb", "name": "Dichloromethane  for aldehyde"}
+{"id": "S-af83ad772155", "name": "similar solvent system as COF-366-Co"}
+{"id": "S-d4e0017c09f7", "name": "Pre-assembly: DMAc"}
+{"id": "S-9460370bb0ca", "name": "Water"}
+{"id": "S-97461a3fb637", "name": "底层二氯甲烷（醛单体溶剂）"}
+{"id": "S-f50ba3b39bdb", "name": "2-dichlorobenzene + o-dichlorobenzene + 6.0 mol"}
+{"id": "S-15e68966eb93", "name": "具体比例见SI）"}
+{"id": "S-1d8fa93cc789", "name": "n-butanol (v:v = 2:1"}
+{"id": "S-ebf6ee29275c", "name": "受限界面合成"}
+{"id": "S-4476041fe77a", "name": "甲苯为单体溶剂"}
+{"id": "S-e78eaf356ff0", "name": "30 mL)"}
+{"id": "S-b574ac2407f3", "name": "详见SI)"}
+{"id": "S-359f63439698", "name": "H2O 或 H2O-DMF (19"}
+{"id": "S-21cca4c33293", "name": "DMAC  + 二甲基硅油"}
+{"id": "S-559db35aa15a", "name": "0.5 mL)"}
+{"id": "S-524c9fd4faac", "name": "有机相: DCM:n-hexane = 1:10"}
+{"id": "S-562353ccbcc9", "name": "混合溶剂（与COF-F6相同）"}
+{"id": "S-d2a4d1a53893", "name": "trifluoroacetic acid"}
+{"id": "S-e526ef5ae617", "name": "无溶剂（ bulk melt"}
+{"id": "S-0a2011ff4be6", "name": "二氯甲烷"}
+{"id": "S-3a01bbf8ecca", "name": "dioxane (均三甲苯"}
+{"id": "S-1e7107923869", "name": "体积比4"}
+{"id": "S-57af69bb8c5c", "name": "1:1 v"}
+{"id": "S-b89d5c48800f", "name": "deionized water（去离子水）"}
+{"id": "S-fc581c19151c", "name": "对伞花烃）"}
+{"id": "S-5486a63d0a8a", "name": "正丁醇"}
+{"id": "S-c6c52bab57d7", "name": "o-dichlorobenzene"}
+{"id": "S-bee8dc5bcec0", "name": "aqueous phase: water (pH 4.8"}
+{"id": "S-75b15e98f88b", "name": "DMSO (1:1 v"}
+{"id": "S-0bac6a4938a4", "name": "2 v"}
+{"id": "S-252139365f2e", "name": "4-dioxane : mesitylene : chloroform = 1:1:2 (v"}
+{"id": "S-2b3a057cecde", "name": "mesitylene (1"}
+{"id": "S-4e5978ba68c1", "name": "洗涤用）"}
+{"id": "S-874f7e8225f4", "name": "4-二氧六环) 混合溶剂"}
+{"id": "S-e56c472755e6", "name": "total 3.0 mL)"}
+{"id": "S-9460370bb0ca", "name": "water"}
+{"id": "S-5368443fa57a", "name": "4-二氧六环混合溶剂（4"}
+{"id": "S-9d564fdbc08e", "name": "mesitylene (3:3:1 v"}
+{"id": "S-443b263940f7", "name": "未明确提及"}
+{"id": "S-ac7223aa2759", "name": "水相（用于界面聚合）"}
+{"id": "S-e53cec5131a2", "name": "水相: 去离子水"}
+{"id": "S-4321cf77b311", "name": "n-butanol (9:1"}
+{"id": "S-641174a8ef2f", "name": "by vol.)"}
+{"id": "S-aa81a86a5ffa", "name": "THF（四氢呋喃）"}
+{"id": "S-6e5e470be6a2", "name": "acetonitrile"}
+{"id": "S-ff4503e427d0", "name": "1-丁醇"}
+{"id": "S-3a6620e588e5", "name": "toluene  + water"}
+{"id": "S-1c07b1684f96", "name": "mesitylene（均三甲苯）"}
+{"id": "S-0a5057e9c3aa", "name": "4:1 (v"}
+{"id": "S-399902ffc262", "name": "Tp侧: 正己烷"}
+{"id": "S-1d8dff623df3", "name": "water + acetic acid"}
+{"id": "S-5851e2062f0c", "name": "o-dichlorobenzene (o-DCB"}
+{"id": "S-aeaf49c81694", "name": "n-BuOH:o-DCB:6 M AcOH = 5:5:1"}
+{"id": "S-2e0578ec2db4", "name": "三层溶剂体系：顶层DMF（胺单体溶剂）"}
+{"id": "S-9d4433422952", "name": "dioxane"}
+{"id": "S-7c098385e8a8", "name": "aq: water"}
+{"id": "S-66c928ab96a1", "name": "n-BuOH (0.5 mL"}
+{"id": "S-6ca3159f9c95", "name": "mesitylene (D:M = 9:1"}
+{"id": "S-1e36d3e12845", "name": "混合溶剂体系如mesitylene"}
+{"id": "S-477d816ef04c", "name": "Water  + n-Octane"}
+{"id": "S-13d610b17f13", "name": "acetonitrile (ACN"}
+{"id": "S-5a0a035c8d15", "name": "tetrachloromethane"}
+{"id": "S-03d8da194bb1", "name": "醋酸-水混合溶液（2.0%"}
+{"id": "S-b1af8b3bdb7e", "name": "n-BuOH"}
+{"id": "S-a83190057c5a", "name": "n-butanol (3"}
+{"id": "S-2f902d2b6146", "name": "DMF (N"}
+{"id": "S-c6a1b4a74e65", "name": "未明确披露（solvothermal路线"}
+{"id": "S-ae5f8bff4af0", "name": "1 mL)"}
+{"id": "S-fb472fce3505", "name": "5:1"}
+{"id": "S-f7dc560912e8", "name": "water (20 mL"}
+{"id": "S-3fc2ea75caa9", "name": "2mL）"}
+{"id": "S-6329a9a294de", "name": "o-dichlorobenzene (3:7 v"}
+{"id": "S-1adbf69b1168", "name": "6 M CH3CO2H (3:3:1 v"}
+{"id": "S-bd684ea106aa", "name": "acetone（丙酮）"}
+{"id": "S-b0f9a55f56ae", "name": "水 两相体系"}
+{"id": "S-956ae6d14351", "name": "N-dimethylformamide（DMF"}
+{"id": "S-fc7516e1d777", "name": "N-二甲基乙酰胺）"}
+{"id": "S-b661c66fe8e0", "name": "triethylamine mixture"}
+{"id": "S-55b322186d7a", "name": "4-二氧六环20 mL)"}
+{"id": "S-22559e18089b", "name": "mesitylene"}
+{"id": "S-64eb760658c2", "name": "o-dichlorobenzene 蒸汽"}
+{"id": "S-e300b78c2300", "name": "ODCB（1"}
+{"id": "S-36caef271f30", "name": "o-dichlorobenzene（邻二氯苯）"}
+{"id": "S-5645f284f38f", "name": "mesitylene (1:1"}
+{"id": "S-9186cb8725b3", "name": "二氧六环 (mesitylene"}
+{"id": "S-d3da4b957ee3", "name": "total 4.4 mL)"}
+{"id": "S-9720e14b0ed1", "name": "有机相两相体系"}
+{"id": "S-4fe1b1b7b591", "name": "1.4 mL o-xylene + 0.6 mL butanol"}
+{"id": "S-1c2537b5f919", "name": "organic phase: dichloromethane"}
+{"id": "S-fbb7d027ce92", "name": "表面活性剂层（SDS）铺展于空气-水界面"}
+{"id": "S-b52f1dfa5e55", "name": "2-dichlorobenzene:1-butanol (1:1"}
+{"id": "S-f2bfb093931c", "name": "o-dichlorobenzene (7:3 v"}
+{"id": "S-b155b6467742", "name": "Dichloromethane  - H₂O bilayer"}
+{"id": "S-c333efa9ace4", "name": "likely organic solvents"}
+{"id": "S-00cb1e758107", "name": "Not detailed in main text"}
+{"id": "S-7d060635c6df", "name": "chlorobenzene"}
+{"id": "S-bac1351f56e9", "name": "dioxane or similar polar aprotic solvents"}
+{"id": "S-506f5d12ae6f", "name": "o-dichlorobenzene:n-butanol = 1:1 (v"}
+{"id": "S-1e95ebefbea8", "name": "ethanol (5:5"}
+{"id": "S-4cb535939e81", "name": "90 vol% acetic acid aqueous solution"}
+{"id": "S-93da55798fa5", "name": "t-BuOH (2 mL"}
+{"id": "S-029f7a7e026c", "name": "4-dioxane:mesitylene (4:1"}
+{"id": "S-957108402aad", "name": "四氢呋喃（无水"}
+{"id": "S-8e39eaf7a84e", "name": "dioxane (V"}
+{"id": "S-e00a7a2edb83", "name": "DCM（二氯甲烷）"}
+{"id": "S-fdb9bc4ebcd9", "name": "dioxane (1 mL"}
+{"id": "S-3d96227d3e16", "name": "amine solution)"}
+{"id": "S-aa64110345c5", "name": "H₂O"}
+{"id": "S-b0deb68c51c1", "name": "类似COP-1合成条件（具体溶剂未明确）"}
+{"id": "S-1a5d91227efd", "name": "均三甲苯混合溶剂"}
+{"id": "S-5eadfcb4d9a3", "name": "n-BuOH (1"}
+{"id": "S-2de79e3b14bc", "name": "mesitylene (4:1 v"}
+{"id": "S-3a64892ef0ef", "name": "mesitylene (v"}
+{"id": "S-80843e1062b3", "name": "4-二氧六环混合溶剂"}
+{"id": "S-fe3481eeac18", "name": "acetic acid aqueous solution for amine"}
+{"id": "S-2a214b17446c", "name": "acetonitrile（乙腈）用于HPLC流动相"}
+{"id": "S-a6b409ee9e95", "name": "未明确说明具体溶剂体系"}
+{"id": "S-c05a60aa8d97", "name": "methanol（甲醇"}
+{"id": "S-aa175adce887", "name": "另加0.2 mL乙腈"}
+{"id": "S-793eb6c200ed", "name": "体积比7:3"}
+{"id": "S-9c9d8e25732c", "name": "乙酸乙酯  或二氯甲烷"}
+{"id": "S-a84a2a9740a8", "name": "用于TpPa-2SO3H纳米片合成）"}
+{"id": "S-6f447b822a0a", "name": "dioxane (3"}
+{"id": "S-993477afaeb5", "name": "可能是水"}
+{"id": "S-a2e7710043d1", "name": "体积比未明确"}
+{"id": "S-9e7be7c1af1f", "name": "n-BuOH = 1"}
+{"id": "S-ebcad2264a81", "name": "DMSO（二甲基亚砜"}
+{"id": "S-96edd9e8b9a2", "name": "12 M acetic acid (v"}
+{"id": "S-f4d3613baccf", "name": "n-butanol (4"}
+{"id": "S-63511072e8b9", "name": "2-二氯苯（蒸汽退火介质）"}
+{"id": "S-12b024410c09", "name": "MeOH"}
+{"id": "S-2d668c91dd0e", "name": "Not explicitly specified in main text"}
+{"id": "S-4053e04715f3", "name": "5-三甲苯  作为有机相"}
+{"id": "S-29b8094b59bb", "name": "acetonitrile-water (3:7 v"}
+{"id": "S-8860ba1bfa42", "name": "dimethylacetamide（DMAC"}
+{"id": "S-9191fea72151", "name": "20 mL 1"}
+{"id": "S-b5d9ba7ebdb0", "name": "4-二氧六环）"}
+{"id": "S-8cd08abacc8d", "name": "33% n-butanol)"}
+{"id": "S-2c460b8e09d8", "name": "4-dioxane + 0.5 mL aqueous acetic acid (13 M"}
+{"id": "S-3b8b6b10c303", "name": "middle: aqueous phase"}
+{"id": "S-5aabed95bf44", "name": "甲苯（toluene"}
+{"id": "S-edeeccccff82", "name": "水 两相体系 (dichloromethane"}
+{"id": "S-d2304b5546b1", "name": "N-dimethylacetamide（N"}
+{"id": "S-9afdb279078e", "name": "n-BuOH 1:1"}
+{"id": "S-c27a7219f887", "name": "Pa侧: 水"}
+{"id": "S-3760c9a24d13", "name": "油相为正己烷"}
+{"id": "S-a333f8b3186d", "name": "0.25% vol.)"}
+{"id": "S-c07cc5b609ac", "name": "CH₂Cl₂  + DMF  oil-water-oil三相体系"}
+{"id": "S-955f9b540002", "name": "DCM（dichloromethane"}
+{"id": "S-73c7cfde35c5", "name": "水相界面体系（具体溶剂见SI Section B）"}
+{"id": "S-1cc5847bec4c", "name": "4-二氧六环"}
+{"id": "S-368f93644860", "name": "aqueous phase（水相"}
+{"id": "S-794000cecabc", "name": "二氯甲烷）"}
+{"id": "S-bfcf8a60a41e", "name": "p-cymene（仲丁醇"}
+{"id": "S-5ee12e11db09", "name": "MeCN"}
+{"id": "S-1c86d7c46e0d", "name": "ethanol mixture for dispersion"}
+{"id": "S-30d00a25956d", "name": "Mesitylene (1:1 v"}
+{"id": "S-d879ba31d8fb", "name": "dichloromethane  for aldehyde"}
+{"id": "S-a1552259c15f", "name": "3 M）"}
+{"id": "S-7df871b96ab7", "name": "2-dichlorobenzene  + o-dichlorobenzene  + 6.0 mol"}
+{"id": "S-1c28c57f4c17", "name": "属于离子热反应溶剂）"}
+{"id": "S-154316646ba3", "name": "1 (v"}
+{"id": "S-0e76e8b4a07e", "name": "mesitylene（均三甲苯）和1"}
+{"id": "S-f0591031df9a", "name": "v) 1"}
+{"id": "S-5940d88a5d8b", "name": "aprotic  or protic alcohols"}
+{"id": "S-ff5985318311", "name": "aqueous phase: deionized water"}
+{"id": "S-56c00622bba2", "name": "二氯甲烷有机相 + 去离子水水相（液-液两相体系）"}
+{"id": "S-1d3006dee6cf", "name": "均相溶液"}
+{"id": "S-595f0ab821bf", "name": "water (水相"}
+{"id": "S-8ba0888598f0", "name": "未明确（界面聚合体系"}
+{"id": "S-cbcd8ceb4bc2", "name": "4.0 mL)"}
+{"id": "S-d6b0054ebc36", "name": "acetone"}
+{"id": "S-97cb68f69d0b", "name": "酸性介质（用于RT-COF-1合成"}
+{"id": "S-7cb574cbaaa3", "name": "4-dioxane (5:5"}
+{"id": "S-5995eb529a7b", "name": "top phase DMF"}
+{"id": "S-80ab82b561ae", "name": "未在主文明确"}
+{"id": "S-e6404b90d7e2", "name": "o-dichlorobenzene + nBuOH + acetic acid"}
+{"id": "S-ab002bbb602d", "name": "EtOH"}
+{"id": "S-93795a856f74", "name": "water (9:1 v"}
+{"id": "S-77e05a5efda6", "name": "methanol"}
+{"id": "S-2850b1907783", "name": "作为溶剂和酰化试剂)"}
+{"id": "S-80881a274d97", "name": "n-butyl alcohol（正丁醇）"}
+{"id": "S-02c79742ea52", "name": "5 mL)"}
+{"id": "S-092db413c676", "name": "4-dioxane（1"}
+{"id": "S-9ab154958adc", "name": "Tp溶液与PyDA溶液在PVDF支撑层两侧反应"}
+{"id": "S-ae7024828145", "name": "20 mL) + deionized water (water phase"}
+{"id": "S-3eb70665fa56", "name": "0.2 mL)"}
+{"id": "S-f9f979f3e361", "name": "solid-state mixing with water"}
+{"id": "S-b3f74a2e7c8a", "name": "用于洗涤)"}
+{"id": "S-2259cf1faf73", "name": "ethanol（乙醇）"}
+{"id": "S-506c1de6356b", "name": "not detailed"}
+{"id": "S-b63a8b44c9b4", "name": "ethanol:water (50:50"}
+{"id": "S-5aa696c45623", "name": "水相为去离子水"}
+{"id": "S-1ab85611ce1a", "name": "2-二氯苯）"}
+{"id": "S-8867c7f2fb24", "name": "2-dichlorobenzene（1"}
+{"id": "S-6799940e2ce4", "name": "n-butanol + 1"}
+{"id": "S-ce856f7984c6", "name": "W=3.5:30)"}
+{"id": "S-dd2f80a6a2eb", "name": "48:12:5) 混合溶剂"}
+{"id": "S-cdcf1e55a95f", "name": "n-butanol (67% H2O"}
+{"id": "S-48ff315067e7", "name": "碱性水溶液"}
+{"id": "S-04ec6e5dedcf", "name": "间二甲苯"}
+{"id": "S-f7c08fcd9a3d", "name": "mesitylene (4"}
+{"id": "S-5abeaf4a748f", "name": "苯甲腈"}
+{"id": "S-a0ed54014e6c", "name": "o-DCB  + n-BuOH"}
+{"id": "S-f2484ead2e24", "name": "去离子水（纳米片分散液）"}
+{"id": "S-35515084f7d2", "name": "DMAC  + o-DCB"}
+{"id": "S-4de7394c2071", "name": "具体体积比未明确给出）"}
+{"id": "S-021950c18103", "name": "water or similar)"}
+{"id": "S-96b41bf048ac", "name": "acetic acid（乙酸"}
+{"id": "S-b29bd587a16b", "name": "any solvent tested"}
+{"id": "S-f7ad0e15fe52", "name": "4-dioxane）"}
+{"id": "S-ffe0ffa68efb", "name": "NaOH aqueous solution (0.05 mmol"}
+{"id": "S-5f34350b12cc", "name": "混合溶剂（均三甲苯"}
+{"id": "S-eae191fd38ea", "name": "o-DCB + n-BuOH"}
+{"id": "S-2e558a93e7a1", "name": "neat"}
+{"id": "S-49c91371a7a2", "name": "水 (CPB水溶液"}
+{"id": "S-8f84cf451e4e", "name": "邻二氯苯（o-dichlorobenzene）和乙醇混合物"}
+{"id": "S-d15e3108d166", "name": "n-hexane  + 1-butyl-3-methyl-1H-imidazol-3-ium bissulfonyl)amide (IL"}
+{"id": "S-83a0a1b1da86", "name": "methanol (v"}
+{"id": "S-060e2839751d", "name": "正丁醇混合溶剂（体积比19:1）"}
+{"id": "S-90a68822c0b6", "name": "4-dioxane（均三甲苯"}
+{"id": "S-ebd4adaa2390", "name": "n-butanol (1:1:1 v"}
+{"id": "S-0506c9e2a609", "name": "n-hexane"}
+{"id": "S-f7a4f69bb126", "name": "octanoic acid"}
+{"id": "S-13da65b9367b", "name": "n-butanol（正丁醇）"}
+{"id": "S-9f73ca9ed692", "name": "Dichloromethane"}
+{"id": "S-cd68f684337c", "name": "DMAc (1"}
+{"id": "S-8bb9fd3e8c30", "name": "DMF（用于TpEB纳米片三相法合成）"}
+{"id": "S-a554516a2d49", "name": "dioxane (1:1"}
+{"id": "S-2f2029e324f5", "name": "water with TMB as swelling agent"}
+{"id": "S-2cd1938f34bc", "name": "1.8 mL"}
+{"id": "S-b6b5facdff0b", "name": "AcOH等）"}
+{"id": "S-94f916f9f12f", "name": "H2O + n-butanol (67% H2O"}
+{"id": "S-45f8f9f3fa0c", "name": "6 mL total)"}
+{"id": "S-a962b073f29c", "name": "有机相（醛）+ 水相（胺+乙酸）双相体系"}
+{"id": "S-2274f440932c", "name": "TMC溶液: 正己烷"}
+{"id": "S-04c6d48f90c8", "name": "混合溶剂（详见SI Section S2）"}
+{"id": "S-2a07b5c7da28", "name": "4-二氧六环)"}
+{"id": "S-516aa90a2552", "name": "acetic acid"}
+{"id": "S-391cf4298766", "name": "5) for organic phase"}
+{"id": "S-ed59841751d9", "name": "o-DCB = 1"}
+{"id": "S-cf9d2fc084d2", "name": "n-butanol (1:1"}
+{"id": "S-feb9da9195c6", "name": "水相 + 正辛酸 → 两相界面"}
+{"id": "S-50bd3670afd0", "name": "benzyl alcohol:mesitylene (1:1 v"}
+{"id": "S-144993fcb1cb", "name": "4-dioxane:mesitylene (9:1 v"}
+{"id": "S-cfedef5adc9a", "name": "o-dichlorobenzene  + n-butanol"}
+{"id": "S-17b2bcb4eca4", "name": "水相：DMF"}
+{"id": "S-20195b9d6d3b", "name": "用于一锅法合成）"}
+{"id": "S-f86f37b1af89", "name": "ortho-dichlorobenzene"}
+{"id": "S-168ba3674c8a", "name": "水两相体系"}
+{"id": "S-3eb2c94fbcfb", "name": "N-二甲基甲酰胺）"}
+{"id": "S-a2e994383766", "name": "N-甲基-2-吡咯烷酮)"}
+{"id": "S-18652b3f0f17", "name": "1-octanoic acid"}
+{"id": "S-ac80c0282351", "name": "DCE (1"}
+{"id": "S-093bf81aef6c", "name": "acetonitrile（乙腈）"}
+{"id": "S-eef6f84d4816", "name": "乙腈 (acetonitrile"}
+{"id": "S-59da21cad700", "name": "乙腈混合溶剂"}
+{"id": "S-6e968f0f1a2a", "name": "ethyl acetate and mesitylene mixture（乙酸乙酯与均三甲苯混合液"}
+{"id": "S-7c1bcc51c9ff", "name": "chloroform (3"}
+{"id": "S-fe3444851c9b", "name": "H2O (7"}
+{"id": "S-d1407310dd85", "name": "冰醋酸"}
+{"id": "S-13fa4e03c71e", "name": "用于溶解Tag）"}
+{"id": "S-df9447fd479a", "name": "benzonitrile"}
+{"id": "S-af640c13b5ad", "name": "Tpa溶于有机溶液"}
+{"id": "S-b2c4fc642450", "name": "n-butanol (19:1"}
+{"id": "S-a6778620c895", "name": "v=1:1)"}
+{"id": "S-38f38b4ba261", "name": "50 mL) + dry DCM"}
+{"id": "S-e397313b4eda", "name": "benzyl alcohol"}
+{"id": "S-e07ee9c5ecc2", "name": "i-PrOH"}
+{"id": "S-1b9a95cbef90", "name": "邻二氯苯（o-dichlorobenzene"}
+{"id": "S-22d245399fc9", "name": "醋酸双相体系"}
+{"id": "S-8e819d4bd8da", "name": "用于制备前体储备液）"}
+{"id": "S-9c39b5475ff3", "name": "tridecane"}
+{"id": "S-a8135e03a0f9", "name": "未明确"}
+{"id": "S-08147f30342b", "name": "containing Bd+Me)"}
+{"id": "S-08d8a3146515", "name": "二氯甲烷等常用有机溶剂"}
+{"id": "S-f24353e013f3", "name": "ethanol with 0.01 M PTSA"}
+{"id": "S-309b8d06a712", "name": "solution processing (drop-casting"}
+{"id": "S-af39072b996d", "name": "1 by vol.)"}
+{"id": "S-d5a5cf27d5c1", "name": "二甲基亚砜（DMSO）"}
+{"id": "S-8e4d80524ef5", "name": "熔融无溶剂条件）"}
+{"id": "S-19460f20cdf7", "name": "均三甲苯（mesitylene）"}
+{"id": "S-f0076875a41a", "name": "5-三甲苯）与EtOH混合溶剂"}
+{"id": "S-74e061bfceec", "name": "超铺展水层"}
+{"id": "S-1af669517064", "name": "pH 8"}
+{"id": "S-479893ed09c3", "name": "Dimethyl sulfoxide"}
+{"id": "S-f4a7a8e2481d", "name": "dioxane（二氧六环）"}
+{"id": "S-4c4362476b70", "name": "DMA:M:6 M AcOH = 2:8:1"}
+{"id": "S-de77863e718a", "name": "水两相体系（ interfacial polymerization）"}
+{"id": "S-d620c80a902a", "name": "mesitylene:1"}
+{"id": "S-35a2e92da955", "name": "solvent-free"}
+{"id": "S-82bb75eeb62d", "name": "TFA"}
+{"id": "S-1f571bea50e1", "name": "Dioxane (1"}
+{"id": "S-329ba89ed602", "name": "用于界面扩散实验）"}
+{"id": "S-fabb382efcc6", "name": "spin-coating"}
+{"id": "S-15e4c91854af", "name": "有机溶剂（水热合成中的水"}
+{"id": "S-d34969e46066", "name": "mesitylene  + ethanol  + glacial acetic acid"}
+{"id": "S-2a893ed7ef4e", "name": "有机相（含有TMC）"}
+{"id": "S-fd2433b81047", "name": "6 M醋酸水溶液"}
+{"id": "S-0bb60206f65e", "name": "mesitylene  + benzyl alcohol"}
+{"id": "S-8e445939f7a6", "name": "n-hexane（正己烷"}
+{"id": "S-3810c7f4eb0f", "name": "dichloromethane (DCM"}
+{"id": "S-de3c58dabed3", "name": "4-dioxane-n-butanol (v"}
+{"id": "S-e07be824370d", "name": "N-dimethylacetamide（DMAC"}
+{"id": "S-785b7806b3d1", "name": "体积比3:3:1"}
+{"id": "S-9a14dbcf5750", "name": "DMSO"}
+{"id": "S-16d10ce16158", "name": "仅含PTSA)"}
+{"id": "S-c4c99df0562f", "name": "油相）"}
+{"id": "S-20c621e6feb2", "name": "混合溶剂体系（具体组分未明确给出）"}
+{"id": "S-c53b35bb1163", "name": "冰醋酸（混合溶剂"}
+{"id": "S-15c3fa0c7e81", "name": "n-butyl alcohol"}
+{"id": "S-37148ff459bc", "name": "乙腈（acetonitrile）"}
+{"id": "S-bb403015a855", "name": "o-dichlorobenzene  + n-butanol  混合溶剂"}
+{"id": "S-e5c1d1a35dd3", "name": "Ethanol dispersion for nanosheet synthesis"}
+{"id": "S-d65016fdd39d", "name": "THF"}
+{"id": "S-8e3eadd35a7d", "name": "degassed Millipore water  with glacial acetic acid"}
+{"id": "S-25ff28f86568", "name": "用于洗涤）"}
+{"id": "S-95d82d6d9634", "name": "DMF"}
+{"id": "S-a2a58c380f43", "name": "H2O (9:1"}
+{"id": "S-e84e404b2f38", "name": "CH₂Cl₂"}
+{"id": "S-6329b858acc4", "name": "dichlorobenzene（二氯苯）和ethanol（乙醇）混合溶剂（1:1"}
+{"id": "S-42595b2c0082", "name": "用于分步法合成）"}
+{"id": "S-450959342131", "name": "n-butanol"}
+{"id": "S-e270ae4b3908", "name": "n-丁醇 (1:1"}
+{"id": "S-3a64892ef0ef", "name": "mesitylene (V"}
+{"id": "S-a2a2ec7a8b97", "name": "二氧六环混合溶剂)"}
+{"id": "S-edca755afcad", "name": "水（water）- 反应介质"}
+{"id": "S-ff30377df386", "name": "1 或 2"}
+{"id": "S-47236723898c", "name": "aqueous solution with PTSA for amine"}
+{"id": "S-db838bf2fd24", "name": "均三甲苯)"}
+{"id": "S-9f37205a2915", "name": "2-dichlorobenzene  + butanol"}
+{"id": "S-050dff7af825", "name": "有机相) + Water"}
+{"id": "S-0712747d2f07", "name": "n-butanol (v:v = 10:1"}
+{"id": "S-73af7bbe04d9", "name": "toluene:ethanol"}
+{"id": "S-22559e18089b", "name": "Mesitylene"}
+{"id": "S-836707158af2", "name": "乙酸（acetic acid）"}
+{"id": "S-80e9ba136e43", "name": "Good solvent"}
+{"id": "S-8602c478fa15", "name": "L acetic acid"}
+{"id": "S-5935212cc5da", "name": "4-二氧六环）混合溶剂"}
+{"id": "S-bf7edd09149d", "name": "PC-COF合成比例9:1:2（邻二氯苯:乙醇:6 M乙酸）"}
+{"id": "S-6195dcabe7c2", "name": "1-butanol (v"}
+{"id": "S-561b21499e8a", "name": "PC-COF-2合成比例15:5:3.5"}
+{"id": "S-b04e343194c3", "name": "10% n-hexanol)"}
+{"id": "S-0f78794272f8", "name": "2 mL o-xylene"}
+{"id": "S-939366f5ca67", "name": "DEGDME + FEC binary plasticizers"}
+{"id": "S-7494a027fac5", "name": "acetic acid（乙酸）"}
+{"id": "S-679f4ffced08", "name": "体积比2:4:0.6"}
+{"id": "S-ed9ee9674e78", "name": "水（唯一溶剂"}
+{"id": "S-90af7928536a", "name": "1-methyl-2-pyrrolidinone"}
+{"id": "S-90a003c0cdd3", "name": "glycerol（甘油）"}
+{"id": "S-6ac5eb60be49", "name": "Tam-染料-乙酸溶于水相"}
+{"id": "S-d2379c6b4760", "name": "4-dioxane  + aqueous acetic acid"}
+{"id": "S-266d5ff857f2", "name": "oil-water biphase (oil phase: organic solvent containing TFP"}
+{"id": "S-4602c1f60f41", "name": "4-dioxane  + 20 mL去离子水"}
+{"id": "S-2447f2767c2a", "name": "用于Tp和Pa的Schiff碱反应）"}
+{"id": "S-237da9677321", "name": "o-DCB"}
+{"id": "S-2a14d309dc91", "name": "类似COF-1条件"}
+{"id": "S-610cd978014c", "name": "Benzoic acid (苯甲酸"}
+{"id": "S-0eafc6777c99", "name": "正丁醇混合溶剂"}
+{"id": "S-59480b97ebe1", "name": "4-二氧六环（1"}
+{"id": "S-ec7879b13395", "name": "mesitylene:dioxane（1:1 v"}
+{"id": "S-9c02c8bf503b", "name": "水  + 甘油"}
+{"id": "S-c540e0a3d152", "name": "6 M AcOH (5"}
+{"id": "S-054d31972449", "name": "有机相为正己烷"}
+{"id": "S-76cc6f43fa31", "name": "50 μL蒸馏水作为助剂"}
+{"id": "S-bf63f69807f9", "name": "9体积比）"}
+{"id": "S-3d649ea6be2a", "name": "2-二氯乙烷双相体系"}
+{"id": "S-be879d4c498f", "name": "adjusted by HAc)"}
+{"id": "S-6db236704f72", "name": "NMP )"}
+{"id": "S-fdb01fc54876", "name": "acetic acid (aqueous 6 M"}
+{"id": "S-9183adbec08c", "name": "n-octanoic acid"}
+{"id": "S-854adebfc752", "name": "Toluene"}
+{"id": "S-2361943fc39d", "name": "4-dioxane(1"}
+{"id": "S-91497cbd5308", "name": "N-dimethylformamide"}
+{"id": "S-167968675390", "name": "γ-valerolactone"}
+{"id": "S-119f4c6c6e8c", "name": "DI water for TAPA"}
+{"id": "S-da7ce20b3545", "name": "4.0 mL total)"}
+{"id": "S-658b75c83bd5", "name": "去离子水"}
+{"id": "S-f4d942ad880f", "name": "未在正文中明确"}
+{"id": "S-60e426a8fe19", "name": "blade-coating)"}
+{"id": "S-01d9a869da05", "name": "n-butanol (4:1"}
+{"id": "S-a597bf0a34cb", "name": "有机层双相体系"}
+{"id": "S-fe1741ed2ffd", "name": "5-三甲苯"}
+{"id": "S-e47ccbaef742", "name": "未明确提及(推测为常见有机溶剂如均三甲苯"}
+{"id": "S-b01bdbf6aed7", "name": "10 mL)"}
+{"id": "S-a6c1ee11ce87", "name": "1 by vol."}
+{"id": "S-3810c7f4eb0f", "name": "Dichloromethane (DCM"}
+{"id": "S-f7a4f69bb126", "name": "Octanoic acid"}
+{"id": "S-f88724f292bb", "name": "水（液-液界面）"}
+{"id": "S-2177affa4cf9", "name": "4-dioxane mixed solvent (v:v = 2:1"}
+{"id": "S-184c726c6d35", "name": "Deionized water"}
+{"id": "S-8cccdf02530d", "name": "水相（二氯甲烷溶解Tp）"}
+{"id": "S-265538e48f6e", "name": "DCM  + aqueous Na₂S₂O₃  + aqueous PTSA"}
+{"id": "S-6ae17200b5a9", "name": "2-dichloroethane)"}
+{"id": "S-d520dbf8736d", "name": "4:1 ACN"}
+{"id": "S-bd75a1fd7356", "name": "N-dimethylacetamide"}
+{"id": "S-7593df1f7e92", "name": "Ionic liquid-H2O"}
+{"id": "S-8e9f8f23cb6b", "name": "丙酮（用于洗涤）"}
+{"id": "S-e17e16c5b536", "name": "无外加有机溶剂参与聚合反应"}
+{"id": "S-43988cb9ecf2", "name": "o-dichlorobenzene  + nBuOH  + 6 M acetic acid"}
+{"id": "S-854adebfc752", "name": "toluene"}
+{"id": "S-98276613a9ab", "name": "ultrapure water"}
+{"id": "S-16df19c50b50", "name": "1-丁醇（1-butanol）"}
+{"id": "S-4e12984f672f", "name": "体积比1:1"}
+{"id": "S-85a56c7f293e", "name": "dioxane)"}
+{"id": "S-86477a998904", "name": "dichloromethane  + polyethylene glycol"}
+{"id": "S-a91d4ac548a8", "name": "dioxane (1:4"}
+{"id": "S-b8f3b9cfa8f0", "name": "详见Supporting Information Table S1）"}
+{"id": "S-8370dad0db74", "name": "THF）"}
+{"id": "S-f7d8039b34cc", "name": "mesitylene and 1"}
+{"id": "S-326df137a3d9", "name": "9 mL)"}
+{"id": "S-93c71845945c", "name": "有机相两相体系（界面聚合）"}
+{"id": "S-003cccab2828", "name": "Water  + n-Hexane"}
+{"id": "S-376a1758dffb", "name": "n-BuOH (5:5"}
+{"id": "S-c7ec03674ebc", "name": "使用有机溶剂）"}
+{"id": "S-76351102d991", "name": "oil-water-oil tri-phase system (top: diamine in organic phase"}
+{"id": "S-514784e881a5", "name": "二氧六环 混合溶剂"}
+{"id": "S-2173675f1a3d", "name": "水相两相体系（液-液界面聚合体系）"}
+{"id": "S-69e8452ac7d6", "name": "DMF（N"}
+{"id": "S-ef85cba3ed8a", "name": "均三甲苯"}
+{"id": "S-40ed335816e7", "name": "DCM)"}
+{"id": "S-6fdfd6720af8", "name": "acetonitrile:toluene"}
+{"id": "S-28099836b688", "name": "混合溶剂 ( mesitylene"}
+{"id": "S-0e8cc0ed6c08", "name": "dichloromethane（二氯甲烷"}
+{"id": "S-072bcab1ffe3", "name": "hexane  for BTCA"}
+{"id": "S-eb7d7007ff1a", "name": "toluene（甲苯）"}
+{"id": "S-fb30abcf6ced", "name": "绿色合成）"}
+{"id": "S-be7da7bc1948", "name": "4-dioxane (1:1 v"}
+{"id": "S-93f163e05294", "name": "v) for TAPB"}
+{"id": "S-be03239ae0af", "name": "水为反应介质"}
+{"id": "S-1ec33eccd445", "name": "MeOH和EtOH形成无规聚集体)"}
+{"id": "S-f8f08e160ca0", "name": "mesitylene:dioxane (1:1"}
+{"id": "S-0bfe936c4593", "name": "水相（ aqueous phase）和有机相乙酸乙酯（ethyl acetate）"}
+{"id": "S-51dd7e37a57a", "name": "Methanol（甲醇）"}
+{"id": "S-167cca182647", "name": "具体溶剂未明确提及）"}
+{"id": "S-a529f172ef51", "name": "Organic phase: n-octanoic acid"}
+{"id": "S-62fc79fd4aea", "name": "DCM  + H₂O"}
+{"id": "S-6ff2322157da", "name": "水相: water"}
+{"id": "S-20286808d4b1", "name": "n-butanol (0.17 mL"}
+{"id": "S-5cf8a621a144", "name": "2 mL"}
+{"id": "S-44dd95a3163e", "name": "20 mL mixed solution)"}
+{"id": "S-860d94185f05", "name": "N-二甲基甲酰胺（DMF）"}
+{"id": "S-cdb02ee68a10", "name": "1:1)"}
+{"id": "S-54ca86a7ed37", "name": "water-ethyl acetate"}
+{"id": "S-c2e47b44fc4b", "name": "Tetrahydrofuran"}
+{"id": "S-a3197bc853fd", "name": "4-dioxane:mesitylene (1:1 v"}
+{"id": "S-ec2474865db6", "name": "Ethanol dispersion"}
+{"id": "S-180aa1b1a07f", "name": "0.11 mM CTAB水溶液"}

@@ -1,0 +1,23 @@
+{
+  "build_date": "2026-07-13",
+  "data_source": "C:\\Users\\ckx\\Desktop\\tianxuan seek\\data",
+  "node_counts": {
+    "monomer": 1059,
+    "reaction": 6197,
+    "literature": 954,
+    "solvent": 709,
+    "catalyst": 158,
+    "interface": 5,
+    "outcome": 4
+  },
+  "edge_counts": {
+    "reaction_uses_aldehyde": 1808,
+    "reaction_uses_amine": 3274,
+    "reaction_cited_in": 2387,
+    "reaction_produces": 6197,
+    "monomer_cooccurs": 1112,
+    "reaction_uses_solvent": 4603,
+    "reaction_uses_catalyst": 2487,
+    "reaction_at_interface": 2052
+  }
+}
