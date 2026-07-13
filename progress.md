@@ -71,6 +71,19 @@
 - ✅ 测试查询 "TFPT 三嗪醛 与 H3 长氟链酰肼" 命中 sim 0.939 (Chemist-Guided 文献)
 - ✅ v5 docx 生成 (COF-TFPT-...-v5.docx, 60KB, 含 RAG 检索结果 + 紧凑排版)
 - ✅ README.md 全部更新
+
+### 🚨 重要补救 (微信端紧急)
+- ⚠️ **未拦截推送**: 知识库/ PDF 被推到 GitHub (369 文件, ~89MB)
+- ❌ pip install git-filter-repo 失败 (ephemeral temp 权限)
+- ❌ git filter-branch 撞 sh.exe bug
+- ✅ git rm -r --cached 知识库/ 从最新 commit 移除
+- ✅ .gitignore 加 知识库/ 永久屏蔽
+- ✅ **pre-commit hook 安装 + 测试**: 检出 fake API key 阻断 commit (returncode=1)
+- ✅ `bridge/pre_commit_check.py`: 扫描敏感路径 + API key 模式 + 大文件
+- ✅ `bridge/install_pre_commit_hook.py`: 一键安装脚本
+- ✅ commit d42859f: 安全机制
+
+⚠️ **本地历史前 6 个 commit 仍含 PDF objects**, 用户需 force push + GitHub Support 清理 reflog, 或选方案 B (删仓库重建)
 - 待实现：automation cron job (22:00 每日日报)
 
 ---
@@ -107,6 +120,12 @@
 6. **审样例 docx v4**：桌面看 COF-TFPT-...-v4.docx 验证排版+加料
 7. **Bridge 微信运行**：✅ 已确认（用户已在微信上收发）
 8. **API key 轮换**：⚠️ 用户在截图里明文暴露两个 key，强烈建议去 Kimi + MiniMax 控制台轮换
+9. **Force push 覆盖远程历史 (方案 A)**：
+   ```
+   git push --force origin master
+   ```
+   然后联系 GitHub Support (https://support.github.com/contact) 清理 unreachable objects (PDF 副本)
+   或 选方案 B: GitHub 仓库 Settings → Danger Zone → Delete this repository
 
 
 ### 2026-07-13 (auto: cron 22:00)

@@ -38,9 +38,11 @@ minimax/
 │   ├── inspect_abcdef.py       # ABCDEF 巡查工具 (识别新增完成)
 │   ├── index_knowledge.py      # 知识库 PDF/docx → embedding 索引
 │   ├── update_daily.py         # 每日 22:00 日报生成 + git commit
+│   ├── pre_commit_check.py     # 敏感信息扫描 (pre-commit hook 调用)
+│   ├── install_pre_commit_hook.py # 一键安装 pre-commit hook
 │   ├── llm_config.yaml         # LLM 路由 (主 MiniMax + 备 Kimi 2.7)
 │   ├── cas_image_map.json      # CAS → 结构式图片映射
-│   ├── knowledge_index.jsonl   # 知识库 embedding 索引 (1791 chunks)
+│   ├── knowledge_index.jsonl   # 知识库 embedding 索引 (1791 chunks, gitignored)
 │   ├── knowledge_meta.json     # 索引元数据
 │   ├── _build_reagent_db.py    # 从 xlsx 重建 reagent_db.json
 │   └── _copy_predict.py        # 从 tianxuan-seek 复制最小集
@@ -127,6 +129,20 @@ $env:MINIMAX_API_KEY = "你的 MiniMax API key"
 - **认证**: SSH (你已配)
 
 ⚠ Git Bash 自带 `sh.exe` 有 bug (`Win32 error 5`)，`git push` 改用 HTTPS + git credential。
+
+## ⚠️ 敏感信息保护 (pre-commit hook)
+
+所有 commit 前自动扫描 (`.git/hooks/pre-commit.bat`):
+- **阻断路径**: `知识库/`, `.env*`, `secrets/`, `.ssh/`, `.aws/`
+- **阻断大文件**: > 10MB
+- **阻断 API key**: `sk-*`, `ghp_*`, `sk-kimi-*`, `sk-cp-*`
+- **阻断二进制**: `.pdf`, `.pptx`, `.xlsx` (除 `.docx`)
+
+测试通过: fake API key 被检出, commit 被阻断 (returncode=1).
+
+⚠ **本地前 6 个 commit 仍含 知识库/ PDF git objects**:
+- Force push (`git push --force origin master`) 不会删除远程的 unreachable objects
+- 推荐: GitHub 仓库 Settings → Danger Zone → Delete this repository + 重建 (方案 B)
 
 ---
 
