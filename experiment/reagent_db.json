@@ -1,0 +1,359 @@
+{
+  "_meta": {
+    "source": "实验/方案/冰箱试剂.xlsx",
+    "total": 35,
+    "note": "中心核节点: TAPT(苯→三嗪) / TAPB(苯) / TFPT(三嗪醛) / TFPB(苯醛)"
+  },
+  "reagents": [
+    {
+      "cas": "1300701-03-4",
+      "name_zh": "[1,1′:4′,1′′-Terphenyl]-2′,5′-dicarboxaldehyde, 4,4′′-bis(trifluoromethyl)- (ACI)",
+      "name_short": "",
+      "mw": "1176/g",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image1.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "1038-66-0",
+      "name_zh": "[1,1′-Biphenyl]-4,4′-diamine, 2,2′,3,3′,5,5′,6,6′-octafluoro- (9CI, ACI)",
+      "name_short": "F8-BDZ",
+      "mw": "54/g",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image2.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "14544-47-9",
+      "name_zh": "Benzenamine, 4,4′,4′′-(1,3,5-triazine-2,4,6-triyl)tris- (9CI, ACI)",
+      "name_short": "",
+      "mw": "TAPT",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image3.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "443922-06-3",
+      "name_zh": "Benzaldehyde, 4,4′,4′′-(1,3,5-triazine-2,4,6-triyl)tris- (9CI, ACI)",
+      "name_short": "TFPT",
+      "mw": "393.40",
+      "price": "1026/5g",
+      "status": "已买",
+      "structure_image": "experiment/structure/image4.png",
+      "node_type": "C3_aldehyde"
+    },
+    {
+      "cas": "341-58-2",
+      "name_zh": "[1,1′-Biphenyl]-4,4′-diamine, 2,2′-bis(trifluoromethyl)- (9CI, ACI)",
+      "name_short": "TFMB",
+      "mw": "320.23",
+      "price": "118/100g",
+      "status": "已买",
+      "structure_image": "experiment/structure/image5.png",
+      "node_type": "C2_amine"
+    },
+    {
+      "cas": "3217-47-8",
+      "name_zh": "1,4-Benzenedicarboxaldehyde, 2,3,5,6-tetrafluoro- (9CI, ACI)",
+      "name_short": "",
+      "mw": "206.09",
+      "price": "406/5g",
+      "status": "已买",
+      "structure_image": "experiment/structure/image31.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "2640813-40-5",
+      "name_zh": "[1,1′-Biphenyl]-4,4′-dicarboxaldehyde, 2,2′,3,3′,5,5′,6,6′-octafluoro- (ACI)",
+      "name_short": "F8-BDA",
+      "mw": "354.15",
+      "price": "980/g",
+      "status": "已买",
+      "structure_image": "experiment/structure/image7.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "2569674-64-0",
+      "name_zh": "1,4-Benzenedicarboxylic acid, 2,5-bis[(3,3,4,4,5,5,6,6,6-nonafluorohexyl)oxy]-, 1,4-dihydrazide (ACI)",
+      "name_short": "",
+      "mw": "718.34",
+      "price": "1166/250mg",
+      "status": "已买",
+      "structure_image": "experiment/structure/image8.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "2368851-11-8",
+      "name_zh": "C24H10F12O2",
+      "name_short": "TFPTA",
+      "mw": "558.32",
+      "price": "1162/g",
+      "status": "已买",
+      "structure_image": "experiment/structure/image9.png",
+      "node_type": "C2_aldehyde_terphenyl"
+    },
+    {
+      "cas": "1951-36-6",
+      "name_zh": "1,4-Benzenedicarboxaldehyde, 2,5-dihydroxy- (9CI, ACI)",
+      "name_short": "",
+      "mw": "166.13",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image14.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "6393-01-7",
+      "name_zh": "1,4-Benzenediamine, 2,5-dimethyl- (9CI, ACI)",
+      "name_short": "",
+      "mw": "136.19",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image11.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "3163-76-6",
+      "name_zh": "1,3,5-Benzenetricarboxaldehyde (7CI, 8CI, 9CI, ACI)",
+      "name_short": "",
+      "mw": "162.14",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image12.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "34374-88-4",
+      "name_zh": "1,3,5-Benzenetricarboxaldehyde, 2,4,6-trihydroxy- (8CI, 9CI, ACI)",
+      "name_short": "",
+      "mw": "210.14",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image19.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "1951-36-6",
+      "name_zh": "1,4-Benzenedicarboxaldehyde, 2,5-dihydroxy- (9CI, ACI)",
+      "name_short": "",
+      "mw": "166.13",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image14.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "119-90-4",
+      "name_zh": "[1,1′-Biphenyl]-4,4′-diamine, 3,3′-dimethoxy- (9CI, ACI)",
+      "name_short": "",
+      "mw": "244.29",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image15.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "60532-63-0",
+      "name_zh": "Benzenamine, 4,4′,4′′,4′′′-methanetetrayltetrakis- (9CI, ACI)",
+      "name_short": "",
+      "mw": "380.49",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image16.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "106-50-3",
+      "name_zh": "1,4-Benzenediamine (9CI, ACI)",
+      "name_short": "",
+      "mw": "108.14",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image17.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "91-95-2",
+      "name_zh": "[1,1′-Biphenyl]-3,3′,4,4′-tetramine (9CI, ACI)",
+      "name_short": "",
+      "mw": "已买",
+      "price": "",
+      "status": "",
+      "structure_image": "experiment/structure/image18.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "34374-88-4",
+      "name_zh": "1,3,5-Benzenetricarboxaldehyde, 2,4,6-trihydroxy- (8CI, 9CI, ACI)",
+      "name_short": "",
+      "mw": "210.14",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image19.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "623-27-8",
+      "name_zh": "1,4-Benzenedicarboxaldehyde (9CI, ACI)",
+      "name_short": "",
+      "mw": "134.13",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image20.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "5981-09-9",
+      "name_zh": "1,4-Benzenediamine, N1,N1-bis(4-aminophenyl)- (ACI)",
+      "name_short": "",
+      "mw": "290.36",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image21.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "14969-32-5",
+      "name_zh": "[1,1′-Biphenyl]-4,4′-dicarboxaldehyde, 3,3′-dihydroxy- (ACI)",
+      "name_short": "",
+      "mw": "242.23",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image22.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "7310-97-6",
+      "name_zh": "1,4-Benzenedicarboxaldehyde, 2,5-dimethoxy- (9CI, ACI)",
+      "name_short": "",
+      "mw": "194.18",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image23.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "118727-34-7",
+      "name_zh": "[1,1′:3′,1′′-Terphenyl]-4,4′′-diamine, 5′-(4-aminophenyl)- (9CI, ACI)",
+      "name_short": "TAPB",
+      "mw": "351.44",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image27.png",
+      "node_type": "C3_amine"
+    },
+    {
+      "cas": "118688-53-2",
+      "name_zh": "[1,1′:3′,1′′-Terphenyl]-4,4′′-dicarboxaldehyde, 5′-(4-formylphenyl)- (9CI, ACI)",
+      "name_short": "TFPB",
+      "mw": "390.43",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image24.png",
+      "node_type": "C3_aldehyde"
+    },
+    {
+      "cas": "3397-62-4",
+      "name_zh": "1,3,5-Triazine-2,4-diamine, 6-chloro- (9CI, ACI)",
+      "name_short": "",
+      "mw": "145.55",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image25.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "119001-43-3",
+      "name_zh": "Benzaldehyde, 4,4′,4′′-nitrilotris- (9CI, ACI)",
+      "name_short": "",
+      "mw": "329.35",
+      "price": "",
+      "status": "已买",
+      "structure_image": "experiment/structure/image26.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "847450-39-9",
+      "name_zh": "1,4-Benzenedicarboxaldehyde, 2,5-bis(trifluoromethyl)- (9CI, ACI)",
+      "name_short": "",
+      "mw": "270.13",
+      "price": "500mg/2275\r\n1g/2975",
+      "status": "未买",
+      "structure_image": "experiment/structure/image28.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "1271813-32-1",
+      "name_zh": "[1,1′-Biphenyl]-4,4′-dicarboxaldehyde, 2,2′-bis(trifluoromethyl)- (ACI)",
+      "name_short": "",
+      "mw": "1g/3486\r\n5g/6650",
+      "price": "",
+      "status": "未买",
+      "structure_image": "experiment/structure/image29.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "608145-27-3",
+      "name_zh": "1,4-Benzenedicarboxaldehyde, 2,5-difluoro- (9CI, ACI)",
+      "name_short": "",
+      "mw": "100mg/244\r\n250mg/552\r\n500mg/965\r\n1g/1386",
+      "price": "",
+      "status": "未买",
+      "structure_image": "experiment/structure/image30.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "3217-47-8",
+      "name_zh": "1,4-Benzenedicarboxaldehyde, 2,3,5,6-tetrafluoro- (9CI, ACI)",
+      "name_short": "",
+      "mw": "206.09",
+      "price": "1g/135",
+      "status": "未买",
+      "structure_image": "experiment/structure/image31.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "364-13-6",
+      "name_zh": "1,4-Benzenediamine, 2-(trifluoromethyl)- (9CI, ACI)",
+      "name_short": "",
+      "mw": "176.14",
+      "price": "5g/116\r\n25g/437",
+      "status": "未买",
+      "structure_image": "experiment/structure/image32.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "698-52-2",
+      "name_zh": "1,4-Benzenediamine, 2,5-difluoro- (9CI, ACI)",
+      "name_short": "",
+      "mw": "144.12",
+      "price": "50mg/160\r\n100mg/321\r\n250mg/545",
+      "status": "未买",
+      "structure_image": "experiment/structure/image33.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "1198-64-7",
+      "name_zh": "1,4-Benzenediamine, 2,3,5,6-tetrafluoro- (9CI, ACI)",
+      "name_short": "",
+      "mw": "180.10",
+      "price": "100mg/285\r\n250mg/475\r\n1g/1398",
+      "status": "未买",
+      "structure_image": "experiment/structure/image34.png",
+      "node_type": "C2_linear"
+    },
+    {
+      "cas": "316-64-3",
+      "name_zh": "[1,1′-Biphenyl]-4,4′-diamine, 2,2′-difluoro- (9CI, ACI)",
+      "name_short": "",
+      "mw": "220.22",
+      "price": "250mg/427\r\n1g/955",
+      "status": "未买",
+      "structure_image": "experiment/structure/image35.png",
+      "node_type": "C2_linear"
+    }
+  ]
+}

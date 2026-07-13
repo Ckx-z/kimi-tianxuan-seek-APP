@@ -1,0 +1,25 @@
+# Python 缓存
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# 临时脚本 (用户授权保留 set_api_env.ps1)
+_tmp/
+
+# 编辑器/系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# 预测模型权重 (建议 git-lfs 或单独备份)
+predict/models/**/*.pt
+predict/models/**/*.pth
+
+# 用户敏感数据 (不进版本控制)
+.env
+*.env
+secrets/
