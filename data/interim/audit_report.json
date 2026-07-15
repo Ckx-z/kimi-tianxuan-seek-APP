@@ -1,0 +1,81 @@
+{
+  "basic": {
+    "n_rows": 6201,
+    "n_columns": 16,
+    "columns": [
+      "paper_id",
+      "group_id",
+      "source_db",
+      "aldehyde_smiles",
+      "amine_smiles",
+      "aldehyde_name",
+      "amine_name",
+      "stoichiometry",
+      "solvent",
+      "temperature",
+      "catalyst",
+      "synthesis_route",
+      "interface_type",
+      "is_film",
+      "film_quality",
+      "original_is_film"
+    ],
+    "missing_required_columns": []
+  },
+  "missing_rates": {
+    "paper_id": 0.0,
+    "group_id": 0.8632,
+    "source_db": 0.0,
+    "aldehyde_smiles": 0.0003,
+    "amine_smiles": 0.0003,
+    "aldehyde_name": 0.3867,
+    "amine_name": 0.5086,
+    "stoichiometry": 0.8692,
+    "solvent": 0.8671,
+    "temperature": 0.8728,
+    "catalyst": 0.8853,
+    "synthesis_route": 0.8632,
+    "interface_type": 0.8989,
+    "is_film": 0.0,
+    "film_quality": 0.8842,
+    "original_is_film": 0.0
+  },
+  "smiles": {
+    "n_missing_aldehyde": 2,
+    "n_missing_amine": 2,
+    "n_missing_either": 3,
+    "missing_rate": 0.0005
+  },
+  "condition_missing_rates": {
+    "stoichiometry": 0.8692,
+    "solvent": 0.8671,
+    "temperature": 0.8728,
+    "catalyst": 0.8853,
+    "synthesis_route": 0.8632,
+    "interface_type": 0.8989
+  },
+  "label_distribution": {
+    "0.0": 4173,
+    "0.7": 1308,
+    "0.8": 291,
+    "1.0": 429
+  },
+  "label_conflicts": {
+    "n_conflict_groups": 0,
+    "n_conflict_rows": 0
+  },
+  "label_mismatch": {
+    "n_mismatch": 291,
+    "mismatch_rate": 0.0469
+  },
+  "duplicates": {
+    "n_total": 6201,
+    "n_unique": 6201,
+    "n_duplicates": 0
+  },
+  "anomalies": {
+    "film_but_missing_smiles": 3,
+    "temperature_parse_fail": 5604,
+    "temperature_extreme": 2
+  }
+}

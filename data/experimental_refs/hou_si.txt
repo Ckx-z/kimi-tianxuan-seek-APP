@@ -1,0 +1,95 @@
+Supporting Information
+Diffusion/Modulator Dual-Mediated Solid-Liquid/Vapor Interfacial Synthesis of Crystalline Covalent Organic Framework Membranes
+S. Hou, G. Zhang, Z. Qiao, Y. Bai, H. Di, Y. Hua, T. Hao, H. Xu*
+
+Supporting Information
+Diffusion/Modulator Dual-Mediated Solid-Liquid/Vapor Interfacial Synthesis of Crystalline Covalent Organic Framework Membranes
+Shenghuai Hou[a], Ganbing Zhang[b], Zhaoyu Qiao[a], Yuxuan Bai[a], Haoxin Di[a], Yetong Hua[a], Tiantian Hao[a], and Hui Xu*[a] [a] S. Hou, Z. Qiao, Y. Bai, H. Di, Y. Hua, T. Hao, Prof. H. Xu
+National Key Laboratory of Green Pesticide, Engineering Research Center of Photoenergy Utilization for Pollution Control and Carbon Reduction, Ministry of Education, College of Chemistry Central China Normal University Wuhan, 430079, China E-mail: huixu@ccnu.edu.cn [b] Prof. G. Zhang Collaborative Innovation Center for Advanced Organic Chemical Materials Coconstructed by the Province and Ministry, Ministry-of-Education Key Laboratory for the Synthesis and Applications of Organic Functional Molecules, College of Chemistry and Chemical Engineering Hubei University Wuhan, 430062, China
+S1
+
+Table of Contents
+Section S1. Materials and Instrumentations.................................................................................3 S1.1 Materials ...........................................................................................................................3 S1.2 Instrumentation .................................................................................................................4
+Section S2. Material Synthesis and Characterization..................................................................7 S2.1 Synthesis of COF membranes...........................................................................................7 S2.2 Synthesis of TTFT ..........................................................................................................20 S2.3 Characterization of AMCOF-1 .......................................................................................22 S2.4 Characterization of the formation mechanism of COF membranes................................43 S2.5 Formation mechanism of COF membranes ....................................................................49 S2.6 Characterization of additional COF membranes (AMCOF-2 to AMCOF-13) ...............52
+Section S3. Adsorption and Removal of LCMs ..........................................................................73 S3.1 Adsorption experiments ..................................................................................................73 S3.2 Removal experiments......................................................................................................82
+References ...................................................................................................................................... 85
+S2
+
+Section S1. Materials and Instrumentations
+
+S1.1 Materials
+
+Toluene, aniline, 1,4-dioxane, ethyl acetate, acetic acid (HOAc), sodium hydroxide,
+
+ethanol (EtOH), acetonitrile (ACN), benzoic acid, n-butanol, and methanol (MeOH)
+
+were purchased from Sinopharm Chemical Reagent Co., Ltd. (Shanghai, China).
+
+Tetrahydrofuran (THF), 1,2-dichlorobenzene, trifluoroacetic acid (TFA), mesitylene, 2-
+
+(trifluoromethyl)-1,4-benzenediamine (PDA-CF3), 1,3,5-triformylphloroglucinol (Tp),
+
+tris(4-formylphenyl)amine (TPA), and 1,3,5-tris(4-formylphenyl)benzene (TFFT) were
+
+obtained from Aladdin Scientific Corp. (Shanghai, China). Dichloromethane (DCM),
+
+chloroform, and acetone were supplied by Kelong Chemical Co., Ltd. (Chengdu,
+
+China). Scandium (III) trifluoromethanesulfonate (Sc(OTf)3), (trans,trans)-4-(3,4-
+
+difluorophenyl)-4'-pentyl-1,1'-bi(cyclohexane) (DPeCB), 4-ethoxy-2,3-difluoro-4'-
+
+propyl-1,1'-biphenyl
+
+(EDPPB),
+
+1-ethoxy-2,3-difluoro-4-(trans-4-
+
+pentylcyclohexyl)benzene
+
+(EDPeB),
+
+4-ethoxy-2,3-difluoro-4'-(trans-4-
+
+propylcyclohexyl)-1,1'-biphenyl (EDPB), 3,4-difluoro-4'-(trans-4-pentylcyclohexyl)-
+
+1,1'-biphenyl (DPeB), (trans,trans)-4-(4-ethoxy-2,3-difluorophenyl)-4'-propyl-1,1'-
+
+bi(cyclohexane) (EDPBB), 4-(difluoro(3,4,5-trifluorophenoxy)methyl)-3,5-difluoro-
+
+4'-propyl-1,1'-biphenyl (DTMDPB), rel-(1r,1's,4r,4'r)-4-(4-fluorophenyl)-4'-propyl-
+
+1,1'-bi(cyclohexane) (FPCB), 4'-ethoxy-[1,1'-biphenyl]-4-carbonitrile (2OCB), 1-
+
+methoxy-4-(trans-4-n-propylcyclohexyl)benzene (EOPrCHB), 4-ethyl-4'-(trans-4-
+
+propylcyclohexyl)-1,1'-biphenyl (EPB), 4''-pentyl-[1,1':4',1''-terphenyl]-4-carbonitrile
+
+(5CT), cyanuric chloride, and 2-fluoro-4-hydroxybenzalde were supplied by Bide
+
+S3
+
+Pharmatech Co., Ltd. (Shanghai, China). 2,5-Diaminotoluene (PDA-CH3), 2',3,4,5tetrafluoro-4''-propyl-1,1':4',1''-terphenyl (TePT), 2',3,4,5-tetrafluoro-4'-(trans-4propylcyclohexyl)biphenyl (TeprB), and 3,4-difluoro-4'-(4'-propyl-[1,1'bi(cyclohexan)]-4-yl)-1,1'-biphenyl (DPrBB) were purchased from Macklin Biochemical Technology Co., Ltd. (Shanghai, China). 2,2-Dimethyl-4,4diaminobiphenyl (BD-CH3), 2,2-bis(trifluoromethyl)-4,4-diaminobiphenyl (BD-CF3), 2,4,6-tris(4-formylphenoxy)-1,3,5-triazine (TPT), 1,3,5-tris-(4-formyl-biphenyl-4yl)triazine (TFBT), and 4,4,4-(1,3,5-Triazine-2,4,6-triyl)tris[benzaldehyde] (TFPT) were purchased from D&B Biotechnology Co., Ltd. (Shanghai, China). 2-[Difluoro(3,4,5-trifluorophenoxy)methyl]-5-(4-ethylphenyl)-1,3-difluoro-benzene (DTMDEB) and carbon were supplied by Energy Chemical (Shanghai, China). The monomer 2,4,6tris(3-fluoro-4-formylphenoxy)-1,3,5-triazine (TTFT) was synthesized according to the literature methods.1 The chemical structures and physicochemical properties of LCMs are detailed in Table S24. Chromatographic-grade MeOH was obtained from Merck (Darmstadt, Germany). Ultrapure water (18.2 M·cm) was processed utilizing an Arium Pro ultrapure water system (Gottingen, Germany). S1.2 Instrumentation
+Powder X-ray diffraction (PXRD) patterns were collected on a full-fledged Bruker D8 Advance diffractometer using Cu K radiation of  = 1.5418 Å from 2 = 1.5° to 30° (2) at 40 kV, 40 mA (Bruker, Billerica, Germany). Solid-state 13C NMR spectra were collected on a JNM-ECZ600R NMR spectrometer (JEOL, Akijima, Japan). Liquid-state 13C NMR and 1H NMR spectra were collected on a Bruker Avance Neo
+S4
+
+400 MHz spectrometer (Bruker, Billerica, Germany). Fourier transform infrared (FTIR) spectroscopy was carried out using a TENSOR27 spectrophotometer (Bruker, Billerica, Germany). Raman spectra were collected on a LABRAM HR Evolution instrument (HORIBA, Kyoto, Japan) with laser excitation at 532 nm. Xray photoelectron spectroscopy (XPS) spectra were performed on a Escalab Xi+ spectrometer (Thermo Fisher Scientific, Waltham, USA). Thermogravimetric analyses (TGA) curves were collected on a STA PT1600 system (Linseis, Zerb, Germany) from 25  to 800  at a heating rate of 10  min-1 under nitrogen. Transmission electron microscopy (TEM) and high-resolution transmission electron microscopy (HRTEM) images were taken on a JEM-F200 (JEOL, Akijima, Japan). Atomic force microscopy (AFM) images were recorded on a Bruker MultiMode 8 (Bruker, Billerica, Germany). Field emission scanning electron microscope (FE-SEM) images were acquired using a JSM-7900F (JEOL, Akijima, Japan) instrument. Nitrogen adsorption-desorption isotherms were measured using an ASAP 2460 surface characterization analyzer (Micromeritics, Norcross, USA) at 77 K. Pore-size distribution curves and surface areas were determined utilizing non-local density functional theory (NLDFT) and the Brunauer-Emmett-Teller (BET) method, respectively.
+The Agilent 1100 high-performance liquid chromatography (HPLC) system (Agilent Technologies, Santa Clara, USA) was equipped with an Innoval ODS-2 column (5 m, 4.6 × 150 mm, Agela Technologies, Tianjin, China) and a 1100 UV-vis detector. The mobile phase consisted of MeOH (A) and water (B), and the gradient profile was as follows: 0-6 min, 98% A; 6.1-14.0 min, 98%-100% A. The flow rate, UV detection
+S5
+
+wavelength, column temperature, and injection volume were set at 1 mL min­1, 275 nm, 40 °C, and 20 L, respectively. The high-performance liquid chromatography tandem mass spectrometry (HPLC-MS/MS) system comprised a Waters e2695 separations module coupled with a TQ triple quadrupole mass spectrometer (Waters, Milford, USA). The test conditions for HPLC included 0-5 min with 100% MeOH, an injection volume of 5 L, and a flow rate of 0.3 mL min­1. The parameters for the positive ion mode were as follows: desolvation gas at 800 L h-1, source temperature at 150 °C, capillary voltage at 2.5 kV, nebulization flow at 7.0 bar, desolvation gas with 99.99% purity of N2, and desolvation temperature at 400 °C.
+S6
+
+Section S2. Material Synthesis and Characterization S2.1 Synthesis of COF membranes Scheme S1. Synthesis of AMCOF-1
+A 35 mL Pyrex tube was sequentially charged with TFPT (11.8 mg, 0.03 mmol), toluene (0.6 mL), chloroform (0.4 mL), and C6H5NH2 (8.2 L). Subsequently, CH3COOH (0.20 mL, 6.0 M) and BD-CF3 (14.4 mg, 0.045 mmol) dissolved in chloroform (1.0 mL) were added into the Pyrex tube. The mixture was sonicated for 10 minutes and then placed in an oil bath at 120  to obtain a clear solution. After reacting for 2 days at 120 , the yellow membrane was stripped using a metal spatula, washed with acetone and THF, and dried under room temperature to afford AMCOF-1 with an isolated yield of 88.36%.
+S7
+
+Scheme S2. Synthesis of AMCOF-2
+A 35 mL Pyrex tube was sequentially charged with TFPT (11.8 mg, 0.03 mmol), toluene (0.4 mL), MeOH (0.6 mL) and C6H5NH2 (8.2 L). Subsequently, CH3COOH (0.20 mL, 3.0 M) and BD-CH3 (9.6 mg, 0.045 mmol) dissolved in MeOH (2.0 mL) were added to the mixture. The Pyrex tube was sonicated for 10 minutes and heated in an oil bath for 3 days at 120 . The as-synthesized yellow membrane was stripped using a metal spatula, washed with acetone and THF, and dried under room temperature to afford AMCOF-2 in isolated yields of 65.90%. Notably, the precursor or oligomer does not completely dissolve in solvents, leading to the formation of a small amount of COF powder.
+S8
+
+Scheme S3. Synthesis of AMCOF-3
+A 35 mL Pyrex tube was sequentially charged with TFPT (11.8 mg, 0.03 mmol), toluene (0.6 mL), chloroform (0.4 mL) and C6H5NH2 (8.2 L). Subsequently, CH3COOH (0.20 mL, 6.0 M) and PDA-CF3 (7.9 mg, 0.045 mmol) dissolved in chloroform (2.0 mL) were added to the mixture. The tube was sonicated for 10 minutes and heated in an oil bath for 2 days at 120 . The as-synthesized rufous membrane was stripped using a metal spatula, washed with acetone and THF, and dried under room temperature to afford AMCOF-3 in isolated yields of 71.20%. Notably, the precursor or oligomer does not completely dissolve in solvents, leading to the formation of a small amount of COF powder.
+S9
+
+

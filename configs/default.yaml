@@ -1,0 +1,76 @@
+# COF 成膜推荐项目 — 默认配置
+
+# --- 数据源 ---
+# 所有数据均在新工作台 data/raw/ 下（从旧项目复制而来）
+data:
+  v5_train: "data/raw/v5_train_stage1.csv"
+  v5_train_aug: "data/raw/v5_train_stage1_aug_v2.csv"
+  monomer_pool: "data/raw/merged_monomer_pool.csv"
+  # 化学描述符代码已复制到新工作台 src/features/chemistry/，不再依赖旧项目路径
+  chem_module: "src/features/chemistry"
+
+# --- 特征配置 ---
+features:
+  molecular:
+    linker_descriptors: true     # 26维 (linker_analyzer.py)
+    monomer_3d: true              # 10维 (conformer.py)
+    dimer_3d: true                # 10维 (dimer.py)
+    rdkit_builtin: true
+    normalize_by_sites: true      # 按反应位点归一化（解决相似度退化）
+
+  conditions:
+    enabled: true                  # 反应条件首次作为特征
+    temperature: true
+    solvent: true
+    catalyst: true
+    synthesis_route: true
+    interface_type: true
+    stoichiometry: true
+
+  rules:
+    enabled: true                  # 34维规则向量
+    chem_rules_23d: true
+    fluorine_descriptors_11d: true
+
+# --- 模型配置 ---
+# 树模型：主可解释模型
+# GNN：并行准确率模型（使用旧项目 v5.3 权重）
+models:
+  tree:
+    type: "xgboost"               # 或 "lightgbm"
+    params:
+      n_estimators: 500
+      max_depth: 6
+      learning_rate: 0.05
+      subsample: 0.8
+      colsample_bytree: 0.8
+      reg_alpha: 0.1
+      reg_lambda: 1.0
+      min_child_weight: 5
+      objective: "reg:squarederror"  # 连续标签回归
+      eval_metric: "mae"
+
+  gnn:
+    enabled: true
+    checkpoint_path: "data/external/v5.3_gnn_model.pt"  # 从旧项目复制后放这里
+    old_project_checkpoint: "C:/Users/ckx/Desktop/tianxuan seek/models/v5.3/v5_model.pt"
+
+# --- 交叉验证 ---
+cv:
+  method: "leave_one_monomer_out"  # 留一单体法
+  group_by: "aldehyde"             # 按醛单体分组
+
+# --- 评估指标 ---
+evaluation:
+  metrics:
+    - "pr_auc"
+    - "ndcg_at_10"
+    - "hit_at_5"
+    - "chemical_diversity"
+  baseline_gnn_pr_auc: 0.784
+
+# --- 推荐配置 ---
+recommend:
+  top_k: 20
+  diversity_threshold: 0.8
+  novelty_threshold: 0.1

@@ -1,0 +1,15 @@
+{
+  "mae": 0.2551749071712472,
+  "pr_auc": 0.7483726976314947,
+  "ndcg_at_10": 0.8318477135310891,
+  "hit_at_5": 4,
+  "n_samples": 3094,
+  "n_features": 122,
+  "group_by": "aldehyde",
+  "use_rules": true,
+  "reduced_rules": true,
+  "use_interaction": true,
+  "use_conditions": false,
+  "rule_neg_strategy": "remove_hard_rule",
+  "remove_all_rule": false
+}

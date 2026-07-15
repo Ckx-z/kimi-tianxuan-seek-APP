@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 数据文件（大文件不入 git）
+data/raw/*.csv
+data/raw/*.xlsx
+data/raw/*.json
+data/interim/*.csv
+data/processed/*.csv
+data/external/*.csv
+*.pkl
+*.pt
+*.pth
+*.h5
+*.hdf5
+
+# PDF
+data/raw/pdfs/
+*.pdf
+
+# 模型权重
+models/*.pt
+models/*.pkl
+
+# 日志
+logs/
+*.log
+
+# 临时文件
+tmp/
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# Ruff 缓存
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 会话状态（实时状态，不提交到 git）
+.agents/session_state.yaml

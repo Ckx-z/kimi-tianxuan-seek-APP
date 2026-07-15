@@ -1,0 +1,135 @@
+# 会话索引 — 项目历史会话记录
+# 任何新 AI 实例进入项目时，先读此文件了解项目演进
+
+sessions:
+  - id: "2026-07-02-01"
+    date: "2026-07-02"
+    title: "项目启动与阶段 0 完成"
+    summary: "需求沟通+旧项目审阅，完成阶段 0（搭骨架+文档体系+数据复制）。确立了推荐任务、树模型+GNN并行、反应条件首次纳入等 10 项关键决策。"
+    files_modified:
+      - PROJECT_STATE.md
+      - DECISIONS.md
+      - DATA_DICT.md
+      - README.md
+      - SESSION_START.md
+      - docs/ARCHITECTURE.md
+      - docs/background.md
+      - docs/methodology.md
+      - docs/old_project_review.md
+      - configs/default.yaml
+      - src/data/import_data.py
+      - src/data/audit.py
+      - data/raw/README.md
+      - tests/test_data.py
+    decisions_made: [D01, D02, D03, D04, D05, D06, D07, D08, D09, D10]
+    models_trained: []
+    test_status: { passed: null, failed: null }
+    blockers: []
+    status: "completed"
+
+  - id: "2026-07-08-01"
+    date: "2026-07-08"
+    title: "App MVP 搭建完成"
+    summary: "完成阶段 3-5（特征工程+建模+App）。训练树模型基线 PR-AUC 0.727，搭建 Gradio 前端，GNN 通过 subprocess 接入，条件推荐（规则+案例），Word 报告生成。9 个 pytest 全部通过。"
+    files_modified:
+      - app/gradio_app.py
+      - src/predictor/tree_model.py
+      - src/predictor/gnn_model.py
+      - src/predictor/__init__.py
+      - src/features/descriptors.py
+      - src/condition_recommender/__init__.py
+      - src/condition_recommender/rule_engine.py
+      - src/condition_recommender/case_matcher.py
+      - src/report_generator/exporter.py
+      - models/tree_baseline.pkl
+      - start_app.bat
+      - start_app.ps1
+      - launch_app.py
+      - tests/test_app_pipeline.py
+      - data/experimental_refs/
+    decisions_made: []
+    models_trained:
+      - name: "tree_baseline"
+        path: "models/tree_baseline.pkl"
+        metrics: { mae: 0.209, pr_auc: 0.727, n_samples: 6198, n_features: 85 }
+    test_status: { passed: 9, failed: 0 }
+    blockers: []
+    status: "completed"
+
+  - id: "2026-07-15-01"
+    date: "2026-07-15"
+    title: "构建记忆系统与上下文管理"
+    summary: "用户明确要求优先完成记忆系统和上下文管理。创建 .agents/ 目录、AGENTS.md、session_index.yaml、session_state.yaml，升级 SESSION_START.md，创建状态检查脚本，更新 PROJECT_STATE.md。建立日报双轨制（AI 看 + 人看）。"
+    files_modified:
+      - .agents/AGENTS.md
+      - .agents/session_index.yaml
+      - .agents/session_state.yaml
+      - SESSION_START.md
+      - scripts/check_project_state.py
+      - PROJECT_STATE.md
+      - .gitignore
+      - DAILY_LOG/2026-07-15.md
+      - DAILY_LOG/2026-07-15_human.md
+    decisions_made:
+      - "D11: 记忆系统建设优先于模型优化"
+      - "D12: 日报双轨制（AI 日报 + 人日报）"
+    models_trained: []
+    test_status: { passed: 13, failed: 0 }
+    blockers: []
+    status: "completed"
+
+  - id: "2026-07-15-02"
+    date: "2026-07-15"
+    title: "反应条件补全（YAML → CSV）"
+    summary: "发现 CSV 条件缺失不是因为原始数据没有，而是 YAML→CSV 映射丢失。用两阶段补全（YAML精确匹配+单体推断）将条件覆盖率从13%提升到64%。为模型优化阶段提供条件特征数据。"
+    files_modified:
+      - scripts/fill_conditions_from_yaml.py
+      - data/interim/v5_train_stage1_cond_filled.csv
+      - data/interim/condition_fill_report.json
+      - PROJECT_STATE.md
+    decisions_made:
+      - "D13: 反应条件补全优先于3D描述符接入"
+    models_trained: []
+    test_status: { passed: 2, failed: 0 }
+    blockers: []
+    status: "completed"
+
+  - id: "2026-07-15-03"
+    date: "2026-07-15"
+    title: "模型 v2 训练、消融与归因"
+    summary: "在条件补全后的数据上训练模型 v2。精简化学规则至9条核心约束，移除hard_rule_sampled负样本，加入醛-胺Hadamard交互特征。PR-AUC从0.727提升到0.7484，MAE 0.2552。完成A/B/C/D四组消融实验和SHAP归因报告。条件特征实验异常高（0.9112）已排除在主模型外。"
+    files_modified:
+      - src/features/chemistry/hard_rules.py
+      - src/features/descriptors.py
+      - src/models/train.py
+      - scripts/ablation_v2.py
+      - src/models/attribution.py
+      - scripts/generate_attribution_report.py
+      - models/tree_v2.pkl
+      - models/tree_v2_metrics.json
+      - EXPERIMENTS/exp_001.md
+      - reports/attribution_v2.md
+      - PROJECT_STATE.md
+      - DAILY_LOG/2026-07-15.md
+      - DAILY_LOG/2026-07-15_human.md
+      - SESSION_START.md
+      - scripts/check_project_state.py
+    decisions_made:
+      - "D14: 精简化学规则至9条核心硬性约束"
+      - "D15: 移除hard_rule_sampled负样本"
+      - "D16: 主模型不启用反应条件特征"
+      - "D17: 阶段2接入3D/二聚体描述符"
+    models_trained:
+      - name: "tree_v2"
+        path: "models/tree_v2.pkl"
+        metrics: { mae: 0.2552, pr_auc: 0.7484, n_samples: 3094, n_features: 122 }
+    test_status: { passed: 4, failed: 0 }
+    blockers: []
+    status: "completed"
+
+# 快速统计
+total_sessions: 5
+completed_sessions: 5
+in_progress_sessions: 0
+models_trained_total: 2
+decisions_made_total: 17

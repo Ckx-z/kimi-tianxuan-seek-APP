@@ -1,0 +1,61 @@
+{
+  "total_rows": 6201,
+  "yaml_matched": 848,
+  "inferred": 3179,
+  "fills": {
+    "solvent": {
+      "before": 826,
+      "after": 3982,
+      "yaml_filled": 0,
+      "inferred": 3156
+    },
+    "temperature": {
+      "before": 789,
+      "after": 3921,
+      "yaml_filled": 0,
+      "inferred": 3132
+    },
+    "time": {
+      "before": 0,
+      "after": 747,
+      "yaml_filled": 747,
+      "inferred": 0
+    },
+    "catalyst": {
+      "before": 709,
+      "after": 3421,
+      "yaml_filled": 0,
+      "inferred": 2716
+    },
+    "catalyst_volume": {
+      "before": 0,
+      "after": 438,
+      "yaml_filled": 438,
+      "inferred": 0
+    },
+    "synthesis_route": {
+      "before": 848,
+      "after": 4027,
+      "yaml_filled": 0,
+      "inferred": 3179
+    },
+    "interface_type": {
+      "before": 627,
+      "after": 3457,
+      "yaml_filled": 0,
+      "inferred": 2862
+    },
+    "atmosphere": {
+      "before": 0,
+      "after": 773,
+      "yaml_filled": 773,
+      "inferred": 0
+    },
+    "additive": {
+      "before": 0,
+      "after": 85,
+      "yaml_filled": 85,
+      "inferred": 0
+    }
+  }
+}
