@@ -26,7 +26,7 @@ from docx.oxml import OxmlElement
 
 PROJ = r'C:\Users\ckx\Desktop\minimax'
 OUT = os.path.join(PROJ, 'experiment', 'proposals',
-                   'COF-TFPT-TAPT-2026-07-13-D-A1-v8.docx')
+                   'COF-TFPT-TAPT-2026-07-15-D-A1-v8.docx')
 
 # ==================== 样式工具 ====================
 
@@ -234,10 +234,10 @@ def main():
     info_p = doc.add_paragraph()
     info_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     add_run(info_p, '方案编号: ', size=10.5, bold=True)
-    add_run(info_p, 'COF-TFPT-TAPT-2026-07-13-D-A1-v8', size=10.5)
+    add_run(info_p, 'COF-TFPT-TAPT-2026-07-15-D-A1-v8', size=10.5)
     info_p.add_run().add_break()
     add_run(info_p, '生成日期: ', size=10.5, bold=True)
-    add_run(info_p, '2026-07-13', size=10.5)
+    add_run(info_p, '2026-07-15', size=10.5)
     info_p.add_run().add_break()
     add_run(info_p, '迭代依据: ', size=10.5, bold=True)
     add_run(info_p, '14 条 ABCDEF + A1-D9 历史失败 (用户两步法实验)', size=10.5)
