@@ -1,0 +1,20 @@
+{
+  "mae": 0.23444049141934004,
+  "pr_auc": 0.7785439100316647,
+  "ndcg_at_10": 0.9054643438853687,
+  "hit_at_5": 5,
+  "n_samples": 3094,
+  "n_features": 142,
+  "group_by": "aldehyde",
+  "use_rules": true,
+  "reduced_rules": true,
+  "use_interaction": true,
+  "use_conditions": false,
+  "use_3d": true,
+  "use_dimer": false,
+  "n_confs": 5,
+  "rule_neg_strategy": "remove_hard_rule",
+  "remove_all_rule": false,
+  "model_name": "tree_v3",
+  "note": "selected: monomer3d_full (best PR-AUC and MAE on full data)"
+}

@@ -157,6 +157,12 @@ def train(df: pd.DataFrame,
           reduced_rules: bool = False,
           use_interaction: bool = True,
           use_conditions: bool = False,
+          use_3d: bool = False,
+          use_dimer: bool = False,
+          n_confs: int = 5,
+          seed: int = 42,
+          monomer_cache_path: str | Path | None = None,
+          dimer_cache_path: str | Path | None = None,
           hard_rule_strategy: str = "remove_hard_rule",
           remove_all_rule: bool = False,
           model_path: str | Path | None = None,
@@ -174,6 +180,12 @@ def train(df: pd.DataFrame,
         use_rules=use_rules,
         reduced_rules=reduced_rules,
         use_interaction=use_interaction,
+        use_3d=use_3d,
+        use_dimer=use_dimer,
+        n_confs=n_confs,
+        seed=seed,
+        monomer_cache_path=Path(monomer_cache_path) if monomer_cache_path else None,
+        dimer_cache_path=Path(dimer_cache_path) if dimer_cache_path else None,
     )
 
     # 如果需要条件特征，把条件列拼接到 X（利用保留的原始索引对齐）
@@ -220,6 +232,9 @@ def train(df: pd.DataFrame,
     metrics["reduced_rules"] = reduced_rules
     metrics["use_interaction"] = use_interaction
     metrics["use_conditions"] = use_conditions
+    metrics["use_3d"] = use_3d
+    metrics["use_dimer"] = use_dimer
+    metrics["n_confs"] = n_confs
     metrics["rule_neg_strategy"] = hard_rule_strategy
     metrics["remove_all_rule"] = remove_all_rule
 
@@ -254,6 +269,11 @@ def main():
     parser.add_argument("--reduced_rules", action="store_true", help="使用精简规则向量")
     parser.add_argument("--no_interaction", action="store_true", help="不使用 Hadamard 交互特征")
     parser.add_argument("--use_conditions", action="store_true", help="使用反应条件特征")
+    parser.add_argument("--use_3d", action="store_true", help="使用单体 3D 描述符")
+    parser.add_argument("--use_dimer", action="store_true", help="使用二聚体 3D 描述符")
+    parser.add_argument("--n_confs", type=int, default=5, help="3D 构象数")
+    parser.add_argument("--monomer_cache", default=None, help="单体 3D 缓存路径")
+    parser.add_argument("--dimer_cache", default=None, help="二聚体 3D 缓存路径")
     parser.add_argument("--hard_rule_strategy", default="remove_hard_rule",
                         choices=["keep", "remove_hard_rule", "downsample"],
                         help="hard_rule_sampled 负样本处理策略")
@@ -273,6 +293,11 @@ def main():
         reduced_rules=args.reduced_rules,
         use_interaction=not args.no_interaction,
         use_conditions=args.use_conditions,
+        use_3d=args.use_3d,
+        use_dimer=args.use_dimer,
+        n_confs=args.n_confs,
+        monomer_cache_path=args.monomer_cache,
+        dimer_cache_path=args.dimer_cache,
         hard_rule_strategy=args.hard_rule_strategy,
         remove_all_rule=args.remove_all_rule,
         model_path=args.model_path,

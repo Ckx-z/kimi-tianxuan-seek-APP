@@ -19,7 +19,7 @@ SRC_DIR = Path(__file__).resolve().parent
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from chemistry import hard_rules, interaction, linker_analyzer
+from chemistry import cache_3d, hard_rules, interaction, linker_analyzer
 
 
 def _get_reactive_sites(smiles: str, role: str = "aldehyde") -> int:
@@ -107,7 +107,13 @@ def compute_single_monomer_features(smiles: str, role: str = "aldehyde") -> dict
 def compute_pair_features(ald_smiles: str, amine_smiles: str,
                             use_rules: bool = True,
                             reduced_rules: bool = False,
-                            use_interaction: bool = True) -> dict:
+                            use_interaction: bool = True,
+                            use_3d: bool = False,
+                            use_dimer: bool = False,
+                            n_confs: int = 5,
+                            seed: int = 42,
+                            monomer_cache_path: Optional[Path] = None,
+                            dimer_cache_path: Optional[Path] = None) -> dict:
     """计算一对醛+胺的组合特征。
 
     Args:
@@ -116,6 +122,12 @@ def compute_pair_features(ald_smiles: str, amine_smiles: str,
         use_rules: 是否拼接规则特征
         reduced_rules: 是否使用精简规则向量（仅核心违反 + F/CF3）
         use_interaction: 是否拼接醛-胺 Hadamard 交互特征
+        use_3d: 是否拼接单体 3D 描述符（醛 + 胺各 10 维）
+        use_dimer: 是否拼接二聚体 3D 描述符（10 维）
+        n_confs: 3D 构象生成数量
+        seed: 3D 构象随机种子
+        monomer_cache_path: 单体 3D 缓存路径，默认由 cache_3d 决定
+        dimer_cache_path: 二聚体 3D 缓存路径，默认由 cache_3d 决定
 
     重点：使用比例型和每反应位点归一化特征，避免退化为相似度排序。
     """
@@ -175,19 +187,63 @@ def compute_pair_features(ald_smiles: str, amine_smiles: str,
     for k, v in interact_features.items():
         features[f"int_{k}"] = v
 
+    # 5. 单体 3D 描述符
+    if use_3d:
+        try:
+            ald_3d = cache_3d.get_monomer_3d(
+                ald_smiles, n_confs=n_confs, seed=seed, cache_path=monomer_cache_path
+            )
+            amine_3d = cache_3d.get_monomer_3d(
+                amine_smiles, n_confs=n_confs, seed=seed, cache_path=monomer_cache_path
+            )
+            if ald_3d is not None:
+                for name, val in zip(cache_3d.DESCRIPTOR_NAMES, ald_3d):
+                    features[f"ald_3d_{name}"] = val
+            if amine_3d is not None:
+                for name, val in zip(cache_3d.DESCRIPTOR_NAMES, amine_3d):
+                    features[f"amine_3d_{name}"] = val
+        except Exception:
+            pass
+
+    # 6. 二聚体 3D 描述符
+    if use_dimer:
+        try:
+            dimer_3d = cache_3d.get_dimer_3d(
+                ald_smiles, amine_smiles, n_confs=n_confs, seed=seed, cache_path=dimer_cache_path
+            )
+            if dimer_3d is not None:
+                for name, val in zip(cache_3d.DIMER_DESCRIPTOR_NAMES, dimer_3d):
+                    # DIMER_DESCRIPTOR_NAMES 已带 dimer_ 前缀，避免生成 dimer_3d_dimer_*
+                    base_name = name[6:] if name.startswith("dimer_") else name
+                    features[f"dimer_3d_{base_name}"] = val
+        except Exception:
+            pass
+
     return features
 
 
 def featurize_pair(ald_smiles: str, amine_smiles: str,
                     use_rules: bool = True,
                     reduced_rules: bool = False,
-                    use_interaction: bool = True) -> pd.Series:
+                    use_interaction: bool = True,
+                    use_3d: bool = False,
+                    use_dimer: bool = False,
+                    n_confs: int = 5,
+                    seed: int = 42,
+                    monomer_cache_path: Optional[Path] = None,
+                    dimer_cache_path: Optional[Path] = None) -> pd.Series:
     """把一对单体转换为特征 Series。"""
     features = compute_pair_features(
         ald_smiles, amine_smiles,
         use_rules=use_rules,
         reduced_rules=reduced_rules,
         use_interaction=use_interaction,
+        use_3d=use_3d,
+        use_dimer=use_dimer,
+        n_confs=n_confs,
+        seed=seed,
+        monomer_cache_path=monomer_cache_path,
+        dimer_cache_path=dimer_cache_path,
     )
     return pd.Series(features)
 
@@ -196,7 +252,13 @@ def featurize_dataframe(df: pd.DataFrame,
                         smiles_cols: tuple[str, str] = ("aldehyde_smiles", "amine_smiles"),
                         use_rules: bool = True,
                         reduced_rules: bool = False,
-                        use_interaction: bool = True) -> pd.DataFrame:
+                        use_interaction: bool = True,
+                        use_3d: bool = False,
+                        use_dimer: bool = False,
+                        n_confs: int = 5,
+                        seed: int = 42,
+                        monomer_cache_path: Optional[Path] = None,
+                        dimer_cache_path: Optional[Path] = None) -> pd.DataFrame:
     """批量把 DataFrame 中的单体对转换为特征矩阵。
 
     自动跳过醛或胺 SMILES 为 NaN 的行，并打印警告。
@@ -208,6 +270,12 @@ def featurize_dataframe(df: pd.DataFrame,
         use_rules: 是否拼接规则特征
         reduced_rules: 是否使用精简规则向量
         use_interaction: 是否拼接交互特征
+        use_3d: 是否拼接单体 3D 描述符
+        use_dimer: 是否拼接二聚体 3D 描述符
+        n_confs: 3D 构象生成数量
+        seed: 3D 构象随机种子
+        monomer_cache_path: 单体 3D 缓存路径
+        dimer_cache_path: 二聚体 3D 缓存路径
     """
     records = []
     kept_indices = []
@@ -223,6 +291,12 @@ def featurize_dataframe(df: pd.DataFrame,
             use_rules=use_rules,
             reduced_rules=reduced_rules,
             use_interaction=use_interaction,
+            use_3d=use_3d,
+            use_dimer=use_dimer,
+            n_confs=n_confs,
+            seed=seed,
+            monomer_cache_path=monomer_cache_path,
+            dimer_cache_path=dimer_cache_path,
         )
         feats["aldehyde_smiles"] = ald
         feats["amine_smiles"] = amine

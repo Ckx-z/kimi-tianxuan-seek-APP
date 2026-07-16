@@ -23,6 +23,7 @@ data/raw/*.csv
 data/raw/*.xlsx
 data/raw/*.json
 data/interim/*.csv
+data/interim/3d_cache/
 data/processed/*.csv
 data/external/*.csv
 *.pkl

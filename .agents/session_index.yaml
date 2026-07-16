@@ -127,9 +127,49 @@ sessions:
     blockers: []
     status: "completed"
 
+  - id: "2026-07-16-01"
+    date: "2026-07-16"
+    title: "阶段 9：3D/二聚体描述符接入与全量验证"
+    summary: "完成单体3D和二聚体3D描述符接入。新建cache_3d.py并增加15秒子进程超时，更新descriptors.py和train.py支持3D开关。500对验证：二聚体3D NDCG@10提升最显著。全量验证（3094行）：monomer3d_full PR-AUC 0.7785、MAE 0.2344，优于dimer3d_full；选定其为tree_v3主模型。"
+    files_modified:
+      - src/features/chemistry/cache_3d.py
+      - src/features/descriptors.py
+      - src/models/train.py
+      - scripts/ablation_3d_500.py
+      - scripts/ablation_3d_full.py
+      - EXPERIMENTS/exp_002.md
+      - EXPERIMENTS/exp_003.md
+      - PROJECT_STATE.md
+      - DAILY_LOG/2026-07-16.md
+      - DECISIONS.md
+      - models/tree_v3.pkl
+      - models/tree_v3_metrics.json
+      - models/tree_v3_baseline_full.pkl
+      - models/tree_v3_monomer3d_full.pkl
+      - models/tree_v3_dimer3d_full.pkl
+    decisions_made:
+      - "D18: 启用 joblib 文件级构象缓存"
+      - "D19: tree_v3 采用单体 3D，不启用二聚体 3D"
+    models_trained:
+      - name: "tree_v3"
+        path: "models/tree_v3.pkl"
+        metrics: { mae: 0.2344, pr_auc: 0.7785, n_samples: 3094, n_features: 142 }
+      - name: "tree_v3_baseline_full"
+        path: "models/tree_v3_baseline_full.pkl"
+        metrics: { mae: 0.2552, pr_auc: 0.7484, n_samples: 3094, n_features: 122 }
+      - name: "tree_v3_monomer3d_full"
+        path: "models/tree_v3_monomer3d_full.pkl"
+        metrics: { mae: 0.2344, pr_auc: 0.7785, n_samples: 3094, n_features: 142 }
+      - name: "tree_v3_dimer3d_full"
+        path: "models/tree_v3_dimer3d_full.pkl"
+        metrics: { mae: 0.2395, pr_auc: 0.7716, n_samples: 3094, n_features: 166 }
+    test_status: { passed: 3, failed: 0 }
+    blockers: []
+    status: "completed"
+
 # 快速统计
-total_sessions: 5
-completed_sessions: 5
+total_sessions: 6
+completed_sessions: 6
 in_progress_sessions: 0
-models_trained_total: 2
-decisions_made_total: 17
+models_trained_total: 6
+decisions_made_total: 19
