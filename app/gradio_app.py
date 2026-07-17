@@ -28,6 +28,12 @@ def _get_predictor() -> FilmPredictor:
     return _predictor
 
 
+def _brief_error(err: str, max_len: int = 80) -> str:
+    """把可能很长的异常信息截短为一行，便于前端展示。"""
+    first_line = str(err).strip().splitlines()[0] if str(err).strip() else "未知错误"
+    return first_line[:max_len] + ("…" if len(first_line) > max_len else "")
+
+
 def predict(ald_smiles: str, amine_smiles: str) -> tuple[str, str, str]:
     """预测 + 推荐条件的 Gradio 回调函数。"""
     if not ald_smiles.strip() or not amine_smiles.strip():
@@ -46,9 +52,13 @@ def predict(ald_smiles: str, amine_smiles: str) -> tuple[str, str, str]:
         if "gnn_std" in pred_result:
             prob_text += f" (±{pred_result['gnn_std']:.3f})"
         prob_text += "\n"
+    elif "gnn_error" in pred_result:
+        prob_text += f"- **GNN v5.3**: ⚠️ 不可用（{_brief_error(pred_result['gnn_error'])}）\n"
     if "tree_probability" in pred_result:
         tree_name = pred_result.get("tree_model_name", "")
         prob_text += f"- **树模型 ({tree_name})**: {pred_result['tree_probability']:.3f}\n"
+    elif "tree_error" in pred_result:
+        prob_text += f"- **树模型**: ⚠️ 不可用（{_brief_error(pred_result['tree_error'])}）\n"
     if pred_result.get("ensemble_probability") is not None:
         prob_text += f"- **综合概率**: {pred_result['ensemble_probability']:.3f}\n"
 

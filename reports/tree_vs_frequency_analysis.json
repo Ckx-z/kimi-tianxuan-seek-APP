@@ -1,0 +1,37 @@
+{
+  "in_sample": {
+    "pr_auc": 0.9764322953886735,
+    "mae": 0.042810080111342526
+  },
+  "cv_protocol": "GroupKFold-10 by aldehyde, seed default",
+  "model": {
+    "pr_auc": 0.772470484461472,
+    "mae": 0.24047875711254132,
+    "spearman": 0.4109087070810944
+  },
+  "F0_global_mean": {
+    "pr_auc": 0.5404302934945506,
+    "mae": 0.35813489608492627,
+    "spearman": -0.320870089729559
+  },
+  "F1_amine_freq": {
+    "pr_auc": 0.8640020090773539,
+    "mae": 0.22657557314450194,
+    "spearman": 0.37824494053062524
+  },
+  "F2_ald_amine_freq": {
+    "pr_auc": 0.8537213495000937,
+    "mae": 0.2815164486712143,
+    "spearman": 0.3638029471526124
+  },
+  "decomposition": {
+    "model_pred_additive_r2": 0.9771571773238062,
+    "label_additive_r2": 0.957800471344676,
+    "model_pred_vs_amine_freq_spearman": 0.3493328630957212,
+    "model_pred_vs_label_spearman": 0.4109087070810944
+  },
+  "reported_logo_cv": {
+    "pr_auc": 0.7785439100316647,
+    "mae": 0.23444049141934004
+  }
+}

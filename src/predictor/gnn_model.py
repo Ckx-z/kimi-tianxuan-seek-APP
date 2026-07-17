@@ -23,6 +23,20 @@ def _find_python() -> Path:
     return Path("python")
 
 
+def _decode_output(raw: bytes) -> str:
+    """解码子进程输出，兼容 UTF-8 / GBK。
+
+    旧项目 dphuanjing 环境（Windows Python 3.8）按 GBK 打印中文，
+    若按 UTF-8 强制解码会得到乱码，导致概率正则解析失败。
+    """
+    for enc in ("utf-8", "gbk"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 class GNNFilmPredictor:
     """基于旧项目 GNN 的 COF 成膜概率预测器（subprocess 封装）。"""
 
@@ -55,23 +69,23 @@ class GNNFilmPredictor:
         ]
 
         # 在旧项目目录下运行，确保相对路径和 import 正确
+        # 捕获字节流后手动解码（UTF-8 优先，GBK 回退）
         result = subprocess.run(
             cmd,
             cwd=OLD_PROJECT_ROOT,
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
             timeout=120,
         )
+        stdout = _decode_output(result.stdout)
+        stderr = _decode_output(result.stderr)
 
         if result.returncode != 0:
             raise RuntimeError(
                 f"GNN 预测失败（returncode={result.returncode}）。\n"
-                f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+                f"stdout:\n{stdout}\nstderr:\n{stderr}"
             )
 
-        prob, std = self._parse_probability(result.stdout)
+        prob, std = self._parse_probability(stdout)
         return {
             "probability": prob,
             "std": std,

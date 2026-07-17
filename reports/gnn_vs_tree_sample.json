@@ -1,0 +1,205 @@
+{
+  "n": 22,
+  "spearman_tree_gnn": 0.583286278938453,
+  "pearson_tree_gnn": 0.8997308947930734,
+  "mean_gap_tree_minus_gnn": 0.045895454545454545,
+  "mean_abs_gap": 0.13954999999999998,
+  "tree_mean": 0.5928454545454545,
+  "gnn_mean": 0.5469499999999999,
+  "tree_vs_label_spearman": 0.9684462807805936,
+  "gnn_vs_label_spearman": 0.5469010303264279,
+  "rows": [
+    {
+      "ald": "O=Cc1ccc(-c2cc(F)c(C=O)c(F)c2F)cc1",
+      "amine": "N=C(N)NN",
+      "label": 0.0,
+      "tree": 0.0107,
+      "gnn": 0.205,
+      "gnn_std": 0.0368
+    },
+    {
+      "ald": "O=Cc1ccc(-c2ncccc2C=O)nc1",
+      "amine": "Cl.Cl.Nc1c(O)cccc1O",
+      "label": 0.0,
+      "tree": 0.0,
+      "gnn": 0.0072,
+      "gnn_std": 0.0042
+    },
+    {
+      "ald": "O=Cc1ccccn1",
+      "amine": "Nc1ccc(-c2cncc(N)c2)nc1",
+      "label": 0.0,
+      "tree": 0.0118,
+      "gnn": 0.0506,
+      "gnn_std": 0.0279
+    },
+    {
+      "ald": "c1ccncc1",
+      "amine": "c1ccc(-c2cccc(-c3ccccn3)n2)nc1",
+      "label": 0.0,
+      "tree": 0.066,
+      "gnn": 0.4391,
+      "gnn_std": 0.0643
+    },
+    {
+      "ald": "O=Cc1ccccn1",
+      "amine": "Nc1nc(N)nc(-c2ccc(-c3nc(N)nc(N)n3)cc2)n1",
+      "label": 0.0,
+      "tree": 0.0373,
+      "gnn": 0.2021,
+      "gnn_std": 0.0671
+    },
+    {
+      "ald": "O=Cc1ccc(-c2ncccc2C=O)nc1",
+      "amine": "Nc1ccc(-c2cc(N)ccc2N)cc1",
+      "label": 0.0,
+      "tree": 0.0018,
+      "gnn": 0.0619,
+      "gnn_std": 0.0209
+    },
+    {
+      "ald": "O=CC(=CC=C)C1=C(C=C(C=C1)C=C)C=O",
+      "amine": "Nc1ccc(-c2cccc(-c3ccc(N)nc3)c2)cc1",
+      "label": 0.7,
+      "tree": 0.6744,
+      "gnn": 0.7081,
+      "gnn_std": 0.0357
+    },
+    {
+      "ald": "O=CC1=CC(C=O)=CC(C=O)=C1",
+      "amine": "Nc1cncc(N)c1",
+      "label": 0.7,
+      "tree": 0.6728,
+      "gnn": 0.4745,
+      "gnn_std": 0.0907
+    },
+    {
+      "ald": "O=CC1=CC(=O)C(=O)C(C=O)=C1O",
+      "amine": "Nc1cc(F)c(P(=O)(O)O)c(F)c1N",
+      "label": 0.7,
+      "tree": 0.707,
+      "gnn": 0.7812,
+      "gnn_std": 0.0406
+    },
+    {
+      "ald": "O=Cc1c(F)c(O)c(F)c(=O)c(F)c1C=O",
+      "amine": "NC1=CC=C(N)C=C1",
+      "label": 0.7,
+      "tree": 0.662,
+      "gnn": 0.6015,
+      "gnn_std": 0.0499
+    },
+    {
+      "ald": "O=CC1=CC=C(C=O)C=C1",
+      "amine": "Nc1ccc(C(c2ccc(N)cc2)(c2ccc(N)cc2)c2ccc(N)nc2)cc1",
+      "label": 0.7,
+      "tree": 0.7494,
+      "gnn": 0.7295,
+      "gnn_std": 0.0335
+    },
+    {
+      "ald": "O=Cc1sc2ccsc2c1C=O",
+      "amine": "NC1=CC=C(c2c(F)c(N)c(F)c(F)c2F)C1",
+      "label": 0.7,
+      "tree": 0.7074,
+      "gnn": 0.7914,
+      "gnn_std": 0.0266
+    },
+    {
+      "ald": "O=Cc1c(O)cc(C=O)cc1C=O",
+      "amine": "c1ccc(Nc2ccc(N)cc2)cc1",
+      "label": 0.8,
+      "tree": 0.8119,
+      "gnn": 0.6249,
+      "gnn_std": 0.0244
+    },
+    {
+      "ald": "O=CC1=CC=C(O)C=C1C=O",
+      "amine": "NC1=CC=C(C2=NC(NC3=CC(C(N)=CC=C3)=CC=C2)=NC(NC4=CC(C(N)=CC=C4)=CC=C4)=N1)CC5=CC(C(N)=CC=C5)=CC=C4",
+      "label": 0.8,
+      "tree": 0.7692,
+      "gnn": 0.7498,
+      "gnn_std": 0.0259
+    },
+    {
+      "ald": "O=CC1=CC(Br)=C(C=O)C=C1Br",
+      "amine": "C1=CC(=CC=C1C2=CC(=CC=C2)N)C3=CC(=CC=C3)N",
+      "label": 0.8,
+      "tree": 0.8602,
+      "gnn": 0.6985,
+      "gnn_std": 0.0427
+    },
+    {
+      "ald": "O=CC1=CC=C(C2=CC(C3=CC(C4=CC=C(C=O)C=C4)=CC=C3C4=CC=C(C=O)C=C4)=CC=C2)C=C1",
+      "amine": "NC1=CC=C(C2=CC(C3=NC(N=C3)=NC(N=C2)=N)=CC=C1)C=N1",
+      "label": 0.8,
+      "tree": 0.8144,
+      "gnn": null,
+      "gnn_std": null
+    },
+    {
+      "ald": "O=CC1=CC=C(C=O)C=C1",
+      "amine": "Nc1ccccc1",
+      "label": 0.8,
+      "tree": 0.7748,
+      "gnn": 0.726,
+      "gnn_std": 0.0395
+    },
+    {
+      "ald": "O=Cc1c(O)c(C=O)c(O)c(C=O)c1O",
+      "amine": "c1cc(N)ccc1N",
+      "label": 0.8,
+      "tree": 0.8159,
+      "gnn": 0.7901,
+      "gnn_std": 0.0391
+    },
+    {
+      "ald": "O=CC1=CC(=O)C(=O)C(=C1)C=O",
+      "amine": "C1=CC(=CC=C1N)N (Pa); branched polymer with -NH2 groups (PEI)",
+      "label": 1.0,
+      "tree": 0.999,
+      "gnn": 0.6387,
+      "gnn_std": 0.0526
+    },
+    {
+      "ald": "O=CC1=C(C=O)C=C(C=O)C=C1O",
+      "amine": "CCCCCCCC1=C(N)C2=CC=C(C=C2C1(C)CCCCCC)N",
+      "label": 1.0,
+      "tree": 0.8943,
+      "gnn": 0.729,
+      "gnn_std": 0.0373
+    },
+    {
+      "ald": "O=Mc1ccc(C=O)cc1C=O",
+      "amine": "Cc1cc(C)nc(C)c1",
+      "label": 1.0,
+      "tree": 0.8144,
+      "gnn": null,
+      "gnn_std": null
+    },
+    {
+      "ald": "O=CC1=CC(C=O)=C(O)C=C1",
+      "amine": "C1=CC(=CC=C1C2=CC(=CC=C2)N)C3=CC(=CC=C3)N",
+      "label": 1.0,
+      "tree": 0.9071,
+      "gnn": 0.6756,
+      "gnn_std": 0.0304
+    },
+    {
+      "ald": "O=CC#Cc1ccccc1C#C",
+      "amine": "Nc1ccccc1C#C",
+      "label": 1.0,
+      "tree": 1.0,
+      "gnn": 0.7056,
+      "gnn_std": 0.034
+    },
+    {
+      "ald": "COc1cc(C=O)ccc1C=O",
+      "amine": "Nc1ccc(-c2nc(-c3ccc(N)cc3)c(-c3ccc(N)cc3)[nH]2)cc1",
+      "label": 1.0,
+      "tree": 0.9096,
+      "gnn": 0.6426,
+      "gnn_std": 0.0251
+    }
+  ]
+}
