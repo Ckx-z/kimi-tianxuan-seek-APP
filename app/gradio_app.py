@@ -47,7 +47,8 @@ def predict(ald_smiles: str, amine_smiles: str) -> tuple[str, str, str]:
             prob_text += f" (±{pred_result['gnn_std']:.3f})"
         prob_text += "\n"
     if "tree_probability" in pred_result:
-        prob_text += f"- **树模型**: {pred_result['tree_probability']:.3f}\n"
+        tree_name = pred_result.get("tree_model_name", "")
+        prob_text += f"- **树模型 ({tree_name})**: {pred_result['tree_probability']:.3f}\n"
     if pred_result.get("ensemble_probability") is not None:
         prob_text += f"- **综合概率**: {pred_result['ensemble_probability']:.3f}\n"
 

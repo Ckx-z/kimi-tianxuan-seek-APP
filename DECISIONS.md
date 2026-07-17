@@ -1,7 +1,7 @@
 # DECISIONS — 关键决策日志
 
 > 每个关键选择记下「为什么这么定 / 考虑过什么 / 何时复盘」。换任何大模型对接都能秒懂上下文。
-> 最后更新：2026-07-15
+> 最后更新：2026-07-17
 
 ---
 
@@ -26,6 +26,7 @@
 | D17 | 阶段 2 接入 3D/二聚体描述符 | 2026-07-15 | ✅ 已定 |
 | D18 | 启用 joblib 文件级构象缓存 | 2026-07-16 | ✅ 已定 |
 | D19 | tree_v3 采用单体 3D，不启用二聚体 3D | 2026-07-16 | ✅ 已定 |
+| D20 | App/predictor 默认模型切换为 tree_v3，特征开关从 pkl 自动恢复 | 2026-07-17 | ✅ 已定 |
 
 ---
 
@@ -323,6 +324,22 @@
 **何时复盘**：
 - 若后续发现排序/Top-K 场景更重要，可重新评估二聚体 3D 或仅使用二聚体 3D 做排序模型。
 - 可进一步做仅二聚体 3D（无单体 3D）的消融，确认其独立贡献。
+
+---
+
+## D20 — App/predictor 默认模型切换为 tree_v3，特征开关从 pkl 自动恢复
+
+**决定**：
+1. `FilmPredictor` 默认树模型从 `tree_baseline.pkl` 切换为 `models/tree_v3.pkl`。
+2. `TreeFilmPredictor.load()` 从 pkl 内的 `metrics` 恢复特征开关（`use_rules` / `reduced_rules` / `use_interaction` / `use_3d` / `use_dimer` / `n_confs`），预测时按训练配置生成特征；旧 pkl 无 `metrics` 则回退默认特征。
+3. 预测特征矩阵用 `reindex(columns=feature_cols)` 对齐，3D 计算失败的样本补 0 而不是报错。
+
+**为什么**：
+- tree_v3 有 142 维特征（含单体 3D），若预测时仍按默认开关生成特征，会因缺列直接报 KeyError；开关存进 pkl 后模型自描述，切换模型不需要改代码。
+- App 用户可输入任意 SMILES，3D 构象生成可能失败，补 0 比中断更稳健。
+- `TreeFilmPredictor` 的默认路径保持 `tree_baseline.pkl` 不变：`tests/test_app_pipeline.py` 的快速训练测试会保存到默认路径，避免测试覆盖主模型。
+
+**何时复盘**：若后续切换主模型（如 tree_v4），只需改 `src/predictor/__init__.py` 中的 `DEFAULT_TREE_MODEL`。
 
 ---
 

@@ -44,6 +44,8 @@ class TreeFilmPredictor:
         self.model_path = Path(model_path) if model_path else MODELS_DIR / "tree_baseline.pkl"
         self.model = None
         self.feature_cols = None
+        # 特征开关（use_rules / use_3d 等），加载模型时从 pkl 内的 metrics 恢复
+        self.feature_flags: dict = {}
 
     def train(self, df: pd.DataFrame, group_by: str = "aldehyde") -> dict:
         """训练模型，使用留一单体交叉验证。
@@ -132,9 +134,11 @@ class TreeFilmPredictor:
         if self.model is None:
             self.load()
         df = df.dropna(subset=["aldehyde_smiles", "amine_smiles"]).reset_index(drop=True)
-        X = featurize_dataframe(df)
-        X_num = X[self.feature_cols].fillna(0)
-        preds = self.model.predict(X_num)
+        X = featurize_dataframe(df, **self.feature_flags)
+        # reindex 保证列与训练时一致：3D 计算失败的样本/缺失列一律补 0
+        X_num = X.reindex(columns=self.feature_cols).fillna(0)
+        # 回归输出可能略超出 [0, 1]，按概率语义裁剪
+        preds = self.model.predict(X_num).clip(0.0, 1.0)
         return pd.Series(preds, index=df.index, name="film_probability")
 
     def predict_single(self, ald_smiles: str, amine_smiles: str) -> float:
@@ -155,6 +159,14 @@ class TreeFilmPredictor:
         data = joblib.load(self.model_path)
         self.model = data["model"]
         self.feature_cols = data["feature_cols"]
+        # 从训练指标恢复特征开关（tree_v2 及更早的 pkl 无此记录，保持默认特征）
+        metrics = data.get("metrics") or {}
+        self.feature_flags = {
+            k: metrics[k]
+            for k in ("use_rules", "reduced_rules", "use_interaction",
+                      "use_3d", "use_dimer", "n_confs")
+            if k in metrics
+        }
 
 
 def train_tree_baseline(data_path: str | Path | None = None) -> TreeFilmPredictor:

@@ -6,19 +6,27 @@ GNN 通过 subprocess 调用旧项目 predict_pair.py，避免包名冲突。
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from .gnn_model import GNNFilmPredictor
-from .tree_model import TreeFilmPredictor
+from .tree_model import MODELS_DIR, TreeFilmPredictor
+
+# App 默认树模型（tree_v3：精简规则 + Hadamard 交互 + 单体 3D 描述符）
+DEFAULT_TREE_MODEL = MODELS_DIR / "tree_v3.pkl"
 
 
 class FilmPredictor:
     """统一的 COF 成膜概率预测器。"""
 
-    def __init__(self, use_gnn: bool = True, use_tree: bool = True):
+    def __init__(self, use_gnn: bool = True, use_tree: bool = True,
+                 tree_model_path: str | Path | None = None):
         self.use_gnn = use_gnn
         self.use_tree = use_tree
 
         self.gnn = GNNFilmPredictor() if use_gnn else None
-        self.tree = TreeFilmPredictor() if use_tree else None
+        self.tree = TreeFilmPredictor(
+            model_path=tree_model_path or DEFAULT_TREE_MODEL
+        ) if use_tree else None
 
         # 树模型是否可用：看能否加载
         self.tree_available = False
@@ -49,6 +57,7 @@ class FilmPredictor:
             try:
                 tree_prob = self.tree.predict_single(ald_smiles, amine_smiles)
                 result["tree_probability"] = tree_prob
+                result["tree_model_name"] = self.tree.model_path.stem
             except Exception as e:
                 result["tree_error"] = str(e)
                 self.tree_available = False

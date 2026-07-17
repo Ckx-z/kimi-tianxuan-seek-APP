@@ -89,8 +89,9 @@ def global_shap_summary(model, X: pd.DataFrame, feature_cols: List[str],
 
 
 def group_contributions(shap_values: np.ndarray, feature_cols: List[str]) -> Dict[str, float]:
-    """把 SHAP 值按醛/胺/交互/规则分组求和（取绝对值，表示贡献强度）。"""
-    groups = {"aldehyde": 0.0, "amine": 0.0, "interaction": 0.0, "rules": 0.0, "other": 0.0}
+    """把 SHAP 值按醛/胺/交互/规则/3D 分组求和（取绝对值，表示贡献强度）。"""
+    groups = {"aldehyde": 0.0, "amine": 0.0, "interaction": 0.0, "rules": 0.0,
+              "aldehyde_3d": 0.0, "amine_3d": 0.0, "dimer_3d": 0.0, "other": 0.0}
     for val, feat in zip(shap_values, feature_cols):
         groups[classify_feature(feat)] += abs(float(val))
     total = sum(groups.values())
@@ -99,12 +100,18 @@ def group_contributions(shap_values: np.ndarray, feature_cols: List[str]) -> Dic
     return groups
 
 
-def explain_single(model, feature_cols: List[str], ald_smiles: str, amine_smiles: str) -> Dict:
-    """对单个醛-胺组合生成可解释报告。"""
+def explain_single(model, feature_cols: List[str], ald_smiles: str, amine_smiles: str,
+                   use_3d: bool = False, use_dimer: bool = False, n_confs: int = 5) -> Dict:
+    """对单个醛-胺组合生成可解释报告。
+
+    use_3d / use_dimer / n_confs 必须与模型训练时的特征开关一致，
+    否则 3D 特征会缺省为 0，导致归因失真。
+    """
     from features.descriptors import compute_pair_features
 
     feats = compute_pair_features(ald_smiles, amine_smiles,
-                                   use_rules=True, reduced_rules=True, use_interaction=True)
+                                   use_rules=True, reduced_rules=True, use_interaction=True,
+                                   use_3d=use_3d, use_dimer=use_dimer, n_confs=n_confs)
     X = pd.DataFrame([{k: feats.get(k, 0.0) for k in feature_cols}])
 
     pred = float(model.predict(X)[0])
@@ -143,9 +150,12 @@ def explain_single(model, feature_cols: List[str], ald_smiles: str, amine_smiles
 
 
 def summarize_pair_interaction(ald_smiles: str, amine_smiles: str,
-                                model, feature_cols: List[str]) -> str:
+                                model, feature_cols: List[str],
+                                use_3d: bool = False, use_dimer: bool = False,
+                                n_confs: int = 5) -> str:
     """生成一段人类可读的归因摘要。"""
-    exp = explain_single(model, feature_cols, ald_smiles, amine_smiles)
+    exp = explain_single(model, feature_cols, ald_smiles, amine_smiles,
+                         use_3d=use_3d, use_dimer=use_dimer, n_confs=n_confs)
     lines = [
         f"预测成膜得分: {exp['predicted_film_score']:.3f}",
         f"主导贡献方: {exp['dominant_side']}（醛/胺）",

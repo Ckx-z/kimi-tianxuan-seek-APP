@@ -167,9 +167,32 @@ sessions:
     blockers: []
     status: "completed"
 
+  - id: "2026-07-17-01"
+    date: "2026-07-17"
+    title: "阶段 10：tree_v3 归因与 App 接入"
+    summary: "生成 tree_v3 SHAP 归因报告（3D 特征占全局 SHAP 29.8%，ald_3d_radius_ratio 全局第 3）。FilmPredictor 默认树模型切换为 tree_v3.pkl，特征开关从 pkl metrics 自动恢复，预测输出 clip 到 [0,1] 修复回归超界显示问题。attribution.py 支持 3D 分组与 3D 开关，归因报告脚本泛化为任意模型可用。App 端到端验证通过，9 个 pytest 全过。"
+    files_modified:
+      - src/models/attribution.py
+      - scripts/generate_attribution_report.py
+      - reports/attribution_v3.md
+      - src/predictor/__init__.py
+      - src/predictor/tree_model.py
+      - app/gradio_app.py
+      - PROJECT_STATE.md
+      - DECISIONS.md
+      - SESSION_START.md
+      - DAILY_LOG/2026-07-17.md
+      - DAILY_LOG/2026-07-17_human.md
+    decisions_made:
+      - "D20: App/predictor 默认模型切换为 tree_v3，特征开关从 pkl 自动恢复"
+    models_trained: []
+    test_status: { passed: 9, failed: 0 }
+    blockers: []
+    status: "completed"
+
 # 快速统计
-total_sessions: 6
-completed_sessions: 6
+total_sessions: 7
+completed_sessions: 7
 in_progress_sessions: 0
 models_trained_total: 6
-decisions_made_total: 19
+decisions_made_total: 20

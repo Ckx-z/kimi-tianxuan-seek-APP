@@ -80,15 +80,15 @@ cd "C:/Users/ckx/Desktop/全新机器学习实验"
 
 ---
 
-## 7. 当前项目速览（截至 2026-07-15）
+## 7. 当前项目速览（截至 2026-07-17）
 
-- **阶段**：模型 v2 已完成 → **准备接入 3D/二聚体描述符（阶段 9）**
+- **阶段**：3D 描述符接入与全量验证已完成 → **归因报告 + App 接入 tree_v3（阶段 10）**
 - **可运行**：`.venv/Scripts/python.exe app/gradio_app.py` 或双击 `start_app.bat`
-- **模型**：`tree_v2`（PR-AUC **0.7484**，MAE **0.2552**，122 特征）+ GNN v5.3（subprocess 调用，PR-AUC 0.784）
-- **最新报告**：`EXPERIMENTS/exp_001.md`（消融）、`reports/attribution_v2.md`（SHAP 归因）
+- **模型**：`tree_v3`（PR-AUC **0.7785**，MAE **0.2344**，142 特征，App 默认）+ GNN v5.3（subprocess 调用，PR-AUC 0.784）
+- **最新报告**：`EXPERIMENTS/exp_003.md`（全量 3D 验证）、`reports/attribution_v3.md`（SHAP 归因）
 - **记忆系统**：.agents/ 目录已创建，AGENTS.md + session_index + session_state 已建立
 - **日报双轨制**：AI 日报 + 人日报，每天工作结束后生成
-- **已知阻塞**：无。待决策：3D/二聚体描述符接入顺序
+- **已知阻塞**：无
 
 ---
 
