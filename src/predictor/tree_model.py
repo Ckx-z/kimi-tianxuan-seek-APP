@@ -19,6 +19,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from features.descriptors import featurize_dataframe
+from features.target_encoding import apply_film_rates
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -46,6 +47,8 @@ class TreeFilmPredictor:
         self.feature_cols = None
         # 特征开关（use_rules / use_3d 等），加载模型时从 pkl 内的 metrics 恢复
         self.feature_flags: dict = {}
+        # 单体历史成膜率映射表（tree_v4 起存入 pkl；旧 pkl 无此字段 → None）
+        self.te_rates: dict | None = None
 
     def train(self, df: pd.DataFrame, group_by: str = "aldehyde") -> dict:
         """训练模型，使用留一单体交叉验证。
@@ -135,6 +138,12 @@ class TreeFilmPredictor:
             self.load()
         df = df.dropna(subset=["aldehyde_smiles", "amine_smiles"]).reset_index(drop=True)
         X = featurize_dataframe(df, **self.feature_flags)
+        # tree_v4 起：pkl 内含 te_rates 时，把单体历史成膜率先验补为特征列
+        # （未见过的单体回退全量全局均值；旧 pkl 无 te_rates 则跳过，向后兼容）
+        if self.te_rates is not None:
+            te_df = apply_film_rates(df, self.te_rates)
+            for col in te_df.columns:
+                X[col] = te_df[col].values
         # reindex 保证列与训练时一致：3D 计算失败的样本/缺失列一律补 0
         X_num = X.reindex(columns=self.feature_cols).fillna(0)
         # 回归输出可能略超出 [0, 1]，按概率语义裁剪
@@ -167,6 +176,8 @@ class TreeFilmPredictor:
                       "use_3d", "use_dimer", "n_confs")
             if k in metrics
         }
+        # tree_v4 起 pkl 内含 target encoding 映射表；旧 pkl 无此键 → None
+        self.te_rates = data.get("te_rates")
 
 
 def train_tree_baseline(data_path: str | Path | None = None) -> TreeFilmPredictor:

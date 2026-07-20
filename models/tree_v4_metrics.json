@@ -1,0 +1,55 @@
+{
+  "mae": 0.22609436318106962,
+  "pr_auc": 0.8783893236030069,
+  "n_samples": 3094,
+  "n_features": 144,
+  "group_by": "aldehyde",
+  "use_rules": true,
+  "reduced_rules": true,
+  "use_interaction": true,
+  "use_3d": true,
+  "use_dimer": false,
+  "n_confs": 5,
+  "use_conditions": false,
+  "rule_neg_strategy": "remove_hard_rule",
+  "remove_all_rule": false,
+  "use_te": true,
+  "use_freq_weights": true,
+  "freq_weight_formula": "1/sqrt(ald_freq * amine_freq), 均值归一化",
+  "param_set": "v4_mild",
+  "xgb_params": {
+    "n_estimators": 600,
+    "max_depth": 5,
+    "learning_rate": 0.04,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_alpha": 0.5,
+    "reg_lambda": 3.0,
+    "min_child_weight": 10,
+    "objective": "reg:squarederror",
+    "eval_metric": "mae"
+  },
+  "logo_cv": {
+    "n_val_covered": 3094,
+    "coverage": 1.0,
+    "pr_auc": 0.8783893236030069,
+    "mae": 0.22609436318106962,
+    "F0_global_mean_pr_auc": 0.5404302934945506,
+    "F1_amine_freq_pr_auc": 0.8640020090773539
+  },
+  "dual_holdout_cv": {
+    "n_val_covered": 635,
+    "coverage": 0.20523594053005817,
+    "pr_auc": 0.6609335699097829,
+    "mae": 0.35683219289216467,
+    "F0_global_mean_pr_auc": 0.5230938214586653,
+    "F1_amine_freq_pr_auc": 0.5230938214586653
+  },
+  "dual_protocol": "5 折网格分组：验证集的醛和胺均不出现在训练集",
+  "in_sample": {
+    "pr_auc": 0.9992481940500941,
+    "mae": 0.02463241958005598
+  },
+  "in_sample_gap_logo": 0.12085887044708721,
+  "in_sample_gap_dual": 0.3383146241403112
+}

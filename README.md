@@ -72,7 +72,20 @@ pip install gradio python-docx xgboost rdkit joblib pandas scikit-learn
 
 ## 快速启动
 
-### 方式 1：命令行
+### 方式 1：双击 `start_app.vbs`（推荐，无窗口启动）
+
+直接双击 `start_app.vbs`：
+
+- **无任何黑色终端窗口**，App 在后台静默运行
+- 自动打开浏览器到 `http://127.0.0.1:7860`
+- 若 App 已在运行，双击只会再打开一个浏览器标签页，不会重复启动
+- 启动失败（依赖缺失、进程异常退出、超时等）会**弹出错误提示框**，详细日志见 `logs/app_launch.log` 和 `logs/gradio_app.log`
+
+### 方式 2：双击 `start_app.bat`（调试用）
+
+会打开独立终端窗口运行，可在终端里查看实时日志；关掉窗口即关闭 App。
+
+### 方式 3：命令行
 
 ```bash
 cd "C:\Users\ckx\Desktop\全新机器学习实验"
@@ -87,16 +100,12 @@ Running on local URL:  http://127.0.0.1:7860
 
 浏览器打开：`http://127.0.0.1:7860`
 
-### 方式 2：双击启动
-
-直接双击 `start_app.bat`，会打开独立终端运行，关掉命令窗口不影响。
-
 ### 打不开怎么办？
 
-1. **终端必须保持运行**——App 是本地服务器，关掉终端 = 关闭网站
-2. **端口被占用**——改 `app/gradio_app.py` 最后一行 `server_port=7861`
+1. **静默启动失败**——看弹窗提示与 `logs/gradio_app.log` 末尾的报错；或改用 `start_app.bat` 在终端里直接看报错
+2. **端口被占用**——`start_app.vbs` 会自动复用已运行的实例；如需换端口，改 `app/gradio_app.py` 最后一行 `server_port=7861`
 3. **防火墙拦截**——允许 Python 访问本地网络
-4. **首次启动慢**——等 10-30 秒
+4. **首次启动慢**——等 10-30 秒（模型加载期间浏览器可能暂时打不开，稍等刷新即可）
 
 ---
 

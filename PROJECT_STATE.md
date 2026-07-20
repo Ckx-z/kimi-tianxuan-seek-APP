@@ -1,7 +1,7 @@
 # PROJECT_STATE — 项目当前状态
 
 > ⭐ **这是每次会话的第一份必读文件**。会话开头读它进入状态，结尾更新它。
-> 最后更新：2026-07-17（阶段 10 完成：tree_v3 归因报告 + App 默认模型切换 tree_v3）
+> 最后更新：2026-07-20（阶段 11 完成：双留出评估 + tree_v4 + 前端打分理由 + 静默启动器；默认模型保持 tree_v3）
 
 ---
 
@@ -30,7 +30,7 @@
 | **阶段 8** | **模型 v2：精简规则 + Hadamard 交互 + 归因** | ✅ **已完成** |
 | **阶段 9** | **3D/二聚体描述符接入与对比** | ✅ **已完成** |
 | **阶段 10** | **归因与 App 接入选 tree_v3** | ✅ **已完成** |
-| **阶段 11** | **统计先验入模 + 双留出评估 + 前端打分理由** | 🔄 **进行中** |
+| **阶段 11** | **统计先验入模 + 双留出评估 + 前端打分理由** | ✅ **已完成** |
 
 **阶段 6 子任务（记忆系统建设）**：
 - [x] 创建 `.agents/` 目录
@@ -129,7 +129,7 @@
 - Top 特征：`int_hadamard_tpsa_per_site`、`ald_n_aromatic_rings_per_site`、`ald_aromatic_frac`、`rule_C3对位(非间位)`
 - 醛侧特征贡献整体高于胺侧，交互特征有效补全了配对信息。
 
-## 五、阶段 9-10 小结与下一步（NEXT）
+## 五、阶段 9-11 小结与下一步（NEXT）
 
 ### 阶段 9：3D 描述符接入与全量验证（2026-07-16 完成）
 
@@ -154,17 +154,40 @@
 - 特征开关从模型 pkl 的 metrics 自动恢复，旧模型向后兼容
 - 预测特征用 `reindex` 对齐，3D 计算失败的样本补 0
 
+### 阶段 11：统计先验入模 + 双留出评估 + 前端打分理由（2026-07-20 完成）
+
+**建模实验（exp_005，D21）：**
+
+| 模型 | LOGO PR-AUC | 双留出 PR-AUC（3 种子均值） | in-sample 间隙 | 特征数 | 状态 |
+|---|---|---|---|---|---|
+| 胺频率基线 F1 | 0.8640 | 0.5231（≈正例率） | — | 1 | 基线 |
+| `models/tree_v3.pkl` | 0.7610 | **0.6530** | 0.2154 | 142 | **App 默认（保持）** |
+| `models/tree_v4.pkl` | **0.8784** | 0.6418 | **0.1209** | 144（+2 TE） | 保存为可选模型 |
+
+- tree_v4 = TE（CV 安全 target encoding）+ 频率降权 + mild 正则：LOGO +0.117 并**首次超过频率基线 0.864**，in-sample 间隙减半——对"已知单体池内推荐"的 App 主场景是实质进步。
+- 但切换门槛"双留出 PR-AUC 明确优于 v3"**未达成**（0.642 vs 0.653；单种子 +0.033 不可复现）→ **App 默认模型保持 tree_v3**（`src/predictor/__init__.py` 未动）。
+- 双留出协议证实 exp_004 的泄漏判断：验证集胺全未见时 F1 基线坍缩到正例率，LOGO 的 0.864 在"单体全新"场景不存在。
+- 输出：`scripts/stage11_dual_holdout.py`、`src/features/target_encoding.py`、`reports/stage11_dual_holdout.json`、`models/tree_v4.pkl`（+metrics，predictor 已兼容 `te_rates`）、`EXPERIMENTS/exp_005.md`。
+
+**前端打分理由（App）：**
+- `app/gradio_app.py` 新增「打分理由」板块（`_explain_tree_score`）：基于实际加载的树模型做 SHAP 归因，中文标签映射（`feature_label_zh` / `format_explanation_zh`），explainer 缓存（热态 0.03-0.05s）。
+- 缺 shap 的环境仅降级本板块、不影响预测主流程；**base 环境已补装 shap 0.52.0**（2026-07-20），冒烟测试确认打分理由实际产出（见 `DAILY_LOG/2026-07-20.md`）。
+- 测试：`tests/test_attribution_app.py`（无 shap 环境整文件跳过）。
+
+**静默启动器：**
+- `start_app.vbs` + `silent_launch.py`：pythonw 无窗口静默启动 + 自动开浏览器 + 失败弹 msgbox + `logs/` 日志。README 快速启动已更新，**推荐双击 `start_app.vbs`**。
+
 ### 下一步
 
-**阶段 11（进行中，源自 exp_004 发现）：**
+**阶段 12 候选（源自 exp_005 遗留）：**
 
-1. **双留出 CV**：醛胺双留出与 LOGO 同时报告，避免胺统计泄漏高估泛化
-2. **统计先验入模**：单体历史成膜率用 CV 安全 target encoding 显式作为特征
-3. **频率降权**：借鉴旧项目 GNN，降低高频单体样本权重
-4. **正则化**：减小在样本内间隙（in-sample 0.976 vs CV 0.772）
-5. **前端打分理由**：App 展示 SHAP 归因（哪个官能团/特征导致成膜或不成膜）
+1. **双未见单体泛化（真正瓶颈）**：双留出下所有模型在 0.63-0.68 挣扎——瓶颈在化学表征而非容量（更强正则反而更差）。方向：单体指纹/图特征入树模型。
+2. **双模型策略候选**：LOGO 态用 tree_v4（含 TE）、新单体场景用 noTE 变体或 v3；待使用场景定型后复盘（D21 复盘点）。
+3. **概率校准**：双留出 MAE 与 PR-AUC 背离（v4 排序升但 MAE 偏差），可做 Platt/isotonic 校准。
+4. **TE 归因补 0**：`attribution.py` 解释 tree_v4 时需从 pkl `te_rates` 填充 TE 特征（当前默认 v3 不受影响）。
+5. **双留出多种子协议**：分组对种子敏感（±0.03），今后外推评估必须报多分组种子。
 
-**后续候选：**
+**更早的候选（仍有效）：**
 
 1. 消融实验（可选）：分别关闭 3D、二聚体、交互特征，分析各自贡献
 2. **异常检测再评估**：条件特征实验 D PR-AUC 0.9112 异常高，需单独诊断是否与标签泄漏有关
@@ -176,6 +199,9 @@
 ## 六、阻塞点 / 待决策（BLOCKERS）
 
 暂无阻塞。待决策：
+- 是否采用 LOGO/双留出双模型策略（tree_v4 含 TE 负责已知单体池，noTE/v3 负责新单体场景），待 App 使用场景定型后复盘（D21 复盘点）
+- 是否做概率校准（Platt/isotonic），修复双留出下 MAE 与 PR-AUC 背离
+- 双未见单体泛化（0.63-0.68）的表征升级路线：单体指纹 / 图特征
 - 是否做仅二聚体 3D（无单体 3D）的消融，确认二聚体的独立排序价值（D19 复盘点）
 - 是否引入 LightGBM 与 XGBoost 对比
 
@@ -228,18 +254,20 @@
 ### 推荐运行方式
 
 - **树模型训练/脚本**：`.venv\Scripts\python.exe`（Python 3.12，已安装 numpy、pandas、scikit-learn、xgboost、rdkit、pyyaml、shap、joblib）
-- **App 前端**：base 环境 Python 3.13（已安装 gradio 6.20、python-docx、xgboost）或 `.venv` 环境
+- **App 前端**：base 环境 Python 3.13（已安装 gradio 6.20、python-docx、xgboost、**shap 0.52.0** — 2026-07-20 补装，打分理由可用）或 `.venv` 环境
 - **GNN 预测**：通过 subprocess 自动调用 dphuanjing 环境 Python 3.8（torch 2.3.1 + PyG 2.6.1）
 
 ### 启动 App
 
-方式 1：命令行
+方式 1（推荐）：双击 `start_app.vbs` —— pythonw 静默启动，无黑色终端窗口，自动打开浏览器；失败弹 msgbox 提示，日志写入 `logs/`（由 `silent_launch.py` 实现）
+
+方式 2：命令行
 ```bash
 cd "C:\Users\ckx\Desktop\全新机器学习实验"
 .venv\Scripts\python.exe app/gradio_app.py
 ```
 
-方式 2：双击 `start_app.bat`（终端独立运行，不会随关闭）
+方式 3：双击 `start_app.bat`（终端独立运行，不会随关闭）
 
 打开浏览器访问：`http://127.0.0.1:7860`
 

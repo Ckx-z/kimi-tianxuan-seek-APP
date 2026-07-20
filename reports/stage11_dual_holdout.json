@@ -1,0 +1,271 @@
+{
+  "protocols": {
+    "logo": "GroupKFold-10 by aldehyde",
+    "dual": "自定义网格分组 5 折：验证集的醛和胺均不在训练集出现"
+  },
+  "variants": {
+    "v3_ref": {
+      "params": {
+        "n_estimators": 500,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 1.0,
+        "min_child_weight": 5,
+        "objective": "reg:squarederror",
+        "eval_metric": "mae"
+      },
+      "use_te": false,
+      "use_freq_weights": false,
+      "logo": {
+        "n_val_covered": 3094,
+        "coverage": 1.0,
+        "pr_auc": 0.7610206448245653,
+        "mae": 0.24229577856827134,
+        "F0_global_mean_pr_auc": 0.5404302934945506,
+        "F1_amine_freq_pr_auc": 0.8640020090773539
+      },
+      "dual": {
+        "n_val_covered": 635,
+        "coverage": 0.20523594053005817,
+        "pr_auc": 0.6274638567391193,
+        "mae": 0.33335672574484443,
+        "F0_global_mean_pr_auc": 0.5230938214586653,
+        "F1_amine_freq_pr_auc": 0.5230938214586653
+      }
+    },
+    "v4_mild": {
+      "params": {
+        "n_estimators": 600,
+        "max_depth": 5,
+        "learning_rate": 0.04,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.5,
+        "reg_lambda": 3.0,
+        "min_child_weight": 10,
+        "objective": "reg:squarederror",
+        "eval_metric": "mae"
+      },
+      "use_te": true,
+      "use_freq_weights": true,
+      "logo": {
+        "n_val_covered": 3094,
+        "coverage": 1.0,
+        "pr_auc": 0.8783893236030069,
+        "mae": 0.22609436318106962,
+        "F0_global_mean_pr_auc": 0.5404302934945506,
+        "F1_amine_freq_pr_auc": 0.8640020090773539
+      },
+      "dual": {
+        "n_val_covered": 635,
+        "coverage": 0.20523594053005817,
+        "pr_auc": 0.6609335699097829,
+        "mae": 0.35683219289216467,
+        "F0_global_mean_pr_auc": 0.5230938214586653,
+        "F1_amine_freq_pr_auc": 0.5230938214586653
+      }
+    },
+    "v4_medium": {
+      "params": {
+        "n_estimators": 800,
+        "max_depth": 4,
+        "learning_rate": 0.03,
+        "subsample": 0.7,
+        "colsample_bytree": 0.7,
+        "reg_alpha": 1.0,
+        "reg_lambda": 5.0,
+        "min_child_weight": 10,
+        "objective": "reg:squarederror",
+        "eval_metric": "mae"
+      },
+      "use_te": true,
+      "use_freq_weights": true,
+      "logo": {
+        "n_val_covered": 3094,
+        "coverage": 1.0,
+        "pr_auc": 0.8704483995117512,
+        "mae": 0.226390795947169,
+        "F0_global_mean_pr_auc": 0.5404302934945506,
+        "F1_amine_freq_pr_auc": 0.8640020090773539
+      },
+      "dual": {
+        "n_val_covered": 635,
+        "coverage": 0.20523594053005817,
+        "pr_auc": 0.6081623038875235,
+        "mae": 0.3611704563343619,
+        "F0_global_mean_pr_auc": 0.5230938214586653,
+        "F1_amine_freq_pr_auc": 0.5230938214586653
+      }
+    },
+    "v4_strong": {
+      "params": {
+        "n_estimators": 1000,
+        "max_depth": 3,
+        "learning_rate": 0.03,
+        "subsample": 0.7,
+        "colsample_bytree": 0.6,
+        "reg_alpha": 2.0,
+        "reg_lambda": 10.0,
+        "min_child_weight": 20,
+        "objective": "reg:squarederror",
+        "eval_metric": "mae"
+      },
+      "use_te": true,
+      "use_freq_weights": true,
+      "logo": {
+        "n_val_covered": 3094,
+        "coverage": 1.0,
+        "pr_auc": 0.859045627120467,
+        "mae": 0.23069358923314134,
+        "F0_global_mean_pr_auc": 0.5404302934945506,
+        "F1_amine_freq_pr_auc": 0.8640020090773539
+      },
+      "dual": {
+        "n_val_covered": 635,
+        "coverage": 0.20523594053005817,
+        "pr_auc": 0.5785567004792331,
+        "mae": 0.356668842852585,
+        "F0_global_mean_pr_auc": 0.5230938214586653,
+        "F1_amine_freq_pr_auc": 0.5230938214586653
+      }
+    },
+    "v4_mild_noTE": {
+      "params": {
+        "n_estimators": 600,
+        "max_depth": 5,
+        "learning_rate": 0.04,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.5,
+        "reg_lambda": 3.0,
+        "min_child_weight": 10,
+        "objective": "reg:squarederror",
+        "eval_metric": "mae"
+      },
+      "use_te": false,
+      "use_freq_weights": true,
+      "logo": {
+        "n_val_covered": 3094,
+        "coverage": 1.0,
+        "pr_auc": 0.789977429678293,
+        "mae": 0.24491607592726847,
+        "F0_global_mean_pr_auc": 0.5404302934945506,
+        "F1_amine_freq_pr_auc": 0.8640020090773539
+      },
+      "dual": {
+        "n_val_covered": 635,
+        "coverage": 0.20523594053005817,
+        "pr_auc": 0.6694150699800118,
+        "mae": 0.3273807576157915,
+        "F0_global_mean_pr_auc": 0.5230938214586653,
+        "F1_amine_freq_pr_auc": 0.5230938214586653
+      }
+    },
+    "v4_mild_noWeight": {
+      "params": {
+        "n_estimators": 600,
+        "max_depth": 5,
+        "learning_rate": 0.04,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.5,
+        "reg_lambda": 3.0,
+        "min_child_weight": 10,
+        "objective": "reg:squarederror",
+        "eval_metric": "mae"
+      },
+      "use_te": true,
+      "use_freq_weights": false,
+      "logo": {
+        "n_val_covered": 3094,
+        "coverage": 1.0,
+        "pr_auc": 0.8561652316881081,
+        "mae": 0.2405952535686017,
+        "F0_global_mean_pr_auc": 0.5404302934945506,
+        "F1_amine_freq_pr_auc": 0.8640020090773539
+      },
+      "dual": {
+        "n_val_covered": 635,
+        "coverage": 0.20523594053005817,
+        "pr_auc": 0.6093323555539805,
+        "mae": 0.3727982909895304,
+        "F0_global_mean_pr_auc": 0.5230938214586653,
+        "F1_amine_freq_pr_auc": 0.5230938214586653
+      }
+    }
+  },
+  "n_samples": 3094,
+  "n_base_features": 142,
+  "best_candidate": "v4_mild",
+  "in_sample": {
+    "tree_v3": {
+      "pr_auc": 0.9764322953886735,
+      "mae": 0.042842458229057155
+    },
+    "tree_v4": {
+      "pr_auc": 0.9992481940500941,
+      "mae": 0.02463241958005598
+    },
+    "gap_v3_logo": 0.21541165056410816,
+    "gap_v4_logo": 0.12085887044708721,
+    "gap_v4_dual": 0.3383146241403112
+  },
+  "v3_pkl_reported": {
+    "pr_auc": 0.7785439100316647,
+    "mae": 0.23444049141934004
+  },
+  "dual_seed_robustness": {
+    "note": "双留出协议对分组种子敏感；3 个种子（42/123/7）的合并 PR-AUC/MAE。LOGO（GroupKFold-10）无种子依赖。",
+    "seeds": [
+      42,
+      123,
+      7
+    ],
+    "v3_ref": {
+      "pr_auc": [
+        0.6275,
+        0.6765,
+        0.6551
+      ],
+      "mae": [
+        0.3334,
+        0.3121,
+        0.3038
+      ],
+      "pr_auc_mean": 0.653,
+      "mae_mean": 0.3164
+    },
+    "v4_mild": {
+      "pr_auc": [
+        0.6609,
+        0.6283,
+        0.6362
+      ],
+      "mae": [
+        0.3568,
+        0.3481,
+        0.3227
+      ],
+      "pr_auc_mean": 0.6418,
+      "mae_mean": 0.3425
+    },
+    "v4_mild_noTE": {
+      "pr_auc": [
+        0.6694,
+        0.7075,
+        0.6703
+      ],
+      "mae": [
+        0.3274,
+        0.3142,
+        0.307
+      ],
+      "pr_auc_mean": 0.6824,
+      "mae_mean": 0.3162
+    },
+    "conclusion": "v4_mild(TE) 双留出未稳定优于 v3_ref（3 种子均值 -0.011，MAE 一致偏差）；v4_mild_noTE 三个种子均优于 v3_ref（均值 +0.029）。→ 不满足默认模型切换门槛。"
+  }
+}

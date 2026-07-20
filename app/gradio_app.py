@@ -1,7 +1,7 @@
 """Gradio App 入口：COF 成膜实验指导系统。
 
 输入：醛单体 SMILES + 胺单体 SMILES
-输出：成膜概率 + 推荐实验条件 + Word 实验报告
+输出：成膜概率 + 打分理由（SHAP 归因）+ 推荐实验条件 + Word 实验报告
 """
 
 from __future__ import annotations
@@ -34,10 +34,38 @@ def _brief_error(err: str, max_len: int = 80) -> str:
     return first_line[:max_len] + ("…" if len(first_line) > max_len else "")
 
 
-def predict(ald_smiles: str, amine_smiles: str) -> tuple[str, str, str]:
-    """预测 + 推荐条件的 Gradio 回调函数。"""
+def _explain_tree_score(predictor: FilmPredictor, ald_smiles: str, amine_smiles: str) -> str:
+    """生成「打分理由」：基于 FilmPredictor 实际加载的树模型做 SHAP 归因。
+
+    归因模块懒加载：运行环境缺少 shap 时只降级本板块，不影响预测主流程。
+    模型/特征列/特征开关全部从 predictor.tree 动态获取，不硬编码模型路径。
+    """
+    if not getattr(predictor, "tree_available", False) or getattr(predictor, "tree", None) is None:
+        return "### 打分理由（SHAP 归因）\n\n树模型不可用，无法生成打分理由。"
+    try:
+        from models.attribution import explain_pair_for_app, format_explanation_zh
+    except ImportError:
+        return ("### 打分理由（SHAP 归因）\n\n"
+                "⚠️ 当前 Python 环境缺少 shap 包，打分理由不可用"
+                "（在运行 App 的环境中 `pip install shap` 后即可显示）。")
+    try:
+        tree = predictor.tree
+        exp = explain_pair_for_app(
+            tree.model,
+            tree.feature_cols,
+            ald_smiles,
+            amine_smiles,
+            feature_flags=tree.feature_flags,
+        )
+        return format_explanation_zh(exp, model_name=tree.model_path.stem)
+    except Exception as e:
+        return f"### 打分理由（SHAP 归因）\n\n⚠️ 打分理由生成失败（{_brief_error(e)}）"
+
+
+def predict(ald_smiles: str, amine_smiles: str) -> tuple[str, str, str, str]:
+    """预测 + 推荐条件 + 打分理由的 Gradio 回调函数。"""
     if not ald_smiles.strip() or not amine_smiles.strip():
-        return "请输入醛和胺的 SMILES", "", ""
+        return "请输入醛和胺的 SMILES", "", "", ""
 
     predictor = _get_predictor()
     pred_result = predictor.predict(ald_smiles.strip(), amine_smiles.strip())
@@ -75,7 +103,10 @@ def predict(ald_smiles: str, amine_smiles: str) -> tuple[str, str, str]:
     cond_text += f"**相似历史案例**: {conditions.get('case_description', 'N/A')} "
     cond_text += f"(相似度 {conditions.get('case_similarity_score', 0):.2f})\n"
 
-    return prob_text, cond_text, "点击生成报告按钮下载"
+    # 打分理由（SHAP 归因，基于实际加载的树模型）
+    explain_text = _explain_tree_score(predictor, ald_smiles.strip(), amine_smiles.strip())
+
+    return prob_text, cond_text, "点击生成报告按钮下载", explain_text
 
 
 def generate_report_callback(ald_smiles: str, amine_smiles: str) -> str:
@@ -101,7 +132,8 @@ def create_app() -> gr.Blocks:
     with gr.Blocks(title="COF 成膜实验指导系统") as app:
         gr.Markdown("# COF 成膜实验指导系统")
         gr.Markdown(
-            "输入醛和胺单体的 SMILES，系统将预测成膜概率、推荐实验条件，并生成 Word 实验报告。"
+            "输入醛和胺单体的 SMILES，系统将预测成膜概率、给出打分理由（SHAP 归因）、"
+            "推荐实验条件，并生成 Word 实验报告。"
         )
 
         with gr.Row():
@@ -122,12 +154,13 @@ def create_app() -> gr.Blocks:
             with gr.Column():
                 prob_output = gr.Markdown(label="成膜概率")
                 cond_output = gr.Markdown(label="推荐实验条件")
+                explain_output = gr.Markdown(label="打分理由")
                 report_output = gr.File(label="实验报告")
 
         predict_btn.click(
             fn=predict,
             inputs=[ald_input, amine_input],
-            outputs=[prob_output, cond_output, gr.Textbox(visible=False)],
+            outputs=[prob_output, cond_output, gr.Textbox(visible=False), explain_output],
         )
 
         report_btn.click(
