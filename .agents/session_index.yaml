@@ -190,10 +190,41 @@ sessions:
     test_status: { passed: 9, failed: 0 }
     blockers: []
     status: "completed"
+  - id: "2026-07-20-01"
+    date: "2026-07-20"
+    title: "阶段 11+12：双留出/tree_v4/打分理由/静默启动 + 双模型路由落地"
+    summary: "阶段 11：双留出评估协议确立（D21），tree_v4（TE 先验+频率降权+弱正则）LOGO 0.8784 首超频率基线但双留出未达切换门槛；前端打分理由（SHAP 中文归因）与静默启动器上线。阶段 12：Morgan/MACCS 指纹入模证伪（exp_006，tree_v5 仅存档）、Hadamard 交互排除记忆通道疑点并保留（exp_007，fold3 诊断为难折）、概率校准证伪（MAE 变差，未保存校准器）；随后落地双模型路由（D22）：训练保存自描述 tree_v4_noTE.pkl（双留出 3 种子均值 0.6824 最强），新增 src/predictor/routing.py 与 models/monomer_pool.json（醛 896/胺 1366），FilmPredictor 默认路由模式——醛/胺都已见走 tree_v4、任一未见走 tree_v4_noTE，预测标注模型与路由原因，打分理由跟随路由模型，向后兼容（显式路径/use_routing=False/资产缺失回退 tree_v3）。路由评估（exp_008，随机 KFold×3 种子 + LOGO 分桶）：routed 对 v3 全线不劣（帕累托改进）；'一新一熟'混合查询代价与 routed_strict 改进候选已量化，列为 D22 第一复盘点。池内模型维持 v4_int（v4_noint LOGO 差异在逐折噪声内）。测试 54 passed。"
+    files_modified:
+      - scripts/stage12_train_noTE.py
+      - src/predictor/routing.py
+      - src/predictor/__init__.py
+      - app/gradio_app.py
+      - scripts/stage12_routing_eval.py
+      - reports/routing_eval.json
+      - tests/test_routing.py
+      - EXPERIMENTS/exp_005.md
+      - EXPERIMENTS/exp_006.md
+      - EXPERIMENTS/exp_007.md
+      - EXPERIMENTS/exp_008.md
+      - PROJECT_STATE.md
+      - DECISIONS.md
+      - SESSION_START.md
+      - DAILY_LOG/2026-07-20.md
+      - DAILY_LOG/2026-07-20_human.md
+    decisions_made:
+      - "D21: 双留出评估协议 + 统计先验入模（tree_v4）；默认模型保持 tree_v3"
+      - "D22: 双模型路由上线（tree_v4 池内 + tree_v4_noTE 外推）；指纹/校准路线关闭"
+    models_trained:
+      - models/tree_v4.pkl
+      - models/tree_v5.pkl
+      - models/tree_v4_noTE.pkl
+    test_status: { passed: 54, failed: 0 }
+    blockers: []
+    status: "completed"
 
 # 快速统计
-total_sessions: 7
-completed_sessions: 7
+total_sessions: 8
+completed_sessions: 8
 in_progress_sessions: 0
-models_trained_total: 6
-decisions_made_total: 20
+models_trained_total: 9
+decisions_made_total: 22

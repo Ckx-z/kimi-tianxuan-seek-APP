@@ -6,17 +6,38 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import gradio as gr
+from rdkit import RDLogger
 
 from condition_recommender import recommend
 from predictor import FilmPredictor
 from report_generator.exporter import generate_report
 from utils.molecule_viz import render_imine_product, smiles_to_image
+
+
+def _configure_rdkit_logging() -> None:
+    """统一 App 进程的 RDKit 日志状态（须在全部导入之后调用）。
+
+    候选池含已知脏 SMILES（特征侧按补 0 优雅降级），每次预测/绘图都会向
+    stderr 刷 Parse Error 告警，淹没真正的报错，故默认静默。
+    注意导入链中 features.fingerprints 等模块在 import 时也会静默 RDKit，
+    因此调试模式必须显式 EnableLog 恢复，而非"不处理"。
+    调试入口（start_app.bat）通过设置 COF_RDKIT_DEBUG=1 恢复 RDKit 日志。
+    仅影响日志输出，不改变解析与预测行为。
+    """
+    if os.environ.get("COF_RDKIT_DEBUG"):
+        RDLogger.EnableLog("rdApp.*")
+        return
+    RDLogger.DisableLog("rdApp.*")
+
+
+_configure_rdkit_logging()
 
 # 全局预测器（懒加载）
 _predictor = None
@@ -36,12 +57,14 @@ def _brief_error(err: str, max_len: int = 80) -> str:
 
 
 def _explain_tree_score(predictor: FilmPredictor, ald_smiles: str, amine_smiles: str) -> str:
-    """生成「打分理由」：基于 FilmPredictor 实际加载的树模型做 SHAP 归因。
+    """生成「打分理由」：基于该输入实际路由到的树模型做 SHAP 归因。
 
     归因模块懒加载：运行环境缺少 shap 时只降级本板块，不影响预测主流程。
-    模型/特征列/特征开关全部从 predictor.tree 动态获取，不硬编码模型路径。
+    双模型路由（D22）下通过 predictor.get_tree_for() 取实际使用的模型：
+    池内 tree_v4 走 te_rates 填充路径，外推 tree_v4_noTE 走原 v3 路径；
+    单模型模式退回 predictor.tree，不硬编码模型路径。
     """
-    if not getattr(predictor, "tree_available", False) or getattr(predictor, "tree", None) is None:
+    if not getattr(predictor, "tree_available", False):
         return "### 打分理由（SHAP 归因）\n\n树模型不可用，无法生成打分理由。"
     try:
         from models.attribution import explain_pair_for_app, format_explanation_zh
@@ -50,15 +73,21 @@ def _explain_tree_score(predictor: FilmPredictor, ald_smiles: str, amine_smiles:
                 "⚠️ 当前 Python 环境缺少 shap 包，打分理由不可用"
                 "（在运行 App 的环境中 `pip install shap` 后即可显示）。")
     try:
-        tree = predictor.tree
+        tree, route_info = predictor.get_tree_for(ald_smiles, amine_smiles)
+        if tree is None:
+            return "### 打分理由（SHAP 归因）\n\n树模型不可用，无法生成打分理由。"
         exp = explain_pair_for_app(
             tree.model,
             tree.feature_cols,
             ald_smiles,
             amine_smiles,
             feature_flags=tree.feature_flags,
+            te_rates=tree.te_rates,  # tree_v4 按样本醛/胺填充 TE 先验列；v3/noTE 为 None 无影响
         )
-        return format_explanation_zh(exp, model_name=tree.model_path.stem)
+        text = format_explanation_zh(exp, model_name=tree.model_path.stem)
+        if route_info:
+            text += f"\n\n**模型路由**：{route_info['route_reason']}"
+        return text
     except Exception as e:
         return f"### 打分理由（SHAP 归因）\n\n⚠️ 打分理由生成失败（{_brief_error(e)}）"
 
@@ -108,6 +137,8 @@ def predict(ald_smiles: str, amine_smiles: str):
     if "tree_probability" in pred_result:
         tree_name = pred_result.get("tree_model_name", "")
         prob_text += f"- **树模型 ({tree_name})**: {pred_result['tree_probability']:.3f}\n"
+        if pred_result.get("tree_route_reason"):
+            prob_text += f"  - 模型路由：{pred_result['tree_route_reason']}\n"
     elif "tree_error" in pred_result:
         prob_text += f"- **树模型**: ⚠️ 不可用（{_brief_error(pred_result['tree_error'])}）\n"
     if pred_result.get("ensemble_probability") is not None:
