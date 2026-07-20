@@ -10,7 +10,8 @@
 
 - ✅ 输入醛 + 胺 SMILES → 输出成膜概率
 - ✅ 推荐实验条件 / 溶液配比（基于规则 + 历史案例）
-- ✅ 生成 Word 实验报告
+- ✅ 生成 Word 实验报告（内嵌单体 2D 结构图）
+- ✅ 展示化学结构图：醛/胺单体 2D 结构 + 亚胺缩合产物骨架（RDKit 渲染，非法 SMILES 优雅降级）
 - ✅ Gradio 前端可启动
 - ✅ GNN v5.3 已通过 subprocess 接入
 - ✅ 树模型基线（PR-AUC 0.727）
@@ -174,7 +175,7 @@ pytest tests/ -v
 2. **GNN 全接入**：目前通过 subprocess 调用，未来可直接导入（需解决 src 包名冲突）
 3. **案例库丰富**：从 `data/experimental_refs/main_template.docx` 自动提取历史案例
 4. **报告模板优化**：复用现有 Word 模板格式
-5. **单体结构图可视化**：在 App 中显示 RDKit 渲染的分子结构
+5. ~~**单体结构图可视化**~~：已完成（2026-07-20，App + Word 报告均内嵌 RDKit 渲染结构图）
 
 ---
 
@@ -187,6 +188,7 @@ pytest tests/ -v
 | `src/predictor/gnn_model.py` | GNN v5.3 subprocess 封装 |
 | `src/condition_recommender/` | 条件推荐规则 + 案例 |
 | `src/report_generator/exporter.py` | Word 报告生成 |
+| `src/utils/molecule_viz.py` | 分子结构渲染（SMILES→PNG，App/报告复用） |
 | `src/features/descriptors.py` | 统一描述符接口（含归一化） |
 | `PROJECT_STATE.md` | 项目状态 |
 | `SESSION_START.md` | 会话启动清单 |

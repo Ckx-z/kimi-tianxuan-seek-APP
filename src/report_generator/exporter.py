@@ -12,6 +12,8 @@ from pathlib import Path
 from docx import Document
 from docx.shared import Inches
 
+from utils.molecule_viz import png_temp_file
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = PROJECT_ROOT / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -21,6 +23,31 @@ def _safe_text(value) -> str:
     if value is None:
         return "N/A"
     return str(value)
+
+
+def _add_structure_images(doc: Document, ald_smiles: str, amine_smiles: str) -> None:
+    """在报告中嵌入醛/胺单体 2D 结构图。
+
+    SMILES 解析失败时写降级提示，不影响报告其余部分；
+    临时 PNG 文件用后清理。
+    """
+    entries = [("醛单体", ald_smiles), ("胺单体", amine_smiles)]
+    temp_paths: list[Path] = []
+    try:
+        for label, smiles in entries:
+            png = png_temp_file(smiles, prefix="report_mol")
+            if png is None:
+                doc.add_paragraph(f"{label}结构图：SMILES 无法解析，结构图不可用。")
+                continue
+            temp_paths.append(png)
+            doc.add_paragraph(f"{label}结构图：")
+            doc.add_picture(str(png), width=Inches(2.8))
+    finally:
+        for p in temp_paths:
+            try:
+                p.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def generate_report(
@@ -62,6 +89,9 @@ def generate_report(
     table.rows[0].cells[1].text = ald_smiles
     table.rows[1].cells[0].text = "胺单体 SMILES"
     table.rows[1].cells[1].text = amine_smiles
+
+    # 单体 2D 结构图（解析失败自动降级为文字提示）
+    _add_structure_images(doc, ald_smiles, amine_smiles)
 
     # 2. 成膜概率预测
     doc.add_heading("2. 成膜概率预测", level=1)

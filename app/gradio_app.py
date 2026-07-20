@@ -16,6 +16,7 @@ import gradio as gr
 from condition_recommender import recommend
 from predictor import FilmPredictor
 from report_generator.exporter import generate_report
+from utils.molecule_viz import render_imine_product, smiles_to_image
 
 # 全局预测器（懒加载）
 _predictor = None
@@ -62,10 +63,32 @@ def _explain_tree_score(predictor: FilmPredictor, ald_smiles: str, amine_smiles:
         return f"### 打分理由（SHAP 归因）\n\n⚠️ 打分理由生成失败（{_brief_error(e)}）"
 
 
-def predict(ald_smiles: str, amine_smiles: str) -> tuple[str, str, str, str]:
-    """预测 + 推荐条件 + 打分理由的 Gradio 回调函数。"""
+def _structure_images(ald_smiles: str, amine_smiles: str):
+    """渲染醛/胺单体结构图 + 缩合产物骨架图。
+
+    非法 SMILES 优雅降级：对应位置返回 None（前端显示空白），
+    并汇总到提示文本，不影响预测主流程。
+    """
+    ald_img = smiles_to_image(ald_smiles)
+    amine_img = smiles_to_image(amine_smiles)
+    product_img = render_imine_product(ald_smiles, amine_smiles)
+
+    notes = []
+    if ald_img is None:
+        notes.append("醛单体 SMILES 无法解析结构")
+    if amine_img is None:
+        notes.append("胺单体 SMILES 无法解析结构")
+    if ald_img is not None and amine_img is not None and product_img is None:
+        notes.append("缩合产物骨架图生成失败（不影响其他结果）")
+    note_text = "⚠️ " + "；".join(notes) if notes else ""
+    return ald_img, amine_img, product_img, note_text
+
+
+def predict(ald_smiles: str, amine_smiles: str):
+    """预测 + 结构图 + 推荐条件 + 打分理由的 Gradio 回调函数。"""
     if not ald_smiles.strip() or not amine_smiles.strip():
-        return "请输入醛和胺的 SMILES", "", "", ""
+        return ("请输入醛和胺的 SMILES", "", "", "",
+                None, None, None, "")
 
     predictor = _get_predictor()
     pred_result = predictor.predict(ald_smiles.strip(), amine_smiles.strip())
@@ -106,7 +129,13 @@ def predict(ald_smiles: str, amine_smiles: str) -> tuple[str, str, str, str]:
     # 打分理由（SHAP 归因，基于实际加载的树模型）
     explain_text = _explain_tree_score(predictor, ald_smiles.strip(), amine_smiles.strip())
 
-    return prob_text, cond_text, "点击生成报告按钮下载", explain_text
+    # 单体结构图 + 缩合产物骨架图（解析失败优雅降级）
+    ald_img, amine_img, product_img, struct_note = _structure_images(
+        ald_smiles.strip(), amine_smiles.strip()
+    )
+
+    return (prob_text, cond_text, "点击生成报告按钮下载", explain_text,
+            ald_img, amine_img, product_img, struct_note)
 
 
 def generate_report_callback(ald_smiles: str, amine_smiles: str) -> str:
@@ -157,10 +186,18 @@ def create_app() -> gr.Blocks:
                 explain_output = gr.Markdown(label="打分理由")
                 report_output = gr.File(label="实验报告")
 
+        gr.Markdown("### 化学结构")
+        with gr.Row():
+            ald_img_output = gr.Image(label="醛单体", height=280)
+            amine_img_output = gr.Image(label="胺单体", height=280)
+            product_img_output = gr.Image(label="缩合产物骨架（亚胺键 C=N 示意）", height=280)
+        struct_note_output = gr.Markdown()
+
         predict_btn.click(
             fn=predict,
             inputs=[ald_input, amine_input],
-            outputs=[prob_output, cond_output, gr.Textbox(visible=False), explain_output],
+            outputs=[prob_output, cond_output, gr.Textbox(visible=False), explain_output,
+                     ald_img_output, amine_img_output, product_img_output, struct_note_output],
         )
 
         report_btn.click(
