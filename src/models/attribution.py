@@ -42,12 +42,17 @@ FUNCTIONAL_GROUPS = {
 
 
 def classify_feature(feature_name: str, split_3d: bool = False) -> str:
-    """把特征名归类到醛/胺/交互/规则。
+    """把特征名归类到醛/胺/交互/规则/先验。
 
     split_3d=True 时把 3D 描述符从单体特征中拆出，单独归为
     aldehyde_3d / amine_3d / dimer_3d（与归因报告的口径一致）；
     默认 False 保持历史行为（3D 特征并入醛/胺组），向后兼容。
+
+    tree_v4 起的 TE 统计先验列（te_ald_/te_amine_）单独归为 "prior"，
+    不与结构特征混在同一组里展示（TE 在 v4 中占全局重要性约 36%）。
     """
+    if feature_name.startswith(("te_ald_", "te_amine_")):
+        return "prior"
     if split_3d:
         if feature_name.startswith("ald_3d_"):
             return "aldehyde_3d"
@@ -107,7 +112,8 @@ def group_contributions(shap_values: np.ndarray, feature_cols: List[str],
     split_3d=True 时 3D 描述符单独成组（aldehyde_3d / amine_3d / dimer_3d）。
     """
     groups = {"aldehyde": 0.0, "amine": 0.0, "interaction": 0.0, "rules": 0.0,
-              "aldehyde_3d": 0.0, "amine_3d": 0.0, "dimer_3d": 0.0, "other": 0.0}
+              "aldehyde_3d": 0.0, "amine_3d": 0.0, "dimer_3d": 0.0,
+              "prior": 0.0, "other": 0.0}
     for val, feat in zip(shap_values, feature_cols):
         groups[classify_feature(feat, split_3d=split_3d)] += abs(float(val))
     total = sum(groups.values())
@@ -193,7 +199,14 @@ GROUP_LABELS_ZH = {
     "aldehyde_3d": "醛 3D 结构",
     "amine_3d": "胺 3D 结构",
     "dimer_3d": "二聚体 3D 结构",
+    "prior": "单体历史先验",
     "other": "其他特征",
+}
+
+# TE 统计先验特征（tree_v4 起；te_ = target encoding）
+_TE_FEATURE_LABELS_ZH = {
+    "te_ald_film_rate": "先验·醛历史成膜率",
+    "te_amine_film_rate": "先验·胺历史成膜率",
 }
 
 # 单体基础描述符（ald_/amine_ 前缀后的公共部分）
@@ -278,6 +291,8 @@ _PAIR_FEATURE_LABELS_ZH = {
 
 def feature_label_zh(feature_name: str) -> str:
     """把特征名翻译成普通人看得懂的中文标签，映射不到时回退为原名。"""
+    if feature_name.startswith(("te_ald_", "te_amine_")):
+        return _TE_FEATURE_LABELS_ZH.get(feature_name, "先验·" + feature_name)
     if feature_name.startswith("rule_"):
         base = feature_name[5:]
         return f"规则·{_RULE_FEATURE_LABELS_ZH.get(base, base)}"
@@ -325,8 +340,34 @@ def get_tree_explainer(model) -> "shap.TreeExplainer":
     return _EXPLAINER_CACHE[key]
 
 
+def fill_te_values(feature_cols: List[str], ald_smiles: str, amine_smiles: str,
+                   te_rates: Optional[Dict]) -> Dict[str, float]:
+    """从模型 pkl 的 te_rates 映射生成 TE 统计先验特征值。
+
+    tree_v4 起模型含 te_ald_film_rate / te_amine_film_rate 两列 target encoding；
+    归因（SHAP）时必须与预测侧（TreeFilmPredictor.predict）一致地按样本
+    醛/胺 SMILES 查表填充（未见过的单体回退 global_mean），否则补 0 会
+    同时扭曲预测分与归因值。
+
+    te_rates 为 None（tree_v3 等无 TE 的旧 pkl）时返回空 dict，
+    调用方保持补 0 的旧行为，向后兼容。
+    """
+    if not te_rates:
+        return {}
+    from features.target_encoding import TE_ALD, TE_AMINE
+
+    gm = float(te_rates.get("global_mean", 0.0))
+    values: Dict[str, float] = {}
+    if TE_ALD in feature_cols:
+        values[TE_ALD] = float((te_rates.get("ald_rate") or {}).get(ald_smiles, gm))
+    if TE_AMINE in feature_cols:
+        values[TE_AMINE] = float((te_rates.get("amine_rate") or {}).get(amine_smiles, gm))
+    return values
+
+
 def explain_pair_for_app(model, feature_cols: List[str], ald_smiles: str, amine_smiles: str,
-                         feature_flags: Optional[Dict] = None, top_k: int = 5) -> Dict:
+                         feature_flags: Optional[Dict] = None, top_k: int = 5,
+                         te_rates: Optional[Dict] = None) -> Dict:
     """基于已加载的树模型，对单个醛-胺组合做 SHAP 归因（供 App「打分理由」使用）。
 
     Args:
@@ -336,6 +377,8 @@ def explain_pair_for_app(model, feature_cols: List[str], ald_smiles: str, amine_
         feature_flags: 特征开关（TreeFilmPredictor.feature_flags，来自 pkl 内 metrics）；
             缺省时退回 explain_single 的默认开关
         top_k: 正/负向各展示的 Top 特征数
+        te_rates: 单体历史成膜率映射表（TreeFilmPredictor.te_rates，tree_v4 起
+            存入 pkl）；提供时按样本醛/胺填充 TE 特征列，缺省时补 0（旧行为）
 
     Returns:
         含预测分、分组贡献（3D 单独成组）、Top± 特征（带中文标签）、主导方的字典
@@ -347,7 +390,10 @@ def explain_pair_for_app(model, feature_cols: List[str], ald_smiles: str, amine_
         flags.update({k: v for k, v in feature_flags.items() if k in flags})
 
     feats = compute_pair_features(ald_smiles, amine_smiles, **flags)
-    X = pd.DataFrame([{k: feats.get(k, 0.0) for k in feature_cols}])
+    row = {k: feats.get(k, 0.0) for k in feature_cols}
+    # tree_v4 起：TE 先验列查 te_rates 填充（未见过回退全局均值），不再补 0
+    row.update(fill_te_values(feature_cols, ald_smiles, amine_smiles, te_rates))
+    X = pd.DataFrame([row])
 
     pred_raw = float(model.predict(X)[0])
 
@@ -371,10 +417,11 @@ def explain_pair_for_app(model, feature_cols: List[str], ald_smiles: str, amine_
     top_negative = (feature_df[feature_df["shap"] < 0]
                     .sort_values("shap").head(top_k))
 
-    # 主导贡献方：醛/胺两侧合并各自 3D 后比较
+    # 主导贡献方：醛/胺两侧比较（各自 3D 并入本侧；tree_v4 的 TE 先验按所描述的单体归侧）
+    abs_shap = feature_df["shap"].abs()
     side_strength = {
-        "aldehyde": groups.get("aldehyde", 0.0) + groups.get("aldehyde_3d", 0.0),
-        "amine": groups.get("amine", 0.0) + groups.get("amine_3d", 0.0),
+        "aldehyde": float(abs_shap[feature_df["feature"].str.startswith(("ald_", "te_ald_"))].sum()),
+        "amine": float(abs_shap[feature_df["feature"].str.startswith(("amine_", "te_amine_"))].sum()),
     }
     dominant_side = max(side_strength, key=side_strength.get)
     fg = detect_functional_groups(ald_smiles, amine_smiles)

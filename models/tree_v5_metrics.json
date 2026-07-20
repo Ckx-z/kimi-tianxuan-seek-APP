@@ -1,0 +1,94 @@
+{
+  "mae": 0.22937022494408915,
+  "pr_auc": 0.8713199874615258,
+  "n_samples": 3094,
+  "n_features": 4240,
+  "group_by": "aldehyde",
+  "use_rules": true,
+  "reduced_rules": true,
+  "use_interaction": true,
+  "use_3d": true,
+  "use_dimer": false,
+  "n_confs": 5,
+  "use_conditions": false,
+  "rule_neg_strategy": "remove_hard_rule",
+  "remove_all_rule": false,
+  "use_te": true,
+  "use_freq_weights": true,
+  "freq_weight_formula": "1/sqrt(ald_freq * amine_freq), 均值归一化",
+  "param_set": "v4_mild",
+  "xgb_params": {
+    "n_estimators": 600,
+    "max_depth": 5,
+    "learning_rate": 0.04,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_alpha": 0.5,
+    "reg_lambda": 3.0,
+    "min_child_weight": 10,
+    "objective": "reg:squarederror",
+    "eval_metric": "mae"
+  },
+  "use_fingerprint": true,
+  "fp_kind": "morgan",
+  "fp_radius": 2,
+  "fp_n_bits": 2048,
+  "variant": "v5_fp2048",
+  "logo_cv": {
+    "n_val_covered": 3094,
+    "coverage": 1.0,
+    "pr_auc": 0.8713199874615258,
+    "mae": 0.22937022494408915,
+    "F0_global_mean_pr_auc": 0.5404302934945506,
+    "F1_amine_freq_pr_auc": 0.8640020090773539
+  },
+  "dual_holdout_by_seed": {
+    "42": {
+      "n_val_covered": 635,
+      "coverage": 0.20523594053005817,
+      "pr_auc": 0.6390828002086204,
+      "mae": 0.35657197009860064,
+      "F0_global_mean_pr_auc": 0.5230938214586653,
+      "F1_amine_freq_pr_auc": 0.5230938214586653
+    },
+    "123": {
+      "n_val_covered": 612,
+      "coverage": 0.1978021978021978,
+      "pr_auc": 0.6349306652405254,
+      "mae": 0.3557842430141237,
+      "F0_global_mean_pr_auc": 0.5673758018295136,
+      "F1_amine_freq_pr_auc": 0.5673758018295136
+    },
+    "7": {
+      "n_val_covered": 623,
+      "coverage": 0.20135746606334842,
+      "pr_auc": 0.6356378150263357,
+      "mae": 0.3222373114064646,
+      "F0_global_mean_pr_auc": 0.6070255920483753,
+      "F1_amine_freq_pr_auc": 0.6070255920483753
+    }
+  },
+  "dual_holdout_mean": {
+    "pr_auc_mean": 0.6365504268251606,
+    "pr_auc_std": 0.0018137808430338713,
+    "mae_mean": 0.344864508173063,
+    "mae_std": 0.01600307582155536,
+    "pr_auc_by_seed": [
+      0.6390828002086204,
+      0.6349306652405254,
+      0.6356378150263357
+    ],
+    "mae_by_seed": [
+      0.35657197009860064,
+      0.3557842430141237,
+      0.3222373114064646
+    ]
+  },
+  "dual_protocol": "5 折网格分组 × 种子 [42, 123, 7]：验证集的醛和胺均不出现在训练集",
+  "in_sample": {
+    "pr_auc": 0.9992537063937397,
+    "mae": 0.02446897941876396
+  },
+  "in_sample_gap_logo": 0.12793371893221384,
+  "in_sample_gap_dual": 0.36270327956857906
+}

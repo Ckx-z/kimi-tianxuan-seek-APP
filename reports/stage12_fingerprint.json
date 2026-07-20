@@ -1,0 +1,373 @@
+{
+  "protocols": {
+    "logo": "GroupKFold-10 by aldehyde（无种子依赖）",
+    "dual": "自定义网格分组 5 折 × 种子 [42, 123, 7]：验证集的醛和胺均不在训练集出现"
+  },
+  "common_config": {
+    "base": "tree_v4 胜者配置 v4_mild（XGBoost 弱正则 + 频率降权）",
+    "params": {
+      "n_estimators": 600,
+      "max_depth": 5,
+      "learning_rate": 0.04,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "reg_alpha": 0.5,
+      "reg_lambda": 3.0,
+      "min_child_weight": 10,
+      "objective": "reg:squarederror",
+      "eval_metric": "mae"
+    },
+    "freq_weight_formula": "1/sqrt(ald_freq * amine_freq), 均值归一化"
+  },
+  "baselines_from_stage11": {
+    "note": "同协议同种子，直接摘自 reports/stage11_dual_holdout.json",
+    "logo_pr_auc": {
+      "v3_ref": 0.7610206448245653,
+      "v4_mild": 0.8783893236030069,
+      "v4_mild_noTE": 0.789977429678293
+    },
+    "dual_pr_auc_mean": {
+      "note": "双留出协议对分组种子敏感；3 个种子（42/123/7）的合并 PR-AUC/MAE。LOGO（GroupKFold-10）无种子依赖。",
+      "seeds": [
+        42,
+        123,
+        7
+      ],
+      "v3_ref": {
+        "pr_auc": [
+          0.6275,
+          0.6765,
+          0.6551
+        ],
+        "mae": [
+          0.3334,
+          0.3121,
+          0.3038
+        ],
+        "pr_auc_mean": 0.653,
+        "mae_mean": 0.3164
+      },
+      "v4_mild": {
+        "pr_auc": [
+          0.6609,
+          0.6283,
+          0.6362
+        ],
+        "mae": [
+          0.3568,
+          0.3481,
+          0.3227
+        ],
+        "pr_auc_mean": 0.6418,
+        "mae_mean": 0.3425
+      },
+      "v4_mild_noTE": {
+        "pr_auc": [
+          0.6694,
+          0.7075,
+          0.6703
+        ],
+        "mae": [
+          0.3274,
+          0.3142,
+          0.307
+        ],
+        "pr_auc_mean": 0.6824,
+        "mae_mean": 0.3162
+      },
+      "conclusion": "v4_mild(TE) 双留出未稳定优于 v3_ref（3 种子均值 -0.011，MAE 一致偏差）；v4_mild_noTE 三个种子均优于 v3_ref（均值 +0.029）。→ 不满足默认模型切换门槛。"
+    }
+  },
+  "variants": {
+    "v5_maccs": {
+      "params": {
+        "n_estimators": 600,
+        "max_depth": 5,
+        "learning_rate": 0.04,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.5,
+        "reg_lambda": 3.0,
+        "min_child_weight": 10,
+        "objective": "reg:squarederror",
+        "eval_metric": "mae"
+      },
+      "use_te": true,
+      "use_freq_weights": true,
+      "fp": {
+        "kind": "maccs",
+        "radius": 2,
+        "n_bits": 166
+      },
+      "n_features": 476,
+      "logo": {
+        "n_val_covered": 3094,
+        "coverage": 1.0,
+        "pr_auc": 0.8778083007217735,
+        "mae": 0.22692235951725792,
+        "F0_global_mean_pr_auc": 0.5404302934945506,
+        "F1_amine_freq_pr_auc": 0.8640020090773539
+      },
+      "dual_by_seed": {
+        "42": {
+          "n_val_covered": 635,
+          "coverage": 0.20523594053005817,
+          "pr_auc": 0.6457388993043507,
+          "mae": 0.35891281801884567,
+          "F0_global_mean_pr_auc": 0.5230938214586653,
+          "F1_amine_freq_pr_auc": 0.5230938214586653
+        },
+        "123": {
+          "n_val_covered": 612,
+          "coverage": 0.1978021978021978,
+          "pr_auc": 0.607007954945047,
+          "mae": 0.3544397068958656,
+          "F0_global_mean_pr_auc": 0.5673758018295136,
+          "F1_amine_freq_pr_auc": 0.5673758018295136
+        },
+        "7": {
+          "n_val_covered": 623,
+          "coverage": 0.20135746606334842,
+          "pr_auc": 0.6372166837896244,
+          "mae": 0.32347016765064834,
+          "F0_global_mean_pr_auc": 0.6070255920483753,
+          "F1_amine_freq_pr_auc": 0.6070255920483753
+        }
+      },
+      "dual_mean": {
+        "pr_auc_mean": 0.6299878460130074,
+        "pr_auc_std": 0.016617532597457692,
+        "mae_mean": 0.34560756418845323,
+        "mae_std": 0.015759662113206258,
+        "pr_auc_by_seed": [
+          0.6457388993043507,
+          0.607007954945047,
+          0.6372166837896244
+        ],
+        "mae_by_seed": [
+          0.35891281801884567,
+          0.3544397068958656,
+          0.32347016765064834
+        ]
+      }
+    },
+    "v5_fp1024": {
+      "params": {
+        "n_estimators": 600,
+        "max_depth": 5,
+        "learning_rate": 0.04,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.5,
+        "reg_lambda": 3.0,
+        "min_child_weight": 10,
+        "objective": "reg:squarederror",
+        "eval_metric": "mae"
+      },
+      "use_te": true,
+      "use_freq_weights": true,
+      "fp": {
+        "kind": "morgan",
+        "radius": 2,
+        "n_bits": 1024
+      },
+      "n_features": 2192,
+      "logo": {
+        "n_val_covered": 3094,
+        "coverage": 1.0,
+        "pr_auc": 0.8814784239459854,
+        "mae": 0.2297702927162041,
+        "F0_global_mean_pr_auc": 0.5404302934945506,
+        "F1_amine_freq_pr_auc": 0.8640020090773539
+      },
+      "dual_by_seed": {
+        "42": {
+          "n_val_covered": 635,
+          "coverage": 0.20523594053005817,
+          "pr_auc": 0.6178055709182082,
+          "mae": 0.3634928596113611,
+          "F0_global_mean_pr_auc": 0.5230938214586653,
+          "F1_amine_freq_pr_auc": 0.5230938214586653
+        },
+        "123": {
+          "n_val_covered": 612,
+          "coverage": 0.1978021978021978,
+          "pr_auc": 0.6213949304482735,
+          "mae": 0.35316146879511723,
+          "F0_global_mean_pr_auc": 0.5673758018295136,
+          "F1_amine_freq_pr_auc": 0.5673758018295136
+        },
+        "7": {
+          "n_val_covered": 623,
+          "coverage": 0.20135746606334842,
+          "pr_auc": 0.6242333491974713,
+          "mae": 0.3259880673827941,
+          "F0_global_mean_pr_auc": 0.6070255920483753,
+          "F1_amine_freq_pr_auc": 0.6070255920483753
+        }
+      },
+      "dual_mean": {
+        "pr_auc_mean": 0.621144616854651,
+        "pr_auc_std": 0.0026300920228775034,
+        "mae_mean": 0.3475474652630908,
+        "mae_std": 0.01581750373837368,
+        "pr_auc_by_seed": [
+          0.6178055709182082,
+          0.6213949304482735,
+          0.6242333491974713
+        ],
+        "mae_by_seed": [
+          0.3634928596113611,
+          0.35316146879511723,
+          0.3259880673827941
+        ]
+      }
+    },
+    "v5_fp1024_noTE": {
+      "params": {
+        "n_estimators": 600,
+        "max_depth": 5,
+        "learning_rate": 0.04,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.5,
+        "reg_lambda": 3.0,
+        "min_child_weight": 10,
+        "objective": "reg:squarederror",
+        "eval_metric": "mae"
+      },
+      "use_te": false,
+      "use_freq_weights": true,
+      "fp": {
+        "kind": "morgan",
+        "radius": 2,
+        "n_bits": 1024
+      },
+      "n_features": 2190,
+      "logo": {
+        "n_val_covered": 3094,
+        "coverage": 1.0,
+        "pr_auc": 0.7825111329109782,
+        "mae": 0.24782882672534387,
+        "F0_global_mean_pr_auc": 0.5404302934945506,
+        "F1_amine_freq_pr_auc": 0.8640020090773539
+      },
+      "dual_by_seed": {
+        "42": {
+          "n_val_covered": 635,
+          "coverage": 0.20523594053005817,
+          "pr_auc": 0.6131793542390234,
+          "mae": 0.3526935474363368,
+          "F0_global_mean_pr_auc": 0.5230938214586653,
+          "F1_amine_freq_pr_auc": 0.5230938214586653
+        },
+        "123": {
+          "n_val_covered": 612,
+          "coverage": 0.1978021978021978,
+          "pr_auc": 0.6524225118964004,
+          "mae": 0.334446686321833,
+          "F0_global_mean_pr_auc": 0.5673758018295136,
+          "F1_amine_freq_pr_auc": 0.5673758018295136
+        },
+        "7": {
+          "n_val_covered": 623,
+          "coverage": 0.20135746606334842,
+          "pr_auc": 0.6594754447674733,
+          "mae": 0.31426097560034133,
+          "F0_global_mean_pr_auc": 0.6070255920483753,
+          "F1_amine_freq_pr_auc": 0.6070255920483753
+        }
+      },
+      "dual_mean": {
+        "pr_auc_mean": 0.6416924369676323,
+        "pr_auc_std": 0.020366359199054065,
+        "mae_mean": 0.3338004031195037,
+        "mae_std": 0.01569668555174303,
+        "pr_auc_by_seed": [
+          0.6131793542390234,
+          0.6524225118964004,
+          0.6594754447674733
+        ],
+        "mae_by_seed": [
+          0.3526935474363368,
+          0.334446686321833,
+          0.31426097560034133
+        ]
+      }
+    },
+    "v5_fp2048": {
+      "params": {
+        "n_estimators": 600,
+        "max_depth": 5,
+        "learning_rate": 0.04,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.5,
+        "reg_lambda": 3.0,
+        "min_child_weight": 10,
+        "objective": "reg:squarederror",
+        "eval_metric": "mae"
+      },
+      "use_te": true,
+      "use_freq_weights": true,
+      "fp": {
+        "kind": "morgan",
+        "radius": 2,
+        "n_bits": 2048
+      },
+      "n_features": 4240,
+      "logo": {
+        "n_val_covered": 3094,
+        "coverage": 1.0,
+        "pr_auc": 0.8713199874615258,
+        "mae": 0.22937022494408915,
+        "F0_global_mean_pr_auc": 0.5404302934945506,
+        "F1_amine_freq_pr_auc": 0.8640020090773539
+      },
+      "dual_by_seed": {
+        "42": {
+          "n_val_covered": 635,
+          "coverage": 0.20523594053005817,
+          "pr_auc": 0.6390828002086204,
+          "mae": 0.35657197009860064,
+          "F0_global_mean_pr_auc": 0.5230938214586653,
+          "F1_amine_freq_pr_auc": 0.5230938214586653
+        },
+        "123": {
+          "n_val_covered": 612,
+          "coverage": 0.1978021978021978,
+          "pr_auc": 0.6349306652405254,
+          "mae": 0.3557842430141237,
+          "F0_global_mean_pr_auc": 0.5673758018295136,
+          "F1_amine_freq_pr_auc": 0.5673758018295136
+        },
+        "7": {
+          "n_val_covered": 623,
+          "coverage": 0.20135746606334842,
+          "pr_auc": 0.6356378150263357,
+          "mae": 0.3222373114064646,
+          "F0_global_mean_pr_auc": 0.6070255920483753,
+          "F1_amine_freq_pr_auc": 0.6070255920483753
+        }
+      },
+      "dual_mean": {
+        "pr_auc_mean": 0.6365504268251606,
+        "pr_auc_std": 0.0018137808430338713,
+        "mae_mean": 0.344864508173063,
+        "mae_std": 0.01600307582155536,
+        "pr_auc_by_seed": [
+          0.6390828002086204,
+          0.6349306652405254,
+          0.6356378150263357
+        ],
+        "mae_by_seed": [
+          0.35657197009860064,
+          0.3557842430141237,
+          0.3222373114064646
+        ]
+      }
+    }
+  },
+  "n_samples": 3094,
+  "best_variant": "v5_fp2048"
+}
