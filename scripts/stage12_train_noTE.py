@@ -4,7 +4,8 @@
 - v4_mild_noTE（v4_mild 配置去 TE：频率降权 + 弱正则 + Hadamard 交互）是
   双留出协议下所有模型中的最强者（3 种子均值 PR-AUC 0.6824），
   但此前只作为 CV 变体存在，未保存为独立 pkl；
-- 双模型路由（D22）：醛/胺都已见 → tree_v4（TE 先验）；任一未见 → tree_v4_noTE。
+- 双模型路由（D22 上线，D23 修订为 routed_strict）：仅醛/胺均未见（双未见）→ tree_v4_noTE；
+  其余（双已见/一新一熟）→ tree_v4（TE 先验）。
 
 本脚本：
 1. 复用 stage11 的特征缓存（stage11_xy_cache.pkl）与 v4_mild 参数，
@@ -59,7 +60,7 @@ def build_monomer_pool(df) -> dict:
         "amines": sorted(df["amine_smiles"].unique().tolist()),
         "n_samples": len(df),
         "source": "data/interim/v5_train_stage1_cond_filled.csv（过滤 hard_rule_sampled 后）",
-        "note": "双模型路由键（D22）：醛/胺都在池内 → tree_v4；任一不在 → tree_v4_noTE",
+        "note": "双模型路由键（D23 routed_strict）：仅醛/胺均不在池内（双未见）→ tree_v4_noTE；其余（双已见/一新一熟）→ tree_v4",
     }
 
 
@@ -108,7 +109,7 @@ def main() -> None:
         "dual_seed_robustness": robust,
         "dual_protocol": "5 折网格分组：验证集的醛和胺均不出现在训练集",
         "in_sample": in_sample,
-        "routing_role": "外推臂（D22）：任一单体未见于训练池时使用本模型",
+        "routing_role": "外推臂（D23 routed_strict）：醛/胺均未见于训练池（双未见）时使用本模型",
     }
     joblib.dump({
         "model": final_model,

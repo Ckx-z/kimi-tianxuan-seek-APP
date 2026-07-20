@@ -1,8 +1,13 @@
-"""双树模型路由（D22）：按输入单体是否在训练池中选择树模型。
+"""双树模型路由（D22 上线，D23 修订为 routed_strict）：按输入单体是否在训练池中选择树模型。
 
-路由规则：
-- 醛和胺都已见于训练池 → tree_v4（TE 统计先验有效，LOGO/池内场景最强）
-- 任一单体未见 → tree_v4_noTE（频率降权 + 弱正则，双留出外推最强）
+路由规则（routed_strict，D23）：
+- 醛和胺均未见于训练池（双未见）→ tree_v4_noTE（频率降权 + 弱正则，双留出外推最强）
+- 其余（双已见 / 一新一熟）→ tree_v4（TE 统计先验有效，LOGO/池内场景最强）
+
+修订依据（exp_008 复盘，D23）：对照策略 routed_strict 在协议 A/B 全部分桶上不劣于
+原规定键（任一未见即走 noTE）——混合桶 PR-AUC +0.024（协议 A，3 种子逐一胜）/
++0.031（协议 B 胺已见桶），单侧 TE 在"一新一熟"查询上仍有强信号；唯一代价是
+协议 A 混合桶 MAE 小幅回退 −0.0075（约为 PR-AUC 收益的 1/3），列为 D23 复盘点。
 
 路由键来自 models/monomer_pool.json（由训练数据生成，scripts/stage12_train_noTE.py），
 加载一次后常驻内存，避免每次预测读 CSV。
@@ -32,9 +37,9 @@ ROUTE_BOTH_UNSEEN = "both_unseen"
 # 路由原因（中文，供 App 前端展示）
 _ROUTE_REASONS_ZH = {
     ROUTE_IN_POOL: "已知单体组合 → tree_v4（含历史先验）",
-    ROUTE_ALD_UNSEEN: "含未见单体（醛）→ tree_v4_noTE（外推模式）",
-    ROUTE_AMINE_UNSEEN: "含未见单体（胺）→ tree_v4_noTE（外推模式）",
-    ROUTE_BOTH_UNSEEN: "醛/胺单体均未见 → tree_v4_noTE（外推模式）",
+    ROUTE_ALD_UNSEEN: "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+    ROUTE_AMINE_UNSEEN: "含未见单体（胺）但非双未见 → tree_v4（沿用池内模型）",
+    ROUTE_BOTH_UNSEEN: "双未见单体（醛/胺均未见）→ tree_v4_noTE（外推模式）",
 }
 
 
@@ -73,7 +78,7 @@ class MonomerPool:
 
 
 class RoutedTreePredictor:
-    """双树模型路由器：池内 tree_v4 / 外推 tree_v4_noTE。"""
+    """双树模型路由器（routed_strict，D23）：双未见 tree_v4_noTE / 其余 tree_v4。"""
 
     def __init__(self,
                  pool_model_path: str | Path = POOL_MODEL_PATH,
@@ -91,11 +96,15 @@ class RoutedTreePredictor:
         self.pool = MonomerPool.load(self.monomer_pool_path)
 
     def route_for(self, ald_smiles: str, amine_smiles: str) -> tuple[TreeFilmPredictor, str, str]:
-        """返回 (实际使用的 TreeFilmPredictor, 路由键, 路由原因中文)。"""
+        """返回 (实际使用的 TreeFilmPredictor, 路由键, 路由原因中文)。
+
+        routed_strict（D23）：仅双未见（ROUTE_BOTH_UNSEEN）走外推臂 tree_v4_noTE，
+        其余（双已见 / 一新一熟）均走池内臂 tree_v4。
+        """
         if self.pool is None:
             self.load()
         key = self.pool.route_key(ald_smiles, amine_smiles)
-        model = self.pool_model if key == ROUTE_IN_POOL else self.extrap_model
+        model = self.extrap_model if key == ROUTE_BOTH_UNSEEN else self.pool_model
         return model, key, _ROUTE_REASONS_ZH[key]
 
     def predict_with_info(self, ald_smiles: str, amine_smiles: str) -> dict:

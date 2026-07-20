@@ -2267,5 +2267,5 @@
  ],
  "n_samples": 3094,
  "source": "data/interim/v5_train_stage1_cond_filled.csv（过滤 hard_rule_sampled 后）",
- "note": "双模型路由键（D22）：醛/胺都在池内 → tree_v4；任一不在 → tree_v4_noTE"
+ "note": "双模型路由键（D23 routed_strict）：仅醛/胺均不在池内（双未见）→ tree_v4_noTE；其余（双已见/一新一熟）→ tree_v4"
 }

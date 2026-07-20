@@ -3,9 +3,9 @@
 对外提供单一 predict() 函数，内部自动选择可用模型。
 GNN 通过 subprocess 调用旧项目 predict_pair.py，避免包名冲突。
 
-树模型两种模式（D22）：
+树模型两种模式（D22 上线，D23 修订为 routed_strict）：
 - 路由模式（默认）：RoutedTreePredictor 按"醛/胺是否在训练池"双模型路由——
-  都已见 → tree_v4（TE 先验）；任一未见 → tree_v4_noTE（外推）。
+  仅醛胺均未见（双未见）→ tree_v4_noTE（外推）；其余（双已见/一新一熟）→ tree_v4（TE 先验）。
 - 单模型模式（向后兼容）：显式传 tree_model_path 或 use_routing=False 时，
   加载指定/默认的单个 TreeFilmPredictor，行为与旧版一致。
 """

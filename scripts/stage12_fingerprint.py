@@ -100,14 +100,17 @@ def load_fp_matrix(df: pd.DataFrame, kind: str, radius: int, n_bits: int) -> np.
 def run_cv_fp(X_base: np.ndarray, fp: np.ndarray, y: np.ndarray, df: pd.DataFrame,
               folds, params: dict, use_te: bool, weights: np.ndarray | None,
               tag: str) -> dict:
-    """与 s11.run_cv 同口径，但特征为 [X_base (+TE 折内拟合) + 指纹]。"""
+    """与 s11.run_cv 同口径，但特征为 [X_base (+TE 折内拟合) + 指纹]。
+    逐折报告标配（D23）：返回指标含 per_fold 逐折明细 + fold_summary。"""
     pred = np.full(len(df), np.nan)
     pred_f0 = np.full(len(df), np.nan)
     pred_f1 = np.full(len(df), np.nan)
+    per_fold = []
 
     for i, (tr, va) in enumerate(folds):
         t0 = time.time()
         if len(va) == 0:
+            per_fold.append({"fold": i, "n_val": 0})
             print(f"  [{tag}] fold {i}: 验证集为空，跳过", flush=True)
             continue
         parts = [X_base]
@@ -122,14 +125,23 @@ def run_cv_fp(X_base: np.ndarray, fp: np.ndarray, y: np.ndarray, df: pd.DataFram
         if weights is not None:
             fit_kwargs["sample_weight"] = weights[tr]
         m.fit(X_full[tr], y[tr], **fit_kwargs)
-        pred[va] = m.predict(X_full[va])
+        p = m.predict(X_full[va])
+        pred[va] = p
+        per_fold.append({
+            "fold": i,
+            "n_train": int(len(tr)),
+            "n_val": int(len(va)),
+            "pos_rate_val": float((y[va] >= 0.5).mean()),
+            "pr_auc": s11.pr_auc(y[va], p),
+            "mae": float(mean_absolute_error(y[va], p)),
+        })
 
         gm = y[tr].mean()
         pred_f0[va] = gm
         amine_rate_tr = df.iloc[tr].groupby("amine_smiles")["is_film"].mean()
         pred_f1[va] = df.iloc[va]["amine_smiles"].map(amine_rate_tr).fillna(gm).values
         print(f"  [{tag}] fold {i}: n_train={len(tr)} n_val={len(va)} "
-              f"({time.time() - t0:.1f}s)", flush=True)
+              f"pr_auc={per_fold[-1]['pr_auc']:.4f} ({time.time() - t0:.1f}s)", flush=True)
 
     mask = ~np.isnan(pred)
     return {
@@ -139,6 +151,9 @@ def run_cv_fp(X_base: np.ndarray, fp: np.ndarray, y: np.ndarray, df: pd.DataFram
         "mae": float(mean_absolute_error(y[mask], pred[mask])),
         "F0_global_mean_pr_auc": s11.pr_auc(y[mask], pred_f0[mask]),
         "F1_amine_freq_pr_auc": s11.pr_auc(y[mask], pred_f1[mask]),
+        # D23 逐折报告标配：逐折明细 + fold 级均值±std（合并指标会掩盖难折）
+        "per_fold": per_fold,
+        "fold_summary": s11.fold_summary(per_fold),
     }
 
 

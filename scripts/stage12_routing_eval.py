@@ -3,6 +3,10 @@
 问题：路由策略（醛/胺都已见 → tree_v4；任一未见 → tree_v4_noTE）
 相对单一模型（v3 配置 / v4 / noTE）是否更优？
 
+历史注记（D23，2026-07-20 收官）：本脚本评估时 routed 为上线规则、routed_strict 为对照；
+复盘后上线规则已切换为 routed_strict（仅双未见 → noTE，其余 → v4），
+routed 结果保留为历史对照。复盘证据与结论见 EXPERIMENTS/exp_008.md 复盘小节。
+
 两个协议（与 stage11 同口径：合并折后算 PR-AUC/MAE，多种子报均值±std）：
 
 协议 A —— 随机 KFold（5 折 × 3 种子），模拟 App 混合查询流：

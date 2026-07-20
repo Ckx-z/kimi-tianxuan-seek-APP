@@ -221,10 +221,38 @@ sessions:
     test_status: { passed: 54, failed: 0 }
     blockers: []
     status: "completed"
+  - id: "2026-07-20-03"
+    date: "2026-07-20"
+    title: "阶段 12 收官：routed_strict 切换（D23）+ 双留出逐折报告标配化"
+    summary: "基于 exp_008 既有证据正式评审 routed_strict 并切换（D22 第一复盘点关闭）：仅双未见 → tree_v4_noTE，其余（双已见/一新一熟）→ tree_v4——协议 A/B 全部分桶 PR-AUC 不劣于原规定键（混合桶 +0.024，3 种子逐一胜；B 胺已见桶 +0.031 且 MAE 同优），唯一回退 A 混合桶 MAE −0.0075 列为 D23 复盘点；关键论证为评审不依赖查询占比（占比只影响收益大小、不改变方向）。routing.py 路由与文案切换，App 经 route_reason 自动同步；tests/test_routing.py 14 → 17 个（混合桶/四键映射/归因边界）。双留出逐折报告标配化：stage11 run_cv 输出 per_fold + fold_summary（fold 级均值±std + 最难折，共享 fold_summary() 公式），hadamard（--summarize-existing 免训练补 16 条目）与 fingerprint 继承；v3_ref dual 单协议验证跑合并指标逐位一致（0.6275/0.3334），fold 级 std 0.209、最难折 fold3 0.334 实证标配动机。DECISIONS 追加 D23，exp_008 追加复盘小节。测试 57 passed。"
+    files_modified:
+      - src/predictor/routing.py
+      - src/predictor/__init__.py
+      - tests/test_routing.py
+      - scripts/stage11_dual_holdout.py
+      - scripts/stage11_hadamard_ablation.py
+      - scripts/stage12_fingerprint.py
+      - scripts/stage12_routing_eval.py
+      - scripts/stage12_train_noTE.py
+      - models/monomer_pool.json
+      - reports/stage11_dual_holdout.json
+      - reports/hadamard_ablation.json
+      - DECISIONS.md
+      - EXPERIMENTS/exp_008.md
+      - PROJECT_STATE.md
+      - SESSION_START.md
+      - DAILY_LOG/2026-07-20.md
+      - DAILY_LOG/2026-07-20_human.md
+    decisions_made:
+      - "D23: 路由规则切换为 routed_strict（仅双未见 → noTE，其余 → v4）；双留出逐折报告标配化"
+    models_trained: []
+    test_status: { passed: 57, failed: 0 }
+    blockers: []
+    status: "completed"
 
 # 快速统计
-total_sessions: 8
-completed_sessions: 8
+total_sessions: 9
+completed_sessions: 9
 in_progress_sessions: 0
 models_trained_total: 9
-decisions_made_total: 22
+decisions_made_total: 23

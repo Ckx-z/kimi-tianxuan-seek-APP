@@ -45,11 +45,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# 复用阶段 11 基础设施（数据加载 / 折划分 / 参数 / 缓存）
+# 复用阶段 11 基础设施（数据加载 / 折划分 / 参数 / 缓存 / fold 级汇总）
 from stage11_dual_holdout import (  # noqa: E402
     V3_PARAMS,
     V4_CANDIDATES,
     dual_holdout_folds,
+    fold_summary,
     load_v3,
     load_xy,
     pr_auc,
@@ -193,7 +194,8 @@ def cmd_ablation(only: list[str] | None = None) -> None:
         # LOGO（无种子依赖，只跑一次）
         _, logo_metrics, logo_per_fold = run_cv(
             X, y, df, logo_folds, cfg["params"], cfg["use_te"], w, f"{name}/LOGO")
-        entry["logo"] = {**logo_metrics, "per_fold": logo_per_fold}
+        entry["logo"] = {**logo_metrics, "per_fold": logo_per_fold,
+                         "fold_summary": fold_summary(logo_per_fold)}
         results["variants"][name] = entry
         _save_json(ABLATION_JSON, results)
 
@@ -203,7 +205,7 @@ def cmd_ablation(only: list[str] | None = None) -> None:
             _, m, pf = run_cv(
                 X, y, df, dual_folds_by_seed[s], cfg["params"], cfg["use_te"], w,
                 f"{name}/双留出/s{s}")
-            dual_runs[str(s)] = {**m, "per_fold": pf}
+            dual_runs[str(s)] = {**m, "per_fold": pf, "fold_summary": fold_summary(pf)}
             entry["dual_by_seed"] = dual_runs
             results["variants"][name] = entry
             _save_json(ABLATION_JSON, results)  # 每个种子落盘一次
@@ -489,6 +491,27 @@ def cmd_fold3(fold_index: int = 3, seed: int = 42) -> None:
     print(f"[fold3诊断] 完成 -> {FOLD3_JSON}", flush=True)
 
 
+# ---------------------------------------------------------------- 既有结果补汇总
+
+def cmd_summarize_existing() -> None:
+    """只加汇总视图（D23，不重复训练）：为既有 JSON 中已有的 per_fold 逐折数据
+    补算 fold_summary（fold 级均值±std + 最难折）。逐折明细缺失的条目原样保留。"""
+    results = _load_json(ABLATION_JSON, {"variants": {}})
+    n_updated = 0
+    for name, entry in results.get("variants", {}).items():
+        for proto_key in ("logo",):
+            proto = entry.get(proto_key) or {}
+            if proto.get("per_fold") and "fold_summary" not in proto:
+                proto["fold_summary"] = fold_summary(proto["per_fold"])
+                n_updated += 1
+        for seed, proto in (entry.get("dual_by_seed") or {}).items():
+            if proto.get("per_fold") and "fold_summary" not in proto:
+                proto["fold_summary"] = fold_summary(proto["per_fold"])
+                n_updated += 1
+    _save_json(ABLATION_JSON, results)
+    print(f"[summarize] 补算 fold_summary 条目 {n_updated} 个 -> {ABLATION_JSON}", flush=True)
+
+
 # ---------------------------------------------------------------- 入口
 
 def main() -> None:
@@ -498,9 +521,13 @@ def main() -> None:
     ap.add_argument("--fold3", action="store_true", help="运行双留出 fold3 诊断")
     ap.add_argument("--fold-index", type=int, default=3)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--summarize-existing", action="store_true",
+                    help="只为既有逐折数据补算 fold_summary（不训练）")
     args = ap.parse_args()
 
-    if args.fold3:
+    if args.summarize_existing:
+        cmd_summarize_existing()
+    elif args.fold3:
         cmd_fold3(args.fold_index, args.seed)
     else:
         cmd_ablation(only=[args.variant] if args.variant else None)

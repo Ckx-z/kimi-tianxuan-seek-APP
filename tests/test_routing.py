@@ -1,8 +1,8 @@
-"""双模型路由（D22）单元测试。
+"""双模型路由（D22 上线，D23 修订为 routed_strict）单元测试。
 
 覆盖：
 - MonomerPool 单体池判定与路由键
-- RoutedTreePredictor 模型切换（已见/未见/混合输入路由正确）
+- RoutedTreePredictor 模型切换（routed_strict：仅双未见 → noTE，其余含"一新一熟" → v4）
 - FilmPredictor 路由模式输出与路由原因标注
 - 打分理由（SHAP 归因）跟随实际路由的模型（v4 走 TE 填充 / noTE 走原 v3 路径）
 - 向后兼容：单模型加载路径、TreeFilmPredictor 直接加载 tree_v4_noTE.pkl
@@ -76,7 +76,7 @@ def router():
 
 
 class TestRoutedTreePredictor:
-    """路由切换：已见/未见/混合输入应路由到正确模型。"""
+    """路由切换（routed_strict，D23）：仅双未见走 noTE，其余（含一新一熟）走 v4。"""
 
     def test_both_seen_routes_to_v4(self, router):
         model, key, reason = router.route_for(TP, PA)
@@ -86,22 +86,54 @@ class TestRoutedTreePredictor:
         assert model.te_rates is not None  # v4 走 TE 填充路径
         assert "已知单体组合" in reason
 
-    def test_any_unseen_routes_to_noTE(self, router):
-        for ald, amine, key in ((UNSEEN_ALD, PA, ROUTE_ALD_UNSEEN),
-                                (TP, UNSEEN_AMINE, ROUTE_AMINE_UNSEEN),
-                                (UNSEEN_ALD, UNSEEN_AMINE, ROUTE_BOTH_UNSEEN)):
+    def test_mixed_unseen_routes_to_v4(self, router):
+        """一新一熟（非双未见）→ tree_v4：单侧 TE 仍有强信号（exp_008 混合桶 +0.024~0.031）。"""
+        for ald, amine, key, side in ((UNSEEN_ALD, PA, ROUTE_ALD_UNSEEN, "醛"),
+                                      (TP, UNSEEN_AMINE, ROUTE_AMINE_UNSEEN, "胺")):
             model, got_key, reason = router.route_for(ald, amine)
             assert got_key == key
-            assert model is router.extrap_model
-            assert model.model_path.stem == "tree_v4_noTE"
-            assert model.te_rates is None  # noTE 走原 v3 无先验路径
-            assert "外推模式" in reason
+            assert model is router.pool_model
+            assert model.model_path.stem == "tree_v4"
+            assert model.te_rates is not None
+            assert "非双未见" in reason and side in reason and "tree_v4" in reason
+
+    def test_both_unseen_routes_to_noTE(self, router):
+        """双未见 → tree_v4_noTE（外推模式）：双留出最强臂，切换后兜底不变。"""
+        model, key, reason = router.route_for(UNSEEN_ALD, UNSEEN_AMINE)
+        assert key == ROUTE_BOTH_UNSEEN
+        assert model is router.extrap_model
+        assert model.model_path.stem == "tree_v4_noTE"
+        assert model.te_rates is None  # noTE 走原 v3 无先验路径
+        assert "双未见" in reason and "外推模式" in reason
+
+    def test_route_model_mapping_strict(self, router):
+        """边界：四个路由键的模型映射——仅 ROUTE_BOTH_UNSEEN 映射到外推臂。"""
+        expected = {
+            ROUTE_IN_POOL: router.pool_model,
+            ROUTE_ALD_UNSEEN: router.pool_model,
+            ROUTE_AMINE_UNSEEN: router.pool_model,
+            ROUTE_BOTH_UNSEEN: router.extrap_model,
+        }
+        for (ald, amine), (key, model) in {
+            (TP, PA): (ROUTE_IN_POOL, router.pool_model),
+            (UNSEEN_ALD, PA): (ROUTE_ALD_UNSEEN, router.pool_model),
+            (TP, UNSEEN_AMINE): (ROUTE_AMINE_UNSEEN, router.pool_model),
+            (UNSEEN_ALD, UNSEEN_AMINE): (ROUTE_BOTH_UNSEEN, router.extrap_model),
+        }.items():
+            got_model, got_key, _ = router.route_for(ald, amine)
+            assert got_key == key
+            assert got_model is expected[got_key] is model
 
     def test_predict_with_info(self, router):
         info = router.predict_with_info(TP, PA)
         assert 0.0 <= info["probability"] <= 1.0
         assert info["model_name"] == "tree_v4"
         assert info["ald_seen"] and info["amine_seen"]
+        # 一新一熟：routed_strict 下也走 v4
+        info_mix = router.predict_with_info(UNSEEN_ALD, PA)
+        assert info_mix["model_name"] == "tree_v4"
+        assert info_mix["route"] == ROUTE_ALD_UNSEEN
+        assert not info_mix["ald_seen"] and info_mix["amine_seen"]
         info2 = router.predict_with_info(UNSEEN_ALD, UNSEEN_AMINE)
         assert info2["model_name"] == "tree_v4_noTE"
         assert not info2["ald_seen"] and not info2["amine_seen"]
@@ -110,8 +142,12 @@ class TestRoutedTreePredictor:
         """路由预测必须等于被路由模型自己的预测（无额外变换）。"""
         assert router.predict_single(TP, PA) == pytest.approx(
             router.pool_model.predict_single(TP, PA), abs=1e-9)
+        # 一新一熟：routed_strict 后等于池内臂 v4 的预测
         assert router.predict_single(UNSEEN_ALD, PA) == pytest.approx(
-            router.extrap_model.predict_single(UNSEEN_ALD, PA), abs=1e-9)
+            router.pool_model.predict_single(UNSEEN_ALD, PA), abs=1e-9)
+        # 双未见：仍等于外推臂 noTE 的预测
+        assert router.predict_single(UNSEEN_ALD, UNSEEN_AMINE) == pytest.approx(
+            router.extrap_model.predict_single(UNSEEN_ALD, UNSEEN_AMINE), abs=1e-9)
 
 
 @pytest.fixture(scope="module")
@@ -142,11 +178,22 @@ class TestFilmPredictorRouting:
         assert r["tree_route"] == ROUTE_BOTH_UNSEEN
         assert "外推模式" in r["tree_route_reason"]
 
+    def test_mixed_pair_uses_v4_with_reason(self, routed_film_predictor):
+        """一新一熟（routed_strict，D23）→ tree_v4，并标注非双未见原因。"""
+        r = routed_film_predictor.predict(UNSEEN_ALD, PA)
+        assert r["tree_model_name"] == "tree_v4"
+        assert r["tree_route"] == ROUTE_ALD_UNSEEN
+        assert "非双未见" in r["tree_route_reason"]
+
     def test_get_tree_for_follows_route(self, routed_film_predictor):
         tree, info = routed_film_predictor.get_tree_for(TP, PA)
         assert tree.model_path.stem == "tree_v4" and info["route"] == ROUTE_IN_POOL
+        # 一新一熟：routed_strict 后跟随池内臂 v4
         tree2, info2 = routed_film_predictor.get_tree_for(TP, UNSEEN_AMINE)
-        assert tree2.model_path.stem == "tree_v4_noTE" and info2["route"] == ROUTE_AMINE_UNSEEN
+        assert tree2.model_path.stem == "tree_v4" and info2["route"] == ROUTE_AMINE_UNSEEN
+        # 双未见：仍跟随外推臂 noTE
+        tree3, info3 = routed_film_predictor.get_tree_for(UNSEEN_ALD, UNSEEN_AMINE)
+        assert tree3.model_path.stem == "tree_v4_noTE" and info3["route"] == ROUTE_BOTH_UNSEEN
 
 
 class TestAttributionFollowsRoute:
@@ -159,7 +206,10 @@ class TestAttributionFollowsRoute:
     def test_explain_matches_routed_prediction(self, shap_ok, routed_film_predictor):
         from models.attribution import explain_pair_for_app
 
-        for ald, amine, expect_te in ((TP, PA, True), (UNSEEN_ALD, PA, False)):
+        # routed_strict（D23）：一新一熟也走 v4（expect_te=True），仅双未见走 noTE
+        for ald, amine, expect_te in ((TP, PA, True),
+                                      (UNSEEN_ALD, PA, True),
+                                      (UNSEEN_ALD, UNSEEN_AMINE, False)):
             tree, _ = routed_film_predictor.get_tree_for(ald, amine)
             exp = explain_pair_for_app(tree.model, tree.feature_cols, ald, amine,
                                        feature_flags=tree.feature_flags,

@@ -17,6 +17,9 @@
    按双留出 PR-AUC 选主，再对胜者做 TE / 权重消融。
 5. 输出对比报告 + 保存 models/tree_v4.pkl（含 te_rates 与特征开关，
    保持 tree_v3.pkl 的自描述格式）。
+6. 逐折报告标配（D23）：每个协议/种子的输出除合并指标外，标配 per_fold
+   逐折 PR-AUC/MAE 明细 + fold_summary（fold 级均值±std 与最难折）——
+   fold3 诊断（exp_007）证明合并指标会掩盖难折（fold 级 std≈0.21）。
 
 用法（完整运行，约 20-40 分钟）：
     .venv\\Scripts\\python.exe scripts/stage11_dual_holdout.py
@@ -94,6 +97,29 @@ V4_CANDIDATES = {
 
 def pr_auc(y, pred):
     return float(average_precision_score((np.asarray(y) >= 0.5).astype(int), pred))
+
+
+def fold_summary(per_fold: list[dict]) -> dict:
+    """fold 级汇总（D23 逐折报告标配）：逐折 PR-AUC/MAE 的均值±std + 最难折。
+
+    fold3 诊断（exp_007）证明合并指标掩盖难折（fold 级 std≈0.21），
+    今后外推评估一律同时报告本汇总。空验证折（n_val=0）不计入。
+    """
+    vals = [f for f in per_fold if f.get("n_val")]
+    if not vals:
+        return {"n_folds": 0}
+    pr = [f["pr_auc"] for f in vals]
+    mae = [f["mae"] for f in vals]
+    worst = min(vals, key=lambda f: f["pr_auc"])
+    return {
+        "n_folds": len(vals),
+        "pr_auc_mean": float(np.mean(pr)),
+        "pr_auc_std": float(np.std(pr)),
+        "mae_mean": float(np.mean(mae)),
+        "mae_std": float(np.std(mae)),
+        "worst_fold": {"fold": int(worst["fold"]), "n_val": int(worst["n_val"]),
+                       "pr_auc": float(worst["pr_auc"]), "mae": float(worst["mae"])},
+    }
 
 
 # ---------------------------------------------------------------- 数据与特征
@@ -189,10 +215,10 @@ def dual_holdout_folds(df: pd.DataFrame, n_splits: int = 5, seed: int = 42):
     return folds
 
 
-def make_folds(df: pd.DataFrame, y: np.ndarray, X_base: np.ndarray):
+def make_folds(df: pd.DataFrame, y: np.ndarray, X_base: np.ndarray, dual_seed: int = 42):
     ald_groups = df["aldehyde_smiles"].astype("category").cat.codes.values
     logo_folds = list(GroupKFold(n_splits=10).split(X_base, y, ald_groups))
-    dual_folds = dual_holdout_folds(df, n_splits=5, seed=42)
+    dual_folds = dual_holdout_folds(df, n_splits=5, seed=dual_seed)
     return logo_folds, dual_folds
 
 
@@ -211,14 +237,16 @@ def build_fold_features(X_base: np.ndarray, df: pd.DataFrame,
 def run_cv(X_base: np.ndarray, y: np.ndarray, df: pd.DataFrame,
            folds, params: dict, use_te: bool, weights: np.ndarray | None,
            tag: str) -> tuple[np.ndarray, dict]:
-    """在给定折划分上跑 CV，返回 out-of-fold 预测与 F0/F1 基线指标。"""
+    """在给定折划分上跑 CV，返回 out-of-fold 预测与指标（含逐折明细，D23 标配）。"""
     pred = np.full(len(df), np.nan)
     pred_f0 = np.full(len(df), np.nan)
     pred_f1 = np.full(len(df), np.nan)
+    per_fold = []
 
     for i, (tr, va) in enumerate(folds):
         t0 = time.time()
         if len(va) == 0:
+            per_fold.append({"fold": i, "n_val": 0})
             print(f"  [{tag}] fold {i}: 验证集为空，跳过", flush=True)
             continue
         X_full = build_fold_features(X_base, df, tr, use_te)
@@ -227,7 +255,16 @@ def run_cv(X_base: np.ndarray, y: np.ndarray, df: pd.DataFrame,
         if weights is not None:
             fit_kwargs["sample_weight"] = weights[tr]
         m.fit(X_full[tr], y[tr], **fit_kwargs)
-        pred[va] = m.predict(X_full[va])
+        p = m.predict(X_full[va])
+        pred[va] = p
+        per_fold.append({
+            "fold": i,
+            "n_train": int(len(tr)),
+            "n_val": int(len(va)),
+            "pos_rate_val": float((y[va] >= 0.5).mean()),
+            "pr_auc": pr_auc(y[va], p),
+            "mae": float(mean_absolute_error(y[va], p)),
+        })
 
         # 同折基线：F0 全局均值、F1 胺历史成膜率（双留出下胺未见过 → 回退均值）
         gm = y[tr].mean()
@@ -235,7 +272,7 @@ def run_cv(X_base: np.ndarray, y: np.ndarray, df: pd.DataFrame,
         amine_rate_tr = df.iloc[tr].groupby("amine_smiles")["is_film"].mean()
         pred_f1[va] = df.iloc[va]["amine_smiles"].map(amine_rate_tr).fillna(gm).values
         print(f"  [{tag}] fold {i}: n_train={len(tr)} n_val={len(va)} "
-              f"({time.time() - t0:.1f}s)", flush=True)
+              f"pr_auc={per_fold[-1]['pr_auc']:.4f} ({time.time() - t0:.1f}s)", flush=True)
 
     mask = ~np.isnan(pred)
     metrics = {
@@ -245,7 +282,14 @@ def run_cv(X_base: np.ndarray, y: np.ndarray, df: pd.DataFrame,
         "mae": float(mean_absolute_error(y[mask], pred[mask])),
         "F0_global_mean_pr_auc": pr_auc(y[mask], pred_f0[mask]),
         "F1_amine_freq_pr_auc": pr_auc(y[mask], pred_f1[mask]),
+        # D23 逐折报告标配：逐折明细 + fold 级均值±std（合并指标会掩盖难折）
+        "per_fold": per_fold,
+        "fold_summary": fold_summary(per_fold),
     }
+    fs = metrics["fold_summary"]
+    if fs.get("n_folds"):
+        print(f"  [{tag}] fold 级: PR-AUC {fs['pr_auc_mean']:.4f}±{fs['pr_auc_std']:.4f} "
+              f"(最难折 fold{fs['worst_fold']['fold']} {fs['worst_fold']['pr_auc']:.4f})", flush=True)
     return pred, metrics
 
 
@@ -280,12 +324,12 @@ def save_results(results: dict) -> None:
     tmp.replace(REPORT_JSON)
 
 
-def cmd_variant(name: str, protocol: str = "both") -> None:
+def cmd_variant(name: str, protocol: str = "both", dual_seed: int = 42) -> None:
     params, use_te, use_weights = resolve_variant(name)
     X_base, y, df = load_xy()
     weights = frequency_sample_weights(df).values
     w = weights if use_weights else None
-    logo_folds, dual_folds = make_folds(df, y, X_base)
+    logo_folds, dual_folds = make_folds(df, y, X_base, dual_seed=dual_seed)
 
     results = load_results()
     results["n_samples"] = len(df)
@@ -299,8 +343,11 @@ def cmd_variant(name: str, protocol: str = "both") -> None:
         _, entry["logo"] = run_cv(X_base, y, df, logo_folds, params, use_te, w, f"{name}/LOGO")
         save_results(results)  # 每跑完一个协议就落盘
     if protocol in ("both", "dual"):
-        print(" 双留出（醛+胺 5 折）:", flush=True)
-        _, entry["dual"] = run_cv(X_base, y, df, dual_folds, params, use_te, w, f"{name}/双留出")
+        # seed=42 保持历史键名 "dual"（向后兼容）；其他种子存 dual_s{seed}
+        dual_key = "dual" if dual_seed == 42 else f"dual_s{dual_seed}"
+        print(f" 双留出（醛+胺 5 折, seed={dual_seed}）:", flush=True)
+        _, entry[dual_key] = run_cv(X_base, y, df, dual_folds, params, use_te, w,
+                                    f"{name}/双留出/s{dual_seed}")
         save_results(results)
     print(f"[variant] {name} 完成 -> {REPORT_JSON}", flush=True)
 
@@ -443,6 +490,9 @@ def main() -> None:
                     help="运行单个 variant（v3_ref / v4_* / v4_*_noTE / v4_*_noWeight）")
     ap.add_argument("--protocol", choices=["both", "logo", "dual"], default="both",
                     help="只跑某一种评估协议（用于超时后续跑）")
+    ap.add_argument("--dual-seed", type=int, default=42,
+                    help="双留出分组种子（默认 42 保持历史键名 dual；其他种子存 dual_s{seed}，"
+                         "用于多种子逐折标配补跑）")
     ap.add_argument("--finalize", action="store_true", help="选主 + 训练最终模型 + 保存 tree_v4")
     args = ap.parse_args()
 
@@ -451,7 +501,7 @@ def main() -> None:
     elif args.merge_features:
         merge_features(args.n_chunks)
     elif args.variant is not None:
-        cmd_variant(args.variant, args.protocol)
+        cmd_variant(args.variant, args.protocol, dual_seed=args.dual_seed)
     elif args.finalize:
         finalize()
     else:
