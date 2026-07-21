@@ -24,6 +24,7 @@ data/raw/*.xlsx
 data/raw/*.json
 data/interim/*.csv
 data/interim/3d_cache/
+data/interim/gnn_emb_v53_index.json
 data/processed/*.csv
 data/external/*.csv
 *.pkl
@@ -31,6 +32,7 @@ data/external/*.csv
 *.pth
 *.h5
 *.hdf5
+*.npy
 
 # PDF
 data/raw/pdfs/

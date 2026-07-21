@@ -80,17 +80,17 @@ cd "C:/Users/ckx/Desktop/全新机器学习实验"
 
 ---
 
-## 7. 当前项目速览（截至 2026-07-20）
+## 7. 当前项目速览（截至 2026-07-21）
 
-- **阶段**：阶段 12 已完成并收官 —— 双模型路由上线（D22）+ 切换 routed_strict（D23：仅双未见走 noTE，一新一熟走 v4）；指纹/校准路线证伪关闭；Hadamard 交互确认保留；双留出逐折报告标配化
+- **阶段**：阶段 13 进行中——GNN embedding 迁移阶段 A 完成（D24）：配对 embedding（512 维）入树模型双留出 3 种子均值 **0.6824 → 0.844**（+0.16，逐种子一致，过 +0.03 门槛）；mono_emb 证伪。阶段 A 为乐观上界（GNN 训练集与本数据单体重叠，记忆泄漏未排除），**阶段 B 逐折重训 GNN 是第一优先**
 - **可运行**：双击 `start_app.vbs`（推荐，静默启动）或 `.venv/Scripts/python.exe app/gradio_app.py`
-- **模型（路由模式，routed_strict/D23）**：醛/胺均未见（双未见）→ `tree_v4_noTE`（142 特征，双留出 3 种子均值 0.6824 最强）；其余（双已见/一新一熟）→ `tree_v4`（144 特征含 TE，LOGO 0.8784）；路由键 `models/monomer_pool.json`（醛 896/胺 1366）；`tree_v3` 为单模型模式默认与回退；GNN v5.3 并行输出不变
-- **评估协议**：LOGO 与醛胺双留出同时报告；双留出必须报多分组种子（单种子噪声 ±0.03）+ 逐折明细与 fold 级均值±std（fold 级 std≈0.21，最难折必报）；路由验证见 `reports/routing_eval.json`
+- **模型（路由模式，routed_strict/D23）**：醛/胺均未见（双未见）→ `tree_v4_noTE`（142 特征，双留出 3 种子均值 0.6824）；其余（双已见/一新一熟）→ `tree_v4`（144 特征含 TE，LOGO 0.8784）；路由键 `models/monomer_pool.json`（醛 896/胺 1366）；`tree_v3` 为单模型模式默认与回退；GNN v5.3 并行输出不变（App 行为未受阶段 13 影响）
+- **评估协议**：LOGO 与醛胺双留出同时报告；双留出必须报多分组种子（单种子噪声 ±0.03）+ 逐折明细与 fold 级均值±std（fold 级 std≈0.21，最难折必报）；路由验证见 `reports/routing_eval.json`；embedding 评估见 `reports/gnn_embedding_eval.json`
 - **前端**：「打分理由」SHAP 归因跟随路由模型（热态 ~0.04s）；预测标注实际模型 + 路由原因
-- **最新报告**：`EXPERIMENTS/exp_006.md`（指纹证伪）、`exp_007.md`（交互消融 + fold3 诊断）、`exp_008.md`（路由评估 + D23 复盘：routed_strict 切换）
+- **最新报告**：`EXPERIMENTS/exp_009.md`（GNN embedding 阶段 A：pair PASS / mono 证伪；fold3 难折 0.364→0.65+）、`exp_008.md`（路由评估 + D23 复盘）
 - **记忆系统**：.agents/ 目录已创建，AGENTS.md + session_index + session_state 已建立
 - **日报双轨制**：AI 日报 + 人日报，每天工作结束后生成
-- **已知阻塞**：无；真正瓶颈是双未见单体泛化（0.63-0.68，指纹已证伪 → GNN 表征迁移方向，明日第一优先：可行性评估）
+- **已知阻塞**：无；第一优先 = 阶段 B（逐折重训 GNN：调研旧项目训练管线，1 种子 5 折摸底 → 3 种子全量）
 
 ---
 

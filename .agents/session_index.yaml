@@ -249,10 +249,33 @@ sessions:
     test_status: { passed: 57, failed: 0 }
     blockers: []
     status: "completed"
+  - id: "2026-07-21-01"
+    date: "2026-07-21"
+    title: "阶段 13 阶段 A：GNN embedding 迁移可行性评估（exp_009，D24）——过门槛，立项阶段 B"
+    summary: "双未见泛化瓶颈（0.63-0.68）主攻方向首次实证：不改旧项目任何文件，从 GNN v5.3 提取 pair_emb（[ea‖eb‖ea⊙eb‖e_pair] 512 维，交叉注意力后）与 mono_emb（encoder 出口 256 维，注意力前），3094 行全量提取（dphuanjing GPU ~10s，自检 Tp+Pa 0.6474≈0.665，147 行脏 SMILES 补零）。同口径评估（v4_mild+频率降权，LOGO + 双留出 3 种子，逐折标配）：基线复跑逐位吻合 0.6824；emb_pair_only 0.8431 / emb_pair_plus 0.8442（+0.16，逐种子一致，远超 +0.03 门槛 → PASS）；emb_mono_plus −0.01 证伪关闭。fold3 难折 0.364→0.65+，gain 诊断 embedding 维占 81.1%。泄漏警告：GNN 训练集与本数据单体几乎完全重叠，阶段 A 为乐观上界，+0.16 与配对标签记忆形态量级不可区分——按预案立项阶段 B（逐折重训 GNN 排除记忆）。DECISIONS 追加 D24，exp_009 留档。测试 57 passed，App/routing 未动。"
+    files_modified:
+      - scripts/stage13_extract_gnn_emb.py
+      - scripts/stage13_gnn_embedding_eval.py
+      - data/interim/gnn_emb_v53_pair.npy
+      - data/interim/gnn_emb_v53_mono.npy
+      - data/interim/gnn_emb_v53_index.json
+      - reports/gnn_embedding_eval.json
+      - EXPERIMENTS/exp_009.md
+      - DECISIONS.md
+      - PROJECT_STATE.md
+      - SESSION_START.md
+      - DAILY_LOG/2026-07-21.md
+      - DAILY_LOG/2026-07-21_human.md
+    decisions_made:
+      - "D24: GNN embedding 迁移阶段 A 通过门槛 → 立项阶段 B（逐折重训 GNN）；mono_emb 证伪关闭"
+    models_trained: []
+    test_status: { passed: 57, failed: 0 }
+    blockers: []
+    status: "completed"
 
 # 快速统计
-total_sessions: 9
-completed_sessions: 9
+total_sessions: 10
+completed_sessions: 10
 in_progress_sessions: 0
 models_trained_total: 9
-decisions_made_total: 23
+decisions_made_total: 24
