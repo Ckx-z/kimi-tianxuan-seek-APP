@@ -27,6 +27,8 @@ predict/models/**/*.pth
 .env
 *.env
 secrets/
+config/secrets.local.json
+*.local.json
 
 # 本地文献知识库 (私人下载的 PDF, 不应上传)
 知识库/

@@ -251,5 +251,258 @@ class TestSinglePredict:
         assert app is not None
 
 
+# ---------------------------------------------------------------------------
+# P2：收藏夹 / 方案卡 / 实验记录（任务1后端一律 monkeypatch 桩，不写盘）
+# ---------------------------------------------------------------------------
+
+_FAKE_FAV = {
+    "id": "fav_20260722_001",
+    "aldehyde": {"smiles": "O=Cc1ccccc1", "cas": "", "name": "A2"},
+    "amine": {"smiles": "Nc1ccc(N)cc1", "cas": "", "name": "TAPT"},
+    "created_at": "2026-07-22T10:00:00+08:00",
+    "notes": "重点组合",
+    "latest_prediction": {"score": 0.699, "std": 0.04, "arm": "tree_v4",
+                          "ood": "none", "date": "2026-07-22"},
+    "references": [
+        {"title": "101", "doi": "", "source": "auto-matched",
+         "path_or_url": "", "match_type": "both", "count": 1,
+         "note": "报道过该醛胺组合"},
+        {"title": "手动文献", "doi": "10.1/abc", "source": "user-added",
+         "path_or_url": "", "note": "支撑打分决策"},
+    ],
+    "experiment_record_ids": [],
+}
+
+# 任务1 plan_card 真实 schema：checklist 为 {item, detail}，conditions 英文键
+_FAKE_CARD = {
+    "template": "侯老师法（v3.9 方案）",
+    "defaults_note": "按 v3.9 方案默认值，可按组调整",
+    "conditions": {"solvent": "甲苯（或氯仿）", "catalyst": "6M 乙酸",
+                   "temperature_c": 120},
+    "steps": ["先醛+苯胺", "后胺", "最后乙酸"],
+    "checklist": [{"item": "乙酸浓度核对", "detail": "必须用 6M 乙酸，6M≠18M"}],
+    "monomer_hints": ["含氟单体注意溶解性"],
+}
+
+_FAKE_REC = {
+    "record_id": "rec_20260722_001",
+    "favorite_id": "fav_20260722_001",
+    "aldehyde": {"smiles": "O=Cc1ccccc1", "name": "A2"},
+    "amine": {"smiles": "Nc1ccc(N)cc1", "name": "TAPT"},
+    "prediction_snapshot": {"score": 0.65, "std": 0.04, "ood": "none"},
+    "conditions": {"solvent": "甲苯", "catalyst": "6M 乙酸",
+                   "temperature_c": "120", "time_days": "3"},
+    "outcome": "failed", "strength": "膜脆", "notes": "乙酸用错浓度",
+    "operator": "测试员", "date": "2026-07-22",
+}
+
+
+class TestSnapshotPayload:
+    def test_normal_pred_maps_score(self):
+        payload = gradio_app._snapshot_payload(_fake_predict("good_ald", "B"))
+        assert payload["score"] == 0.7 and payload["std"] == 0.05
+        assert payload["arm"] == "tree_v4_ens" and payload["ood"] == "none"
+
+    def test_ood_out_nulls_score(self):
+        payload = gradio_app._snapshot_payload(_fake_predict("bad_ald", "B"))
+        assert payload["score"] is None and payload["ood"] == "out"
+
+
+class TestFavoriteFlow:
+    def test_favorite_with_snapshot(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_fav_add",
+                            lambda a, b, an, bn, n: (dict(_FAKE_FAV), None))
+        snapped = {}
+        monkeypatch.setattr(
+            gradio_app, "_fav_update_snapshot",
+            lambda fid, pred: snapped.update(fid=fid, pred=pred) or (True, None))
+        monkeypatch.setattr(
+            gradio_app, "_snapshot_payload", lambda pred: {"score": 0.7})
+        gradio_app._LAST_PREDICTION.clear()
+        gradio_app._LAST_PREDICTION.update(
+            {"ald": "ALD", "amine": "AMN", "pred": {"tree_probability": 0.7}})
+        msg = gradio_app.favorite_current("ALD", "AMN", "备注")
+        assert "已收藏" in msg and "快照" in msg
+        assert snapped["fid"] == _FAKE_FAV["id"]
+
+    def test_favorite_without_snapshot(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_fav_add",
+                            lambda a, b, an, bn, n: (dict(_FAKE_FAV), None))
+        gradio_app._LAST_PREDICTION.clear()
+        msg = gradio_app.favorite_current("ALD", "AMN", "")
+        assert "已收藏" in msg and "重新打分" in msg
+
+    def test_favorite_backend_missing(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_favorites_store",
+                            lambda: (None, "⏳ 收藏夹后端模块尚未上线（后端开发中），本功能暂不可用。"))
+        msg = gradio_app.favorite_current("ALD", "AMN", "")
+        assert "尚未上线" in msg
+
+    def test_favorite_empty_input(self):
+        assert "请先填写" in gradio_app.favorite_current(" ", "AMN", "")
+
+
+class TestPlanCard:
+    def test_real_schema_render(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_plan_generate",
+                            lambda a, b, an, bn: (dict(_FAKE_CARD), None))
+        html_out, status = gradio_app.plan_card_for_input("O=Cc1ccccc1", "Nc1ccc(N)cc1")
+        assert "✓" in status
+        assert "侯老师法" in html_out and "防错清单" in html_out
+        assert "6M≠18M" in html_out  # {item, detail} 拼接
+        assert "溶剂" in html_out and "催化剂" in html_out  # 英文键→中文标签
+        assert "含氟单体注意溶解性" in html_out
+
+    def test_backend_missing(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_plan_generate",
+                            lambda a, b, an, bn: (None, "⏳ 方案卡模块尚未上线（后端开发中）。"))
+        html_out, status = gradio_app.plan_card_for_input("ALD", "AMN")
+        assert html_out == "" and "尚未上线" in status
+
+    def test_list_conditions_compat(self):
+        card = {"conditions": [{"param": "温度", "value": "120 °C"}],
+                "monomer_hints": "单条提示字符串"}
+        html_out = gradio_app._render_plan_card_html(card, "A", "B")
+        assert "温度" in html_out and "单条提示字符串" in html_out
+
+
+class TestFavoritePages:
+    def test_refresh_favorites(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_fav_list",
+                            lambda: ([dict(_FAKE_FAV)], None))
+        cards, sel, status = gradio_app.refresh_favorites()
+        assert "共 1 条收藏" in status
+        assert "fav-badge" in cards and "0.699" in cards  # 打分徽章
+        assert "A2 × TAPT" in cards
+        assert sel["choices"][0][1] == _FAKE_FAV["id"]
+
+    def test_refresh_backend_missing(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_fav_list",
+                            lambda: (None, "⏳ 收藏夹后端模块尚未上线"))
+        cards, sel, status = gradio_app.refresh_favorites()
+        assert "尚未上线" in cards and "尚未上线" in status
+
+    def test_score_badge_semantics(self):
+        assert "#0f766e" in gradio_app._score_badge_html(0.7, 0.04, "none")
+        assert "#b45309" in gradio_app._score_badge_html(0.5, None, "warning")
+        assert "⛔" in gradio_app._score_badge_html(None, None, "out")
+        assert "未打分" in gradio_app._score_badge_html(None, None, "none")
+
+    def test_show_detail(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_fav_get",
+                            lambda fid: (dict(_FAKE_FAV), None))
+        monkeypatch.setattr(gradio_app, "_rec_list",
+                            lambda favorite_id=None: ([dict(_FAKE_REC)], None))
+        info, snap, notes, refs, recs = gradio_app.show_favorite_detail(
+            _FAKE_FAV["id"])
+        assert "A2 × TAPT" in info and "fav_20260722_001" in info
+        assert "0.699" in snap and "池内" in snap
+        assert notes == "重点组合"
+        assert "相关文献·自动匹配" in refs and "手动添加" in refs
+        assert "rec_20260722_001" in recs and "预测 0.650" in recs
+
+    def test_show_detail_missing(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_fav_get",
+                            lambda fid: (None, "⚠️ 收藏条目不存在"))
+        info = gradio_app.show_favorite_detail("fav_x")[0]
+        assert "不存在" in info
+
+    def test_save_notes_and_add_ref(self, monkeypatch):
+        updated = {}
+        monkeypatch.setattr(gradio_app, "_fav_update",
+                            lambda fid, **kw: updated.update(kw) or ({}, None))
+        assert "✓" in gradio_app.save_favorite_notes("fav_x", "新备注")
+        assert updated["notes"] == "新备注"
+        monkeypatch.setattr(gradio_app, "_fav_add_ref",
+                            lambda fid, t, d, u, n: ({}, None))
+        monkeypatch.setattr(gradio_app, "_fav_get",
+                            lambda fid: (dict(_FAKE_FAV), None))
+        st, refs = gradio_app.add_favorite_reference("fav_x", "标题", "", "", "")
+        assert "✓" in st and "相关文献·自动匹配" in refs
+        st, _ = gradio_app.add_favorite_reference("fav_x", " ", "", "", "")
+        assert "标题不能为空" in st
+
+    def test_auto_match_refs(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_fav_get",
+                            lambda fid: (dict(_FAKE_FAV), None))
+        monkeypatch.setattr(
+            gradio_app, "_fav_auto_refs",
+            lambda a, b: ([{"title": "202", "match_type": "aldehyde",
+                            "note": "报道过该醛单体"}], None))
+        refs, st = gradio_app.auto_match_favorite_refs(_FAKE_FAV["id"])
+        assert "自动匹配到 1 篇" in st and "202" in refs
+
+    def test_rescore(self, fake_predictor, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_fav_get",
+                            lambda fid: (dict(_FAKE_FAV), None))
+        snapped = {}
+        monkeypatch.setattr(
+            gradio_app, "_fav_update_snapshot",
+            lambda fid, pred: snapped.update(fid=fid) or (True, None))
+        st, snap_md = gradio_app.rescore_favorite(_FAKE_FAV["id"])
+        assert "✓" in st and snapped["fid"] == _FAKE_FAV["id"]
+        assert "最新预测快照" in snap_md
+
+    def test_delete(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_fav_delete", lambda fid: (True, None))
+        monkeypatch.setattr(gradio_app, "_fav_list", lambda: ([], None))
+        out = gradio_app.delete_favorite(_FAKE_FAV["id"])
+        assert "已删除" in out[0]
+
+
+class TestRecordsPage:
+    def test_submit_success(self, monkeypatch):
+        created = {}
+        monkeypatch.setattr(
+            gradio_app, "_rec_create",
+            lambda fid, cond, out, s, n, op: created.update(
+                fid=fid, outcome=out) or (dict(_FAKE_REC), None))
+        monkeypatch.setattr(gradio_app, "_rec_list",
+                            lambda favorite_id=None: ([dict(_FAKE_REC)], None))
+        st, timeline, _ = gradio_app.submit_record(
+            "fav_20260722_001", "甲苯", "", "6M 乙酸", "120", "3",
+            "先醛后胺", "失败", "膜脆", "测试员", "乙酸用错")
+        assert "✓" in st and "rec_20260722_001" in st
+        assert created["outcome"] == "failed"  # 中文→契约枚举
+        assert "预测 0.650 ± 0.040" in timeline
+        assert "实际" in timeline and "⛔ 失败" in timeline
+        assert "溶剂：甲苯" in timeline
+
+    def test_submit_requires_favorite(self):
+        st, _, _ = gradio_app.submit_record(
+            "", "甲苯", "", "", "", "", "", "成膜", "", "", "")
+        assert "收藏" in st and "⚠️" in st
+
+    def test_submit_requires_content(self):
+        st, _, _ = gradio_app.submit_record(
+            "fav_x", "", "", "", "", "", "", "成膜", "", "", "")
+        assert "至少填写一项" in st
+
+    def test_timeline_without_snapshot(self):
+        rec = dict(_FAKE_REC, prediction_snapshot=None, outcome="film")
+        timeline = gradio_app._render_records_timeline([rec])
+        assert "无预测快照" in timeline and "✓ 成膜" in timeline
+
+    def test_timeline_ood_snapshot(self):
+        rec = dict(_FAKE_REC, prediction_snapshot={"score": None, "std": None,
+                                                   "ood": "out"})
+        timeline = gradio_app._render_records_timeline([rec])
+        assert "OOD 不适用" in timeline
+
+    def test_pair_names_fallback_to_favorite(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_fav_get",
+                            lambda fid: (dict(_FAKE_FAV), None))
+        rec = {"record_id": "rec_x", "favorite_id": "fav_20260722_001",
+               "conditions": {}, "outcome": "partial"}
+        timeline = gradio_app._render_records_timeline([rec])
+        assert "A2 × TAPT" in timeline and "部分成膜" in timeline
+
+    def test_refresh_records_tab_missing(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_rec_list",
+                            lambda favorite_id=None: (None, "⏳ 实验记录后端模块尚未上线"))
+        _, recs_html = gradio_app.refresh_records_tab()
+        assert "尚未上线" in recs_html
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

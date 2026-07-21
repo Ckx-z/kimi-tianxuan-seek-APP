@@ -1,26 +1,31 @@
 # LLM 路由配置
-# 所有 API key 必须从环境变量读，绝不能写进任何代码或配置文件
+# 所有 API key 必须从环境变量或 gitignored 的 config/secrets.local.json 读，
+# 绝不能写进任何代码或提交入 git 的配置文件。
+# 统一入口: bridge/llm_client.py（chat_completion 主端点失败自动回落 longcat）
 # PowerShell 设置:
 #   $env:KIMI_API_KEY = "你的kimi key"
 #   $env:MINIMAX_API_KEY = "你的minimax key"
+#   $env:LONGCAT_API_KEY = "你的longcat key"
 
 # 主 LLM：用于方案 docx 拼装、结构化抽取（成本低、平台一致）
 primary:
   provider: minimax
-  base_url: https://api.minimax.chat/v1    # 占位，请按实际端点修正
+  base_url: https://api.minimax.chat/v1
   api_key_env: MINIMAX_API_KEY
   model: MiniMax-Text-01
   max_tokens: 8000
   temperature: 0.3
 
-# 备用 LLM：用于复杂化学推理、失败诊断、文献综述
+# 备用 LLM：OpenAI 兼容端点，主端点失败/未配置时自动回落
+# 切换方式: llm_client.chat_completion() 默认按 fallback_order (minimax -> longcat)
+# 依次尝试; 传 provider='longcat' 可强制走备用。key 放 secrets.local.json 或环境变量。
 fallback:
-  provider: kimi
-  base_url: https://api.kimi.com/coding/v1
-  api_key_env: KIMI_API_KEY
-  model: kimi for coding
-  max_tokens: 16000
-  temperature: 0.2
+  provider: longcat
+  base_url: https://api.longcat.chat/openai/v1
+  api_key_env: LONGCAT_API_KEY
+  model: LongCat-2.0
+  max_tokens: 8000
+  temperature: 0.3
 
 # 任务路由
 routing:

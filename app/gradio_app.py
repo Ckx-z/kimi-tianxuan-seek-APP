@@ -5,16 +5,23 @@
   GNN 对照、OOD ⛔/⚠️、SHAP 中文理由、结构图三件套、相似成膜案例、Word 报告。
 - ② 批量排序：内置库多选（醛×胺笛卡尔组合）/ 粘贴 SMILES 对 / 上传 CSV →
   排序表（打分±std、路由臂、OOD、Top 理由一句话）→ 排序/过滤 → 导出 CSV。
-- ③④⑤：占位（P2/P3 上线）。
+- ③ 收藏夹：卡片墙 + 详情（预测快照、备注、文献自动匹配/手动添加、关联实验
+  记录、重新打分、方案卡、删除）。
+- ④ 实验记录：标准化录入表单 + 时间线（当初预测快照 vs 实际结果对比）。
+- ⑤：占位（P3 上线）。
 
-依赖任务2的三个后端模块（src/utils/cas_lookup.py、src/utils/predict_log.py、
-src/recommend/similar_cases.py），均为懒加载 + 优雅降级：模块未就位时
-对应板块显示提示而不报错。
+依赖的并行后端模块均为懒加载 + 优雅降级：模块未就位时对应板块显示提示而
+不报错。P1 后端：src/utils/cas_lookup.py、src/utils/predict_log.py、
+src/recommend/similar_cases.py；P2 后端（任务1）：src/favorites/store.py、
+src/records/store.py、src/recommend/plan_card.py。
 """
 
 from __future__ import annotations
 
+import base64
 import csv
+import html
+import io
 import json
 import os
 import sys
@@ -59,6 +66,11 @@ _configure_rdkit_logging()
 
 # 全局预测器（懒加载）
 _predictor = None
+
+# 页① 最近一次打分的快照（本地单用户 App，模块级即可）：
+# {"ald": ..., "amine": ..., "pred": FilmPredictor.predict 的原始返回}
+# 「☆ 收藏这组单体」时若 SMILES 对匹配则随收藏写入预测快照。
+_LAST_PREDICTION: dict = {}
 
 
 def _get_predictor() -> FilmPredictor:
@@ -390,6 +402,8 @@ def predict(ald_smiles: str, amine_smiles: str):
     amine_smiles = amine_smiles.strip()
     predictor = _get_predictor()
     pred_result = predictor.predict(ald_smiles, amine_smiles)
+    _LAST_PREDICTION.update(
+        {"ald": ald_smiles, "amine": amine_smiles, "pred": pred_result})
 
     # 预测日志（D23 路由复盘 / 使用统计）
     _log_prediction(_build_log_record(ald_smiles, amine_smiles, pred_result, "single"))
@@ -680,6 +694,673 @@ def export_batch_csv(state: dict) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# 任务1 后端模块的安全封装（收藏夹 / 实验记录 / 方案卡；未就位时优雅降级）
+# 所有封装统一返回 (payload, 错误文案)；payload 为 None 时错误文案必有值。
+# ---------------------------------------------------------------------------
+
+def _load_favorites_store():
+    try:
+        from favorites import store as fav_store
+        return fav_store, None
+    except ImportError:
+        return None, "⏳ 收藏夹后端模块尚未上线（后端开发中），本功能暂不可用。"
+
+
+def _load_records_store():
+    try:
+        from records import store as rec_store
+        return rec_store, None
+    except ImportError:
+        return None, "⏳ 实验记录后端模块尚未上线（后端开发中），本功能暂不可用。"
+
+
+def _fav_add(ald, amine, ald_name, amine_name, notes):
+    store, err = _load_favorites_store()
+    if err:
+        return None, err
+    try:
+        return store.add_favorite(ald, amine, ald_name, amine_name, notes), None
+    except Exception as e:
+        return None, f"⚠️ 收藏失败：{_brief_error(e)}"
+
+
+def _fav_list():
+    store, err = _load_favorites_store()
+    if err:
+        return None, err
+    try:
+        return store.list_favorites() or [], None
+    except Exception as e:
+        return None, f"⚠️ 收藏列表读取失败：{_brief_error(e)}"
+
+
+def _fav_get(fid):
+    store, err = _load_favorites_store()
+    if err:
+        return None, err
+    try:
+        fav = store.get_favorite(fid)
+    except Exception as e:
+        return None, f"⚠️ 收藏条目读取失败：{_brief_error(e)}"
+    if not fav:
+        return None, f"⚠️ 收藏条目 {fid} 不存在（可能已被删除）。"
+    return fav, None
+
+
+def _fav_update(fid, **fields):
+    store, err = _load_favorites_store()
+    if err:
+        return None, err
+    try:
+        return store.update_favorite(fid, **fields), None
+    except Exception as e:
+        return None, f"⚠️ 收藏更新失败：{_brief_error(e)}"
+
+
+def _fav_delete(fid):
+    store, err = _load_favorites_store()
+    if err:
+        return None, err
+    try:
+        store.delete_favorite(fid)
+        return True, None
+    except Exception as e:
+        return None, f"⚠️ 删除失败：{_brief_error(e)}"
+
+
+def _snapshot_payload(pred: dict) -> dict:
+    """FilmPredictor 原始返回 → 任务1 update_prediction_snapshot 期望的
+    {score, std, arm, ood} 快照口径（ood 为 level 字符串；⛔ out 时 score=None）。"""
+    pred = pred or {}
+    ood = pred.get("ood") or {}
+    level = ood.get("level", "none") if isinstance(ood, dict) else str(ood or "none")
+    score = pred.get("tree_probability", pred.get("ensemble_probability"))
+    return {
+        "score": None if level == "out" else score,
+        "std": pred.get("score_std"),
+        "arm": pred.get("tree_model_name", ""),
+        "ood": level,
+    }
+
+
+def _fav_update_snapshot(fid, pred):
+    store, err = _load_favorites_store()
+    if err:
+        return None, err
+    try:
+        store.update_prediction_snapshot(fid, _snapshot_payload(pred))
+        return True, None
+    except Exception as e:
+        return None, f"⚠️ 预测快照写入失败：{_brief_error(e)}"
+
+
+def _fav_add_ref(fid, title, doi, url_or_path, note):
+    store, err = _load_favorites_store()
+    if err:
+        return None, err
+    try:
+        return store.add_reference(fid, title, doi, url_or_path, note), None
+    except Exception as e:
+        return None, f"⚠️ 文献添加失败：{_brief_error(e)}"
+
+
+def _fav_auto_refs(ald, amine, max_refs=8):
+    store, err = _load_favorites_store()
+    if err:
+        return None, err
+    try:
+        return store.auto_match_references(ald, amine, max_refs=max_refs) or [], None
+    except Exception as e:
+        return None, f"⚠️ 文献自动匹配失败：{_brief_error(e)}"
+
+
+def _rec_create(favorite_id, conditions, outcome, strength, notes, operator):
+    store, err = _load_records_store()
+    if err:
+        return None, err
+    try:
+        return store.create_record(favorite_id, conditions, outcome,
+                                   strength, notes, operator), None
+    except Exception as e:
+        return None, f"⚠️ 实验记录保存失败：{_brief_error(e)}"
+
+
+def _rec_list(favorite_id=None):
+    store, err = _load_records_store()
+    if err:
+        return None, err
+    try:
+        return store.list_records(favorite_id=favorite_id) or [], None
+    except Exception as e:
+        return None, f"⚠️ 实验记录读取失败：{_brief_error(e)}"
+
+
+def _plan_generate(ald, amine, ald_name, amine_name):
+    try:
+        from recommend.plan_card import generate_plan_card
+    except ImportError:
+        return None, "⏳ 方案卡模块尚未上线（后端开发中）。"
+    try:
+        return generate_plan_card(ald, amine, ald_name, amine_name), None
+    except Exception as e:
+        return None, f"⚠️ 方案卡生成失败：{_brief_error(e)}"
+
+
+# ---------------------------------------------------------------------------
+# P2 展示辅助：收藏卡片墙 / 方案卡 / 文献 / 实验记录时间线
+# ---------------------------------------------------------------------------
+
+def _esc(s) -> str:
+    return html.escape(str(s if s is not None else ""))
+
+
+def _smiles_img_b64(smiles: str, size=(220, 150)) -> str:
+    """SMILES → base64 data URI（嵌卡片墙）；解析失败返回空串。"""
+    if not smiles:
+        return ""
+    img = smiles_to_image(smiles, size=size)
+    if img is None:
+        return ""
+    buf = io.BytesIO()
+    try:
+        img.save(buf, format="PNG")
+    except Exception:
+        return ""
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _fav_pair(fav: dict) -> tuple[str, str, str, str]:
+    """从收藏条目提取 (醛SMILES, 胺SMILES, 醛名, 胺名)，宽容兼容任务1 schema：
+    单体可能是 {"smiles","name"} 对象（数据契约形态）或平铺 ald_smiles 字段。
+    """
+    def _mon(obj_key: str, flat_prefix: str) -> tuple[str, str]:
+        obj = fav.get(obj_key)
+        if isinstance(obj, dict):
+            return obj.get("smiles") or "", obj.get("name") or ""
+        if isinstance(obj, str):
+            return obj, ""
+        return (fav.get(f"{flat_prefix}_smiles") or fav.get(flat_prefix) or "",
+                fav.get(f"{flat_prefix}_name") or "")
+
+    ald_s, ald_n = _mon("aldehyde", "ald")
+    amine_s, amine_n = _mon("amine", "amine")
+    name_map = load_builtin_monomers()["name_by_smiles"]
+    ald_n = ald_n or (_display_name(ald_s, name_map) if ald_s else "?")
+    amine_n = amine_n or (_display_name(amine_s, name_map) if amine_s else "?")
+    return ald_s, amine_s, ald_n, amine_n
+
+
+def _fav_label(fav: dict) -> str:
+    _, _, ald_n, amine_n = _fav_pair(fav)
+    return f"{ald_n} × {amine_n} · {fav.get('id', '?')}"
+
+
+def _fav_snapshot(fav: dict) -> tuple:
+    """提取 (score, std, ood_level, date)；ood 兼容字符串或 {"level"} 对象。"""
+    snap = fav.get("latest_prediction") or fav.get("prediction_snapshot") or {}
+    score = snap.get("score")
+    std = snap.get("std", snap.get("score_std"))
+    ood = snap.get("ood", "none")
+    if isinstance(ood, dict):
+        ood = ood.get("level", "none")
+    date = snap.get("date") or snap.get("timestamp") or ""
+    return score, std, ood, date
+
+
+def _score_badge_html(score, std, ood_level: str) -> str:
+    """收藏卡片上的打分徽章，沿用页① 色彩语义（青/琥珀/红 + OOD）。"""
+    if ood_level == "out":
+        return '<span class="fav-badge" style="background:#b91c1c">⛔ 不适用</span>'
+    if not isinstance(score, (int, float)):
+        return '<span class="fav-badge" style="background:#64748b">未打分</span>'
+    std_txt = f"±{std:.3f} " if isinstance(std, (int, float)) else ""
+    warn = " ⚠️" if ood_level == "warning" else ""
+    return (f'<span class="fav-badge" style="background:{_score_color(score)}">'
+            f"{score:.3f} {std_txt}{warn}</span>")
+
+
+def _render_favorite_cards(favs: list) -> str:
+    """收藏卡片墙：结构缩略图 + 名称 + 最新打分徽章 + OOD 状态。"""
+    if not favs:
+        return ('<div class="placeholder-page">收藏夹还是空的——'
+                "到页① 打分后点击「☆ 收藏这组单体」。</div>")
+    cards = []
+    for fav in favs:
+        ald_s, amine_s, ald_n, amine_n = _fav_pair(fav)
+        score, std, ood_level, _ = _fav_snapshot(fav)
+        imgs = ""
+        for s in (ald_s, amine_s):
+            uri = _smiles_img_b64(s)
+            if uri:
+                imgs += f'<img src="{uri}" alt="单体结构">'
+        notes = _esc((fav.get("notes") or "")[:60])
+        meta = _esc(str(fav.get("id", "?"))) + (f" · {notes}" if notes else "")
+        cards.append(
+            '<div class="fav-card">'
+            f'<div class="fav-card-imgs">{imgs}</div>'
+            f'<div class="fav-card-title">{_esc(ald_n)} × {_esc(amine_n)}</div>'
+            f"<div>{_score_badge_html(score, std, ood_level)}</div>"
+            f'<div class="fav-card-meta">{meta}</div>'
+            "</div>")
+    return ('<div class="fav-wall">' + "".join(cards) + "</div>"
+            '<div class="fav-wall-hint">👇 在下方「收藏详情」选择条目，'
+            "查看快照 / 文献 / 实验记录。</div>")
+
+
+def _render_plan_card_html(card: dict, ald_name: str = "", amine_name: str = "") -> str:
+    """方案卡 HTML：条件表 + 加料顺序 + ⛔ 防错清单 + 单体特异提示。
+
+    宽容兼容任务1 schema：conditions 接受 dict 或 [{param,value}] 列表。
+    """
+    if not card:
+        return ""
+    title = card.get("title") or f"实验方案卡：{ald_name} × {amine_name}"
+    template = card.get("template") or ""
+    parts = [f'<div class="plan-card"><h3>🧪 {_esc(title)}</h3>']
+    if template:
+        parts.append(f'<div class="plan-template">模板：{_esc(template)}'
+                     + (f"（{_esc(card['defaults_note'])}）" if card.get("defaults_note") else "")
+                     + "</div>")
+
+    conds = card.get("conditions") or {}
+    rows = ""
+    if isinstance(conds, dict):
+        rows = "".join(
+            f"<tr><td>{_esc(_COND_LABELS.get(k, k))}</td><td>{_esc(v)}</td></tr>"
+            for k, v in conds.items())
+    elif isinstance(conds, list):
+        for c in conds:
+            if isinstance(c, dict):
+                rows += (f"<tr><td>{_esc(c.get('param') or c.get('name') or '')}</td>"
+                         f"<td>{_esc(c.get('value') or '')}</td></tr>")
+            else:
+                rows += f'<tr><td colspan="2">{_esc(c)}</td></tr>'
+    if rows:
+        parts.append(f'<h4>条件参数</h4><table class="plan-table">{rows}</table>')
+
+    steps = card.get("steps") or []
+    if steps:
+        items = "".join(f"<li>{_esc(s)}</li>" for s in steps)
+        parts.append(f"<h4>加料顺序与操作要点</h4><ol>{items}</ol>")
+
+    checklist = card.get("checklist") or []
+    if checklist:
+        items = ""
+        for c in checklist:
+            if isinstance(c, dict):  # 任务1 schema：{item, detail}
+                items += (f"<li><b>{_esc(c.get('item') or '')}</b>"
+                          f"——{_esc(c.get('detail') or '')}</li>")
+            else:
+                items += f"<li>{_esc(c)}</li>"
+        parts.append(f'<h4>⛔ 防错清单（逐条核对后再开反应）</h4>'
+                     f'<ul class="plan-checklist">{items}</ul>')
+
+    hints = card.get("monomer_hints") or []
+    if isinstance(hints, str):
+        hints = [hints]
+    if hints:
+        items = "".join(f"<li>{_esc(h)}</li>" for h in hints)
+        parts.append(f"<h4>单体特异提示</h4><ul>{items}</ul>")
+
+    parts.append("</div>")
+    return "".join(parts)
+
+
+def _render_refs_html(fav: dict, auto_refs: list | None = None) -> str:
+    """文献列表：收藏条目内已挂文献 + （可选）即时自动匹配结果。
+
+    自动匹配的标注「相关文献·自动匹配」（方案 8.2：反查到的是报道过该单体
+    的文献，与支撑该组合不完全等同，措辞为相关文献）。
+    """
+    def _ref_li(r: dict, tag: str, tag_cls: str) -> str:
+        title = _esc(r.get("title") or r.get("paper_id") or "（无标题）")
+        line = f"<b>{title}</b>"
+        doi = r.get("doi") or ""
+        if doi:
+            line += f" · DOI: {_esc(doi)}"
+        link = r.get("url_or_path") or r.get("path_or_url") or ""
+        if link:
+            if str(link).startswith("http"):
+                line += f' · <a href="{_esc(link)}" target="_blank">链接</a>'
+            else:
+                line += f" · {_esc(link)}"
+        note = r.get("note") or ""
+        if note:
+            line += f"<br><i>{_esc(note)}</i>"
+        return f'{line} <span class="ref-tag {tag_cls}">{tag}</span>'
+
+    items = []
+    for r in fav.get("references") or []:
+        src = r.get("source") or "user-added"
+        if src == "auto-matched":
+            items.append(f"<li>{_ref_li(r, '相关文献·自动匹配', 'auto')}</li>")
+        else:
+            items.append(f"<li>{_ref_li(r, '手动添加', '')}</li>")
+    for r in auto_refs or []:
+        items.append(f"<li>{_ref_li(r, '相关文献·自动匹配', 'auto')}</li>")
+    if not items:
+        return ("<i>暂无文献——点击「自动匹配相关文献」按醛/胺反查训练语料，"
+                "或手动填写标题/DOI 添加。</i>")
+    return "<ul>" + "".join(items) + "</ul>"
+
+
+_OUTCOME_ZH = {
+    "film": ("✓ 成膜", "#0f766e"),
+    "partial": ("⚠️ 部分成膜", "#b45309"),
+    "failed": ("⛔ 失败", "#b91c1c"),
+}
+_COND_LABELS = {
+    "solvent": "溶剂", "modulator": "调制剂", "catalyst": "催化剂",
+    "temperature_c": "温度(°C)", "time_days": "时间(天)",
+    "vessel": "容器", "addition_order": "加料顺序",
+}
+
+
+def _record_pair_names(rec: dict) -> str:
+    """记录条目的单体对显示名：优先记录内嵌单体对象，缺失时回查收藏条目。"""
+    ald, amine = rec.get("aldehyde"), rec.get("amine")
+    if isinstance(ald, dict) and isinstance(amine, dict):
+        name_map = load_builtin_monomers()["name_by_smiles"]
+        a = ald.get("name") or _display_name(ald.get("smiles", "?"), name_map)
+        b = amine.get("name") or _display_name(amine.get("smiles", "?"), name_map)
+        return f"{a} × {b}"
+    fid = rec.get("favorite_id")
+    if fid:
+        fav, err = _fav_get(fid)
+        if fav:
+            _, _, ald_n, amine_n = _fav_pair(fav)
+            return f"{ald_n} × {amine_n}"
+    return "（游离记录）"
+
+
+def _render_records_timeline(records: list) -> str:
+    """实验记录时间线：每条显示当初预测快照 vs 实际结果的对比。"""
+    if not records:
+        return '<div class="placeholder-page">暂无实验记录。</div>'
+    items = []
+    for rec in records:
+        label, color = _OUTCOME_ZH.get(rec.get("outcome"), (rec.get("outcome") or "—", "#64748b"))
+        date = rec.get("date") or str(rec.get("created_at") or "")[:10] or "?"
+        pair = _esc(_record_pair_names(rec))
+
+        snap = rec.get("prediction_snapshot") or {}
+        snap_score, snap_std = snap.get("score"), snap.get("std", snap.get("score_std"))
+        snap_ood = snap.get("ood", "none")
+        if isinstance(snap_ood, dict):
+            snap_ood = snap_ood.get("level", "none")
+        if snap_ood == "out":
+            pred_txt = "预测：⛔ OOD 不适用"
+        elif isinstance(snap_score, (int, float)):
+            pred_txt = f"预测 {snap_score:.3f}"
+            if isinstance(snap_std, (int, float)):
+                pred_txt += f" ± {snap_std:.3f}"
+            pred_txt += f"（{_ood_label(snap_ood)}）"
+        else:
+            pred_txt = "无预测快照"
+        compare = (f'<div class="rec-compare">{_esc(pred_txt)}'
+                   f" → 实际：<b style=\"color:{color}\">{label}</b></div>")
+
+        conds = rec.get("conditions") or {}
+        cond_txt = "；".join(
+            f"{_COND_LABELS.get(k, k)}：{_esc(v)}" for k, v in conds.items()
+            if v not in (None, ""))
+        cond_html = f'<div class="rec-conds">{cond_txt}</div>' if cond_txt else ""
+
+        rid = rec.get("record_id") or rec.get("id") or "?"
+        meta_parts = []
+        if rec.get("strength"):
+            meta_parts.append(f"机械强度：{_esc(rec['strength'])}")
+        if rec.get("operator"):
+            meta_parts.append(f"操作人：{_esc(rec['operator'])}")
+        meta_parts.append(f"<code>{_esc(rid)}</code>")
+        notes_html = (f'<div class="rec-notes">备注：{_esc(rec["notes"])}</div>'
+                      if rec.get("notes") else "")
+
+        items.append(
+            '<div class="rec-item">'
+            f'<div class="rec-head"><span class="rec-date">{_esc(date)}</span> '
+            f"<b>{pair}</b> "
+            f'<span class="rec-outcome" style="background:{color}">{label}</span></div>'
+            f"{compare}{cond_html}"
+            f'<div class="rec-meta">{" · ".join(meta_parts)}</div>'
+            f"{notes_html}</div>")
+    return '<div class="rec-timeline">' + "".join(items) + "</div>"
+
+
+# ---------------------------------------------------------------------------
+# 页① 增强回调：收藏 + 方案卡
+# ---------------------------------------------------------------------------
+
+def favorite_current(ald_smiles: str, amine_smiles: str, notes: str) -> str:
+    """「☆ 收藏这组单体」：add_favorite；若与最近一次打分同组合则附带预测快照。"""
+    if not ald_smiles.strip() or not amine_smiles.strip():
+        return "⚠️ 请先填写醛和胺的 SMILES 再收藏。"
+    ald_smiles, amine_smiles = ald_smiles.strip(), amine_smiles.strip()
+    name_map = load_builtin_monomers()["name_by_smiles"]
+    ald_name = _display_name(ald_smiles, name_map)
+    amine_name = _display_name(amine_smiles, name_map)
+    fav, err = _fav_add(ald_smiles, amine_smiles, ald_name, amine_name,
+                        (notes or "").strip())
+    if err:
+        return err
+    msg = f"✓ 已收藏「{ald_name} × {amine_name}」（{fav.get('id', '?')}），可到页③ 收藏夹查看。"
+    snap = _LAST_PREDICTION
+    if snap.get("ald") == ald_smiles and snap.get("amine") == amine_smiles:
+        _, serr = _fav_update_snapshot(fav.get("id"), snap.get("pred") or {})
+        msg += " 已附带当前打分快照。" if not serr else f"（{serr}）"
+    else:
+        msg += "（当前无该组合的打分快照——可在页③ 详情中「重新打分」。）"
+    return msg
+
+
+def plan_card_for_input(ald_smiles: str, amine_smiles: str):
+    """页①「生成实验方案卡」：直接按当前 SMILES 对生成。"""
+    if not ald_smiles.strip() or not amine_smiles.strip():
+        return "", "⚠️ 请先填写醛和胺的 SMILES。"
+    name_map = load_builtin_monomers()["name_by_smiles"]
+    ald_name = _display_name(ald_smiles.strip(), name_map)
+    amine_name = _display_name(amine_smiles.strip(), name_map)
+    card, err = _plan_generate(ald_smiles.strip(), amine_smiles.strip(),
+                               ald_name, amine_name)
+    if err:
+        return "", err
+    return (_render_plan_card_html(card, ald_name, amine_name),
+            "✓ 方案卡已生成——防错清单来自历史失败教训，请逐条核对后再开反应。")
+
+
+# ---------------------------------------------------------------------------
+# 页③ 收藏夹：回调
+# ---------------------------------------------------------------------------
+
+def refresh_favorites():
+    """刷新卡片墙 + 详情下拉选项。返回 (cards_html, select_update, status)。"""
+    favs, err = _fav_list()
+    if err:
+        return (f'<div class="placeholder-page">{_esc(err)}</div>',
+                gr.update(choices=[], value=None), err)
+    choices = [(_fav_label(f), f.get("id")) for f in favs]
+    status = f"共 {len(favs)} 条收藏。" if favs else "收藏夹为空。"
+    return _render_favorite_cards(favs), gr.update(choices=choices, value=None), status
+
+
+def _snapshot_markdown(fav: dict) -> str:
+    score, std, ood_level, date = _fav_snapshot(fav)
+    date_txt = f"（{date}）" if date else ""
+    if ood_level == "out":
+        return f"**最新预测快照**：⛔ OOD 不适用（不出分）{date_txt}"
+    if not isinstance(score, (int, float)):
+        return "*尚无预测快照——可点击下方「重新打分」。*"
+    return (f"**最新预测快照**：{_big_score_html(score, std)}　"
+            f"OOD：{_ood_label(ood_level)}{date_txt}")
+
+
+def _pred_snapshot_markdown(pred: dict) -> str:
+    """由 FilmPredictor 原始返回渲染快照（重新打分后立即展示用）。"""
+    ood = pred.get("ood") or {}
+    level = ood.get("level", "none")
+    if level == "out":
+        return "**最新预测快照**：⛔ OOD 不适用（不出分）（刚刚）"
+    score = pred.get("tree_probability", pred.get("ensemble_probability"))
+    if not isinstance(score, (int, float)):
+        return "*重新打分未出分。*"
+    return (f"**最新预测快照**：{_big_score_html(score, pred.get('score_std'))}　"
+            f"OOD：{_ood_label(level)}（刚刚）")
+
+
+def show_favorite_detail(fid: str):
+    """选中收藏条目 → (信息, 快照, 备注值, 文献HTML, 关联记录HTML)。"""
+    if not fid:
+        return ("*请先在上方选择收藏条目。*", "", "",
+                "<i>暂无文献。</i>", "<i>暂无记录。</i>")
+    fav, err = _fav_get(fid)
+    if err:
+        return (err, "", "", "", "")
+    ald_s, amine_s, ald_n, amine_n = _fav_pair(fav)
+    info = (f"### {_esc(ald_n)} × {_esc(amine_n)}\n\n"
+            f"- 收藏 ID：`{fav.get('id', '?')}`\n"
+            f"- 创建时间：{fav.get('created_at', '?')}\n"
+            f"- 醛 SMILES：`{ald_s}`\n"
+            f"- 胺 SMILES：`{amine_s}`")
+    recs, _ = _rec_list(favorite_id=fid)
+    return (info, _snapshot_markdown(fav), fav.get("notes") or "",
+            _render_refs_html(fav), _render_records_timeline(recs or []))
+
+
+def save_favorite_notes(fid: str, notes: str) -> str:
+    if not fid:
+        return "⚠️ 请先选择收藏条目。"
+    _, err = _fav_update(fid, notes=notes or "")
+    return err or "✓ 备注已保存。"
+
+
+def add_favorite_reference(fid: str, title: str, doi: str, url_or_path: str, note: str):
+    """手动添加文献 → (状态, 文献HTML)。"""
+    if not fid:
+        return "⚠️ 请先选择收藏条目。", ""
+    if not (title or "").strip():
+        return "⚠️ 文献标题不能为空。", ""
+    _, err = _fav_add_ref(fid, title.strip(), (doi or "").strip(),
+                          (url_or_path or "").strip(), (note or "").strip())
+    if err:
+        return err, ""
+    fav, ferr = _fav_get(fid)
+    return "✓ 文献已添加。", (_render_refs_html(fav) if fav else (ferr or ""))
+
+
+def auto_match_favorite_refs(fid: str):
+    """自动匹配文献 → (文献HTML, 状态)。"""
+    if not fid:
+        return "", "⚠️ 请先选择收藏条目。"
+    fav, err = _fav_get(fid)
+    if err:
+        return "", err
+    ald_s, amine_s, _, _ = _fav_pair(fav)
+    refs, rerr = _fav_auto_refs(ald_s, amine_s)
+    if rerr:
+        return "", rerr
+    return (_render_refs_html(fav, auto_refs=refs),
+            f"✓ 自动匹配到 {len(refs)} 篇相关文献（标注「相关文献·自动匹配」）。")
+
+
+def rescore_favorite(fid: str):
+    """重新打分并写回快照 → (状态, 快照Markdown)。"""
+    if not fid:
+        return "⚠️ 请先选择收藏条目。", ""
+    fav, err = _fav_get(fid)
+    if err:
+        return err, ""
+    ald_s, amine_s, _, _ = _fav_pair(fav)
+    try:
+        pred = _get_predictor().predict(ald_s, amine_s)
+    except Exception as e:
+        return f"⚠️ 打分失败：{_brief_error(e)}", ""
+    _log_prediction(_build_log_record(ald_s, amine_s, pred, "single"))
+    _, serr = _fav_update_snapshot(fid, pred)
+    if serr:
+        return serr, ""
+    return "✓ 已重新打分并更新快照。", _pred_snapshot_markdown(pred)
+
+
+def plan_card_for_favorite(fid: str):
+    """页③「生成方案卡」→ (方案卡HTML, 状态)。"""
+    if not fid:
+        return "", "⚠️ 请先选择收藏条目。"
+    fav, err = _fav_get(fid)
+    if err:
+        return "", err
+    ald_s, amine_s, ald_n, amine_n = _fav_pair(fav)
+    card, perr = _plan_generate(ald_s, amine_s, ald_n, amine_n)
+    if perr:
+        return "", perr
+    return _render_plan_card_html(card, ald_n, amine_n), "✓ 方案卡已生成。"
+
+
+def delete_favorite(fid: str):
+    """删除收藏 → (状态, 卡片墙, 下拉, 详情清空×5)。"""
+    empty_detail = ("", "", "", "", "")
+    if not fid:
+        return ("⚠️ 请先选择收藏条目。", "", gr.update()) + empty_detail
+    _, err = _fav_delete(fid)
+    if err:
+        return (err, "", gr.update()) + empty_detail
+    cards, sel, _ = refresh_favorites()
+    return (f"✓ 已删除收藏 {fid}。", cards, sel) + empty_detail
+
+
+# ---------------------------------------------------------------------------
+# 页④ 实验记录：回调
+# ---------------------------------------------------------------------------
+
+_OUTCOME_MAP = {"成膜": "film", "部分成膜": "partial", "失败": "failed"}
+
+
+def _record_fav_choices():
+    favs, _ = _fav_list()
+    choices = [(_fav_label(f), f.get("id")) for f in (favs or [])]
+    return gr.update(choices=choices)
+
+
+def refresh_records_tab():
+    """页④ 进入/刷新：更新收藏下拉 + 记录时间线。"""
+    recs, err = _rec_list()
+    recs_html = (f'<div class="placeholder-page">{_esc(err)}</div>'
+                 if err else _render_records_timeline(recs or []))
+    return _record_fav_choices(), recs_html
+
+
+def submit_record(fav_id, solvent, modulator, catalyst, temperature, time_days,
+                  addition_order, outcome_zh, strength, operator, notes):
+    """录入实验记录 → (状态, 记录时间线, 收藏下拉更新)。
+
+    后端契约：记录必须关联已存在的收藏条目（单体对象与预测快照从收藏冗余），
+    故未选收藏时直接提示先去页①/③ 收藏，不放行。
+    """
+    if not fav_id:
+        return ("⚠️ 请先选择关联的收藏条目——实验记录必须挂在收藏上"
+                "（可先到页① 打分后「☆ 收藏这组单体」）。", "", gr.update())
+    conditions = {
+        "solvent": (solvent or "").strip(),
+        "modulator": (modulator or "").strip(),
+        "catalyst": (catalyst or "").strip(),
+        "temperature_c": (temperature or "").strip(),
+        "time_days": (time_days or "").strip(),
+        "addition_order": (addition_order or "").strip(),
+    }
+    if not any(conditions.values()) and not (notes or "").strip():
+        return ("⚠️ 请至少填写一项实际条件或备注再保存。", "", gr.update())
+    rec, err = _rec_create(fav_id, conditions,
+                           _OUTCOME_MAP.get(outcome_zh, "failed"),
+                           (strength or "").strip(), (notes or "").strip(),
+                           (operator or "").strip())
+    if err:
+        return err, "", gr.update()
+    recs, _ = _rec_list()
+    rid = rec.get("record_id") or rec.get("id") or "?"
+    return (f"✓ 实验记录已保存（{rid}）。",
+            _render_records_timeline(recs or []), _record_fav_choices())
+
+
+# ---------------------------------------------------------------------------
 # 主题与布局
 # ---------------------------------------------------------------------------
 
@@ -693,6 +1374,32 @@ CUSTOM_CSS = """
 .score-big { font-size: 2.6rem; font-weight: 700; line-height: 1.15; }
 .score-std { font-size: 1.05rem; font-weight: 400; color: #64748b; }
 .placeholder-page { padding: 24px; text-align: center; color: #64748b; }
+/* P2：收藏卡片墙 / 方案卡 / 文献标签 / 实验记录时间线 */
+.fav-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.fav-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; background: #fff; }
+.fav-card-imgs { display: flex; gap: 6px; justify-content: center; min-height: 60px; }
+.fav-card-imgs img { max-width: 48%; height: 90px; object-fit: contain; }
+.fav-card-title { font-weight: 600; margin: 6px 0 4px; font-size: 0.9rem; }
+.fav-badge { color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 0.78rem; white-space: nowrap; }
+.fav-card-meta { color: #64748b; font-size: 0.75rem; margin-top: 4px; }
+.fav-wall-hint { color: #64748b; font-size: 0.85rem; margin-top: 8px; }
+.plan-card { border: 1px solid #99f6e4; border-left: 5px solid #0f766e; border-radius: 10px; padding: 6px 18px 14px; background: #f0fdfa; }
+.plan-card h3 { margin-bottom: 4px; }
+.plan-template { color: #0f766e; font-size: 0.82rem; margin-bottom: 6px; }
+.plan-table { border-collapse: collapse; margin: 6px 0; }
+.plan-table td { border: 1px solid #cbd5e1; padding: 4px 12px; background: #fff; }
+.plan-checklist li { margin: 2px 0; }
+.ref-tag { font-size: 0.7rem; background: #e2e8f0; border-radius: 999px; padding: 1px 8px; color: #475569; }
+.ref-tag.auto { background: #ccfbf1; color: #0f766e; }
+.rec-timeline { padding-left: 4px; }
+.rec-item { border-left: 3px solid #0f766e; padding: 8px 14px; margin: 12px 0; background: #fff; border-radius: 6px; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+.rec-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rec-date { color: #64748b; font-size: 0.82rem; }
+.rec-outcome { color: #fff; border-radius: 999px; padding: 1px 10px; font-size: 0.78rem; }
+.rec-compare { margin: 6px 0; font-size: 0.92rem; }
+.rec-conds { color: #334155; font-size: 0.85rem; margin: 4px 0; }
+.rec-meta { color: #64748b; font-size: 0.8rem; }
+.rec-notes { color: #475569; font-size: 0.85rem; margin-top: 4px; }
 /* 中文字体栈放在 CSS 里：theme 的 font= 字符串参数会触发 gradio 6.20
    launch() 主题比较 bug（fonts.py __eq__: 'str' object has no attribute 'name'） */
 body, .gradio-container {
@@ -771,6 +1478,15 @@ def create_app() -> gr.Blocks:
                         predict_btn = gr.Button("开始打分", variant="primary", size="lg")
                         report_btn = gr.Button("生成 Word 实验报告")
                         report_output = gr.File(label="实验报告")
+                        with gr.Group():
+                            gr.Markdown("#### 收藏与方案卡")
+                            fav_notes_input1 = gr.Textbox(
+                                label="收藏备注（可选）", lines=1,
+                                placeholder="例如：G2 候选，优先验证")
+                            with gr.Row():
+                                favorite_btn = gr.Button("☆ 收藏这组单体", size="sm")
+                                plan_btn1 = gr.Button("生成实验方案卡", size="sm")
+                            fav_status1 = gr.Markdown()
 
                     # ---- 输出卡片 ----
                     with gr.Column(scale=7):
@@ -785,6 +1501,9 @@ def create_app() -> gr.Blocks:
                         with gr.Group():
                             cond_output = gr.Markdown(
                                 value="*推荐实验条件将在打分后显示。*")
+                        plan_html1 = gr.HTML(
+                            value="<i>点击左侧「生成实验方案卡」后在此显示："
+                                  "条件表 + 加料顺序 + ⛔ 防错清单 + 单体提示。</i>")
 
                 gr.Markdown("### 化学结构")
                 with gr.Row():
@@ -811,6 +1530,12 @@ def create_app() -> gr.Blocks:
                 report_btn.click(fn=generate_report_callback,
                                  inputs=[ald_input, amine_input],
                                  outputs=[report_output])
+                favorite_btn.click(fn=favorite_current,
+                                   inputs=[ald_input, amine_input, fav_notes_input1],
+                                   outputs=[fav_status1])
+                plan_btn1.click(fn=plan_card_for_input,
+                                inputs=[ald_input, amine_input],
+                                outputs=[plan_html1, fav_status1])
 
             # ===================== 页② 批量排序 =====================
             with gr.Tab("② 批量排序"):
@@ -862,17 +1587,123 @@ def create_app() -> gr.Blocks:
                 export_btn.click(fn=export_batch_csv, inputs=[batch_state],
                                  outputs=[export_file])
 
-            # ===================== 页③④⑤ 占位 =====================
-            with gr.Tab("③ 收藏夹"):
-                gr.Markdown(
-                    '<div class="placeholder-page"><h3>🚧 即将上线（P2）</h3>'
-                    "收藏单体组合、自动匹配训练文献、关联实验记录与方案卡。"
-                    "</div>")
-            with gr.Tab("④ 实验记录"):
-                gr.Markdown(
-                    '<div class="placeholder-page"><h3>🚧 即将上线（P2）</h3>'
-                    "上传真实实验条件与结果，沉淀标准化记录，展示预测 vs 实际偏差。"
-                    "</div>")
+            # ===================== 页③ 收藏夹 =====================
+            with gr.Tab("③ 收藏夹") as fav_tab:
+                with gr.Row():
+                    fav_refresh_btn = gr.Button("刷新收藏夹", size="sm", scale=1)
+                    fav_status = gr.Markdown(value="*进入本页自动加载。*", container=False)
+                fav_cards = gr.HTML()
+                with gr.Group():
+                    gr.Markdown("#### 收藏详情")
+                    fav_select = gr.Dropdown(label="选择收藏条目", choices=[],
+                                             interactive=True)
+                    fav_detail_info = gr.Markdown()
+                    fav_detail_snapshot = gr.Markdown()
+                    with gr.Row():
+                        fav_rescore_btn = gr.Button("重新打分", size="sm")
+                        fav_plan_btn = gr.Button("生成方案卡", size="sm")
+                        fav_delete_btn = gr.Button("删除收藏", size="sm", variant="stop")
+                    fav_action_status = gr.Markdown()
+                    fav_plan_html = gr.HTML()
+                with gr.Group():
+                    gr.Markdown("#### 备注")
+                    fav_notes_input = gr.Textbox(label="历史备注", lines=2)
+                    fav_notes_save_btn = gr.Button("保存备注", size="sm")
+                    fav_notes_status = gr.Markdown()
+                with gr.Group():
+                    gr.Markdown("#### 文献")
+                    fav_refs_html = gr.HTML(
+                        value="<i>选择收藏条目后显示文献列表。</i>")
+                    fav_auto_ref_btn = gr.Button("自动匹配相关文献", size="sm")
+                    with gr.Row():
+                        ref_title = gr.Textbox(label="标题", scale=3)
+                        ref_doi = gr.Textbox(label="DOI", scale=2)
+                    with gr.Row():
+                        ref_url = gr.Textbox(label="链接或本地路径", scale=3)
+                        ref_note = gr.Textbox(label="备注（支撑哪条决策）", scale=2)
+                    ref_add_btn = gr.Button("手动添加文献", size="sm")
+                    ref_status = gr.Markdown()
+                with gr.Group():
+                    gr.Markdown("#### 关联实验记录")
+                    fav_records_html = gr.HTML(
+                        value="<i>选择收藏条目后显示关联实验记录。</i>")
+
+                _detail_outputs = [fav_detail_info, fav_detail_snapshot,
+                                   fav_notes_input, fav_refs_html, fav_records_html]
+                fav_tab.select(fn=refresh_favorites,
+                               outputs=[fav_cards, fav_select, fav_status])
+                fav_refresh_btn.click(fn=refresh_favorites,
+                                      outputs=[fav_cards, fav_select, fav_status])
+                fav_select.change(fn=show_favorite_detail, inputs=[fav_select],
+                                  outputs=_detail_outputs)
+                fav_notes_save_btn.click(fn=save_favorite_notes,
+                                         inputs=[fav_select, fav_notes_input],
+                                         outputs=[fav_notes_status])
+                ref_add_btn.click(fn=add_favorite_reference,
+                                  inputs=[fav_select, ref_title, ref_doi,
+                                          ref_url, ref_note],
+                                  outputs=[ref_status, fav_refs_html])
+                fav_auto_ref_btn.click(fn=auto_match_favorite_refs,
+                                       inputs=[fav_select],
+                                       outputs=[fav_refs_html, ref_status])
+                fav_rescore_btn.click(fn=rescore_favorite, inputs=[fav_select],
+                                      outputs=[fav_action_status,
+                                               fav_detail_snapshot])
+                fav_plan_btn.click(fn=plan_card_for_favorite, inputs=[fav_select],
+                                   outputs=[fav_plan_html, fav_action_status])
+                fav_delete_btn.click(fn=delete_favorite, inputs=[fav_select],
+                                     outputs=[fav_action_status, fav_cards,
+                                              fav_select] + _detail_outputs)
+
+            # ===================== 页④ 实验记录 =====================
+            with gr.Tab("④ 实验记录") as rec_tab:
+                with gr.Group():
+                    gr.Markdown("#### 录入实验记录")
+                    rec_fav_select = gr.Dropdown(
+                        label="关联收藏条目（必选——记录挂在收藏上，"
+                              "单体与预测快照自动带入）",
+                        choices=[], interactive=True)
+                    with gr.Row():
+                        rec_solvent = gr.Textbox(label="溶剂",
+                                                 placeholder="甲苯 / BTF/二氧六环")
+                        rec_modulator = gr.Textbox(label="调制剂",
+                                                   placeholder="苯胺 13.7 μL")
+                        rec_catalyst = gr.Textbox(label="催化剂",
+                                                  placeholder="6M 乙酸 0.2 mL")
+                    with gr.Row():
+                        rec_temp = gr.Textbox(label="温度 (°C)", placeholder="120")
+                        rec_time = gr.Textbox(label="时间 (天)", placeholder="3")
+                        rec_order = gr.Textbox(
+                            label="加料顺序", placeholder="先醛+苯胺，后胺，最后乙酸")
+                    with gr.Row():
+                        rec_outcome = gr.Radio(
+                            ["成膜", "部分成膜", "失败"], value="成膜",
+                            label="实验结果", scale=1)
+                        rec_strength = gr.Textbox(
+                            label="机械强度/膜质量描述", scale=2,
+                            placeholder="例如：膜完整可剥离，弯折不裂")
+                    with gr.Row():
+                        rec_operator = gr.Textbox(label="操作人", scale=1)
+                        rec_notes = gr.Textbox(label="备注", scale=2)
+                    rec_submit_btn = gr.Button("保存实验记录", variant="primary")
+                    rec_status = gr.Markdown()
+                with gr.Group():
+                    gr.Markdown("#### 记录列表（当初预测 vs 实际结果）")
+                    rec_refresh_btn = gr.Button("刷新记录", size="sm")
+                    rec_list_html = gr.HTML()
+
+                rec_tab.select(fn=refresh_records_tab,
+                               outputs=[rec_fav_select, rec_list_html])
+                rec_refresh_btn.click(fn=refresh_records_tab,
+                                      outputs=[rec_fav_select, rec_list_html])
+                rec_submit_btn.click(
+                    fn=submit_record,
+                    inputs=[rec_fav_select, rec_solvent, rec_modulator,
+                            rec_catalyst, rec_temp, rec_time, rec_order,
+                            rec_outcome, rec_strength, rec_operator, rec_notes],
+                    outputs=[rec_status, rec_list_html, rec_fav_select])
+
+            # ===================== 页⑤ 占位（P3） =====================
             with gr.Tab("⑤ 方案迭代"):
                 gr.Markdown(
                     '<div class="placeholder-page"><h3>🚧 即将上线（P3）</h3>'

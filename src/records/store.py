@@ -1,0 +1,170 @@
+"""实验记录存储（P2 后端，页④支撑）。
+
+落盘到 data/rag_export/records/rec_<YYYYMMDD>_<NNN>.json —— 即
+App ↔ RAG 数据契约的单一数据源（schema 见 data/rag_export/README.md
+Schema 2 experiment_record），不再另建 data/experiment_records/。
+
+- record_id 独立编号体系（防 CV 泄漏教训）；
+- 创建记录必须关联已存在的收藏条目（单体对象与预测快照从收藏里取）；
+- 创建后把 rec_id 回挂到对应 favorite 的 experiment_record_ids。
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+from datetime import datetime
+from pathlib import Path
+
+from favorites import store as favorites_store
+
+logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RECORDS_DIR = PROJECT_ROOT / "data" / "rag_export" / "records"
+
+SCHEMA_VERSION = "1.0"
+RECORD_TYPE = "experiment_record"
+VALID_OUTCOMES = ("film", "partial", "failed")  # 成膜 / 部分 / 失败
+
+_ID_RE = re.compile(r"^rec_(\d{8})_(\d{3})$")
+
+# 契约 conditions 标准字段（未知留空字符串；额外字段原样保留）
+_CONDITION_KEYS = (
+    "solvent",
+    "modulator",
+    "catalyst",
+    "temperature_c",
+    "time_days",
+    "vessel",
+    "addition_order",
+)
+
+# 契约示例文件不作为真实记录列出
+_EXAMPLE_FILE = "example.json"
+
+
+def _today() -> str:
+    return datetime.now().astimezone().date().isoformat()
+
+
+def _next_id() -> str:
+    """生成 rec_<YYYYMMDD>_<NNN>，按当日已有文件取最大序号 +1。"""
+    today = datetime.now().strftime("%Y%m%d")
+    max_n = 0
+    if RECORDS_DIR.exists():
+        for p in RECORDS_DIR.glob("rec_*.json"):
+            m = _ID_RE.match(p.stem)
+            if m and m.group(1) == today:
+                max_n = max(max_n, int(m.group(2)))
+    return f"rec_{today}_{max_n + 1:03d}"
+
+
+def _read_file(path: Path) -> dict | None:
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8"))
+        return obj if isinstance(obj, dict) else None
+    except Exception as exc:
+        logger.warning("实验记录读取失败 %s: %s", path.name, exc)
+        return None
+
+
+def create_record(
+    favorite_id: str,
+    conditions: dict,
+    outcome: str,
+    strength: str = "",
+    notes: str = "",
+    operator: str = "",
+) -> dict:
+    """创建实验记录并按 RAG 契约落盘，返回完整记录 dict。
+
+    - outcome 必须是 film|partial|failed，否则 ValueError；
+    - favorite_id 必须指向已存在的收藏条目，否则 KeyError
+      （单体对象与 prediction_snapshot 从收藏条目冗余过来）；
+    - 成功后把 record_id 回挂到收藏条目的 experiment_record_ids。
+    """
+    outcome = (outcome or "").strip()
+    if outcome not in VALID_OUTCOMES:
+        raise ValueError(
+            f"outcome 必须是 {VALID_OUTCOMES} 之一，收到: {outcome!r}"
+        )
+
+    fav = favorites_store.get_favorite(favorite_id)
+    if fav is None:
+        raise KeyError(f"收藏条目不存在，无法创建实验记录: {favorite_id}")
+
+    cond = {k: "" for k in _CONDITION_KEYS}
+    cond.update(conditions or {})
+
+    snap = fav.get("latest_prediction")
+    prediction_snapshot = (
+        {
+            "score": snap.get("score"),
+            "std": snap.get("std"),
+            "ood": snap.get("ood", ""),
+        }
+        if isinstance(snap, dict)
+        else None
+    )
+
+    rec = {
+        "schema_version": SCHEMA_VERSION,
+        "record_type": RECORD_TYPE,
+        "record_id": _next_id(),
+        "favorite_id": favorite_id,
+        "aldehyde": fav.get("aldehyde", {"smiles": "", "cas": "", "name": ""}),
+        "amine": fav.get("amine", {"smiles": "", "cas": "", "name": ""}),
+        "prediction_id": None,
+        "prediction_snapshot": prediction_snapshot,
+        "conditions": cond,
+        "outcome": outcome,
+        "failure_class": None,
+        "strength": strength or "",
+        "notes": notes or "",
+        "attachments": [],
+        "operator": operator or "",
+        "date": _today(),
+        "minimax_plan_no": None,
+    }
+
+    RECORDS_DIR.mkdir(parents=True, exist_ok=True)
+    path = RECORDS_DIR / f"{rec['record_id']}.json"
+    path.write_text(
+        json.dumps(rec, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
+    )
+
+    # 回挂到收藏条目
+    ids = list(fav.get("experiment_record_ids") or [])
+    ids.append(rec["record_id"])
+    favorites_store.update_favorite(favorite_id, experiment_record_ids=ids)
+
+    return rec
+
+
+def list_records(favorite_id: str | None = None) -> list[dict]:
+    """全部实验记录（可按 favorite_id 过滤），按日期+id 升序（时间线）。
+
+    契约示例文件 example.json 不作为真实记录列出；损坏文件跳过。
+    """
+    if not RECORDS_DIR.exists():
+        return []
+    recs = []
+    for p in sorted(RECORDS_DIR.glob("rec_*.json")):
+        if p.name == _EXAMPLE_FILE:
+            continue
+        rec = _read_file(p)
+        if rec and _ID_RE.match(str(rec.get("record_id", ""))):
+            if favorite_id is None or rec.get("favorite_id") == favorite_id:
+                recs.append(rec)
+    recs.sort(key=lambda r: (str(r.get("date", "")), str(r.get("record_id", ""))))
+    return recs
+
+
+def get_record(rec_id: str) -> dict | None:
+    """按 record_id 取记录；不存在/损坏返回 None。"""
+    if not rec_id or not isinstance(rec_id, str) or not _ID_RE.match(rec_id):
+        return None
+    path = RECORDS_DIR / f"{rec_id}.json"
+    return _read_file(path) if path.exists() else None

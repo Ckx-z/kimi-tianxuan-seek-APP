@@ -49,4 +49,30 @@ if log.exists():
     lines = log.read_text(encoding="utf-8").strip().splitlines()
     print("最近 2 条:", *[l[:200] for l in lines[-2:]], sep="\n")
 
+print("== 8. P2 收藏全流程（真实后端，收尾清理） ==")
+g._LAST_PREDICTION.clear()
+g._LAST_PREDICTION.update({"ald": ald, "amine": amine, "pred": {"tree_probability": 0.5}})
+msg = g.favorite_current(ald, amine, "冒烟测试")
+print(msg)
+fid = msg.split("（")[1].split("）")[0] if "（fav_" in msg else None
+assert fid, "应返回收藏 id"
+cards, sel, status = g.refresh_favorites()
+print("卡片墙:", status, "| 徽章:", "fav-badge" in cards, "| 结构图:", "base64" in cards)
+info, snap, notes, refs, recs = g.show_favorite_detail(fid)
+print("详情:", info.splitlines()[0], "| 快照:", snap[:50])
+print("文献自动匹配条数:", refs.count("相关文献·自动匹配"))
+plan_html, st = g.plan_card_for_favorite(fid)
+print("方案卡:", st, "| 防错清单:", "防错清单" in plan_html)
+st, timeline, _ = g.submit_record(fid, "甲苯", "", "6M 乙酸", "120", "3",
+                                  "先醛后胺", "部分成膜", "", "冒烟", "测试")
+print(st, "| 时间线含对比:", "实际" in timeline)
+# 清理冒烟数据
+import json as _json
+rec_dir = ROOT / "data" / "rag_export" / "records"
+for p in rec_dir.glob("rec_*.json"):
+    if p.name != "example.json" and "冒烟" in p.read_text(encoding="utf-8"):
+        p.unlink()
+st, *_ = g.delete_favorite(fid)
+print(st, "（冒烟数据已清理）")
+
 print("SMOKE_OK")

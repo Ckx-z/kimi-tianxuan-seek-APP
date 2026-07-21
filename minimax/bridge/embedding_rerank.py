@@ -29,14 +29,20 @@ BATCH_SIZE = 16  # 一次最多 16 个 text
 
 
 def get_api_key():
-    """从环境变量读 API key"""
+    """从环境变量读 API key（env 优先, 其次 config/secrets.local.json）"""
     key = os.environ.get('MINIMAX_API_KEY') or os.environ.get('MINIMAX_KEY')
+    if not key:
+        try:
+            from llm_client import get_minimax_api_key
+            key = get_minimax_api_key()
+        except ImportError:
+            pass
     if not key:
         # 尝试 _tmp/set_api_env.ps1
         ps = Path(r'C:\Users\ckx\Desktop\minimax\_tmp\set_api_env.ps1')
         if ps.exists():
             raise RuntimeError('API key 未设置, 请先跑 _tmp/set_api_env.ps1')
-        raise RuntimeError('API key 未设置, 请在环境变量 MINIMAX_API_KEY 中提供')
+        raise RuntimeError('API key 未设置, 请在环境变量 MINIMAX_API_KEY 或 config/secrets.local.json 中提供')
     return key
 
 

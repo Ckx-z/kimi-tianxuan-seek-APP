@@ -151,10 +151,23 @@ def embedding_search(query_text, top_k=5, min_sim=0.5, sources=None):
     return all_sims[:top_k]
 
 
-def _compute_query_embedding(text):
-    """调用 MiniMax embedding API 计算 query 向量"""
+def _get_minimax_api_key():
+    """取 MiniMax key：环境变量优先，其次 config/secrets.local.json（见 llm_client）"""
     try:
-        api_key = os.environ.get('MINIMAX_API_KEY', '')
+        from llm_client import get_minimax_api_key
+        return get_minimax_api_key() or ''
+    except ImportError:
+        return os.environ.get('MINIMAX_API_KEY', '')
+
+
+def _compute_query_embedding(text):
+    """调用 MiniMax embedding API 计算 query 向量
+
+    注意: 索引向量均为 embo-01 (1536 维) 构建, embedding 不做 longcat fallback
+    （模型不同则与存量索引不可比）; longcat 仅作 chat completion 备用。
+    """
+    try:
+        api_key = _get_minimax_api_key()
         if not api_key:
             return None
         import requests as req
