@@ -56,16 +56,55 @@ msg = g.favorite_current(ald, amine, "冒烟测试")
 print(msg)
 fid = msg.split("（")[1].split("）")[0] if "（fav_" in msg else None
 assert fid, "应返回收藏 id"
+
+print("== 8b. 主分数口径（主分=路由树模型分，不取 max） ==")
+import re as _re
+headline = prob.split("### 成膜打分")[0]
+m_main = _re.search(r'score-big[^>]*>([\d.]+)', headline)
+m_tree = _re.search(r'\*\*树模型 \([^)]+\)\*\*: ([\d.]+)', prob)
+assert m_main and m_tree, "主分数与树模型行都应存在"
+assert m_main.group(1) == m_tree.group(1), "主分数必须 == 路由树模型分"
+m_gnn = _re.search(r'\*\*GNN v5\.3\*\*: ([\d.]+)', prob)
+if m_gnn:
+    print("主分数", m_main.group(1), "== 树模型分", m_tree.group(1),
+          "（GNN 对照", m_gnn.group(1), "，未取 max）")
+assert "综合打分（树与 GNN 平均，仅对照参考）" in prob, "综合分须明确标注"
+
+print("== 8c. 收藏去重提示（同 SMILES 对不新建） ==")
+msg_dup = g.favorite_current(ald, amine, "")
+print(msg_dup)
+assert "已收藏过" in msg_dup and fid in msg_dup, "重复收藏应提示已收藏过"
+
 cards, sel, status = g.refresh_favorites()
 print("卡片墙:", status, "| 徽章:", "fav-badge" in cards, "| 结构图:", "base64" in cards)
+assert any(c[1] == fid for c in sel["choices"]), "下拉应含新收藏"
 info, snap, notes, refs, recs = g.show_favorite_detail(fid)
 print("详情:", info.splitlines()[0], "| 快照:", snap[:50])
+assert fid in info and "醛 SMILES" in info, "选中后详情应展示完整信息"
+assert "最新预测快照" in snap
 print("文献自动匹配条数:", refs.count("相关文献·自动匹配"))
 plan_html, st = g.plan_card_for_favorite(fid)
 print("方案卡:", st, "| 防错清单:", "防错清单" in plan_html)
 st, timeline, _ = g.submit_record(fid, "甲苯", "", "6M 乙酸", "120", "3",
                                   "先醛后胺", "部分成膜", "", "冒烟", "测试")
 print(st, "| 时间线含对比:", "实际" in timeline)
+
+print("== 9. 游离实验记录（不关联收藏） ==")
+st2, timeline2, _ = g.submit_record("", "甲苯", "", "6M 乙酸", "120", "3",
+                                    "", "成膜", "", "冒烟", "游离测试",
+                                    True, ald, amine)
+print(st2)
+assert "✓" in st2, "游离记录应保存成功（后端签名已就位）"
+assert "游离" not in timeline2 or "×" in timeline2
+
+print("== 10. 页⑤ 方案迭代展示 ==")
+summary5, timeline5, sug_html5, sel5, status5 = g.refresh_iteration_tab("")
+print("摘要:", summary5[:80])
+print("建议区:", (status5 or sug_html5[:80]))
+assert summary5 and sug_html5
+html_sug2, status_sug2 = g.refresh_suggestions(fid)
+print("按收藏过滤:", status_sug2 or html_sug2[:60])
+
 # 清理冒烟数据
 import json as _json
 rec_dir = ROOT / "data" / "rag_export" / "records"

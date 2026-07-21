@@ -7,8 +7,14 @@
   排序表（打分±std、路由臂、OOD、Top 理由一句话）→ 排序/过滤 → 导出 CSV。
 - ③ 收藏夹：卡片墙 + 详情（预测快照、备注、文献自动匹配/手动添加、关联实验
   记录、重新打分、方案卡、删除）。
-- ④ 实验记录：标准化录入表单 + 时间线（当初预测快照 vs 实际结果对比）。
-- ⑤：占位（P3 上线）。
+- ④ 实验记录：标准化录入表单（支持关联收藏 / 游离记录）+ 时间线
+  （当初预测快照 vs 实际结果对比）。
+- ⑤ 方案迭代（RAG 对接）：实验记录时间线摘要 + RAG 建议卡片回显
+  （src.rag.suggestions，未就位时优雅降级为占位提示）。
+
+打分口径（Bug 修复，任何位置不许取 max）：主展示分数一律 = 路由树模型
+打分（±std）；GNN 仅为对照参考；综合分为两者平均，仅对照展示并明确标注；
+树模型未出分时显示提示，绝不用 GNN/综合分冒充主分数。
 
 依赖的并行后端模块均为懒加载 + 优雅降级：模块未就位时对应板块显示提示而
 不报错。P1 后端：src/utils/cas_lookup.py、src/utils/predict_log.py、
@@ -133,6 +139,17 @@ def _log_prediction(record: dict) -> bool:
         return False
 
 
+def _main_tree_score(pred_result: dict) -> float | None:
+    """主分数统一口径：主展示分数一律取路由树模型打分。
+
+    绝不取 max(GNN, 树, 综合)，也不在树模型缺席时用综合/GNN 冒充主分数——
+    树模型未出分时返回 None，由展示层明确提示。GNN 仅为对照参考，
+    综合分为两者平均，仅对照展示。
+    """
+    score = (pred_result or {}).get("tree_probability")
+    return score if isinstance(score, (int, float)) else None
+
+
 def _build_log_record(ald_smiles: str, amine_smiles: str, pred_result: dict,
                       source: str) -> dict:
     """按数据契约（方案第 6 节）组装 prediction 日志记录。"""
@@ -142,7 +159,7 @@ def _build_log_record(ald_smiles: str, amine_smiles: str, pred_result: dict,
         "type": "prediction",
         "ald_smiles": ald_smiles,
         "amine_smiles": amine_smiles,
-        "score": pred_result.get("tree_probability", pred_result.get("ensemble_probability")),
+        "score": _main_tree_score(pred_result),
         "std": pred_result.get("score_std"),
         "arm": pred_result.get("tree_model_name"),
         "route": pred_result.get("tree_route"),
@@ -415,13 +432,16 @@ def predict(ald_smiles: str, amine_smiles: str):
     ood = pred_result.get("ood") or {}
     ood_out = ood.get("level") == "out"
 
-    # 格式化打分输出（口径：倾向性打分，非严格概率——论文口径 D27）
+    # 格式化打分输出（口径：倾向性打分，非严格概率——论文口径 D27；
+    # 主分数 = 路由树模型打分，任何位置不许取 max / 不用 GNN 或综合分冒充）
     prob_text = ""
     if not ood_out:
-        main_score = pred_result.get("tree_probability",
-                                     pred_result.get("ensemble_probability"))
+        main_score = _main_tree_score(pred_result)
         if main_score is not None:
             prob_text += _big_score_html(main_score, pred_result.get("score_std")) + "\n\n"
+        else:
+            prob_text += ("> ⚠️ 树模型未出分——主分数仅采用路由树模型口径，"
+                          "不以 GNN 或综合分代替（对照分见下）。\n\n")
     prob_text += "### 成膜打分（倾向性）\n\n"
     prob_text += "> 四级软标签上的倾向性打分，非严格概率；对反应条件不敏感。\n\n"
     banner = _format_ood_banner(ood)
@@ -450,7 +470,8 @@ def predict(ald_smiles: str, amine_smiles: str):
         elif "tree_error" in pred_result:
             prob_text += f"- **树模型**: ⚠️ 不可用（{_brief_error(pred_result['tree_error'])}）\n"
         if pred_result.get("ensemble_probability") is not None:
-            prob_text += f"- **综合打分**: {pred_result['ensemble_probability']:.3f}"
+            prob_text += (f"- **综合打分（树与 GNN 平均，仅对照参考）**: "
+                          f"{pred_result['ensemble_probability']:.3f}")
             if pred_result.get("score_std"):
                 prob_text += f" (±{pred_result['score_std']:.3f})"
             prob_text += "\n"
@@ -621,9 +642,12 @@ def batch_predict(ald_choices, amine_choices, pasted_text, csv_file):
         if level == "out":
             score, std, reason = None, None, "OOD 不适用，不出分"
         else:
-            score = pred.get("tree_probability", pred.get("ensemble_probability"))
+            score = _main_tree_score(pred)
             std = pred.get("score_std")
-            reason = _one_line_reason(predictor, ald, amine)
+            if score is None:
+                reason = "树模型未出分（主分数不取 GNN/综合代替）"
+            else:
+                reason = _one_line_reason(predictor, ald, amine)
         rows.append({
             "ald": ald, "amine": amine,
             "ald_name": _display_name(ald, name_map),
@@ -774,7 +798,7 @@ def _snapshot_payload(pred: dict) -> dict:
     pred = pred or {}
     ood = pred.get("ood") or {}
     level = ood.get("level", "none") if isinstance(ood, dict) else str(ood or "none")
-    score = pred.get("tree_probability", pred.get("ensemble_probability"))
+    score = _main_tree_score(pred)
     return {
         "score": None if level == "out" else score,
         "std": pred.get("score_std"),
@@ -814,13 +838,32 @@ def _fav_auto_refs(ald, amine, max_refs=8):
         return None, f"⚠️ 文献自动匹配失败：{_brief_error(e)}"
 
 
-def _rec_create(favorite_id, conditions, outcome, strength, notes, operator):
+def _rec_create_linked(favorite_id, conditions, outcome, strength, notes, operator):
+    """关联收藏的实验记录（单体对象与预测快照由后端从收藏冗余）。"""
     store, err = _load_records_store()
     if err:
         return None, err
     try:
-        return store.create_record(favorite_id, conditions, outcome,
-                                   strength, notes, operator), None
+        return store.create_record(
+            favorite_id=favorite_id, conditions=conditions, outcome=outcome,
+            strength=strength, notes=notes, operator=operator), None
+    except Exception as e:
+        return None, f"⚠️ 实验记录保存失败：{_brief_error(e)}"
+
+
+def _rec_create_free(aldehyde_smiles, amine_smiles, conditions, outcome,
+                     strength, notes, operator):
+    """游离实验记录（不关联收藏，醛/胺 SMILES 直接录入；签名与任务B钉死）。"""
+    store, err = _load_records_store()
+    if err:
+        return None, err
+    try:
+        return store.create_record(
+            favorite_id=None, aldehyde_smiles=aldehyde_smiles,
+            amine_smiles=amine_smiles, conditions=conditions, outcome=outcome,
+            strength=strength, notes=notes, operator=operator), None
+    except TypeError:
+        return None, "⏳ 游离记录需后端扩展签名支持（任务B开发中），请改用关联收藏录入。"
     except Exception as e:
         return None, f"⚠️ 实验记录保存失败：{_brief_error(e)}"
 
@@ -1006,15 +1049,43 @@ def _render_plan_card_html(card: dict, ald_name: str = "", amine_name: str = "")
     return "".join(parts)
 
 
+def _resolve_ref_title(paper_id) -> str | None:
+    """auto-matched 文献标题解析（任务B src.references.titles.resolve_title）。
+
+    模块未就位 / 解析失败 / 返回 None 或原名时一律返回 None，调用方回退
+    显示 paper_id。
+    """
+    pid = str(paper_id or "").strip()
+    if not pid:
+        return None
+    try:
+        from references.titles import resolve_title
+    except ImportError:
+        return None
+    try:
+        title = resolve_title(pid)
+    except Exception:
+        return None
+    if not title or str(title) == pid:
+        return None
+    return str(title)
+
+
 def _render_refs_html(fav: dict, auto_refs: list | None = None) -> str:
     """文献列表：收藏条目内已挂文献 + （可选）即时自动匹配结果。
 
     自动匹配的标注「相关文献·自动匹配」（方案 8.2：反查到的是报道过该单体
-    的文献，与支撑该组合不完全等同，措辞为相关文献）。
+    的文献，与支撑该组合不完全等同，措辞为相关文献）；auto-matched 条目
+    标题经 resolve_title 解析为文献标题，解析不到时回退显示 paper_id。
     """
-    def _ref_li(r: dict, tag: str, tag_cls: str) -> str:
-        title = _esc(r.get("title") or r.get("paper_id") or "（无标题）")
-        line = f"<b>{title}</b>"
+    def _ref_li(r: dict, tag: str, tag_cls: str, resolve: bool = False) -> str:
+        raw_title = r.get("title") or r.get("paper_id") or "（无标题）"
+        resolved = _resolve_ref_title(raw_title) if resolve else None
+        if resolved:
+            line = (f"<b>{_esc(resolved)}</b> "
+                    f'<span class="ref-pid">paper_id: {_esc(raw_title)}</span>')
+        else:
+            line = f"<b>{_esc(raw_title)}</b>"
         doi = r.get("doi") or ""
         if doi:
             line += f" · DOI: {_esc(doi)}"
@@ -1033,11 +1104,11 @@ def _render_refs_html(fav: dict, auto_refs: list | None = None) -> str:
     for r in fav.get("references") or []:
         src = r.get("source") or "user-added"
         if src == "auto-matched":
-            items.append(f"<li>{_ref_li(r, '相关文献·自动匹配', 'auto')}</li>")
+            items.append(f"<li>{_ref_li(r, '相关文献·自动匹配', 'auto', resolve=True)}</li>")
         else:
             items.append(f"<li>{_ref_li(r, '手动添加', '')}</li>")
     for r in auto_refs or []:
-        items.append(f"<li>{_ref_li(r, '相关文献·自动匹配', 'auto')}</li>")
+        items.append(f"<li>{_ref_li(r, '相关文献·自动匹配', 'auto', resolve=True)}</li>")
     if not items:
         return ("<i>暂无文献——点击「自动匹配相关文献」按醛/胺反查训练语料，"
                 "或手动填写标题/DOI 添加。</i>")
@@ -1131,14 +1202,54 @@ def _render_records_timeline(records: list) -> str:
 # 页① 增强回调：收藏 + 方案卡
 # ---------------------------------------------------------------------------
 
+def _canonical_smiles(smiles: str) -> str | None:
+    """RDKit 规范化 SMILES（与收藏后端同口径）；解析失败返回 None。"""
+    try:
+        from rdkit import Chem
+        mol = Chem.MolFromSmiles((smiles or "").strip())
+        return Chem.MolToSmiles(mol) if mol else None
+    except Exception:
+        return None
+
+
+def _find_favorite_by_pair(ald_smiles: str, amine_smiles: str, favs: list) -> dict | None:
+    """按规范化 SMILES 对在收藏列表中查重；命中返回该收藏条目。"""
+    canon_ald = _canonical_smiles(ald_smiles) or (ald_smiles or "").strip()
+    canon_amine = _canonical_smiles(amine_smiles) or (amine_smiles or "").strip()
+    for fav in favs or []:
+        f_ald, f_amine, _, _ = _fav_pair(fav)
+        if ((_canonical_smiles(f_ald) or f_ald) == canon_ald
+                and (_canonical_smiles(f_amine) or f_amine) == canon_amine):
+            return fav
+    return None
+
+
 def favorite_current(ald_smiles: str, amine_smiles: str, notes: str) -> str:
-    """「☆ 收藏这组单体」：add_favorite；若与最近一次打分同组合则附带预测快照。"""
+    """「☆ 收藏这组单体」：先查重——同 SMILES 对已收藏过则更新快照而非新建。"""
     if not ald_smiles.strip() or not amine_smiles.strip():
         return "⚠️ 请先填写醛和胺的 SMILES 再收藏。"
     ald_smiles, amine_smiles = ald_smiles.strip(), amine_smiles.strip()
     name_map = load_builtin_monomers()["name_by_smiles"]
     ald_name = _display_name(ald_smiles, name_map)
     amine_name = _display_name(amine_smiles, name_map)
+
+    # 去重：同 SMILES 对已存在 → 走 update_prediction_snapshot，不重复新建
+    favs, _ = _fav_list()
+    existing = _find_favorite_by_pair(ald_smiles, amine_smiles, favs) if favs else None
+    if existing:
+        fid = existing.get("id", "?")
+        msg = f"⚠️ 已收藏过「{ald_name} × {amine_name}」（{fid}）"
+        snap = _LAST_PREDICTION
+        if snap.get("ald") == ald_smiles and snap.get("amine") == amine_smiles:
+            _, serr = _fav_update_snapshot(fid, snap.get("pred") or {})
+            msg += "，已更新快照。" if not serr else f"。（{serr}）"
+        else:
+            msg += "——未重复收藏；可在页③ 详情中「重新打分」刷新快照。"
+        if (notes or "").strip():
+            _, nerr = _fav_update(fid, notes=(notes or "").strip())
+            msg += " 备注已更新。" if not nerr else f"（{nerr}）"
+        return msg
+
     fav, err = _fav_add(ald_smiles, amine_smiles, ald_name, amine_name,
                         (notes or "").strip())
     if err:
@@ -1200,7 +1311,7 @@ def _pred_snapshot_markdown(pred: dict) -> str:
     level = ood.get("level", "none")
     if level == "out":
         return "**最新预测快照**：⛔ OOD 不适用（不出分）（刚刚）"
-    score = pred.get("tree_probability", pred.get("ensemble_probability"))
+    score = _main_tree_score(pred)
     if not isinstance(score, (int, float)):
         return "*重新打分未出分。*"
     return (f"**最新预测快照**：{_big_score_html(score, pred.get('score_std'))}　"
@@ -1329,15 +1440,14 @@ def refresh_records_tab():
 
 
 def submit_record(fav_id, solvent, modulator, catalyst, temperature, time_days,
-                  addition_order, outcome_zh, strength, operator, notes):
+                  addition_order, outcome_zh, strength, operator, notes,
+                  free_record=False, free_ald="", free_amine=""):
     """录入实验记录 → (状态, 记录时间线, 收藏下拉更新)。
 
-    后端契约：记录必须关联已存在的收藏条目（单体对象与预测快照从收藏冗余），
-    故未选收藏时直接提示先去页①/③ 收藏，不放行。
+    两种模式：
+    - 关联收藏（默认）：记录挂在收藏条目上，单体与预测快照由后端冗余带入；
+    - 游离记录（勾选「不关联收藏」）：favorite_id=None，直接录入醛/胺 SMILES。
     """
-    if not fav_id:
-        return ("⚠️ 请先选择关联的收藏条目——实验记录必须挂在收藏上"
-                "（可先到页① 打分后「☆ 收藏这组单体」）。", "", gr.update())
     conditions = {
         "solvent": (solvent or "").strip(),
         "modulator": (modulator or "").strip(),
@@ -1348,16 +1458,180 @@ def submit_record(fav_id, solvent, modulator, catalyst, temperature, time_days,
     }
     if not any(conditions.values()) and not (notes or "").strip():
         return ("⚠️ 请至少填写一项实际条件或备注再保存。", "", gr.update())
-    rec, err = _rec_create(fav_id, conditions,
-                           _OUTCOME_MAP.get(outcome_zh, "failed"),
-                           (strength or "").strip(), (notes or "").strip(),
-                           (operator or "").strip())
+    outcome = _OUTCOME_MAP.get(outcome_zh, "failed")
+    strength, notes, operator = ((strength or "").strip(), (notes or "").strip(),
+                                 (operator or "").strip())
+    if free_record:
+        ald_s, amine_s = (free_ald or "").strip(), (free_amine or "").strip()
+        if not ald_s or not amine_s:
+            return ("⚠️ 游离记录需填写醛和胺的 SMILES（或取消勾选并选择收藏条目）。",
+                    "", gr.update())
+        rec, err = _rec_create_free(ald_s, amine_s, conditions, outcome,
+                                    strength, notes, operator)
+    else:
+        if not fav_id:
+            return ("⚠️ 请先选择关联的收藏条目——或勾选「不关联收藏（游离记录）」"
+                    "后直接填写醛/胺 SMILES。", "", gr.update())
+        rec, err = _rec_create_linked(fav_id, conditions, outcome,
+                                      strength, notes, operator)
     if err:
         return err, "", gr.update()
     recs, _ = _rec_list()
     rid = rec.get("record_id") or rec.get("id") or "?"
     return (f"✓ 实验记录已保存（{rid}）。",
             _render_records_timeline(recs or []), _record_fav_choices())
+
+
+# ---------------------------------------------------------------------------
+# 页⑤ 方案迭代（RAG 对接）：建议回显 + 实验记录时间线摘要
+# ---------------------------------------------------------------------------
+
+def _load_suggestions_store():
+    try:
+        from rag import suggestions as sug_mod
+        return sug_mod, None
+    except ImportError:
+        return None, ("⏳ RAG 建议模块尚未上线（后端开发中）——建议 JSON 落回 "
+                      "data/rag_export/suggestions/ 后在此回显。")
+
+
+def _sug_list(favorite_id=None):
+    """list_suggestions(favorite_id=None) -> list[dict]（签名与任务B钉死）。"""
+    mod, err = _load_suggestions_store()
+    if err:
+        return None, err
+    try:
+        return mod.list_suggestions(favorite_id=favorite_id) or [], None
+    except Exception as e:
+        return None, f"⚠️ 建议读取失败：{_brief_error(e)}"
+
+
+_SUG_TYPE_ZH = {"condition_adjust": "🔧 条件调整", "new_candidate": "🧪 新候选单体对"}
+_SUG_STATUS_ZH = {
+    "new": ("新建议", "#0f766e"),
+    "adopted": ("已采纳", "#1d4ed8"),
+    "rejected": ("已否决", "#b91c1c"),
+    "done": ("已验证", "#64748b"),
+}
+_EV_KIND_ZH = {"experiment_record": "实验记录", "literature": "文献",
+               "prediction": "预测"}
+
+
+def _render_suggestion_cards(sugs: list) -> str:
+    """RAG 建议卡片墙：类型 / 内容 / 依据 / 状态 / 时间 / 关联收藏。"""
+    if not sugs:
+        return ('<div class="placeholder-page">暂无 RAG 建议——迭代建议 JSON '
+                "落回 data/rag_export/suggestions/ 后在此回显。</div>")
+    cards = []
+    for sug in sugs:
+        stype = sug.get("type") or "?"
+        type_zh = _SUG_TYPE_ZH.get(stype, _esc(stype))
+        status, color = _SUG_STATUS_ZH.get(
+            sug.get("status"), (sug.get("status") or "—", "#64748b"))
+        created = str(sug.get("created_at") or "")[:16].replace("T", " ")
+        sid = _esc(sug.get("suggestion_id") or sug.get("id") or "?")
+
+        payload = sug.get("payload") or {}
+        if stype == "condition_adjust":
+            rows = ""
+            for adj in payload.get("adjustments") or []:
+                if isinstance(adj, dict):
+                    field = _COND_LABELS.get(adj.get("field"), adj.get("field") or "?")
+                    rows += (f"<li>{_esc(field)}：{_esc(adj.get('from'))} → "
+                             f"<b>{_esc(adj.get('to'))}</b>"
+                             + (f"<br><i>{_esc(adj['rationale'])}</i>"
+                                if adj.get("rationale") else "")
+                             + "</li>")
+            body = f"<ul>{rows}</ul>" if rows else f"<i>{_esc(payload.get('rationale') or '')}</i>"
+        elif stype == "new_candidate":
+            ald = payload.get("aldehyde") or {}
+            amine = payload.get("amine") or {}
+            pair = (f"{_esc(ald.get('name') or ald.get('smiles') or '?')} × "
+                    f"{_esc(amine.get('name') or amine.get('smiles') or '?')}")
+            body = f"<div>候选组合：<b>{pair}</b></div>"
+            if payload.get("rationale"):
+                body += f"<i>{_esc(payload['rationale'])}</i>"
+        else:
+            body = f"<pre>{_esc(json.dumps(payload, ensure_ascii=False))}</pre>"
+
+        ev_items = ""
+        for ev in sug.get("evidence_refs") or []:
+            if not isinstance(ev, dict):
+                ev_items += f"<li>{_esc(ev)}</li>"
+                continue
+            kind = _EV_KIND_ZH.get(ev.get("kind"), ev.get("kind") or "依据")
+            ref = str(ev.get("ref") or "")
+            shown = _resolve_ref_title(ref) if ev.get("kind") == "literature" else None
+            ref_txt = f"{_esc(shown)}（{_esc(ref)}）" if shown else _esc(ref)
+            note = f" — {_esc(ev['note'])}" if ev.get("note") else ""
+            ev_items += f"<li>{_esc(kind)}：{ref_txt}{note}</li>"
+        ev_html = (f'<div class="sug-ev"><b>依据</b><ul>{ev_items}</ul></div>'
+                   if ev_items else "")
+
+        link = ""
+        fid = sug.get("favorite_id")
+        if fid:
+            fav, _ = _fav_get(fid)
+            if fav:
+                _, _, ald_n, amine_n = _fav_pair(fav)
+                link = f"关联收藏：{_esc(ald_n)} × {_esc(amine_n)}（{_esc(fid)}）"
+            else:
+                link = f"关联收藏：{_esc(fid)}"
+
+        meta = " · ".join(x for x in (f"<code>{sid}</code>", created, link) if x)
+        cards.append(
+            '<div class="sug-card">'
+            f'<div class="sug-head">{type_zh} '
+            f'<span class="rec-outcome" style="background:{color}">{_esc(status)}</span></div>'
+            f"{body}{ev_html}"
+            f'<div class="sug-meta">{meta}</div>'
+            "</div>")
+    return '<div class="sug-wall">' + "".join(cards) + "</div>"
+
+
+def _records_summary(recs: list) -> str:
+    """实验记录时间线摘要一行（页⑤ 顶部）。"""
+    total = len(recs)
+    if not total:
+        return "*暂无实验记录——在页④ 录入后此处自动汇总。*"
+    counts = {}
+    for r in recs:
+        counts[r.get("outcome")] = counts.get(r.get("outcome"), 0) + 1
+    parts = [f"{_OUTCOME_ZH[k][0]} {counts[k]}"
+             for k in ("film", "partial", "failed") if counts.get(k)]
+    dates = sorted((str(r.get("date")) for r in recs if r.get("date")), reverse=True)
+    latest = f"，最近：{dates[0]}" if dates else ""
+    return f"共 **{total}** 条实验记录（{' · '.join(parts)}{latest}）。"
+
+
+def refresh_iteration_tab(fav_filter=""):
+    """页⑤ 进入/刷新 → (记录摘要, 记录时间线, 建议卡片, 过滤下拉, 状态)。"""
+    recs, rerr = _rec_list()
+    recs = recs or []
+    summary = f"⚠️ {rerr}" if rerr else _records_summary(recs)
+    timeline = _render_records_timeline(recs)
+
+    sugs, serr = _sug_list(favorite_id=(fav_filter or None))
+    if serr:
+        sug_html = f'<div class="placeholder-page">{_esc(serr)}</div>'
+        status = serr
+    else:
+        sug_html = _render_suggestion_cards(sugs)
+        status = f"共 {len(sugs)} 条建议。" if sugs else ""
+
+    favs, _ = _fav_list()
+    choices = [("全部", "")] + [(_fav_label(f), f.get("id")) for f in (favs or [])]
+    return (summary, timeline, sug_html,
+            gr.update(choices=choices, value=fav_filter or ""), status)
+
+
+def refresh_suggestions(fav_filter=""):
+    """仅刷新建议区（按收藏过滤下拉变更）→ (建议卡片, 状态)。"""
+    sugs, serr = _sug_list(favorite_id=(fav_filter or None))
+    if serr:
+        return f'<div class="placeholder-page">{_esc(serr)}</div>', serr
+    return (_render_suggestion_cards(sugs),
+            f"共 {len(sugs)} 条建议。" if sugs else "")
 
 
 # ---------------------------------------------------------------------------
@@ -1400,6 +1674,13 @@ CUSTOM_CSS = """
 .rec-conds { color: #334155; font-size: 0.85rem; margin: 4px 0; }
 .rec-meta { color: #64748b; font-size: 0.8rem; }
 .rec-notes { color: #475569; font-size: 0.85rem; margin-top: 4px; }
+/* P3：RAG 建议卡片 / 文献 paper_id 小字 */
+.sug-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.sug-card { border: 1px solid #e2e8f0; border-left: 4px solid #0f766e; border-radius: 10px; padding: 10px 14px; background: #fff; }
+.sug-head { font-weight: 600; display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+.sug-ev { font-size: 0.85rem; color: #334155; margin-top: 6px; }
+.sug-meta { color: #64748b; font-size: 0.78rem; margin-top: 6px; }
+.ref-pid { color: #94a3b8; font-size: 0.75rem; }
 /* 中文字体栈放在 CSS 里：theme 的 font= 字符串参数会触发 gradio 6.20
    launch() 主题比较 bug（fonts.py __eq__: 'str' object has no attribute 'name'） */
 body, .gradio-container {
@@ -1595,8 +1876,13 @@ def create_app() -> gr.Blocks:
                 fav_cards = gr.HTML()
                 with gr.Group():
                     gr.Markdown("#### 收藏详情")
+                    # allow_custom_value=True 必须保留：choices 由 refresh 动态
+                    # 下发，服务端组件 choices 恒为 []，gradio 6 的 preprocess 会
+                    # 拿服务端 choices 校验浏览器选中值，校验不过事件直接报错、
+                    # 详情不刷新（Bug：收藏夹点选后不显示详情的根因）。
                     fav_select = gr.Dropdown(label="选择收藏条目", choices=[],
-                                             interactive=True)
+                                             interactive=True,
+                                             allow_custom_value=True)
                     fav_detail_info = gr.Markdown()
                     fav_detail_snapshot = gr.Markdown()
                     with gr.Row():
@@ -1659,10 +1945,19 @@ def create_app() -> gr.Blocks:
             with gr.Tab("④ 实验记录") as rec_tab:
                 with gr.Group():
                     gr.Markdown("#### 录入实验记录")
+                    # allow_custom_value：同页③，避免动态 choices 被服务端校验拦截
                     rec_fav_select = gr.Dropdown(
-                        label="关联收藏条目（必选——记录挂在收藏上，"
+                        label="关联收藏条目（记录挂在收藏上，"
                               "单体与预测快照自动带入）",
-                        choices=[], interactive=True)
+                        choices=[], interactive=True, allow_custom_value=True)
+                    rec_free = gr.Checkbox(
+                        label="不关联收藏（游离记录）——直接填写醛/胺 SMILES",
+                        value=False)
+                    with gr.Row(visible=False) as rec_free_row:
+                        rec_free_ald = gr.Textbox(
+                            label="醛单体 SMILES", placeholder="游离记录必填")
+                        rec_free_amine = gr.Textbox(
+                            label="胺单体 SMILES", placeholder="游离记录必填")
                     with gr.Row():
                         rec_solvent = gr.Textbox(label="溶剂",
                                                  placeholder="甲苯 / BTF/二氧六环")
@@ -1696,19 +1991,46 @@ def create_app() -> gr.Blocks:
                                outputs=[rec_fav_select, rec_list_html])
                 rec_refresh_btn.click(fn=refresh_records_tab,
                                       outputs=[rec_fav_select, rec_list_html])
+                rec_free.change(fn=lambda v: gr.update(visible=bool(v)),
+                                inputs=[rec_free], outputs=[rec_free_row])
                 rec_submit_btn.click(
                     fn=submit_record,
                     inputs=[rec_fav_select, rec_solvent, rec_modulator,
                             rec_catalyst, rec_temp, rec_time, rec_order,
-                            rec_outcome, rec_strength, rec_operator, rec_notes],
+                            rec_outcome, rec_strength, rec_operator, rec_notes,
+                            rec_free, rec_free_ald, rec_free_amine],
                     outputs=[rec_status, rec_list_html, rec_fav_select])
 
-            # ===================== 页⑤ 占位（P3） =====================
-            with gr.Tab("⑤ 方案迭代"):
+            # ===================== 页⑤ 方案迭代（RAG 对接） =====================
+            with gr.Tab("⑤ 方案迭代") as iter_tab:
                 gr.Markdown(
-                    '<div class="placeholder-page"><h3>🚧 即将上线（P3）</h3>'
-                    "对接 RAG 迭代：预测/收藏/实验记录按约定 schema 导出，"
-                    "RAG 建议回显与收藏条目关联。</div>")
+                    "实验记录沉淀 → RAG 迭代 → 建议回显（文件对接契约见 "
+                    "`data/rag_export/README.md`；建议由 minimax RAG 写入 "
+                    "`suggestions/`，本页只读展示并与收藏条目关联）。")
+                with gr.Group():
+                    gr.Markdown("#### 实验记录时间线摘要")
+                    iter_rec_summary = gr.Markdown()
+                    iter_rec_html = gr.HTML()
+                with gr.Group():
+                    gr.Markdown("#### RAG 迭代建议")
+                    with gr.Row():
+                        iter_refresh_btn = gr.Button("刷新", size="sm", scale=1)
+                        iter_fav_filter = gr.Dropdown(
+                            label="按收藏过滤", choices=[("全部", "")], value="",
+                            interactive=True, allow_custom_value=True, scale=3)
+                    iter_sug_html = gr.HTML()
+                    iter_status = gr.Markdown()
+
+                _iter_outputs = [iter_rec_summary, iter_rec_html, iter_sug_html,
+                                 iter_fav_filter, iter_status]
+                iter_tab.select(fn=refresh_iteration_tab, inputs=[iter_fav_filter],
+                                outputs=_iter_outputs)
+                iter_refresh_btn.click(fn=refresh_iteration_tab,
+                                       inputs=[iter_fav_filter],
+                                       outputs=_iter_outputs)
+                iter_fav_filter.change(fn=refresh_suggestions,
+                                       inputs=[iter_fav_filter],
+                                       outputs=[iter_sug_html, iter_status])
 
     # Gradio 6 把 theme/css 从 Blocks 构造器移到 launch()；构造器 kwargs 仅存入
     # _deprecated_theme/_deprecated_css 并告警。这里直接设置这两个内部字段，

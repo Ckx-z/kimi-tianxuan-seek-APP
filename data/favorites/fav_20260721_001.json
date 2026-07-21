@@ -1,0 +1,97 @@
+{
+ "id": "fav_20260721_001",
+ "aldehyde": {
+  "smiles": "O=Cc1cc(-c2ccc(C(F)(F)F)cc2)c(C=O)cc1-c1ccc(C(F)(F)F)cc1",
+  "cas": "1300701-03-4",
+  "name": "A6 4,4''-双(三氟甲基)-2',5'-二甲酰基对三联苯"
+ },
+ "amine": {
+  "smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+  "cas": "14544-47-9",
+  "name": "TAPT 2,4,6-三(4-氨基苯基)-1,3,5-三嗪"
+ },
+ "created_at": "2026-07-21T20:22:04+08:00",
+ "notes": "",
+ "latest_prediction": {
+  "score": 0.4985671937465668,
+  "std": 0.02862260304391384,
+  "arm": "tree_v4_ens",
+  "ood": "warning",
+  "date": "2026-07-21T20:22:05+08:00"
+ },
+ "references": [
+  {
+   "title": "40",
+   "doi": "",
+   "source": "auto-matched",
+   "path_or_url": "",
+   "match_type": "amine",
+   "count": 3,
+   "note": "报道过该胺单体"
+  },
+  {
+   "title": "161",
+   "doi": "",
+   "source": "auto-matched",
+   "path_or_url": "",
+   "match_type": "amine",
+   "count": 2,
+   "note": "报道过该胺单体"
+  },
+  {
+   "title": "842",
+   "doi": "",
+   "source": "auto-matched",
+   "path_or_url": "",
+   "match_type": "amine",
+   "count": 2,
+   "note": "报道过该胺单体"
+  },
+  {
+   "title": "1349",
+   "doi": "",
+   "source": "auto-matched",
+   "path_or_url": "",
+   "match_type": "amine",
+   "count": 2,
+   "note": "报道过该胺单体"
+  },
+  {
+   "title": "133",
+   "doi": "",
+   "source": "auto-matched",
+   "path_or_url": "",
+   "match_type": "amine",
+   "count": 1,
+   "note": "报道过该胺单体"
+  },
+  {
+   "title": "686",
+   "doi": "",
+   "source": "auto-matched",
+   "path_or_url": "",
+   "match_type": "amine",
+   "count": 1,
+   "note": "报道过该胺单体"
+  },
+  {
+   "title": "1423",
+   "doi": "",
+   "source": "auto-matched",
+   "path_or_url": "",
+   "match_type": "amine",
+   "count": 1,
+   "note": "报道过该胺单体"
+  },
+  {
+   "title": "1621",
+   "doi": "",
+   "source": "auto-matched",
+   "path_or_url": "",
+   "match_type": "amine",
+   "count": 1,
+   "note": "报道过该胺单体"
+  }
+ ],
+ "experiment_record_ids": []
+}

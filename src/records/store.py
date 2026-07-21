@@ -5,8 +5,12 @@ App ↔ RAG 数据契约的单一数据源（schema 见 data/rag_export/README.m
 Schema 2 experiment_record），不再另建 data/experiment_records/。
 
 - record_id 独立编号体系（防 CV 泄漏教训）；
-- 创建记录必须关联已存在的收藏条目（单体对象与预测快照从收藏里取）；
-- 创建后把 rec_id 回挂到对应 favorite 的 experiment_record_ids。
+- 关联收藏的记录：favorite_id 必须指向已存在的收藏条目（单体对象与
+  预测快照从收藏里取），创建后把 rec_id 回挂到 favorite 的
+  experiment_record_ids；
+- 游离记录（P3 扩展）：favorite_id=None 时必须显式给醛/胺 SMILES，
+  单体对象按契约填充（cas/name 尝试内置库反查）、favorite_id 置 null、
+  prediction_snapshot 置 null、不回挂任何收藏。
 """
 
 from __future__ import annotations
@@ -71,9 +75,11 @@ def _read_file(path: Path) -> dict | None:
 
 
 def create_record(
-    favorite_id: str,
-    conditions: dict,
-    outcome: str,
+    favorite_id: str | None = None,
+    aldehyde_smiles: str = "",
+    amine_smiles: str = "",
+    conditions: dict | None = None,
+    outcome: str = "",
     strength: str = "",
     notes: str = "",
     operator: str = "",
@@ -81,41 +87,72 @@ def create_record(
     """创建实验记录并按 RAG 契约落盘，返回完整记录 dict。
 
     - outcome 必须是 film|partial|failed，否则 ValueError；
-    - favorite_id 必须指向已存在的收藏条目，否则 KeyError
-      （单体对象与 prediction_snapshot 从收藏条目冗余过来）；
-    - 成功后把 record_id 回挂到收藏条目的 experiment_record_ids。
+    - 关联收藏（favorite_id 非 None）：favorite_id 必须指向已存在的收藏
+      条目，否则 KeyError（单体对象与 prediction_snapshot 从收藏冗余），
+      成功后把 record_id 回挂到收藏条目的 experiment_record_ids；
+    - 游离记录（favorite_id=None）：aldehyde_smiles / amine_smiles 必须
+      非空，否则 ValueError；favorite_id 置 null、prediction_snapshot
+      置 null、不回挂任何收藏。
+
+    向后兼容：旧签名 create_record(favorite_id, conditions, outcome,
+    strength, notes, operator) 的位置调用（第二个位置参数是 dict）仍然
+    可用，参数自动按旧语义重排。
     """
+    # 旧位置调用检测：create_record(fid, conditions_dict, outcome, ...)
+    if isinstance(aldehyde_smiles, dict):
+        legacy_cond = aldehyde_smiles
+        legacy_outcome = amine_smiles if isinstance(amine_smiles, str) else ""
+        legacy_strength = conditions if isinstance(conditions, str) else ""
+        legacy_notes = outcome if isinstance(outcome, str) else ""
+        legacy_operator = strength if isinstance(strength, str) else ""
+        aldehyde_smiles, amine_smiles = "", ""
+        conditions = legacy_cond
+        outcome = legacy_outcome
+        strength, notes, operator = legacy_strength, legacy_notes, legacy_operator
+
     outcome = (outcome or "").strip()
     if outcome not in VALID_OUTCOMES:
         raise ValueError(
             f"outcome 必须是 {VALID_OUTCOMES} 之一，收到: {outcome!r}"
         )
 
-    fav = favorites_store.get_favorite(favorite_id)
-    if fav is None:
-        raise KeyError(f"收藏条目不存在，无法创建实验记录: {favorite_id}")
+    if favorite_id is not None:
+        fav = favorites_store.get_favorite(favorite_id)
+        if fav is None:
+            raise KeyError(f"收藏条目不存在，无法创建实验记录: {favorite_id}")
+        aldehyde = fav.get("aldehyde", {"smiles": "", "cas": "", "name": ""})
+        amine = fav.get("amine", {"smiles": "", "cas": "", "name": ""})
+        snap = fav.get("latest_prediction")
+        prediction_snapshot = (
+            {
+                "score": snap.get("score"),
+                "std": snap.get("std"),
+                "ood": snap.get("ood", ""),
+            }
+            if isinstance(snap, dict)
+            else None
+        )
+    else:
+        aldehyde_smiles = (aldehyde_smiles or "").strip()
+        amine_smiles = (amine_smiles or "").strip()
+        if not aldehyde_smiles or not amine_smiles:
+            raise ValueError(
+                "游离记录（favorite_id=None）必须提供非空的醛/胺 SMILES"
+            )
+        aldehyde = favorites_store._monomer_obj(aldehyde_smiles)
+        amine = favorites_store._monomer_obj(amine_smiles)
+        prediction_snapshot = None
 
     cond = {k: "" for k in _CONDITION_KEYS}
     cond.update(conditions or {})
-
-    snap = fav.get("latest_prediction")
-    prediction_snapshot = (
-        {
-            "score": snap.get("score"),
-            "std": snap.get("std"),
-            "ood": snap.get("ood", ""),
-        }
-        if isinstance(snap, dict)
-        else None
-    )
 
     rec = {
         "schema_version": SCHEMA_VERSION,
         "record_type": RECORD_TYPE,
         "record_id": _next_id(),
         "favorite_id": favorite_id,
-        "aldehyde": fav.get("aldehyde", {"smiles": "", "cas": "", "name": ""}),
-        "amine": fav.get("amine", {"smiles": "", "cas": "", "name": ""}),
+        "aldehyde": aldehyde,
+        "amine": amine,
         "prediction_id": None,
         "prediction_snapshot": prediction_snapshot,
         "conditions": cond,
@@ -135,10 +172,11 @@ def create_record(
         json.dumps(rec, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
     )
 
-    # 回挂到收藏条目
-    ids = list(fav.get("experiment_record_ids") or [])
-    ids.append(rec["record_id"])
-    favorites_store.update_favorite(favorite_id, experiment_record_ids=ids)
+    # 回挂到收藏条目（游离记录不回挂）
+    if favorite_id is not None:
+        ids = list(fav.get("experiment_record_ids") or [])
+        ids.append(rec["record_id"])
+        favorites_store.update_favorite(favorite_id, experiment_record_ids=ids)
 
     return rec
 
