@@ -34,8 +34,11 @@ bridge/knowledge_index_tianxuan.jsonl
 bridge/tianxuan_vectors.bin
 bridge/tianxuan_meta.json
 bridge/tianxuan_norms.bin
+bridge/tianxuan_norms.bin
 bridge/indexer_*.log
 bridge/run_log.txt
 run_indexer.bat
 run_indexer.vbs
 run_indexer_v2.vbs
+bridge/graphrag_v2/cached/
+graphrag/graph_v2.pkl

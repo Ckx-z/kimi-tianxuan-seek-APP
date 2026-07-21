@@ -32,6 +32,15 @@ FORBIDDEN_PATHS = [
 # 大文件阈值 (10MB)
 SIZE_LIMIT = 10 * 1024 * 1024
 
+# 已知大数据文件名模式 (即使 <10MB 也应警告)
+KNOWN_LARGE_FILES = [
+    r'tianxuan_vectors\.bin$',
+    r'tianxuan_meta\.json$',
+    r'tianxuan_norms\.bin$',
+    r'knowledge_index.*\.jsonl$',
+    r'graph_v2\.pkl$',
+]
+
 # API key 模式
 KEY_PATTERNS = [
     (re.compile(r'sk-[A-Za-z0-9]{20,}'), 'OpenAI/MiniMax key'),
@@ -76,6 +85,12 @@ def check_staged_files(staged):
 
     for path in staged:
         full = PROJ / path
+
+        # 0. 已知大数据文件 (直接阻断)
+        for pat in KNOWN_LARGE_FILES:
+            if re.search(pat, path):
+                errors.append(f'🚫 已知大数据文件: {path} (应加入 .gitignore)')
+                break
 
         # 1. 路径检查
         forbidden = is_forbidden_path(path)
