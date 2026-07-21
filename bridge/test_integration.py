@@ -119,15 +119,15 @@ def _():
     assert has_results, "Expected reactions or literatures in result"
 
 
-@test("graphrag_v2: fallback to v1 when v2 errors")
+@test("graphrag_v2: query global intent uses community index")
 def _():
     from graphrag_v2 import GraphRAGv2
     g2 = GraphRAGv2()
-    # 空查询不应 crash
-    try:
-        result = g2.query("")
-    except Exception:
-        pass  # 允许异常，只要不卡死
+    result = g2.query("总结所有含氟COF的研究趋势")
+    assert 'parsed_query' in result
+    # global 模式应包含 communities 或 reactions
+    has_content = 'reactions' in result or 'communities' in result or 'literatures' in result
+    assert has_content, "Expected some results from v2 query"
 
 
 # ===== generate_proposal data pathway =====
