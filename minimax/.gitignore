@@ -1,0 +1,44 @@
+# Python 缓存
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# 临时脚本 (用户授权保留 set_api_env.ps1)
+_tmp/
+
+# Word 临时文件
+~$*.docx
+*.tmp
+
+# 编辑器/系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# 预测模型权重 (建议 git-lfs 或单独备份)
+predict/models/**/*.pt
+predict/models/**/*.pth
+
+# 用户敏感数据 (不进版本控制)
+.env
+*.env
+secrets/
+
+# 本地文献知识库 (私人下载的 PDF, 不应上传)
+知识库/
+bridge/knowledge_index_tianxuan.jsonl
+bridge/tianxuan_vectors.bin
+bridge/tianxuan_meta.json
+bridge/tianxuan_norms.bin
+bridge/tianxuan_norms.bin
+bridge/indexer_*.log
+bridge/run_log.txt
+run_indexer.bat
+run_indexer.vbs
+run_indexer_v2.vbs
+bridge/graphrag_v2/cached/
+graphrag/graph_v2.pkl

@@ -1,0 +1,1060 @@
+smiles,best_name,monomer_type,has_fluorine,n_f_atoms,has_cf3,n_aldehyde,n_amine,n_papers,source,commercial_id,cas,formula,is_aldehyde,is_amine,is_2d
+O=Cc1c(O)c(C=O)c(O)c(C=O)c1O,"2,4,6-trihydroxy-1,3,5-benzenetricarboxaldehyde",aldehyde,False,0,False,3,0,189,llm,,,,True,False,True
+Nc1ccc(N)cc1,"p-Phenylenediamine (1,4-Diaminobenzene)",amine,False,0,False,0,2,101,llm,,,,False,True,True
+Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline-15N",amine,False,0,False,0,3,37,llm,,,,False,True,True
+O=Cc1ccc(C=O)cc1,"Benzene-1,4-dicarboxaldehyde",aldehyde,False,0,False,2,0,90,llm,,,,True,False,True
+Nc1ccc(-c2ccc(N)cc2)cc1,"4,4'-diaminobiphenyl (benzidine)",amine,False,0,False,0,2,34,llm,,,,False,True,True
+O=Cc1c(F)c(F)c(C=O)c(F)c1F,"2,3,5,6-tetrafluorobenzene-1,4-dicarboxaldehyde",aldehyde,True,4,False,2,0,15,llm,,,,True,False,True
+O=Cc1c(F)c(F)c(F)c(C=O)c1F,"2,3,5,6-tetrafluoroterephthalaldehyde",aldehyde,True,4,False,2,0,1,llm,,,,True,False,True
+O=Cc1ccc(C(=O)C(F)(F)F)cc1,4-(trifluoroacetyl)benzaldehyde,aldehyde,True,3,True,1,0,1,llm,,,,False,False,False
+Nc1cccc(N)c1,m-phenylenediamine,amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc(C=O)c(C=O)c1,"1,3,5-benzenetricarboxaldehyde",aldehyde,False,0,False,3,0,10,llm,,,,True,False,True
+O=Cc1c(F)cc(F)c(F)c1C=O,"2,3,5,6-tetrafluoroterephthalaldehyde",aldehyde,True,3,False,2,0,2,llm,,,,True,False,True
+CC1(C)OB(c2ccc(-c3ccc(Br)cc3)cc2)OC1c1ccc(-c2ccc(-c3ccc(Br)cc3)cc2)cc1,"1,3,5-tris(4-bromophenyl)boronic acid pinacol ester",other,False,0,False,0,0,1,llm,,,,False,False,False
+CC1(C)OB(c2ccc(C(F)(F)F)cc2)OC1c1ccc(C(F)(F)F)cc1,4-(trifluoromethyl)phenylboronic acid pinacol ester,other,True,6,True,0,0,1,llm,,,,False,False,False
+Nc1c(F)c(F)c(-c2c(N)c(F)c(F)c(F)c2F)c(F)c1F,"2,2',3,3',5,5',6,6'-octafluorobenzidine",amine,True,8,False,0,2,1,llm,,,,False,True,True
+NCCN,"1,2-diaminoethane",amine,False,0,False,0,2,4,llm,,,,False,True,True
+C=Cc1cc(C=O)ccc1C=O,"2,5-divinylbenzene-1,4-dicarboxaldehyde",aldehyde,False,0,False,2,0,4,llm,,,,True,False,True
+C=CC(=O)OCC(C(F)(F)F)(C(F)(F)F)C(F)(F)F,"1H,1H,7H-dodecafluoroheptyl acrylate",other,True,9,True,0,0,1,llm,,,,False,False,False
+O=Cc1ccc(C2=CC=[N+]C(c3ccc(C=O)cc3)=C2)cc1.[Cl-].[Cl-],"1,1-bis(4-formylphenyl)-4,4'-bipyridinium dichloride",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Brc1ccc(C(c2ccc(Br)cc2)(c2ccc(Br)cc2)c2ccc(Br)cc2)cc1,tetrakis(4-bromophenyl)methane,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc2c(c1)C(=O)c1ccccc1C2=O,"2,6-diaminoanthraquinone",amine,False,0,False,0,1,1,llm,,,,False,False,False
+O=Cc1ccc2c(c1-c1ccccc1-c1ccc3c(c1-c1ccccc1-c1ccc(O)cc1)C=C3)C=C2,"2,2′,7,7′-tetramethoxy-9,9′-spirobifluorene-3,3′,6,6′-tetracarbaldehyde",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Cc1cc(N)ccc1-c1cc(N)ccc1C,"4,4′-diamino-2,2′-dimethylbiphenyl",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Cc1ccc(-c2ccc(N)cc2C)c(C)c1,"4,4′-diamino-2,2′,6,6′-tetramethylbiphenyl",amine,False,0,False,0,1,1,llm,,,,False,False,False
+N=C(N)NNC(=N)N.[Cl-],triaminoguanidinium chloride,amine,False,0,False,0,2,1,llm,,,,False,True,True
+N#Cc1ccc(C#N)cc1,"1,4-benzenedicarbonitrile",other,False,0,False,0,0,5,llm,,,,False,False,False
+N#Cc1ccc(-c2ccc(C#N)nc2)nc1,"2,2-bipyridine-5,5-dicarbonitrile",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1,"1,3,5-tris(4-aminophenyl)benzene",amine,False,0,False,0,3,110,llm,,,,False,True,True
+Nc1ccc(C(F)(F)F)cc1N,"2-(trifluoromethyl)benzene-1,4-diamine",amine,True,3,True,0,2,1,llm,,,,False,True,True
+O=Cc1cc(F)c(F)c(C=O)c1F,"2,3,5,6-tetrafluorobenzene-1,4-dicarbaldehyde",aldehyde,True,3,False,2,0,3,llm,,,,True,False,True
+Cl.N=C(N)NNC(N)=[NH2+],triaminoguanidinium chloride,amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1ccc(C(=C(c2ccc(N)cc2)c2ccc(N)cc2)c2ccc(N)cc2)cc1,"4,4',4'',4'''-(ethene-1,1,2,2-tetrayl)tetraaniline",amine,False,0,False,0,4,3,llm,,,,False,True,True
+O=Cc1ccc(F)cc1,4-fluorobenzaldehyde,aldehyde,True,1,False,1,0,2,llm,,,,False,False,False
+O=Cc1ccc(=O)[nH]c(=O)c1,"1,3,5-triformylphloroglucinol",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Nc1c(F)cc(-c2c(F)c(F)cc(F)c2F)c(F)c1F,"1,3,5-tris(2,3,5,6-tetrafluoroanilino)benzene",amine,True,7,False,0,1,1,llm,,,,False,False,False
+Nc1ccc(O)cc1N,"2,5-diamino-1,4-benzenediol",amine,False,0,False,0,2,2,llm,,,,False,True,True
+CCCOc1ccc(C(=O)NN)c(-c2ccccc2C(=O)NN)c1-c1ccccc1,"5′-(4-(hydrazinecarbonyl)-3-propoxyphenyl)-3,3′′-di(propoxy)-[1,1′:3′,1′′-terphenyl]-4,4′′-dicarboxyhydrazide",other,False,0,False,0,2,1,llm,,,,False,False,False
+Nc1c(F)c(F)cc(F)c1F,"1,3,5-tris(2,3,5,6-tetrafluoroanilino)benzene",amine,True,4,False,0,1,2,llm,,,,False,False,False
+O=CC1=CC(=O)C(O)=C(O)C1=O,"1,3,5-triformylphloroglucinol",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Oc1cc(O)cc(O)c1,phloroglucinol,other,False,0,False,0,0,5,llm,,,,False,False,False
+CCCCCCNC(=O)Nc1c(C=O)cc(C=O)cc1C=O,"N,N',N''-trihexyl-1,3,5-benzenetricarboxamide-tri-carbaldehyde",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Cc1ccc(-c2cc(C)ccc2C)cc1,"1,3,5-tris(4-methylphenyl)benzene derivative",other,False,0,False,0,0,1,llm,,,,False,False,False
+NN,hydrazine hydrate,amine,False,0,False,0,2,14,llm,,,,False,True,True
+Cc1cc(N)c(N)cc1C,"2,5-dimethyl-1,4-phenylenediamine",amine,False,0,False,0,2,2,llm,,,,False,True,True
+O=Cc1c(F)c(C=O)c(F)c(C=O)c1F,"2,4,6-trifluoro-1,3,5-benzenetricarbaldehyde",aldehyde,True,3,False,3,0,1,llm,,,,True,False,True
+COc1cc(C=O)ccc1C=O,"2,5-dimethoxyterephthalaldehyde",aldehyde,False,0,False,2,0,14,llm,,,,True,False,True
+O=Cc1ccc(O)cc1C=O,"2,5-dihydroxy-1,4-benzenedicarboxaldehyde",aldehyde,False,0,False,2,0,8,llm,,,,True,False,True
+COc1cc(C=O)c(C=O)c(OC)c1,"2,5-dimethoxyterephthalaldehyde",aldehyde,False,0,False,2,0,2,llm,,,,True,False,True
+Nc1ccc(-c2nc(Nc3ccccc3)nc(-c3ccc(N)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",amine,False,0,False,0,2,2,llm,,,,False,True,True
+O=Cc1c(F)c(F)c(F)c(F)c1C=O,"2,3,5,6-四氟对苯二甲醛",aldehyde,True,4,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(Nc2ccc(-c3ccc(Nc4ccc(-c5ccc(Nc6ccc(-c7ccc8c(ccc9c%10ccccc%10ccc89)c7)cc6)cc5)cc4)cc3)cc2)cc1,"4,4',4'',4'''(Pyrene-1,3,6,8-tetrayl)tetaniline",amine,False,0,False,0,1,1,llm,,,,False,False,False
+O=Cc1ccc(C2=CC=[N+]C(c3ccc(C=O)cc3)=C2)cc1,"1,1'-Bis(4-formylphenyl)-4,4'-bipyridinium dichloride",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+N=C(N)NN,triaminoguanidinium chloride,amine,False,0,False,0,2,2,llm,,,,False,True,True
+O=Cc1cc(C=O)cc(C=O)c1,"Benzene-1,3,5-tricarbaldehyde (Trimesaldehyde)",aldehyde,False,0,False,3,0,44,llm,,,,True,False,True
+Nc1ccc(-c2ccccc3ncnc2-3)cc1,"1,3,5-tris(4-aminophenyl)triazine",amine,False,0,False,0,1,1,llm,,,,False,False,False
+Nc1nc(N)nc(N)n1,"1,3,5-triazine-2,4,6-triamine (TAPT)",amine,False,0,False,0,3,12,llm,,,,False,True,True
+O=Cc1ccc(-c2ccc(C=O)cc2)cc1,"[1,1′-biphenyl]-4,4′-dicarbaldehyde",aldehyde,False,0,False,2,0,13,llm,,,,True,False,True
+O=Cc1ccc(N(c2ccc(C=O)cc2)c2ccc(C=O)cc2)cc1,"4,4',4''-nitrilotrisbenzaldehyde",aldehyde,False,0,False,3,0,16,llm,,,,True,False,True
+O=CC1=C(F)C(C(F)=C(F)F)=C(F)C1=O,"2,3,5,6-tetrafluoroterephthalaldehyde",aldehyde,True,5,False,1,0,1,llm,,,,False,False,False
+OB(O)c1ccc(B(O)O)cc1,"1,4-phenylenediboronic acid",other,False,0,False,0,0,16,llm,,,,False,False,False
+CC1(C)OB(c2ccc(C=O)cc2)OC1(C)C,"4-(4,4,5,5-tetramethyl-1,3,2-dioxaborolan-2-yl)benzaldehyde",aldehyde,False,0,False,1,0,2,llm,,,,False,False,False
+CC1(C)OB(c2ccc(N)cc2)OC1(C)C,"4-(4,4,5,5-tetramethyl-1,3,2-dioxaborolan-2-yl)aniline",amine,False,0,False,0,1,2,llm,,,,False,False,False
+c1ccc2nonc2c1,"2,1,3-benzothiadiazole",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(N(c2ccc(N)cc2)c2ccc(N)cc2)cc1,"N,N,N-tris(4-aminophenyl)aniline",amine,False,0,False,0,3,26,llm,,,,False,True,True
+C=Cc1ccc(C=O)c(C=O)c1,"2,5-divinylterephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+COc1ccccc1N,o-dimethoxyaniline,amine,False,0,False,0,1,1,llm,,,,False,False,False
+O=Cc1ccc(C(=O)c2ccc(-c3nc(C=O)nc(C=O)n3)cc2)cc1,"2,4,6-tris(4-formylphenyl)-1,3,5-triazine",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Oc1ccc(O)c(O)c1,"1,3,5-trihydroxybenzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+N=C(N)N,guanidine hydrochloride,amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc(C[n+]2cccc(C[n+]3cccc(-c4ccc(C=O)cc4)c3)c2)cc1.[Cl-].[Cl-],"1,1-bis(4-formylphenyl)-4,4'-bipyridinium dichloride",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+COc1ccc(C=O)c(C=O)c1,"2,5-dimethoxyterephthalaldehyde",aldehyde,False,0,False,2,0,3,llm,,,,True,False,True
+OBc1ccc(C#CC#Cc2ccc(BO)cc2)cc1,"4,4'-diphenylbutadiynebis(boronic acid)",other,False,0,False,0,0,1,llm,,,,False,False,False
+CC[N+]1=C(c2ccc(N)cc2)N=c2ccccc2=c2ccc(N)cc2=C1c1ccccc1.[Br-],"ethidium bromide (3,8-diamino-5-ethyl-6-phenylphenanthridinium bromide)",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(S(=O)(=O)O)cc1N,"2,5-diaminobenzenesulfonic acid",amine,False,0,False,0,2,7,llm,,,,False,True,True
+Nc1ccc(C(c2ccc(N)cc2)(c2ccc(N)cc2)c2ccc(N)cc2)cc1,"4,4′,4″,4‴-methanetetrayltetraaniline",amine,False,0,False,0,4,19,llm,,,,False,True,True
+O=Cc1cc2nsnc2cc1C=O,"4,7-diformylbenzothiadiazole",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1ccc(N=Nc2ccc(C=O)cc2)cc1,"4,4'-azobenzenedicarboxaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1c2cccc3cc(c(c1N)C=CC1=C4C5=CC6=CC=C2C=C5C6=CC=C14)C=C3,"4,4′,4″,4‴-(pyrene-1,3,6,8-tetrayl)tetraaniline",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc(-c2ccc(C=O)cn2)nc1,"2,2′-bipyridyl-5,5′-dicarboxaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1ccc(C(=O)c2ccc(C3=C4C(=C(c5ccc(C=O)cc5)c5c4ccc4ccccc54)C=C3)cc2)cc1,"1,3,6,8-tetrakis(4-formylphenyl)pyrene",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)tribenzaldehyde",aldehyde,False,0,False,3,0,21,llm,,,,True,False,True
+O=CC1=CCC=NC1C=O,"2,6-pyridinedicarboxaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+NNC(=O)OCCOCCO,PEO-hydrazide monomer (x=3),amine,False,0,False,0,1,1,llm,,,,False,False,False
+OB1C=CC=C(B(O)O)C=C1,"1,4-benzenediboronic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1ccc(-c2ccc(-c3ccc(C=O)cc3)cc2)cc1,"4,4''-p-terphenyldicarbaldehyde NHC-Au complex",aldehyde,False,0,False,2,0,7,llm,,,,True,False,True
+O=Cc1ccc(C(=O)c2nc(-c3ccc(C=O)cc3)cc(-c3ccc(C=O)cc3)c2C=O)cc1,"2,4,6-tris(4-formylphenyl)-1,3,5-triazine",aldehyde,False,0,False,4,0,1,llm,,,,True,False,True
+N#CC(=Cc1ccccc1)c1ccccc1,"2,3-diphenylacrylonitrile",other,False,0,False,0,0,1,llm,,,,False,False,False
+C(=Nc1ccccc1)c1ccccc1,"N,N'-p-phenylenedimethylene dibenzenamine",other,False,0,False,0,0,2,llm,,,,False,False,False
+Cc1cc(C=O)ccc1C=O,"2,5-dimethylterephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1cc(O)c(C=O)c(C=O)c1O,"1,3,5-triformylphloroglucinol",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1ccc(S(=O)(=O)O)c(N)c1,"2,5-diaminobenzenesulfonic acid",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1cccc(C=O)c1,"1,3-Benzenedicarbaldehyde",aldehyde,False,0,False,2,0,3,llm,,,,True,False,True
+COc1ccc(C=O)cc1OC,"2,5-dimethoxyterephthaldehyde",aldehyde,False,0,False,1,0,2,llm,,,,False,False,False
+CCOc1ccc(C=O)cc1OCC,"2,5-diethoxyterephthaldehyde",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+O=Cc1c(O)c(O)c(C=O)c(C=O)c1O,"2,4,6-trihydroxybenzene-1,3,5-tricarbaldehyde",aldehyde,False,0,False,3,0,2,llm,,,,True,False,True
+Brc1cccc2c1C1=C2c2c(Br)ccc1c2Br,"1,3,6,8-tetrabromopyrene",aldehyde,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1cc(O)c(C=O)c(C=O)c1,"2,4,6-trihydroxybenzene-1,3,5-tricarbaldehyde",aldehyde,False,0,False,3,0,8,llm,,,,True,False,True
+Nc1ccc2cc3cc(N)ccc3cc2c1,"anthracene-2,6-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+OB(O)c1ccccc1,"1,4-phenylenebis(boronic acid) (PBBA)",other,False,0,False,0,0,7,llm,,,,False,False,False
+Nc1ccc(-c2nccc(N)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1cc(/N=N/c2ccc(-c3ccccn3)cc2)cnc1C=O,"(E)-4-(4-(phenyldiazenyl)phenyl)pyridine-2,6-dicarboxaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(C#Cc2c3ccccc3cc3ccccc23)cc1,"9,10-bis(4-aminophenylethynyl)anthracene",amine,False,0,False,0,1,1,llm,,,,False,False,False
+N=C(N)NC(=N)N,biguanide,amine,False,0,False,0,2,1,llm,,,,False,True,True
+CN(C)NC(=N)NC(=N)N,metformin,amine,False,0,False,0,1,1,llm,,,,False,False,False
+N=C1N=C(Nc2ccccn2)N=C1c1cccc(N)n1,"5,5',5''-(1,3,5-triazine-2,4,6-triyl)tri(pyridin-2-amine)",amine,False,0,False,0,1,1,llm,,,,False,False,False
+Nc1ccc(-c2ccc(N)nc2)nc1,"5,5'-diamino-2,2'-bipyridine",amine,False,0,False,0,2,6,llm,,,,False,True,True
+O=Cc1ccc(-c2cc(F)c(C=O)c(F)c2F)cc1,"2',3',5',6'-tetrafluoro-[1,1':4',1''-terphenyl]-4,4''-dicarbaldehyde",aldehyde,True,3,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(C2=Cc3cc(ccc3-c3ccc(N)cc3)N2c2ccccc2)cc1,"1,3,6,8-tetra(4-aminophenyl)pyrene",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(B(O)O)cc1,4-aminophenylboronic acid,aldehyde-amine,False,0,False,0,1,1,llm,,,,False,False,False
+C#Cc1ccc(B(O)O)cc1,(4-ethynylphenyl)boronic acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+O=C(O)c1cc(C(=O)O)cc(C(=O)O)c1,"1,3,5-benzenetricarboxylic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+C1CNCCNC1,piperazine,amine,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(S(=O)O)cc1,4-aminobenzenesulfonic acid,amine,False,0,False,0,1,1,llm,,,,False,False,False
+Nc1cc(N)cc(N)c1,"1,3,5-benzenetriamine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1ccc(-c2cncc(N)c2)nc1,"2,2'-bipyridine-5,5'-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc(-c2cc(-c3ccc(C=O)cc3)cc(-c3ccc(C=O)cc3)c2)cc1,"1,3,5-tris(4-formylphenyl)benzene",aldehyde,False,0,False,3,0,21,llm,,,,True,False,True
+O=C(O)CCN(CCN(CC(=O)O)CC(=O)O)CC(=O)O,diethylenetriaminepentaacetic acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+C=Cc1cc(C=O)ccc1C=CC=O,"2,5-divinylterephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Oc1cccc(O)c1O,pyrogallol,other,False,0,False,0,0,1,llm,,,,False,False,False
+Oc1ccccc1O,catechol,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1cccc(-c2cc(N)nc(N)n2)n1,"2,2'-bipyridine-5,5'-diamine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Oc1ccc2c(c1)cc(O)c1c3ccc(O)cc3ccc21,"2,3,6,7,10,11-hexahydroxytriphenylene",other,False,0,False,0,0,1,llm,,,,False,False,False
+OB(O)c1ccc(-c2ccccc2)cc1,biphenyl-4-boronic acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+Cc1cc(C=O)c(C)c(C=O)c1C=O,"2,4,6-trimethyl-1,3,5-triformylbenzene",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1ccc(-c2nc(-c3ccccc3)nc(-c3ccc(N)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1c(O)cc(O)c(C=O)c1,"2,5-dihydroxyterephthalaldehyde",aldehyde,False,0,False,2,0,13,llm,,,,True,False,True
+N#Cc1ccc(N)cc1,4-aminobenzyl cyanide,amine,False,0,False,0,1,3,llm,,,,False,False,False
+C=Cc1ccc(C=O)cc1C=O,"2,5-divinylterephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+COc1cc(C(=O)NN)cc(C(=O)NN)c1,"2,5-dimethoxyterephthalohydrazide",other,False,0,False,0,2,1,llm,,,,False,False,False
+Nc1ccc(Nc2ccc(-c3ncnc(-c4ccc(Nc5ccc(N)cc5)cc4)c3-c3ccc(Nc4ccc(N)cc4)cc3)cc2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)tris(N-phenyl-[1,1'-biphenyl]-4-amine)",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Cc1nc(C)nc(C)n1,"2,4,6-trimethyl-1,3,5-triazine",other,False,0,False,0,0,6,llm,,,,False,False,False
+COc1ccc(Cc2cccc[n+]2C)c(Cc2ccccn2)c1,"1,1'-[(2,5-dimethoxy-1,4-phenylene)bis(methylene)]bis[pyridinium]",other,False,0,False,0,0,1,llm,,,,False,False,False
+Bc1ccc(B(O)O)cc1,"1,4-phenylenediboronic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1cc(O)c(C=O)c(O)c1C=O,"1,3,5-triformylphloroglucinol",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1ccc2c(c1N)C(=O)c1ccccc1C2=O,"2,6-diaminoanthraquinone",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Cc1ccc(N)cc1C,"2,5-dimethyl-1,4-phenylenediamine",amine,False,0,False,0,1,1,llm,,,,False,False,False
+Oc1c(O)c(Cl)c(Cl)c(O)c1Cl,trichlorophloroglucinol,other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1cc(O)cc(C=O)c1,"1,3,5-triformylphloroglucinol",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(S(=O)(=O)O)cc1,4-aminobenzenesulfonic acid,amine,False,0,False,0,1,1,llm,,,,False,False,False
+Nc1ccc(Nc2ccc(-c3ccc(N)cc3)cc2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",amine,False,0,False,0,2,2,llm,,,,False,True,True
+O=Cc1ccc(-c2cc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1,"2,4,6-tris(4-formylphenyl)-1,3,5-triazine",aldehyde,False,0,False,3,0,3,llm,,,,True,False,True
+Nc1ccc(F)nc1F,"2,6-difluoro-1,4-pyridinediamine",amine,True,2,False,0,1,1,llm,,,,False,False,False
+Nc1ccc(-c2ccc(N)c(-c3ccc(N)c(-c4ccccc4)c3)c2)cc1,"1,3,5-tri(4-aminophenyl)benzene",amine,False,0,False,0,3,1,llm,,,,False,True,True
+O=Cc1cc(O)cc(C=O)c1C=O,"2,4,6-trihydroxybenzene-1,3,5-tricarbaldehyde",aldehyde,False,0,False,3,0,3,llm,,,,True,False,True
+Nc1ccc(N)c(S(=O)(=O)O)c1,"2,5-diaminobenzenesulfonic acid",other,False,0,False,0,2,1,llm,,,,False,False,False
+CC#COc1cc(C=O)c(OC#CC)c(C=O)c1,"2,5-bis(prop-2-yn-1-yloxy)terephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+COc1cc(C=O)c(OC)c(C=O)c1,"2,5-dimethoxybenzene-1,4-dicarboxaldehyde",aldehyde,False,0,False,2,0,2,llm,,,,True,False,True
+NN.O,hydrazine hydrate,amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(O)c(N)c1,"2,5-diamino-1-hydroxybenzene",amine,False,0,False,0,2,2,llm,,,,False,True,True
+O=Cc1ccc(-c2c(-c3ccccc3)cc(-c3ccccc3)c(-c3ccc(C=O)cc3)c2-c2ccc(C=O)cc2)cc1,"1,2,4,5-tetrakis(4-formylphenyl)benzene",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1ccc(-c2ccccc2)cc1N,"biphenyl-4,4'-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1cc(O)cc(O)c1C=O,"1,3,5-triformylphloroglucinol",aldehyde,False,0,False,2,0,2,llm,,,,True,False,True
+O=Cc1ccc(C2=NC3=NC(c4ccc(C=O)cc4)=C(c4ccc(C=O)cc4)C3=N2)cc1,"1,3,5-tris(4-formylphenyl)triazine",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+N#Cc1ccc(C2=NC3=NC(c4ccc(C#N)cc4)=C(c4ccc(C#N)cc4)C3=N2)cc1,"1,3,5-tris(4-cyanophenyl)triazine",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(C(=C(c2ccc(N)cc2)c2cccc(N)c2)c2ccc(N)cc2)cc1,"1,1,2,2-Tetrakis(4-aminophenyl)ethene",amine,False,0,False,0,4,3,llm,,,,False,True,True
+Nc1c(N)c(F)c(F)c(F)c1F,"2,3,5,6-tetrafluoro-1,4-phenylenediamine",amine,True,4,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(C(F)(F)F)cc1,4-(trifluoromethyl)aniline,amine,True,3,True,0,1,2,llm,,,,False,False,False
+OB(O)c1ccccc1B(O)O,benzenediboronic acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+Cc1c(-c2ccc(N)cc2)cc(-c2ccc(N)cc2)cc1-c1ccc(N)cc1,"1,3,5-tris(4-aminophenyl)mesitylene",amine,False,0,False,0,3,1,llm,,,,False,True,True
+O=Cc1ccc(C=O)c(F)c1,"2,5-difluoroterephthalaldehyde",aldehyde,True,1,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(NC(=O)c2ccc(N)cc2)cc1,"4,4'-diaminobenzanilide",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1cncc(-c2cncc(C=O)c2)c1,"2,2'-bipyridine-5,5'-dicarbaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+NC(=O)c1ccc(C(N)=O)cc1,terephthalamide dihydrochloride,amine,False,0,False,0,2,1,llm,,,,False,True,True
+NC1=CC(=O)C(N)=C(N)C1=O,"1,2,4,5-tetraaminobenzoquinone",aldehyde-amine,False,0,False,0,3,1,llm,,,,False,True,True
+O=C1C(=O)C(=O)C(=O)C(=O)C1=O,"cyclohexane-1,2,3,4,5,6-hexone",aldehyde,False,0,False,0,0,5,llm,,,,False,False,False
+O=Cc1cncc(-c2ccc([N+](=O)[O-])cc2C=O)c1,"4,4'-dinitro-[1,1'-biphenyl]-4,4'-dicarbaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(N=Nc2ccc(N)cc2)cc1,"4,4-azodiaminobenzene",amine,False,0,False,0,2,4,llm,,,,False,True,True
+COc1ccc(N)cc1OC,"2,5-dimethoxybenzene-1,4-diamine",amine,False,0,False,0,1,1,llm,,,,False,False,False
+CCCCCCC1(c2ccc(N)cc2)CCCCCCc2ccc(N)cc21,"9,9-dihexylfluorene-2,7-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+NC1CCCCC1N,"(1R,2R)-1,2-diaminocyclohexane",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=C(Cl)c1cc(C(=O)Cl)cc(C(=O)Cl)c1,"1,3,5-benzenetricarbonyl chloride",other,False,0,False,0,0,2,llm,,,,False,False,False
+O=Cc1ccc(Oc2nc(C=O)nc(C=O)n2)cc1,"2,4,6-tris(4-formylphenoxy)-1,3,5-triazine",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Cc1ccc(N)c(-c2ccc(C)c(N)c2)c1,"2,2'-dimethyl-[1,1'-biphenyl]-4,4'-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1cc(C=O)c(O)c(C=O)c1O,"2,4-dihydroxybenzene-1,3,5-tricarbaldehyde",aldehyde,False,0,False,3,0,3,llm,,,,True,False,True
+O=Cc1cc(Sc2ccccc2)c(C=O)c(C=O)c1O,"2,4,6-triformyl-4-thiophenylphloroglucinol",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+N#Cc1ccc(-c2ccc(C#N)cc2)cc1,"4,4'-dicyanobiphenyl",other,False,0,False,0,0,2,llm,,,,False,False,False
+N#Cc1cccc(C#N)c1,"2,6-dicyanopyridine",other,False,0,False,0,0,1,llm,,,,False,False,False
+N#Cc1ccc(-c2cc(-c3ccc(C#N)cc3)cc(-c3ccc(C#N)cc3)c2)cc1,"1,3,5-tris(4-cyanophenyl)benzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=C=Nc1cccc2ccccc12,(S)- or (R)-naphthyl isocyanate,other,False,0,False,0,0,1,llm,,,,False,False,False
+O=C(O)c1cccc2c(=O)oc(=O)c(=O)oc(=O)c12,pyromellitic dianhydride,other,False,0,False,0,0,1,llm,,,,False,False,False
+c1ccc(N(c2ccccc2)c2ccccc2)cc1,triphenylamine,amine,False,0,False,0,0,1,llm,,,,False,False,False
+Clc1ncnc(Cl)n1,"2,4,6-trichloro-1,3,5-triazine",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(/N=N/c2ccc(N)cc2)cc1,"4,4'-diaminoazobenzene",amine,False,0,False,0,2,3,llm,,,,False,True,True
+Nc1ccc(C2=CC3=Nc4ccc(N)cc4C=c4c(c5cc(N)ccc5n43)=C2)cc1,"5,10,15,20-tetrakis(4-aminophenyl)-21H,23H-porphyrin",amine,False,0,False,0,3,1,llm,,,,False,True,True
+O=Cc1cc(O)c(C=O)cc1O,"2,5-dihydroxy-1,4-benzenedicarboxaldehyde",aldehyde,False,0,False,2,0,13,llm,,,,True,False,True
+COc1cc(C=O)cc(C=O)c1OC,"2,5-dimethoxybenzene-1,4-dicarboxaldehyde",aldehyde,False,0,False,2,0,2,llm,,,,True,False,True
+CC(C)(COc1ccc(N)cc1)COc1ccc(N)cc1,pentaerythritol tetrakis(4-aminophenyl),amine,False,0,False,0,2,1,llm,,,,False,True,True
+NCC(O)(CO)CO,tris(hydroxymethyl)aminomethane,amine,False,0,False,0,1,1,llm,,,,False,False,False
+Nc1ccc(Nc2ccc(-c3ccc(N)cc3)c(-c3ccccc3)c2)cc1,"5'-(4-aminophenyl)-[1,1':3',1''-terphenyl]-4,4''-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(N)c(N)c1,"2-nitro-1,4-benzenediamine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+C#Cc1ccc(C#Cc2ccc(C(=O)c3ccc(C#Cc4ccc(C(=O)c5ccc(C#C)cc5)cc4)cc3)cc2)cc1,"1,3,5-tris(4-ethynylphenyl)benzene-1',3''-trione",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(-c2ccc(-c3ccc(-c4nc(-c5ccc(N)cc5)nc(-c5ccc(-c6ccc(-c7ccc(N)cc7)cc6)cc5)n4)cc3)cc2)cc1,"1,3,5-tris(4'-(4-aminophenyl)biphenyl-4-yl)-1,3,5-triazine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+O=C1COC(=O)CO1,diglycolic anhydride,other,False,0,False,0,0,1,llm,,,,False,False,False
+COCC(=O)C(C)(CO)COC,"1,1,3-trimethoxypropane",aldehyde,False,0,False,0,0,1,llm,,,,False,False,False
+c1ccc(Nc2ccc(Nc3ccccc3)cc2)cc1,"N1,N1'-(1,4-phenylene)bis(N1-(4-aminophenyl)phenyl-1,4-diamine)",amine,False,0,False,0,0,1,llm,,,,False,False,False
+C=Cc1ccc(C=O)cc1C=C,"2,5-divinylterephthalaldehyde",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+COc1cc(-c2cc(C(=O)NN)cc(-c3cccc(C(=O)NN)c3)c2)ccc1C(=O)NN,"1,3,5-tris(3'-methoxy-4'-hydrazinecarbonylphenyl)benzene",aldehyde-amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1cccc(Nc2ccc(-c3nc(-c4ccc(Nc5ccccc5)cc4)nc(-c4ccc(Nc5ccccc5)cc4)n3)cc2)c1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",amine,False,0,False,0,1,1,llm,,,,False,False,False
+O=C1C=CC(=O)C2=C1Cc1ccccc12,ace-naphthenequinone,other,False,0,False,0,0,1,llm,,,,False,False,False
+Clc1nc(Cl)nc(Cl)n1,"2,4,6-trichloro-1,3,5-triazine",other,False,0,False,0,0,4,llm,,,,False,False,False
+Nc1ccc(C2=NC(Nc3ccccc3)=C3C=CC(=N3)C(c3ccc(N)cc3)=C2c2ccc(N)cc2)cc1,"5,10,15,20-tetrakis(4-aminophenyl)-21H,23H-porphine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1ccc(C2=c3nc(-c4ccc(N)cc4)c4ccc(N)cc4c3=N2)cc1,4-aminophenyl锌卟啉 (ZnTPP-NH2),amine,False,0,False,0,3,1,llm,,,,False,True,True
+CNCCCN,N-propylethylenediamine,amine,False,0,False,0,1,1,llm,,,,False,False,False
+OB(O)c1ccc(C(c2ccc(B(O)O)cc2)(c2ccc(B(O)O)cc2)c2ccc(B(O)O)cc2)cc1,tetrakis(4-boronic acid phenyl)methane,other,False,0,False,0,0,1,llm,,,,False,False,False
+OB(O)c1ccc([Si](c2ccc(B(O)O)cc2)(c2ccc(B(O)O)cc2)c2ccc(B(O)O)cc2)cc1,tetrakis(4-boronic acid phenyl)silane,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1nc(N)nc(F)n1,"2,4-diamino-6-fluoro-s-triazine",amine,True,1,False,0,2,1,llm,,,,False,True,True
+CC(C)Nc1nc(N)nc(N)n1,"2,4-diamino-6-isopropyl-s-triazine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+CC(C)Nc1nc(N)nc(F)n1,4-isopropyl-2-amino-6-fluoro-s-triazine,amine,True,1,False,0,1,1,llm,,,,False,False,False
+NC1CCCC1[N]([Ni][c]1ccc(C=O)cc1O)c1ccc(C=O)cc1O,"(1R,2R)-N,N'-bis(3-formyl-4-hydroxybenzylidene)-1,2-diaminocyclohexane nickel(II)",aldehyde-amine,False,0,False,2,1,1,llm,,,,True,False,True
+CC(C)(C)OC(=O)Nc1ccc(O)c(C=O)c1,tert-butyl (3-formyl-4-hydroxyphenyl)carbamate,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+N=c1nc(N)nc(N)nc1N,melamine,amine,False,0,False,0,3,2,llm,,,,False,True,True
+O=Cc1ccccc1,benzaldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+C1=CCC(C(c2ccccc2)N(c2ccccc2)c2ccccc2)=C1,triphenylamine,amine,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccccc1,aniline,amine,False,0,False,0,1,4,llm,,,,False,False,False
+NNC(=O)N(N)C=O,oxalic dihydrazide,other,False,0,False,0,2,1,llm,,,,False,False,False
+Oc1ccc2c3ccc4c5ccc6c7c(O)c8c7c6c6c8c1c2c3c4c56,"2,3,10,11,18,19-hexahydroxy-hexabenzocoronene",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(-c2nc(-c3ccc(N)cc3)n(-c3ccc(N)cc3)n2)cc1,"4,4',4'-(1,3,5-triazine-2,4,6-triyl)trianiline",amine,False,0,False,0,3,1,llm,,,,False,True,True
+OB(O)c1ccc2sc(-c3ccc(O)cc3)nc2c1,"1,4-benzothiadiazole-2,5-diboronic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=C(c1ccccc1)c1ccccc1,benzophenone,other,False,0,False,0,0,1,llm,,,,False,False,False
+O=CC1=Cc2ccc(C=O)cc2SC1c1cc(C=O)c(C=O)cc1C=O,"4,4',4'',4'''-(thianthrene-2,3,7,8-tetrayl)tetrabenzaldehyde",aldehyde,False,0,False,5,0,1,llm,,,,True,False,True
+NCCCN,"1,3-diaminopropane",amine,False,0,False,0,2,1,llm,,,,False,True,True
+NCCCCN,"1,4-diaminobutane",amine,False,0,False,0,2,1,llm,,,,False,True,True
+NCCCCCN,"1,5-diaminopentane",amine,False,0,False,0,2,1,llm,,,,False,True,True
+NCCCCCCN,"1,6-diaminohexane",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1cc(F)ccc1F,"2,4-difluorobenzaldehyde",aldehyde,True,2,False,1,0,1,llm,,,,False,False,False
+O=Cc1cc(F)c(F)c(F)c1F,"2,3,4,5-tetrafluorobenzaldehyde",aldehyde,True,4,False,1,0,1,llm,,,,False,False,False
+OC1=C2C(=C(O)c3c(O)cccc32)c2cc(O)ccc21,"2,3,6,7,10,11-hexahydroxytriphenylene",other,False,0,False,0,0,1,llm,,,,False,False,False
+CC1(C)CB(OB2CC(C)(C)O2)O1,bis(pinacolato)diboron,other,False,0,False,0,0,1,llm,,,,False,False,False
+N#Cc1ccc(C#N)c(C#N)c1,"1,2,4,5-tetracyanobenzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(-c2ccc(O)c(N)c2)c(O)c1,"3,3'-dihydroxybenzidine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=C(O)c1ccc(-c2nc(-c3ccc(C(=O)O)cc3)nc(-c3ccc(C(=O)O)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)tribenzoic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1cncc(-c2cncc(N)c2)c1,"2,2'-bipyridine-5,5'-diamine",amine,False,0,False,0,2,2,llm,,,,False,True,True
+O=C1OC(=O)c2ccc(cc2)C(=O)O1,pyromellitic dianhydride,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc2[nH]c(N)nc2c1,"2,6-diaminobenzimidazole",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc2c(c1)Cc1ccc(N)cc1C2,"1,2,4,5,8,9-hexahydrotriphenylene-3,6,10-triamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccccc1[N+](=O)[O-],2-nitrobenzaldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Nc1ccccc1C=O,2-aminobenzaldehyde,aldehyde-amine,False,0,False,1,1,1,llm,,,,False,False,False
+O=Cc1ccccc1C(=O)O,2-formylbenzoic acid,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+O=Cc1ccc(C(=O)O)cc1,4-carboxybenzaldehyde,aldehyde,False,0,False,1,0,2,llm,,,,False,False,False
+O=Cc1ccc([N+](=O)[O-])cc1,4-nitrobenzaldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Nc1ccc(-c2ccc(-c3nc(-c4ccc(N)cc4)nc(-c4ccc(N)cc4)n3)cc2)cc1,"1,3,5-tris(4-aminophenyl)triazine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1ccccc1S,2-aminobenzenethiol,amine,False,0,False,0,1,2,llm,,,,False,False,False
+Nc1ccc(F)cc1N,"2,5-difluoro-1,4-benzenediamine",amine,True,1,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc(C(=O)c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1,"1,3,5-tris(4-formylphenyl)triazine",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+O=Cc1ccc(F)cc1C=O,"2,5-difluorobenzene-1,4-dicarboxaldehyde",aldehyde,True,1,False,2,0,1,llm,,,,True,False,True
+O=Cc1cc(C=O)c(C(=O)C(F)(F)F)cc1C=O,"2,2,2-trifluoro-1-(2,4,6-triformylphenyl)ethanone",aldehyde,True,3,True,3,0,1,llm,,,,True,False,True
+Nc1ccc(-c2cccc(-c3nc(-c4ccc(N)cc4)nc(-c4ccc(N)cc4)n3)c2)cc1,"1,3,5-tris(4-aminophenyl)triazine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+CC[N+]1=C(c2c3cccc2[N+](CC)=C(c2ccccc2)c2ccccc2-3)CC(C(=N)N)=C1,Ethidium bromide,other,False,0,False,0,1,1,llm,,,,False,False,False
+O=Cc1ccc(Br)cc1C=O,"2,5-bis(4-bromobutoxy)terephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+N#CCc1ccc(C#N)cc1,"2,2'-(1,4-phenylene)diacetonitrile",other,False,0,False,0,0,1,llm,,,,False,False,False
+N#CCc1ccc(-c2ccc(C#N)cc2)cc1,"2,2'-(biphenyl-4,4'-diyl)diacetonitrile",other,False,0,False,0,0,1,llm,,,,False,False,False
+COc1cc(N)c(N)cc1OC,"2,5-dimethoxy-1,4-phenylenediamine",other,False,0,False,0,2,1,llm,,,,False,False,False
+O=Cc1ccc(OP(=O)(Oc2ccc(C=O)cc2)Oc2ccc(C=O)cc2)cc1,tris(4-formylphenyl) phosphate,aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1cccc(N)n1,"2,6-diaminopyridine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1c(F)ccc(F)c1C=O,"2,3,5,6-tetrafluoroterephthalaldehyde",aldehyde,True,2,False,2,0,1,llm,,,,True,False,True
+Cl.N=C(N)NN,aminoguanidine hydrochloride,amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(-c2ccc(-c3cc(-c4ccc(N)cc4)cc(-c4ccc(N)cc4)c3)cc2)cc1,"1,1',1''-(benzene-1,3,5-triyl)tri(4-aminobenzene)",amine,False,0,False,0,3,1,llm,,,,False,True,True
+OCc1c(F)c(F)c(CO)c(F)c1F,"2,3,5,6-tetrafluoro-1,4-benzenedimethanol",other,True,4,False,0,0,1,llm,,,,False,False,False
+Nc1cc(N)c2c(c1)-c1ccccc1C2,"2,7-diaminofluorene",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc(C=O)c(OCCc2ccc(C(=O)O)cc2)c1OCCC(=O)O,"4,4'-((2,5-diformyl-1,4-phenylene)bis(oxy))dibutanoic acid",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(O)c2c1C(=O)c1c(ccc(O)c1N)C2=O,"2,6-diaminoanthraquinone",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(-c2ncnc(-c3ccc(N)cc3)n2)cc1,"4,4′,4″-(1,3,5-triazine-2,4,6-triyl)trianiline",other,False,0,False,0,2,3,llm,,,,False,False,False
+Nc1ccc(-c2ncc(-c3nc(-c4ccc(N)cc4)nc(-c4ccc(N)cc4)c3-c3ccc(N)cc3)c(-c3ccc(N)cc3)n2)cc1,"2,4,6-tris(4-aminophenyl)-1,3,5-triazine",amine,False,0,False,0,5,1,llm,,,,False,True,True
+Nc1ccc(S(=O)(=O)O)nc1,"2,5-diaminobenzene-1,4-disulfonic acid",amine,False,0,False,0,1,1,llm,,,,False,False,False
+O=Cc1ccc2c(c1)C=CC(=O)C2=O,"2,5-divinylterephthalaldehyde",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Nc1ccc(N)c(O)c1,"2,5-diaminophenol",amine,False,0,False,0,2,1,llm,,,,False,True,True
+N#CC1=C2C(c3ccccc3)=NSC(c3ccccc3)=C2SN=C1c1ccccc1,"2,6-dicyano-1,3,5,7-tetraphenylbenzo[1,2-d:4,5-d']bis(thiazole)",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1cc(F)c(F)c(=O)c(F)c1F,"2,3,5,6-tetrafluoro-1,4-benzenedicarboxaldehyde",aldehyde,True,4,False,1,0,1,llm,,,,False,False,False
+COc1c(C=O)cc(C=O)cc1C=O,"2,4,6-trimethoxy-1,3,5-benzenetricarboxaldehyde",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1c(F)cccc1-c1ncnc(-c2cccc(F)c2N)n1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",amine,True,2,False,0,2,1,llm,,,,False,True,True
+O=c1oc(=O)c2ccccc2o1,pyromellitic anhydride,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc2nsnc2c1,"4,7-diamino-2,1,3-benzothiadiazole (BT-H)",aldehyde-amine,False,0,False,0,1,1,llm,,,,False,False,False
+Nc1c(F)ccc2nsnc12,"4,7-diamino-5-fluoro-2,1,3-benzothiadiazole (BT-F)",aldehyde-amine,True,1,False,0,1,1,llm,,,,False,False,False
+Nc1c(Cl)ccc2nsnc12,"4,7-diamino-5-chloro-2,1,3-benzothiadiazole (BT-Cl)",aldehyde-amine,False,0,False,0,1,1,llm,,,,False,False,False
+Cc1ccc(OCC#Cc2c(O)cccc2C=O)cc1,3-(3-(p-tolyl)prop-2-ynoxy)-2-hydroxybenzaldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+O=Cc1c(O)cccc1OCC#Cc1ccccc1,3-(3-phenylprop-2-ynoxy)-2-hydroxybenzaldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+c1ccc(C2CO2)cc1,styrene oxide,other,False,0,False,0,0,1,llm,,,,False,False,False
+O=CC1=C(C=O)c2c3c(ccc2=C1C=O)=C(C=O)C=C3,pyrene-based aldehyde monomer,aldehyde,False,0,False,4,0,1,llm,,,,True,False,True
+O=Cc1ccc2ccccc2c1,naphthalene-based monomer,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Nc1ccc([N+](=O)[O-])cc1,PaNO₂,amine,False,0,False,0,1,1,llm,,,,False,False,False
+O=[N+]([O-])c1ccc([N+](=O)[O-])cc1,BD(NO₂)₂,amine,False,0,False,0,0,1,llm,,,,False,False,False
+N#Cc1ccc(N=Nc2ccc(N)cc2)cc1,Azo,other,False,0,False,0,1,1,llm,,,,False,False,False
+Nc1ccc(C2=CC=CC=c3ccc4c(c32)C(c2ccc(N)cc2)=CC=c2ccc3ccccc3c2=4)cc1,"4,4',4'',4'''-(pyrene-1,3,6,8-tetrayl)tetraaniline",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(-c2nc(N)c(-c3cccc(N)c3)c(-c3ccc(N)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",amine,False,0,False,0,4,1,llm,,,,False,True,True
+O=CC1=C(C(=O)C2C=CS2)S1,"5,5'-bithiene-2,2'-dicarbaldehyde",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3cccc(N)c3)n2)cc1,"2,4,6-tris(4-aminophenyl)-1,3,5-triazine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1ccc(-c2ccc(-c3ccc(N)cc3)nc2)cc1,"2,4,6-tris(4-aminophenyl)pyridine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+[N-]=[N+]=NCCOCCOCC=O,2-(2-azidoethoxy)ethoxyacetaldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+CCCCOc1ccc(C=O)c(OCCCC)c1C=O,"2,5-dibutoxyterephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(Nc2nc(Nc3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",amine,False,0,False,0,3,1,llm,,,,False,True,True
+CCOc1cc(NC(=O)C(=O)NN)ccc1OC(=O)C(=O)NN,"2,5-diethoxyterephthalohydrazide",other,False,0,False,0,2,1,llm,,,,False,False,False
+Ic1ccc(-c2ccc(-c3ccc(I)cc3)c(-c3ccc(I)cc3)c2)cc1,"1,3,5-tris(4-iodophenyl)benzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(-c2ccccc2)c(N)c1,"3,3'-dihydroxybenzidine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc2ccccc2c1N,"1,5-diaminonaphthalene",amine,False,0,False,0,2,2,llm,,,,False,True,True
+Cc1nc(C)c(C)c(C)n1,"2,4,6-三甲基-1,3,5-三嗪 (TMT)",other,False,0,False,0,0,1,llm,,,,False,False,False
+C=O,formaldehyde (from paraformaldehyde),aldehyde,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccnc(-c2c(-c3ccncc3)ccnc2-c2cccnc2)c1,"1,3,5-tris(4-aminopyridyl)pyridine",amine,False,0,False,0,1,1,llm,,,,False,False,False
+NCc1ccc(N)cn1,"2,5-diaminopyridine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1cccc(-c2ccccc2)c1,"1,3,5-benzenetricarboxaldehyde",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+NC(=S)Nc1ccc(C(N)=S)cc1,"1,4-phenylenebis(thiourea)",amine,False,0,False,0,2,1,llm,,,,False,True,True
+c1ccc(Nc2nc(Nc3ccccn3)nc(Nc3ccccn3)n2)nc1,"2,4,6-tris(pyridin-2-amino)-1,3,5-triazine",amine,False,0,False,0,0,1,llm,,,,False,False,False
+c1ccc(Nc2cc(Nc3ccccn3)cc(Nc3ccccn3)c2)nc1,"1,3,5-tris(pyridin-2-amino)benzene",amine,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(F)cc1,4-fluoroaniline,amine,True,1,False,0,1,1,llm,,,,False,False,False
+Nc1ccc(O)cc1,4-aminophenol,amine,False,0,False,0,1,2,llm,,,,False,False,False
+O=Cc1ccc(B(O)O)cc1,4-(dihydroxyboryl)benzaldehyde,aldehyde,False,0,False,1,0,4,llm,,,,False,False,False
+COc1cc(C=O)c(OC)cc1C=O,"2,5-dimethoxybenzene-1,4-dicarboxaldehyde",aldehyde,False,0,False,2,0,22,llm,,,,True,False,True
+O=Cc1ccc2ccc3cccc4ccc1c2c34,pyrene-1-carbaldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Nc1ccc2c(c1)C1c3ccc(N)cc3C2c2cc(N)ccc21,triaminotriptycene,amine,False,0,False,0,3,2,llm,,,,False,True,True
+O=C(O)c1ccc2nc(C(=O)O)sc2c1,"1,4-benzothiazole-2,5-dicarboxylic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+NNc1ncnc(NN)n1,"2,4,6-trihydrazinyl-1,3,5-triazine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(C(c2ccc(N)cc2)C(c2ccc(N)cc2)c2ccc(N)cc2)cc1,"1,1,2,2-tetrakis(4-aminophenyl)ethane",amine,False,0,False,0,4,2,llm,,,,False,True,True
+Nc1cc(N)cc(S(=O)(=O)O)c1,"2,5-diaminobenzene-sulfonic acid",amine,False,0,False,0,2,6,llm,,,,False,True,True
+Nc1cc(S(=O)(=O)O)ccc1-c1ccc(N)c(S(=O)(=O)O)c1,"4,4'-diamino-[1,1'-biphenyl]-3,3'-disulfonic acid",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc2c(ccc3cc(N)ccc32)c1,"pyrene-1,6-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc(O)c(O)c1,protocatechuic aldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Oc1cccc(O)c1,"1,3-benzenediol",other,False,0,False,0,0,2,llm,,,,False,False,False
+O=Cc1ccc(-c2ccc3c(-c4ccc(C=O)cc4)cc(-c4ccc(C=O)cc4)cc3c2)cc1,"4,4',4'',4'''-(naphthalene-1,3,5,7-tetrayl)tetrabenzaldehyde",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1ccc(C(=O)O)cc1,4-aminobenzoic acid,amine,False,0,False,0,1,1,llm,,,,False,False,False
+NN=C(N)N,triaminoguanidine,amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1ccc(-c2cc3cc(-c4ccc(N)cc4)c(-c4ccc(N)cc4)cc3cc2-c2ccc(N)cc2)cc1,"1,3,6,8-tetra(4-aminophenyl)pyrene",amine,False,0,False,0,4,1,llm,,,,False,True,True
+O=Cc1ccc(-c2c(F)c(F)c(F)c(F)c2-c2c(F)c(F)c(F)c(F)c2-c2ccc(C=O)cc2)cc1,"4,4'-(octafluorobiphenyl-4,4'-diyl)dibenzaldehyde",aldehyde,True,8,False,2,0,1,llm,,,,True,False,True
+CC(C)(C)OC(=O)Nc1ccc(N)cc1,4-(tert-butoxycarbonylamino)-aniline,amine,False,0,False,0,1,3,llm,,,,False,False,False
+O=Cc1cccc(C=O)n1,"2,6-pyridinedicarboxaldehyde",aldehyde,False,0,False,2,0,2,llm,,,,True,False,True
+Nc1ccc(/C=C(\c2ccc(N)cc2)c2ccc(N)cc2-c2ccc(N)cc2)cc1,"4,4′,4″,4‴-(ethene-1,1,2,2-tetrayl)tetraaniline",amine,False,0,False,0,4,1,llm,,,,False,True,True
+Brc1ccc(Br)cc1,"1,4-dibromobenzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+NNC(=O)c1ccc(C(=O)NN)cc1,terephthalohydrazide,amine,False,0,False,0,2,3,llm,,,,False,True,True
+N#Cc1cc(C#N)cc(C#N)c1,"1,3,5-tricyanobenzene",other,False,0,False,0,0,2,llm,,,,False,False,False
+Nc1c(F)c(F)c(F)c(F)c1F,pentafluoroaniline,amine,True,5,False,0,1,1,llm,,,,False,False,False
+O=Cc1ccnc(-c2ccnc(C=O)c2)c1,"[2,2'-bipyridine]-5,5'-dicarbaldehyde",aldehyde,False,0,False,2,0,3,llm,,,,True,False,True
+O=Cc1ccc(Oc2nc(Oc3ccc(C=O)cc3)nc(Oc3ccc(C=O)cc3)n2)cc1,"2,4,6-tris(4-formylphenoxy)-1,3,5-triazine",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1ccc2c(c1)Cc1cc(N)ccc1-2,"2,7-diaminofluorene",amine,False,0,False,0,2,1,llm,,,,False,True,True
+c1cncc(-c2cc3cc(-c4ccncc4)cc(-c4ccncc4)c3cc2-c2ccncc2)c1,"1,3,6,8-tetra(4-pyridyl)pyrene",other,False,0,False,0,0,1,llm,,,,False,False,False
+COc1cc(C=O)cc(-c2ccc(C=O)cc2OC)c1,"3,3′-Dimethoxy-[1,1′-biphenyl]-4,4′-dicarbaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(-c2cc(-c3ccc(N)cc3)c3cc(-c4ccc(N)cc4)c(-c4ccc(N)cc4)cc3c2)cc1,"4,4′,4′′,4′′′-(pyrene-1,3,6,8-tetrayl) tetraaniline",amine,False,0,False,0,4,1,llm,,,,False,True,True
+Nc1ccc(-c2cc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1,"1,3,5-tris-(4-amidophenyl)triazine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1cc(O)ccc1-c1cc(O)ccc1N,"3,3'-二羟基联苯胺",amine,False,0,False,0,2,1,llm,,,,False,True,True
+c1ccc(-c2ccc(-c3ccccc3)cc2)cc1,对三联苯,other,False,0,False,0,0,1,llm,,,,False,False,False
+O=C1CCC(=O)O1,琥珀酸酐,other,False,0,False,0,0,1,llm,,,,False,False,False
+CC(=O)CC(=O)C(F)(F)F,trifluoroacetylacetone,other,True,3,True,0,0,1,llm,,,,False,False,False
+N#CC(C#N)=C(C#N)C#N,tetracyanoethylene,other,False,0,False,0,0,2,llm,,,,False,False,False
+Cc1cc(N)cc(C)c1N,"2,5-dimethyl-1,4-phenylenediamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+C#Cc1ccc(F)cc1,1-ethynyl-4-fluorobenzene,other,True,1,False,0,0,1,llm,,,,False,False,False
+C#Cc1cc(F)cc(F)c1,"1-ethynyl-3,5-difluorobenzene",other,True,2,False,0,0,1,llm,,,,False,False,False
+Nc1cc(C(=O)O)c(N)cc1C(=O)O,"2,5-diaminoterephthalic acid",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc(N=C2C(=O)C(=O)C2=Nc2ccc(C=O)cc2)cc1,squaraine,aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1ccc(-c2ncnc(-c3ccc(C=O)cc3)n2)cc1,"1,3,5-tris(4-formylphenyl)triazine",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+C=Cc1cc(C=O)cc(C=O)c1C=C,"2,5-divinylterephthalaldehyde",aldehyde,False,0,False,2,0,3,llm,,,,True,False,True
+CC=O,acetaldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+N#CCc1ccc(CC#N)cc1,"2,2′-(1,4-phenylene)diacetonitrile",other,False,0,False,0,0,3,llm,,,,False,False,False
+Nc1ccc(-c2ccc(N)c(S(=O)(=O)O)c2)c(S(=O)(=O)O)c1,"4,4'-diamino-3,3'-biphenyldisulfonic acid",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc2c(c1)C(=O)c1ccc(N)cc1C2=O,"2,6-diaminoanthraquinone",amine,False,0,False,0,2,2,llm,,,,False,True,True
+O=Cc1ccccc1B(O)O,2-formylphenylboronic acid,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+O=C1C=CC(=O)C=C1,benzoquinone,other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1nc(C=O)nc(C=O)n1,"1,3,5-triazine-2,4,6-tricarbaldehyde",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1ccc(N(c2ccc(N)cc2)c2ccc(N(c3ccc(N)cc3)c3ccc(N)cc3)cc2)cc1,"N,N,N′,N′-tetrakis(4-aminophenyl)-1,4-phenylenediamine",amine,False,0,False,0,4,2,llm,,,,False,True,True
+Nc1ccc(-c2cc(-c3ccc(N)cc3)c(-c3ccc(N)cc3)cc2/C=C/c2ccc(-c3ccc(N)cc3)c(-c3ccc(N)cc3)c2)cc1,"(E)-3,3',5,5'-tetrakis(4-aminophenyl)stilbene",amine,False,0,False,0,5,1,llm,,,,False,True,True
+COc1ccc(C=O)c(OC)c1C=O,"3,5-dimethoxyterephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(-c2cc3cc4nc(-c5ccc(N)cc5)cc-4c(-c4ccc(N)cc4)c(-c4ccc(N)cc4)cc-3n2)cc1.[Ni],"5,10,15,20-tetrakis(4-aminophenyl)nickel porphyrin",amine,False,0,False,0,4,1,llm,,,,False,True,True
+CCOc1cc(C(=O)NN)cc(OCC)c1C(=O)NN,"2,5-diethoxyterephthalohydrazide",amine,False,0,False,0,2,1,llm,,,,False,True,True
+CC1(C)C2CCC1(C(=O)O)C(C(=O)O)C2,camphoric acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+O=C(O)[C@@H](O)[C@@H](O)C(=O)O,tartaric acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+Oc1ccc2ccccc2c1-c1c(O)ccc2ccccc12,"1,1'-bi-2-naphthol",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1ccccc1/N=C/C/N=C/c1ccccc1O,"N,N'-bis(salicylidene)ethylenediamine",other,False,0,False,1,0,1,llm,,,,False,False,False
+Nc1cc(S(=O)(=O)O)cc(N)c1S(=O)(=O)O,"2,5-diaminobenzene-1,4-disulfonic acid",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=[N+]([O-])c1ccc([N+](=O)[O-])c(-[n+]2ccc(-c3ccc(-c4cccc(-c5cc[n+](-c6cc([N+](=O)[O-])ccc6[N+](=O)[O-])cc5)c4)cc3)cc2)c1.[Cl-].[Cl-],"4,4'-(1,4-phenylene)bis(1-(2,4-dinitrophenyl)pyridinium) dichloride",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=[N+]([O-])c1ccc(C(=C(c2ccc([N+](=O)[O-])cc2)c2ccc([N+](=O)[O-])cc2)c2ccc([N+](=O)[O-])cc2)cc1,"1,1,2,2-Tetrakis(4-nitrophenyl)ethene",other,False,0,False,0,0,2,llm,,,,False,False,False
+CC(=O)O[C@@H]1C(=O)OC(=O)[C@H]1OC(C)=O,(+)-diacetyl-L-tartaric anhydride,other,False,0,False,0,0,1,llm,,,,False,False,False
+Cc1cc(N)c(C)cc1N,"2,5-dimethyl-1,4-phenylenediamine",amine,False,0,False,0,2,2,llm,,,,False,True,True
+Nc1ccc(-c2ccc(N)c(N)c2)cc1,"3,3′-diaminobenzidine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+ClP1(Cl)=NP(Cl)(Cl)=NP(Cl)(Cl)=N1,hexachlorocyclotriphosphazene,other,False,0,False,0,0,1,llm,,,,False,False,False
+N#Cc1ccc(C(=O)Cl)cc1,4-cyanobenzoyl chloride,other,False,0,False,0,0,1,llm,,,,False,False,False
+Cc1cc(C#N)c(O)nc1C,"3-cyano-4,6-dimethyl-2-hydroxypyridine",other,False,0,False,0,0,1,llm,,,,False,False,False
+OC1=C(O)c2cc3c(cc2=C1)C(O)=C(O)C=3O,"2,3,6,7,10,11-hexahydroxytriphenylene",other,False,0,False,0,0,1,llm,,,,False,False,False
+OBc1ccc(B(O)O)cc1,"1,4-phenylenebis(boronic acid)",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1ccc(-c2ccc3nc4ccc(-c5ccc(C=O)cc5)cc4cc3c2)cc1,TAPPy-PDA,aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1cccc(-c2cccc(N)c2)c1,"3,3′-diaminobenzidine",amine,False,0,False,0,2,2,llm,,,,False,True,True
+c1ccc(-c2ccccn2)nc1,"2,2'-bipyridine",other,False,0,False,0,0,1,llm,,,,False,False,False
+c1cnc(-c2ccncn2)nc1,"2,2'-bipyrimidine",other,False,0,False,0,0,1,llm,,,,False,False,False
+c1cnc(-c2cnccn2)nc1,"2,2'-bipyrazine",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1ccc(C(c2ccc(C=O)cc2)(c2ccc(C=O)cc2)c2ccc(C=O)cc2)cc1,tetrakis(4-formylphenyl)methane,aldehyde,False,0,False,4,0,1,llm,,,,True,False,True
+O=C(Cl)c1ccc(C(=O)Cl)cc1,terephthaloyl chloride,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(-c2nc3ccccc3nc2-c2cc(N)ccc2-c2nc3ccccc3nc2-c2cc(N)ccc2-c2nc3ccccc3nc2-c2ccc(N)cc2)cc1,"5,10,15,20-tetrakis(4-aminophenyl)-21H,23H-porphyrin",amine,False,0,False,0,4,1,llm,,,,False,True,True
+O=Cc1ccc(C=O)c(O)c1O,"2,3-dihydroxyterephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1ccc(-c2ccc(C=O)nc2)nc1,"2,2'-bipyridine-5,5'-dicarbaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+OB(O)C1=Cc2c(sc3c4c(sc23)=C(B(O)O)C=C4)=C1,"benzo[1,2-b:4,5-b']dithiophene-2,6-diyldiboronic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+OC1=C(O)c2cc3c(cc2=C1O)C(O)=C(O)C=3O,"2,3,6,7,10,11-hexahydroxytriphenylene",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1cc2sc(C=O)cc2s1,"thieno[3,2-b]thiophene-2,5-dicarbaldehyde",aldehyde,False,0,False,2,0,2,llm,,,,True,False,True
+Cn1c(-c2ccc(C=O)cc2)nc2ccc(-c3ccc(C=O)cc3)cc21,"4,4′-(1-methyl-1H-benzo[d]imidazole-4,7-diyl)dibenzaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+N#Cc1cc(F)c(F)c(F)c1F,"2,3,5,6-tetrafluorobenzonitrile",other,True,4,False,0,0,1,llm,,,,False,False,False
+N#Cc1cc(F)c(I)c(F)c1F,"2,3,5,6-tetrafluoro-4-iodobenzonitrile",other,True,3,False,0,0,1,llm,,,,False,False,False
+C[C@@H]1CNCCN1,S-(+)-2-methylpiperazine,amine,False,0,False,0,0,1,llm,,,,False,False,False
+CCOc1cc(N)c(OCC)cc1N,"2,5-diethoxy-1,4-phenylenediamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1cc2c3cc(cc(N)c3c1)C(=O)NC(=O)NC2=O,"2,6-diaminonaphthalene-1,4,5,8-tetracarboxylic diimide",amine,False,0,False,0,2,1,llm,,,,False,True,True
+NC1=Cc2nc3c(nc2=C1N)C(N)=C(N)C=3,"2,3,7,8-phenazinetetramine",amine,False,0,False,0,4,1,llm,,,,False,True,True
+NNC(=O)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(=O)NN,"perfluorohexane-1,6-dicarbohydrazide",amine,True,12,False,0,2,1,llm,,,,False,True,True
+O=Cc1cc2c(cc1C=O)Sc1ccccc1N2,"phenothiazine-3,7-dicarbaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Brc1c2ccccc2c(Br)c2ccccc12,"9,10-dibromoanthracene",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1ccc(-c2cc(-c3ccc(C=O)cc3)c3cc(-c4ccc(C=O)cc4)ccc3c2)cc1,"4,4',4'',4'''-(pyrene-1,3,6,8-tetrayl)tetrabenzaldehyde",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+N#Cc1ccc(O[PH]2=N[PH](Oc3ccc(C#N)cc3)=NP(Oc3ccc(C#N)cc3)(Oc3ccc(C#N)cc3)=N2)cc1,hexakis(4-cyanophenoxy)cyclotriphosphazene,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1cc2c(cc1N)C(=O)c1ccccc1C2=O,"2,7-diaminophenanthrenequinone",amine,False,0,False,0,2,2,llm,,,,False,True,True
+Nc1cc2c(cc1N)C(=O)c1ccccc1C2,"2,7-diamino-9H-fluorenone",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1cc2cc3ccccc3cc2cc1N,"2,6-diaminoanthracene",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=CC1=C2SC3=Cc4sc2c(C=O)c4SC3=C1,Benzotrithiophene tricarbaldehyde,aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc2nc(N)sc2c1,Benzothiadiazole diamine,amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=C(O)c1ccc(C(=O)O)cc1,terephthalic acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(-c2cc3cc(-c4ccc(N)cc4)cc4c(cc(-c5ccc(N)cc5)c5ccc(-c6ccc(N)cc6)cc54)c-3c2)cc1,"1,3,6,8-tetrakis(4-aminophenyl)pyrene",amine,False,0,False,0,4,1,llm,,,,False,True,True
+Nc1cc(Cl)cc(N)c1Cl,"2,5-dichlorobenzene-1,4-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+C1CNCCN1,piperazine,amine,False,0,False,0,0,1,llm,,,,False,False,False
+O=CC1=CC(C=O)=C1C=O,"1,3,5-benzenetricarbaldehyde",aldehyde,False,0,False,3,0,2,llm,,,,True,False,True
+NNC(=O)C(=O)NN,oxalyl dihydrazide,amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1cc(Br)c(C=O)cc1Br,"2,5-dibromoterephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)c(-c3ccc(C=O)cc3)nc2-c2ccc(C=O)cc2)cc1,"2,3,5,6-tetrakis(4-formylphenyl)pyrazine",aldehyde,False,0,False,4,0,1,llm,,,,True,False,True
+COc1cc(-c2ccc(N)cc2OC)ccc1N,"3,3'-dimethoxybenzidine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(-c2cc(-c3ccc(N)cc3)c3cc(-c4ccc(N)cc4)c4cc(-c5ccc(N)cc5)c(-c5ccc(N)cc5)cc4c3c2)cc1,"4,4',4'',4'''-(pyrene-1,3,6,8-tetrayl)tetraaniline",amine,False,0,False,0,5,2,llm,,,,False,True,True
+O=Cc1ccc(-c2ccc3c(ccc4cc(-c5ccc(C=O)cc5)c(-c5ccc(C=O)cc5)cc43)c2)cc1,"1,3,6,8-tetrakis(4-formylphenyl)pyrene",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+O=C(O)c1cccc(-c2cccc(C(=O)O)n2)n1,"2,2'-bipyridine-6,6'-dicarboxylic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+OB(O)c1ccc(-c2ccc(B(O)O)cc2)cc1,"4,4'-biphenyldiboronic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1ccc(-c2ccc3c(-c4ccc(C=O)cc4)cc4c(=O)[nH]c(=O)[nH]c(=O)c4c3c2)cc1,"3,7-di(4-formylphenyl)naphthalenediimide",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(Oc2nc(Oc3ccc(N)cc3)nc(Oc3ccc(N)cc3)n2)cc1,"2,4,6-tris(4-aminophenoxy)-1,3,5-triazine",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1ccc(-c2ccc3c(-c4ccc(N)cc4)c4c(-c5ccc(N)cc5)c(-c5ccc(N)cc5)ccc4cc3c2)cc1,"1,3,6,8-tetrakis(p-aminophenyl) pyrene",amine,False,0,False,0,4,1,llm,,,,False,True,True
+Fc1ccc(F)cc1,difluorobenzene,other,True,2,False,0,0,1,llm,,,,False,False,False
+Fc1ccc2ccccc2c1F,difluoronaphthalene,other,True,2,False,0,0,1,llm,,,,False,False,False
+Fc1c2ccccc2c(F)c2ccccc12,difluoroanthracene,other,True,2,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(-c2c3ccccc3c(-c3ccc(N)cc3)c3ccccc23)cc1,"9,10-bis(4-aminophenyl)anthracene",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=c1oc(=O)c2ccc3c(=O)oc(=O)c3c2c1=O,"naphthalene-1,4,5,8-tetracarboxylic dianhydride",other,False,0,False,0,0,2,llm,,,,False,False,False
+c1ccc(N(c2ccccc2)c2ccc(N(c3ccccc3)c3ccccc3)cc2)cc1,W-NH2,amine,False,0,False,0,0,1,llm,,,,False,False,False
+C#Cc1ccccc1,phenylacetylene,other,False,0,False,0,0,1,llm,,,,False,False,False
+C#Cc1ccc(C(=O)OC)cc1,methyl 4-ethynylbenzoate,other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1sc2ccsc2c1C=O,"thieno[3,2-b]thiophene-2,5-dicarbaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(-c2nc(-c3ccc(N)cc3)c(-c3ccc(N)cc3)[nH]2)cc1,"5,10,15,20-Tetrakis(4-aminophenyl)porphyrin",amine,False,0,False,0,3,1,llm,,,,False,True,True
+O=C1c2cc(Br)ccc2-c2cc(Br)ccc21,"3,6-dibromophenanthrene-9,10-dione",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1c(N)c2ccc(Br)cc2c2ccc(Br)cc12,"3,6-dibromophenanthrene-9,10-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+N#CCc1cc(CC#N)cc(CC#N)c1,"2,2',2''-(benzene-1,3,5-triyl)triacetonitrile",other,False,0,False,0,0,1,llm,,,,False,False,False
+NC1=CC=C(c2ccc(N)cc2)C(c2ccc(N)cc2)(c2ccc(N)cc2)C1,tetrakis(4-aminophenyl)methane,amine,False,0,False,0,4,1,llm,,,,False,True,True
+CCOc1cc(C(=O)NN)c(OCC)cc1C(=O)NN,"2,5-diethoxyterephthalohydrazide",amine,False,0,False,0,2,1,llm,,,,False,True,True
+C#Cc1c(Cl)c(Cl)c(Cl)c(Cl)c1[C](c1cc(Cl)c(Cl)c(Cl)c1Cl)c1cc(Cl)c(Cl)c(Cl)c1Cl,PTMacetylenic,other,False,0,False,0,0,1,llm,,,,False,False,False
+N=C(N)N(N)N,triaminoguanidine,amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1ccnc(N)c1,"pyridine-2,5-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Cc1nc(C)c(C#N)c(C)c1C#N,"2,4,6-trimethylpyridine-3,5-dicarbonitrile",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1ccc(C#Cc2ccc(C=O)cc2)cc1,4-(2-(4-formylphenyl)ethynyl)benzaldehyde,aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1ccc(C#Cc2cc(C#Cc3ccc(C=O)cc3)cc(C#Cc3ccc(C=O)cc3)c2)cc1,"4,4',4''-(benzene-1,3,5-triyltris(ethyne-2,1-diyl))tribenzaldehyde",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+O=C1OC(=O)c2c1ccc1c(=O)oc(=O)oc(=O)c21,"1,4,5,8-Naphthalenetetracarboxylic dianhydride",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1cc(O)c(N)c(O)c1,"1,4-dihydroxybenzidine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(-c2ccc(N)cc2S(=O)(=O)O)c(S(=O)(=O)O)c1,"4,4'-diaminobiphenyl-3,3'-disulfonic acid",amine,False,0,False,0,2,1,llm,,,,False,True,True
+c1cc2ccc3cccc4ccc5ccc6ccc(c1)c1c2c3c4c5c61,decacyclene,other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Nc1ccc(N=O)cc1,"1,4-dinitrosobenzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+N#Cc1cc(-c2ccc(N)cc2C#N)ccc1N,"4,4'-diamino-[1,1'-biphenyl]-3,3'-dicarbonitrile",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(C2=NC3=NC=NC3=N2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",amine,False,0,False,0,1,1,llm,,,,False,False,False
+CC[n+]1c(-c2ccccc2)c2cc(N)ccc2c2ccc(N)cc21.[Br-],ethidium bromide,amine,False,0,False,0,2,1,llm,,,,False,True,True
+C=Cc1cc(C=O)c(C=C)cc1C=O,"2,5-divinylterephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(P(=O)(O)O)cc1,4-aminophenylphosphonic acid,amine,False,0,False,0,1,1,llm,,,,False,False,False
+Oc1cc(O)c2ccc3cc(O)c(O)cc3c2c1,"2,3,6,7-tetrahydroxyanthracene",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1ccc(-c2cc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)c2)cc1,"1,3,5-tris(4-formylphenyl)pyridine",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1ccc(N)c(C(=O)O)c1,"2,5-diaminobenzoic acid",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc(C2c3ccc(C=O)cc3-c3ccc(C=O)cc32)cc1,triptycene tricarbaldehyde,aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+OB(O)c1cc(B(O)O)cc(B(O)O)c1,"1,3,5-benzenetriboronic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1c(N)c(N)c(N)c(N)c1N,hexaaminophenylbenzene,amine,False,0,False,0,6,1,llm,,,,False,True,True
+O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)c3nc(-c4ccc(C=O)cc4)c(-c4ccc(C=O)cc4)nc3n2)cc1,"4,4',4'',4'''-(1,4-phenylenebis(azanetriyl))tetrabenzaldehyde",aldehyde,False,0,False,4,0,1,llm,,,,True,False,True
+O=Cc1ccc(-c2c(F)c(F)c(F)c(F)c2-c2ccc(C=O)cc2)cc1,"2',3',5',6'-tetrafluoro-[1,1':4',1''-terphenyl]-4,4''-dicarbaldehyde",aldehyde,True,4,False,2,0,1,llm,,,,True,False,True
+Cn1c(-c2ccccc2)nc2cc(Cc3ccc(C=O)cc3)c(Cc3ccc(C=O)cc3)cc21,"5,6-bis(4-formylbenzyl)-1-methyl-1H-benzoimidazole",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+BrCc1cc(CBr)cc(CBr)c1,"1,3,5-tris(bromomethyl)benzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+CCOc1cc(C=O)c(O)cc1C=O,2-butoxy-5-hydroxyterephthalaldehyde,aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+NCCNCCNCCN,triethylenetetramine,amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1cc(OCc2ccccc2)c(C=O)cc1O,2-(benzyloxy)-5-hydroxyterephthalaldehyde,aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1cc(OCc2ccc3ccccc3c2)c(C=O)cc1O,2-(naphthalen-2-ylmethoxy)-5-hydroxyterephthalaldehyde,aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1ccc(C=C(c2ccc(C=O)cc2)c2ccc(C=O)cc2)cc1,"4,4',4''-(ethene-1,1,2-triyl)tribenzaldehyde",aldehyde,False,0,False,3,0,3,llm,,,,True,False,True
+COc1c(C=O)ccc(C=O)c1OC,"2,3-dimethoxyterephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=P(O)(O)c1ccccc1,phenylphosphonic acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+COc1cc(C=O)cc(OC)c1C=O,"2,5-dimethoxyterephthalaldehyde",aldehyde,False,0,False,2,0,2,llm,,,,True,False,True
+O=c1[nH]c2ccc3c(=O)[nH]c(=O)c4ccc5c6ccc7c8ccc9c(=O)[nH]c3c4c5c6c7c8c9ccc12,"perylene-3,4,9,10-tetracarboxylic diimide",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1c(F)c(F)c(N)c(F)c1F,"2,3,5,6-tetrafluoro-1,4-phenylenediamine",amine,True,4,False,0,2,1,llm,,,,False,True,True
+Nc1cc2nc3ccccc3c(N)c2cc1-c1ccccc1,"3,8-diamino-6-phenylphenanthridine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+NNC(=O)C(O)C(O)C(=O)NN,L-tartaric acid dihydrazide,amine,False,0,False,0,2,1,llm,,,,False,True,True
+NC1CC2CC(N)C(C1)C2N,"1,3,5,7-tetraaminoadamantane",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1ccc2c(c1)C=c1ccc(cc1)=C2,M-PhDBC-NH2,amine,False,0,False,0,1,1,llm,,,,False,False,False
+O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(-c4ccc5c(c4)sc4ccccc45)cc3)n2)cc1,M-BT-CHO,aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1ccc(C=C(c2ccc(N)cc2)c2ccc(N)cc2)cc1,"4,4',4'',4'''-(ethene-1,1,2,2-tetrayl)tetraaniline",amine,False,0,False,0,3,2,llm,,,,False,True,True
+O=Cc1ccc(-c2ccc(N(c3ccc(-c4ccc(C=O)cc4)cc3)c3ccc(-c4ccc(C=O)cc4)cc3)cc2)cc1,"4',4'',4'''-nitrilotris(([1,1'-biphenyl]-4-carbaldehyde)",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1ccc(C2=CC3=c4cc(-c5ccc(N)cc5)c(-c5ccc(N)cc5)cc4=C(c4ccc(N)cc4)C3=C2)cc1,"1,3,6,8-Tetrakis(4-aminophenyl) pyrene",amine,False,0,False,0,4,1,llm,,,,False,True,True
+O=Cc1ccc(-c2ncccc2C=O)nc1,"2,2'-Bipyridine-5,5'-dicarboxaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+OB(O)c1ccc2cc3cccc(B(O)O)c3cc2c1,pyrene diboronic acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(C2=CC=S3N=c4ccccc4=NC3=C2c2ccc(N)cc2)cc1,"4,4'-(benzo[c][1,2,5]thiadiazole-4,7-diyl)dianiline",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(C2=CC=S3N=c4ccc(F)cc4=NC3=C2c2ccc(N)cc2)cc1,"4,4'-(5-fluorobenzo[c][1,2,5]thiadiazole-4,7-diyl)dianiline",amine,True,1,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(C2=CC=S3N=c4ccc(F)c(F)c4=NC3=C2c2ccc(N)cc2)cc1,"4,4'-(5,6-difluorobenzo[c][1,2,5]thiadiazole-4,7-diyl)dianiline",amine,True,2,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(C=O)c(N)c1,"2,5-diaminobenzaldehyde",aldehyde-amine,False,0,False,1,2,1,llm,,,,False,True,True
+Nc1ccc(-c2ccc(C(=C(c3ccc(-c4ccc(N)cc4)cc3)c3ccc(-c4ccc(N)cc4)cc3)c3ccc(-c4ccc(N)cc4)cc3)cc2)cc1,Tetrakis(4-aminobiphenyl)ethylene,amine,False,0,False,0,4,1,llm,,,,False,True,True
+CN(C)C=CC(=O)c1cccc(C(=O)C=CN(C)C)c1,"1,1'-(1,3-Phenylene)bis[3-(dimethylamino)-2-propen-1-one]",other,False,0,False,0,0,1,llm,,,,False,False,False
+CN(C)C=CC(=O)c1cccc(C=O)c1,1-(3-Formylphenyl)-3-(dimethylamino)-2-propen-1-one,aldehyde-amine,False,0,False,1,0,1,llm,,,,False,False,False
+O=Cc1cc2sc3sc4sc3c2c14,"benzo[1,2-b:3,4-b':5,6-b'']trithiophene-2,5,8-tricarbaldehyde",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+NNC(=O)c1cc(C(N)=O)cc(C(=O)NN)c1,"benzene-1,3,5-tricarbohydrazide",other,False,0,False,0,3,1,llm,,,,False,False,False
+Brc1ccc2nsnc2c1Br,"4,7-dibromobenzo[c][1,2,5]thiadiazole",other,False,0,False,0,0,1,llm,,,,False,False,False
+NCCOCCN,bis(2-aminoethyl) ether,amine,False,0,False,0,2,1,llm,,,,False,True,True
+NCC(F)(F)C(N)(F)F,"1,1,2,2-tetrafluoroethane-1,2-diamine",amine,True,4,False,0,2,1,llm,,,,False,True,True
+N#Cc1ccc(F)cc1,4-fluorobenzonitrile,other,True,1,False,0,0,1,llm,,,,False,False,False
+OB(O)C1=CC2=C3C1=CC=C1C=C(C=C2)C13B(O)O,"pyrene-2,7-diboronic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+COc1cc(C=O)ccc1O,4-hydroxy-3-methoxybenzaldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Nc1cc(N)c(N)cc1N,"1,2,4,5-benzenetetraamine",amine,False,0,False,0,4,3,llm,,,,False,True,True
+N/N=C/c1ccc(/C=N/N)cc1,"1,4-bis(Z)-hydrazonomethyl benzene",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1c(N)c(N)c(O)c(N)c1N,pentaaminophenol,amine,False,0,False,0,5,1,llm,,,,False,True,True
+O=Cc1ccc(-c2cc(-c3ccc(C=O)cc3)c(-c3ccc(C=O)cc3)c(-c3ccc(C=O)cc3)n2)cc1,"4,4′,4″,4‴-(Porphyrin-5,10,15,20-tetra-yl)-tetrabenzaldehyde",aldehyde,False,0,False,4,0,1,llm,,,,True,False,True
+Nc1nnc(N)s1,"1,3,4-thiadiazole-2,5-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+N[C@H]1CC[C@@H](N)CC1,"trans-1,4-diaminocyclohexane",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc(-c2cc3ccc4cc(-c5ccc(C=O)cc5)c(-c5ccc(C=O)cc5)cc4c3cc2-c2ccc(C=O)cc2)cc1,"1,3,6,8-tetrakis(4-formylphenyl)pyrene",aldehyde,False,0,False,4,0,1,llm,,,,True,False,True
+c1ccc(-c2cccnc2)nc1,"2,2'-bipyridine",other,False,0,False,0,0,1,llm,,,,False,False,False
+N=C(N)NN(N)N,triaminoguanidine,amine,False,0,False,0,3,1,llm,,,,False,True,True
+OB(O)c1ccc(Br)cc1,4-bromobenzeneboronic acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(N=Nc2ccccc2)cc1,4-aminoazobenzene,amine,False,0,False,0,1,1,llm,,,,False,False,False
+O=Cc1ccc(-c2ccc(-c3ccc(-c4ccc(C=O)cc4)cc3)cc2)cc1,四(4-甲酰基苯基)芘,aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Nc1cncc(-c2cc(N)ccn2)c1,"2,2-bipyridine-5,5-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Cc1cc(-c2cc(N)c(C)cc2C)c(C)cc1N,"3,3',5,5'-tetramethylbenzidine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Cc1c(C)c(-c2ccc(N)cc2)c(-c2ccc(N)cc2)c(C)c1-c1ccc(N)cc1,"1,3,5-trimethyl-2,4,6-tris(4-aminophenyl)benzene",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Cc1c(C)c(-c2ccc(C=O)cc2)c(-c2ccc(C=O)cc2)c(C)c1-c1ccc(C=O)cc1,"1,3,5-trimethyl-2,4,6-tris(4-formylphenyl)benzene",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+Nc1ccc(-c2cc3ccc(N)cc3c3ccc(N)c(-c4ccc(N)cc4)c23)cc1,"4,4',4'',4'''-(pyrene-1,3,6,8-tetrayl)tetraaniline",amine,False,0,False,0,4,1,llm,,,,False,True,True
+O=Cc1cc(C=O)cc(OCCCS(=O)(=O)[O-])c1.[Na+],"2,5-di(oxypropane-1-sodium sulfonate)terephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+N#Cc1ccc(C(c2ccc(C#N)cc2)(c2ccc(C#N)cc2)c2ccc(C#N)cc2)cc1,tetrakis(4-cyanophenyl)methane,other,False,0,False,0,0,1,llm,,,,False,False,False
+CC1(C)OB(c2ccc([N+](=O)[O-])cc2)OC1(C)C,"4,4,5,5-tetramethyl-2-(4-nitrophenyl)-1,3,2-dioxaborolane",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc2oc(N)nc2c1,"2,5-diaminobenzoxazole",amine,False,0,False,0,2,1,llm,,,,False,True,True
+OBc1ccc(-c2cc(-c3ccc(B(O)O)cc3)cc(-c3ccc(B(O)O)cc3)c2)cc1,"1,3,5-tris[(4-phenylboronic acid)]benzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+OBc1ccc(-c2ccc(B(O)O)cc2)cc1,"4,4'-biphenyldiboronic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+OBc1cc(B(O)O)cc(B(O)O)c1,"1,3,5-benzenetriboronic acid",other,False,0,False,0,0,1,llm,,,,False,False,False
+COc1ccc(N)cc1,4-methoxyaniline,amine,False,0,False,0,1,2,llm,,,,False,False,False
+Cc1cc(C)cc(N)c1,"3,5-dimethylaniline",amine,False,0,False,0,1,2,llm,,,,False,False,False
+Nc1ccccc1N,"1,2-diaminobenzene",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Brc1cc(Br)c(Br)c(Br)c1,"1,2,4,5-tetrabromobenzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+Brc1ccc(C(=C(c2ccc(Br)cc2)c2ccc(Br)cc2)c2ccc(Br)cc2)cc1,tetrakis(4-bromophenyl)ethylene,other,False,0,False,0,0,2,llm,,,,False,False,False
+Brc1ccc(C(=C(c2ccccc2)c2ccc(Br)cc2)c2ccccc2)cc1,"1,2-bis(4-bromophenyl)-1,2-diphenylethylene",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1cc2sc3c(C=O)c(C=O)sc3c2s1,"benzo[1,2-b:4,5-b']dithiophene-2,6-dicarbaldehyde",aldehyde,False,0,False,3,0,1,llm,,,,True,False,True
+CC(C)(C)OC(=O)Nc1ccccc1N,"N-(tert-butyloxycarbonyl)-1,2-diaminobenzene",amine,False,0,False,0,1,1,llm,,,,False,False,False
+OB(O)c1ccc(C=C(c2ccc(B(O)O)cc2)c2ccc(B(O)O)cc2)cc1,Tetrakis(4-boronophenyl)ethylene,other,False,0,False,0,0,1,llm,,,,False,False,False
+Oc1cc(O)c(O)cc1O,"1,2,4,5-Tetrahydroxybenzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+Oc1cc2c(O)c3ccc4c(O)c(O)ccc4c3cc2c(O)c1O,"2,3,6,7,10,11-hexahydroxytriphenylene",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(C2=Cc3ccc(-c4ccc(N)cc4)c4ccc(-c5ccc(N)cc5)c2c34)cc1,"4,4',4'',4'''-(pyrene-1,3,6,8-tetrayl)tetraaniline",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1cc(N)c(C(=O)O)c(N)c1,"2,5-diaminobenzoic acid",amine,False,0,False,0,3,1,llm,,,,False,True,True
+Nc1ccc(-c2ccc3cc4cc5cc(N)ccc5cc4cc3c2)cc1,"4,4'-(pyrene-2,7-diyl)dianiline",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc2cc3ccc4cc(C=O)ccc4c3cc2c1,"pyrene-2,7-dicarbaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34,pyrene,other,False,0,False,0,0,1,llm,,,,False,False,False
+c1cncc(-c2ccncc2)c1,"4,4'-bipyridine",other,False,0,False,0,0,1,llm,,,,False,False,False
+NC(CCC(=O)NC(CS)C(=O)NCC(=O)O)C(=O)O,glutathione,amine,False,0,False,0,1,1,llm,,,,False,False,False
+Nc1ccc2cc(N)ccc2c1,"naphthalene-2,6-diamine",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Nc1ccc(-c2ccc3nc4cc5nc(ccc5c3c4)cc3nc4ccc3=c3ccc(c2)nc3c4)cc1,"5,10,15,20-tetrakis(p-aminophenyl)porphyrin",amine,False,0,False,0,1,1,llm,,,,False,False,False
+C#CCOc1cc(C=O)c(OCC#C)cc1C=O,"2,5-bis(2-propynyloxy)terephthalaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Brc1ccc(N(c2ccc(Br)cc2)c2ccc(Br)cc2)cc1,tribromo dimethylmethylene-bridged triphenylamine,other,False,0,False,0,0,1,llm,,,,False,False,False
+Brc1cc(Br)cc(Br)c1,"1,3,5-tribromobenzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+NNC(=O)c1cc(O)c(C(=O)NN)c(O)c1,"2,5-dihydroxyterephthalohydrazide",other,False,0,False,0,2,1,llm,,,,False,False,False
+Cc1nnc(C)s1,"2,5-dimethyl-1,3,4-thiadiazole",other,False,0,False,0,0,1,llm,,,,False,False,False
+Brc1cc(Br)c2[nH]c3cc(-c4ccc5c(c4)[nH]c4c(Br)c(Br)ccc45)ccc3c2c1,"3,3′,6,6′-tetrabromo-9,9′-bicarbazole",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(-c2csc(-c3ccc(N)cc3)n2)cc1,"2,5-bis(4-aminophenyl)thiazole",amine,False,0,False,0,2,1,llm,,,,False,True,True
+NC1=Cc2c(N)c3c(cc2=C1N)C(N)=C(N)C=3N,hexaaminotriphenylene,amine,False,0,False,0,6,1,llm,,,,False,True,True
+O=Cc1ccc2cc3ccc(C=O)cc3cc2c1,"pyrene-1,6-dicarbaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1ccc(-c2nc3ccccc3n2-c2ccc(C=O)cc2)cc1,"4,7-bis(4-formylphenyl)benzo[c][1,2,5]thiadiazole",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+Brc1cc(Br)c(Br)cc1Br,"1,2,4,5-tetrabromobenzene",other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1ccc(Cc2ccc(N)cc2)cc1,"4,4'-diaminodiphenylmethane",amine,False,0,False,0,2,1,llm,,,,False,True,True
+O=Cc1ccc2cc(C=O)ccc2c1,"naphthalene-2,6-dicarbaldehyde",aldehyde,False,0,False,2,0,2,llm,,,,True,False,True
+Nc1ccc(-c2cc(-c3ccc(N)cc3)c3cc(-c4ccc(N)cc4)ccc3c2)cc1,"4,4',4'',4'''-(pyrene-1,3,6,8-tetrayl)tetraaniline",amine,False,0,False,0,3,1,llm,,,,False,True,True
+O=Cc1ccc(C#CC#Cc2ccc(C=O)cc2)cc1,"4,4''-(buta-1,3-diyne-1,4-diyl)dibenzaldehyde",aldehyde,False,0,False,2,0,1,llm,,,,True,False,True
+O=Cc1cc(C=O)cc(-c2ccc(-c3cc(C=O)cc(C=O)c3)nc2)c1,"5,5′-([2,2′-联吡啶]-5,5′-二基)二异酞醛",aldehyde,False,0,False,4,0,1,llm,,,,True,False,True
+O=Cc1cc(C=O)cc(-c2csc(-c3cc(C=O)cc(C=O)c3)c2)c1,"5,5′-([2,2′-联噻吩]-4,4′-二基)二异酞醛",aldehyde,False,0,False,4,0,1,llm,,,,True,False,True
+N[C@@H]1CCCC[C@H]1N,"R,R-环己二胺",amine,False,0,False,0,2,1,llm,,,,False,True,True
+N[C@H]1CCCC[C@@H]1N,"S,S-环己二胺",amine,False,0,False,0,2,1,llm,,,,False,True,True
+Cc1ccc(-c2nc(-c3cc(N)ccc3C)nc(-c3cc(N)ccc3C)n2)cc1N,"5,5′,5′′-(1,3,5-triazine-2,4,6-triyl)tris(2-methylaniline)",amine,False,0,False,0,3,2,llm,,,,False,True,True
+Cc1cc(-c2nc(-c3cc(C)c(N)cc3C)nc(-c3cc(C)c(N)cc3C)n2)c(C)cc1N,"4,4′,4′′-(1,3,5-triazine-2,4,6-triyl)tris(2,6-dimethylaniline)",amine,False,0,False,0,3,1,llm,,,,False,True,True
+O=C(O)c1cc(C(=O)O)c(C(=O)O)c(C(=O)O)c1,pyromellitic acid,other,False,0,False,0,0,1,llm,,,,False,False,False
+Nc1c2c3c4[N]5[NH][Ni]5<-[n]5c6c(N)c7c8c9c%10c(N)c%11c%12c(N)c%13c%14c(N)c%15c%16c(N)c%17c%18c(N)c%19c%20c(N)c%21c1c3c%21c%20c%19c%18c%17c%16c%15c%14c%13c%12c%11c%10c9c8c7c6c5c42,"2,3,9,10,16,17,23,24-octaamino-phthalocyanine nickel(II)",amine,False,0,False,0,8,1,llm,,,,False,True,True
+O=c1c(=O)c2c(=O)c(=O)c3c2c2ccc4c5ccc1c1c5c2c3c41,"pyrene-4,5,9,10-tetraone",other,False,0,False,0,0,1,llm,,,,False,False,False
+O=Cc1ccc2c(c1)cc1ccc3cccc4ccc2c1c34,"pyrene-2,7-dicarbaldehyde",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+O=Cc1cc2ccc3cccc4ccc(c1)c2c34,"pyrene-2,7-dicarboxaldehyde",aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+Nc1ccccc1O,2-aminophenol,amine,False,0,False,0,1,1,llm,,,,False,False,False
+O=Cc1ccccc1O,2-hydroxybenzaldehyde,aldehyde,False,0,False,1,0,1,llm,,,,False,False,False
+O=Cc1ccc(C(c2ccc(C=O)c(O)c2)(c2ccc(C=O)c(O)c2)c2ccc(C=O)c(O)c2)cc1O,tetrakis(3-formyl-4-hydroxyphenyl)methane,aldehyde,False,0,False,4,0,1,llm,,,,True,False,True
+Clc1nc2cc(Br)c(Br)cc2[nH]1,"4,7-dibromo-2-chloro-1H-benzo[d]imidazole",other,False,0,False,0,0,1,llm,,,,False,False,False
+C=Cc1ccc(N)cc1,4-vinylaniline,amine,False,0,False,0,1,1,llm,,,,False,False,False
+O=C=Nc1ccc(N=C=O)cc1,"1,4-phenylene diisocyanate",other,False,0,False,0,0,1,llm,,,,False,False,False
+OC1=C(O)c2cc3cc(O)c1cc3c(O)c2O,"2,3,6,7,10,11-hexahydroxytriphenylene",other,False,0,False,0,0,1,llm,,,,False,False,False
+N#Cc1c(F)c(F)c(C#N)c(F)c1F,tetrafluoroterephthalonitrile,other,True,4,False,0,0,1,llm,,,,False,False,False
+O=C1c2ccc(F)c(F)c2C(=O)c2ccc(F)c(F)c21,"2,3,6,7-tetrafluoroanthraquinone",other,True,4,False,0,0,1,llm,,,,False,False,False
+O=Cc1cc(C=O)c(O)c(C=O)c1,"2-羟基-1,3,5-苯三甲醛",aldehyde,False,0,False,3,0,0,commercial,YSZC146,81502-74-1,C9H6O4,True,False,True
+CCOc1cc(C=O)c(OCC)cc1C=O,"2,5-二乙氧基-1,4-对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC340,56766-03-1,C12H16O4,True,False,True
+CCCOc1cc(C=O)c(OCCC)cc1C=O,"2,5-二丙氧基-1,4-对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC204,245116-57-8,C14H20O4,True,False,True
+CCCCOc1cc(C=O)c(OCCCC)cc1C=O,"2,5-二丁氧基-1,4-对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC339,564456-59-3,C16H24O4,True,False,True
+CCCCCCCCCCCC(=O)c1c(O)cc(O)cc1O,"2,5-二戊氧基-1,4-对苯二甲醛",other,False,0,False,0,0,0,commercial,YSZC391,nan,C18H28O4,False,False,False
+CCCCCCOc1cc(C=O)c(OCCCCCC)cc1C=O,"2,5-二己氧基对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC338,151903-52-5,C20H32O4,True,False,True
+CCCCCCCOc1cc(C=O)c(OCCCCCCC)cc1C=O,"2,5-二庚氧基-1,4-对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC200,206762-48-3,C22H36O4,True,False,True
+CCCCCCCCOc1cc(C=O)c(OCCCCCCCC)cc1C=O,"2,5-双(辛氧基)对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC337,123440-34-6,C22H38O4,True,False,True
+O=C1Cc2cc3c(cc2O1)CC(=O)O3,"苯并[1,2-b:4,5-二呋喃]-2,6(3H,7H)-二酮",other,False,0,False,0,0,0,commercial,YSZC198,30272-74-3,C10H6O4,False,False,False
+Cc1cc(-c2ccc(C=O)cc2)c(C)cc1-c1ccc(C=O)cc1,"4,4''-二甲酰基-2',5'-二甲基-1,1':4',1''-三联苯",aldehyde,False,0,False,2,0,0,commercial,YSZC316,857412-04-5,C22H18O2,True,False,True
+O=Cc1cc(-c2cc(C=O)c(O)c(C=O)c2)cc(C=O)c1O,"3,3',5,5'-四醛基-4,4'-二羟基联苯",aldehyde,False,0,False,4,0,0,commercial,YSZC301,286385-47-5,C16H10O6,True,False,True
+O=Cc1ccc(C=O)c2nsnc12,"苯并[c][1,2,5]噻二唑-4,7-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC1780,5170-67-2,C8H4N2O2S,True,False,True
+O=Cc1ccc(C(=C(c2ccc(C=O)cc2)c2ccc(C=O)cc2)c2ccc(C=O)cc2)cc1,四(4-醛基苯基)乙烯,aldehyde,False,0,False,4,0,0,commercial,YSWG431,2170451-48-4,C30H24O4,True,False,True
+O=Cc1ccc([Si](c2ccc(C=O)cc2)(c2ccc(C=O)cc2)c2ccc(C=O)cc2)cc1,四(4-甲酰苯基)硅烷,aldehyde,False,0,False,4,0,0,commercial,YSWG051,1055999-34-2,C28H20O4Si,True,False,True
+O=Cc1ccc(C23CC4(c5ccc(C=O)cc5)CC(c5ccc(C=O)cc5)(C2)CC(c2ccc(C=O)cc2)(C3)C4)cc1,"1,3,5,7-四(4-苯甲醛基)-金刚烷",aldehyde,False,0,False,4,0,0,commercial,YSZC109,645401-15-6,C38H32O4,True,False,True
+O=Cc1ccc(C=O)o1,"2,5-二甲酰基呋喃",aldehyde,False,0,False,2,0,0,commercial,YSWG163,823-82-5,C6H4O3,True,False,True
+O=Cc1cc(C=O)cc(-c2cc(C=O)cc(C=O)c2)c1,"[1,1'-联苯]-3,3',5,5'-四甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC279,150443-85-9,C16H10O4,True,False,True
+O=Cc1c(O)ccc2c(C=O)c(O)ccc12,"2,6-二羟基萘-1,5-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC206,7235-47-4,C12H8O4,True,False,True
+O=Cc1cc(C=O)cc(-c2cccc(-c3cc(C=O)cc(C=O)c3)c2)c1,"[1,1':3',1''-三联苯]-3,3'',5,5''-四甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC319,201734-76-1,C22H14O4,True,False,True
+O=Cc1ccc(C=O)nc1,"吡啶-2,5-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC099,6221-01-8,C7H5NO2,True,False,True
+O=Cc1cc(C=O)cc(B(O)O)c1,"3,5-二甲酰基苯基硼酸",aldehyde,False,0,False,2,0,0,commercial,YSWG126,480424-62-2,C8H7BO4,True,False,True
+CC1(C)OB(c2cc(C=O)c(B3OC(C)(C)C(C)(C)O3)cc2C=O)OC1(C)C,"2,5-双(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC827,2305615-53-4,C20H30B2O6,True,False,True
+O=Cc1ccc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)cc1,"1,1,2-三苯基-2-(4-甲酰基苯)乙烯",aldehyde,False,0,False,1,0,0,commercial,YSWG202,1289218-74-1,C27H22O,False,False,False
+CC1=C(C=O)C(C)=[N+]2C1=C(c1ccccc1)c1c(C)c(C=O)c(C)n1[B-]2(F)F,"5,5-二氟-2,8-二甲酰基-1,3,7,9-四甲基-10H-二吡咯并[1,2-c:1',2'-f][1,3,2]二氮杂硼鎓-10-鎓",aldehyde,True,2,False,2,0,0,commercial,YSZC095,2022166-57-8,C16H16BF2N4O2,True,False,True
+CN1c2ccc(C=O)cc2Sc2cc(C=O)ccc21,"10H-吩噻嗪-3,7-二甲醛,10-甲基-",aldehyde,False,0,False,2,0,0,commercial,YSZC272,31123-52-1,C15H11NO2S,True,False,True
+Cc1c(-c2ccc(C=O)cc2)c(C)c(-c2ccc(C=O)cc2)c(C)c1-c1ccc(C=O)cc1,"[1,3,5-三甲基-2,4,6-三(4-醛基苯基)苯]",aldehyde,False,0,False,3,0,0,commercial,YSZC263,2195343-70-3,C27H24O3,True,False,True
+COc1c(C=O)c(OC)c(C=O)c(OC)c1C=O,"1,3,5-三甲氧基-2,4,6-三甲酰基苯",aldehyde,False,0,False,3,0,0,commercial,YSZC076,680575-17-1,C12H12O6,True,False,True
+O=Cc1c(Cl)c(C=O)c(Cl)c(C=O)c1Cl,"2,4,6-三氯-1,3,5-苯三甲醛",aldehyde,False,0,False,3,0,0,commercial,YSZC222,14222-98-1,C9H3Cl3O3,True,False,True
+O=Cc1ccc(OCC(COc2ccc(C=O)cc2)(COc2ccc(C=O)cc2)COc2ccc(C=O)cc2)cc1,"4,4'-[(2,2-双[(4-甲酰基苯氧基)甲基]丙烷-1,3-二基)双(氧)]二苯甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC220,381670-43-5,C31H26O6,True,False,True
+O=Cc1c2ccccc2c(C=O)c2ccccc12,"蒽-9,10-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSWG147,7044-91-9,C16H10O2,True,False,True
+O=Cc1ccc(-c2ccc(C=O)nc2)cn1,"3,3'-联吡啶-6,6'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSWG016,1264748-06-2,C12H8N2O2,True,False,True
+CC(C)(C)c1cc(C#Cc2ccc(-c3cc(-c4ccc(C#Cc5cc(C=O)c(O)c(C(C)(C)C)c5)cc4)cc(-c4ccc(C#Cc5cc(C=O)c(O)c(C(C)(C)C)c5)cc4)c3)cc2)cc(C=O)c1O,"3,3',3'',3'''-([1,1':4',1''':4'',1''''-四联苯]-2',2'',2'''-四基)四苯甲醛",aldehyde,False,0,False,3,0,0,commercial,YSZC405,2489272-57-1,C44H28O4,True,False,True
+O=Cc1cc(C#Cc2ccc(-c3cc(-c4ccc(C#Cc5ccc(O)c(C=O)c5)cc4)cc(-c4ccc(C#Cc5ccc(O)c(C=O)c5)cc4)c3)cc2)ccc1O,"3,3',3'',3'''-([1,1':4',1''':4'',1''''-四联苯]-2',2'',2'''-四基)四(2-羟基苯甲醛)",aldehyde,False,0,False,3,0,0,commercial,YSZC406,2757082-49-6,C44H28O8,True,False,True
+O=Cc1ccc(-c2cc3c(cc2-c2ccc(C=O)cc2)C2c4cc(-c5ccc(C=O)cc5)c(-c5ccc(C=O)cc5)cc4C3c3cc(-c4ccc(C=O)cc4)c(-c4ccc(C=O)cc4)cc32)cc1,"4,4',4'',4'''-(9,10-二氢-9,10-[1,2]苯并蒽-2,3,6,7,14,15-六基)六苯甲醛",aldehyde,False,0,False,6,0,0,commercial,YSZC017,1835723-12-0,C60H36O6,True,False,True
+Cc1cc(C=O)c(C)cc1C=O,"3,6-二甲基对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC490,7044-92-0,C10H10O2,True,False,True
+Cc1sc(C=O)cc1C1=C(c2cc(C=O)sc2C)CCC1,"1,2-双(5-甲酰基-2-甲基噻吩-3-基)环戊烯",aldehyde,False,0,False,2,0,0,commercial,YSZC492,219537-99-2,C16H14O2S2,True,False,True
+O=Cc1ncc[nH]1,2-咪唑甲醛,aldehyde,False,0,False,1,0,0,commercial,YSWG441,10111-08-7,C4H4N2O,False,False,False
+O=Cc1ccc(-c2c3ccccc3c(-c3ccc(C=O)cc3)c3ccccc23)cc1,"9,10-二(4-醛基苯基)蒽",aldehyde,False,0,False,2,0,0,commercial,YSWG214,324750-99-4,C28H18O2,True,False,True
+Cc1c(-c2ccc(C=O)cc2)c(C)c(-c2c(C)c(-c3ccc(C=O)cc3)c(C)c(-c3ccc(C=O)cc3)c2C)c(C)c1-c1ccc(C=O)cc1,"[1,1':3',1''-三联苯]-4,4''-二甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC532,868046-55-3,C20H14O2,True,False,True
+N#Cc1ccc(O)c(C=O)c1,3-甲酰基-4-羟基苯腈,aldehyde,False,0,False,1,0,0,commercial,YSWG453,74901-29-4,C8H5NO2,False,False,False
+COc1cc(I)cc(C=O)c1O,5-碘-邻香兰素,aldehyde,False,0,False,1,0,0,commercial,YSZC595,7359-14-0,C8H7IO3,False,False,False
+O=Cc1ccc(-c2ccc(-c3ccc(N(c4ccccc4)c4ccccc4)cc3)s2)s1,"5-(4-(二苯氨基)苯基)-2,2'-联噻吩-5-甲醛",aldehyde,False,0,False,1,0,0,commercial,YSZC631,762269-61-4,C29H21NOS2,False,False,False
+O=Cc1ccc(-c2cccc(-c3ccc(C=O)cc3)c2)cc1,"[1,1':3',1''-三联苯]-4,4''-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC558,171820-02-3,C20H14O2,True,False,True
+COc1cc(C=O)cc(C=O)c1O,"2-甲氧基-4,6-二羟基苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC1403,2931-90-0,C8H8O4,True,False,True
+Nc1ccc(-c2cc(-c3ccc(C=O)cc3)c3ccc4c(-c5ccc(N)cc5)cc(-c5ccc(C=O)cc5)c5ccc2c3c45)cc1,"4,4'-(3,8-二溴芘-1,6-二基)二苯甲醛",aldehyde-amine,False,0,False,2,2,0,commercial,YSZC679,2375652-84-7,C30H18Br2O2,True,True,True
+C#Cc1ccc(C=O)cc1,4-乙炔基苯甲醛,aldehyde,False,0,False,1,0,0,commercial,YSZC680,63697-96-1,C9H6O,False,False,False
+O=Cc1ccc(-c2ccc(C=O)s2)s1,"[2,2']-联噻吩-5,5'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSWG404,32364-72-0,C10H6O2S2,True,False,True
+O=Cc1ccc(C2=C(c3ccc(C=O)cc3)SC(=C3SC(c4ccc(C=O)cc4)=C(c4ccc(C=O)cc4)S3)S2)cc1,"4,4'-[2,4,5-双(4-甲酰苯基)-1,3-二硫杂环戊烯-2-亚基]-1,3-二硫杂环戊烯-4,5-二硫基双(苯甲醛)",aldehyde,False,0,False,4,0,0,commercial,YSWG501,1639134-02-3,C34H20O4S4,True,False,True
+O=Cc1cc(C(c2ccc(O)c(C=O)c2)(c2ccc(O)c(C=O)c2)c2ccc(O)c(C=O)c2)ccc1O,"3,3',3'',3'''-甲烷四基四(6-羟基苯甲醛)",aldehyde,False,0,False,4,0,0,commercial,YSZC294,1352523-65-9,C29H20O8,True,False,True
+CC1(C)OB(c2cc(-c3ccc(C=O)cc3)cc(-c3ccc(C=O)cc3)c2)OC1(C)C,"5-(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)-1,1':3',1''-三联苯-4,4''-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC765,1033752-94-1,C26H25BO4,True,False,True
+O=Cc1cc(S(=O)(=O)[O-])ccc1O.[Na+],3-醛基-4-羟基苯磺酸钠（Na盐形式）,aldehyde,False,0,False,1,0,0,commercial,YSZC780,16856-04-5,C7H5NaO6S,False,False,False
+O=Cc1cc(Cl)c(C=O)cc1Cl,"2,5-二氯对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC493,46052-84-0,C8H4Cl2O2,True,False,True
+O=Cc1ccc(-[n+]2ccc(-c3cc[n+](-c4ccc(C=O)cc4)cc3)cc2)cc1,"1,1'-双(4-甲酰基苯基)-4,4'-联吡啶鎓",aldehyde,False,0,False,2,0,0,commercial,YSZC797,1690360-53-2,C24H16N2O2,True,False,True
+O=Cc1ccc(C=O)c([N+](=O)[O-])c1,2-硝基对苯二甲醛,aldehyde,False,0,False,2,0,0,commercial,YSZC494,39909-72-3,C8H5NO4,True,False,True
+CC(C)(C)c1cc(-c2cc(-c3cc(C=O)c(O)c(C(C)(C)C)c3)cc(-c3cc(C=O)c(O)c(C(C)(C)C)c3)c2)cc(C=O)c1O,"5,5'-二叔丁基-3,3'-二羟基-4,4'-二甲酰基联苯",aldehyde,False,0,False,3,0,0,commercial,YSZC066,1809653-01-7,C32H40O4,True,False,True
+COc1ccc(C(=C(c2ccccc2)c2ccc(C=O)cc2)c2ccc(OC)cc2)cc1,"4,4'-双[4-(4-甲氧基苯基)-1-苯乙基]苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSZC828,1471980-33-2,C44H38O3,False,False,False
+O=Cc1ccc(C#Cc2c3ccccc3c(C#Cc3ccc(C=O)cc3)c3ccccc23)cc1,"4,4'-(蒽-9,10-二基双(乙炔-2,1-二基))二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC629,1361119-48-3,C32H18O2,True,False,True
+O=CC=Cc1ccc(C=CC=O)cc1,"(2E,2'E)-1,3-双(4-苯基)丁二烯二醛",aldehyde,False,0,False,2,0,0,commercial,YSZC865,63405-68-5,C18H12O2,True,False,True
+CC(C)(C)OC(=O)c1ccc(Br)c(C=O)c1,4-溴-3-甲酰基苯甲酸叔丁酯,aldehyde,False,0,False,1,0,0,commercial,YSZC866,1329170-75-3,C11H13BrO3,False,False,False
+COc1cc(-c2ccc(C=O)cc2)c(OC)cc1-c1ccc(C=O)cc1,"2',5'-二甲氧基-[1,1':4',1''-三联苯]-4,4''-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC428,111759-27-4,C22H18O4,True,False,True
+CN1c2ccccc2Sc2cc(C=O)ccc21,10-甲基-10H-吩噻嗪-3-甲醛,aldehyde,False,0,False,1,0,0,commercial,YSZC937,4997-36-8,C14H11NOS,False,False,False
+COC(=O)c1cc(C=O)cc(C(=O)OC)c1,5-甲酰基间苯二甲酸二甲酯,aldehyde,False,0,False,1,0,0,commercial,YSZC963,164073-80-7,C11H10O5,False,False,False
+O=Cc1ccc(-c2ccc3c(c2)c2cc(-c4ccc(C=O)cc4)ccc2n3-n2c3ccc(-c4ccc(C=O)cc4)cc3c3cc(-c4ccc(C=O)cc4)ccc32)cc1,"4,4',4'',4'''-(10,9':10',9''-双环蝶呤-3,3'',6,6''-四基)四苯甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC833,2446214-54-4,C44H28O4,True,False,True
+O=Cc1ccc(-c2cn[nH]c2)cc1,4-(1H-吡唑-4-基)苯甲醛,aldehyde,False,0,False,1,0,0,commercial,YSZC1003,1017794-45-4,C10H8N2O,False,False,False
+CCOC(=O)c1cc(C=O)cc(C(=O)OCC)c1,5-甲酰基间苯二甲酸二乙酯,aldehyde,False,0,False,1,0,0,commercial,YSZC1039,208450-84-4,C13H14O5,False,False,False
+Cc1c(C=O)c(C)c(C=O)c(C)c1C=O,"2,4,6-三甲基-1,3,5-苯三甲醛",aldehyde,False,0,False,3,0,0,commercial,YSZC443,119198-88-8,C12H12O3,True,False,True
+O=Cc1ccc(-c2ccc(Br)s2)s1,"5-溴-2,2'-联噻吩-5'-甲醛",aldehyde,False,0,False,1,0,0,commercial,YSZC1124,110046-60-1,C9H5BrOS2,False,False,False
+CC1(C)OB(c2cc(C=O)cc(C=O)c2)OC1(C)C,"1,3-苯二甲醛,5-[4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基]-",aldehyde,False,0,False,2,0,0,commercial,YSZC514,945865-80-5,C14H17BO4,True,False,True
+C#Cc1ccc(C=CC=O)cc1,3-(4-乙炔基苯基)丙烯醛,aldehyde,False,0,False,1,0,0,commercial,YSZC1220,2229670-34-0,C11H8O,False,False,False
+O=Cc1cc(-c2ccccc2)c(C=O)cc1-c1ccccc1,"[1,1':4',1''-三联苯]-2',5'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC1027,144836-60-2,C20H12O2,True,False,True
+O=Cc1cc(Br)cc(C=O)c1,5-溴异邻苯二甲醛,aldehyde,False,0,False,2,0,0,commercial,YSZC1292,120173-41-3,C8H5BrO2,True,False,True
+Cc1c(O)c(C=O)cc(C=O)c1O,"4,6-二羟基-5-甲基-1,3-二甲醛基苯",aldehyde,False,0,False,2,0,0,commercial,YSZC820,22304-67-2,C9H8O4,True,False,True
+Cc1c(-c2ccc(C=O)cc2)c(-c2ccc(C=O)cc2)c(C)c(-c2ccc(C=O)cc2)c1-c1ccc(C=O)cc1,"4',4''-双(4-甲酰基苯基)-1,3,5,6-四甲基-1,1',3,3'-四联苯-4,4''-二甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC583,2363716-37-2,C44H30O4,True,False,True
+O=Cc1ccc(-c2ccc(-c3nc(-c4ccc(-c5ccc(C=O)cc5)cc4)nc(-c4ccc(-c5ccc(C=O)cc5)cc4)n3)cc2)cc1,"2,4,6-三(4-甲酰基-联苯-4-基)-1,3,5-三嗪",aldehyde,False,0,False,3,0,0,commercial,YSZC1117,1221509-80-3,C39H24N3O3,True,False,True
+O=Cc1ccc(-c2ccc(-c3ccc(C=O)cc3)c3n[se]nc23)cc1,"4,4'-(苯并[c][1,2,5]噻二唑-4,7-二基)二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC949,2851938-02-6,C20H12N2O2S,True,False,True
+O=Cc1ccc(-c2c(-c3ccc(C=O)cc3)c(-c3ccc(C=O)cc3)c(-c3ccc(C=O)cc3)c(-c3ccc(C=O)cc3)c2-c2ccc(C=O)cc2)cc1,均六(4-醛基苯基)苯,aldehyde,False,0,False,6,0,0,commercial,YSWG633,1862220-96-9,C48H24O6,True,False,True
+O=Cc1ccc(-c2cc3c(cc2-c2ccc(C=O)cc2)OCCOCCOc2cc(-c4ccc(C=O)cc4)c(-c4ccc(C=O)cc4)cc2OCCOCCO3)cc1,"4,4',4'',4'''-(1,1',1'',1'''-四联苯-2,2',2'',2'''-四基)四苯甲醛",aldehyde,False,0,False,4,0,0,commercial,YSWG638,2837061-91-1,C52H34O4,True,False,True
+O=Cc1ccc(-c2ccc(N(c3ccc(-c4ccc(C=O)s4)cc3)c3ccc(-c4ccc(C=O)s4)cc3)cc2)s1,"5,5'-[1,3-二(5-甲酰基噻吩-2-基)苯-1,3-二基]二噻吩-2-甲醛",aldehyde,False,0,False,3,0,0,commercial,YSWG640,883236-47-3,C24H12O4S4,True,False,True
+O=Cc1ccc(C=O)c2ccccc12,"1,4-萘二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC450,38153-01-4,C12H8O2,True,False,True
+CC(C)(C)c1cc(C#Cc2cccc(C#Cc3cc(C=O)c(O)c(C(C)(C)C)c3)c2)cc(C=O)c1O,"5,5'-(1,3-苯基双(乙炔-2,1-二基))双(3-(叔丁基)-4-羟基苯甲醛)",aldehyde,False,0,False,2,0,0,commercial,YSZC1512,943407-01-0,C36H36O4,True,False,True
+O=Cc1ccc(-c2cc(C=O)c(-c3ccc(C=O)cc3)cc2C=O)cc1,"[1,1':4',1''-三联苯]-2,4,4'',5'-四甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC559,1985610-10-3,C21H12O4,True,False,True
+O=Cc1ccc(-c2ccc(C=O)c(O)c2)cc1,"3-羟基-[1,1'-联苯]-4,4'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC1966,1261930-12-4,C14H10O3,True,False,True
+O=Cc1cc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)ccc1O,"2-羟基-5-(1,2,2-三苯基乙烯基)苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSWG865,1926206-27-0,C27H20O2,False,False,False
+C=CCOc1cc(C=O)c(OCC=C)cc1C=O,"2,5-双(烯丙氧基)对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC810,2377871-78-6,C14H14O4,True,False,True
+O=Cc1ccc(-c2cc(-c3ccc(C=O)s3)cc(-c3ccc(C=O)s3)c2)s1,"5,5',5''-(苯-1,3,5-三基)三(噻吩-2-甲醛)",aldehyde,False,0,False,3,0,0,commercial,YSZC1980,2125450-22-6,C21H12O3S3,True,False,True
+O=Cc1cccc(-c2cccc(C=O)n2)n1,"2,2'-联吡啶-6,6'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCH0125,49669-26-3,C12H8N2O2,True,False,True
+O=Cc1cccc(-c2cc(-c3cccc(C=O)c3)cc(-c3cccc(C=O)c3)c2)c1,"[1,1':3',1''-三联苯]-3,3''-二甲醛",aldehyde,False,0,False,3,0,0,commercial,YSZC980,1395348-26-1,C20H14O2,True,False,True
+O=Cc1ccc(C=O)c(Br)c1,2-溴间苯二甲醛,aldehyde,False,0,False,2,0,0,commercial,YSZC2034,90001-43-7,C8H5BrO2,True,False,True
+O=Cc1ccc(C#Cc2ccc(C#Cc3ccc(C=O)cc3)cc2)cc1,"4,4'-[1,4-亚苯基双(2,1-乙炔二基)]二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC582,192188-70-8,C24H14O2,True,False,True
+Cc1cc(CO)ccc1C=O,4-(羟甲基)-2-甲基苯甲醛,aldehyde,False,0,False,1,0,0,commercial,YSZC1225,1289016-31-4,C9H10O2,False,False,False
+O=CC12CC3(C=O)CC(C=O)(C1)CC(C=O)(C2)C3,"1,3,5,7-四醛基金刚烷",aldehyde,False,0,False,4,0,0,commercial,YSZC1546,853347-01-0,C14H16O4,True,False,True
+COc1ccc(OC)c(C=O)c1,"2,5-二甲氧基苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSWG665,93-02-7,C9H10O3,False,False,False
+Cc1ccc(C)c(C=O)c1,"2,5-二甲基苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSWG666,5779-94-2,C9H10O,False,False,False
+O=Cc1ccc(SSc2ccc(C=O)cc2)cc1,"4,4'-二硫代二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC1509,100538-31-6,C14H10O2S2,True,False,True
+COCCOc1cc(C=O)c(OCCOC)cc1C=O,"1,4-苯二甲醛-2,5-双(2-甲氧基乙氧基)",aldehyde,False,0,False,2,0,0,commercial,YSZC1116,2053247-15-5,C14H18O6,True,False,True
+O=Cc1cnc(C=O)cn1,"吡嗪-2,5-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC1634,77666-94-5,C6H4N2O2,True,False,True
+O=Cc1ccc(-c2nc3sc(-c4ccc(C=O)cc4)nc3s2)cc1,"2,5-二(4-甲酰基苯基)-1,3,4-噻二唑",aldehyde,False,0,False,2,0,0,commercial,YSZC1481,1235020-92-4,C16H10N2O2S,True,False,True
+O=Cc1ccc(Br)c2nsnc12,"7-溴-4-醛基苯并[C][1,2,5]噻二唑",aldehyde,False,0,False,1,0,0,commercial,YSWG671,1071224-34-4,C7H3BrN2OS,False,False,False
+O=Cc1ccc(OCc2cc(COc3ccc(C=O)cc3)c(COc3ccc(C=O)cc3)cc2COc2ccc(C=O)cc2)cc1,"1,3,5-三(4-甲酰基苯氧基)苯",aldehyde,False,0,False,4,0,0,commercial,YSZC1604,1024915-91-0,C27H18O6,True,False,True
+O=Cc1ccc(-c2cnc(-c3ccc(C=O)cc3)c3nsnc23)cc1,"4,4'-[(1,2,5]噻二唑并[3,4-c]吡啶-4,7-二基)]二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC1118,nan,C19H11N3O2S,True,False,True
+O=Cc1ccc(C#Cc2cc(C#Cc3ccc(C=O)cc3)c3ccc4c(C#Cc5ccc(C=O)cc5)cc(C#Cc5ccc(C=O)cc5)c5ccc2c3c54)cc1,"4,4',4'',4'''-(芘-1,3,6,8-四基)四(乙炔-2,1-二基)四苯甲醛",aldehyde,False,0,False,4,0,0,commercial,YSWG689,2438216-59-0,C48H24O4,True,False,True
+O=Cc1ccc(-c2cc(-c3ccccn3)nc(-c3ccccn3)c2)cc1,"4-(2,2':6',2''-三联吡啶)-4'-二苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSWG888,138253-30-2,C28H18N2O2,False,False,False
+O=Cc1ccc(-c2cc(-c3ccc(C=O)nc3)c3ccc4c(-c5ccc(C=O)nc5)cc(-c5ccc(C=O)nc5)c5ccc2c3c54)cn1,"5,5',5'',5'''-(芘-1,3,6,8-四基)四(吡啶-4-甲醛)",aldehyde,False,0,False,4,0,0,commercial,YSZC6029,2728746-50-5,C40H22N4O4,True,False,True
+O=COc1cc(OC=O)cc(OC=O)c1,"1,3,5-苯三甲醛",other,False,0,False,0,0,0,commercial,YSZC1380,1957190-76-9,C15H9O3,False,False,False
+CCCCCCCCCCOc1cc(-c2ccc(C=O)cc2)c(OCCCCCCCCCC)cc1-c1ccc(C=O)cc1,"2',5'-双(癸氧基)-[1,1':4',1''-三联苯]-4,4''-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC1777,850446-24-1,C36H46O4,True,False,True
+CC1(C)OB(c2ccc(C=O)c(O)c2)OC1(C)C,"2-(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSZC1881,1816937-59-3,C13H17BO4,False,False,False
+CC1(C)COC(c2ccc(C=O)cc2)OC1,"4-(5,5-二甲基-1,3-二氧六环-2-基)苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSZC1999,106456-88-6,C13H16O3,False,False,False
+O=Cc1c(O)c(O)c(C=O)c2ccccc12,"2,3-二羟基-1,4-萘二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC676,103860-60-2,C12H8O4,True,False,True
+O=Cc1ccc(OCC2CC2)cc1,4-(环丙基甲氧基)苯甲醛,aldehyde,False,0,False,1,0,0,commercial,YSZC1920,164520-99-4,C11H12O2,False,False,False
+O=Cc1ccc(C#Cc2ccc(C=O)c(O)c2)cc1O,4-羟基-4'-(环丙基甲氧基)二苯乙炔,aldehyde,False,0,False,2,0,0,commercial,YSZC607,791068-96-7,C17H14O2,True,False,True
+O=Cc1ccc(-c2ccc(N(c3ccc(Br)cc3)c3ccc(Br)cc3)cc2)s1,5-(4-(双(4-溴苯基)(苯基)甲基)噻吩-2-甲醛,aldehyde,False,0,False,1,0,0,commercial,YSCK0094,1197992-32-7,C23H17Br2NOS,False,False,False
+O=Cc1ccc(-c2ccc(C(=C(c3ccccc3)c3ccccc3)c3ccc(-c4ccc(C=O)cc4)cc3)cc2)cc1,"[1,1'-联苯]-4,4'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0096,2131097-89-5,C14H10O2,True,False,True
+O=Cc1cc(-c2ccc(O)c(C=O)c2)ccc1O,"4,4'-二羟基-3,3'-二乙酰联苯",aldehyde,False,0,False,2,0,0,commercial,YSCK0100,125366-78-1,C16H14O4,True,False,True
+O=Cc1ccc(-c2cc(-c3ccc(C=O)c(O)c3)cc(-c3ccc(C=O)c(O)c3)c2)cc1O,"5,5'-(1,3-二羟基苯-1,3,5-三基)三(苯-1,3-二甲醛)",aldehyde,False,0,False,3,0,0,commercial,YSCH0190,2244985-34-8,C24H14O6,True,False,True
+O=Cc1ccc(N(c2ccc(Br)cc2)c2ccc(C=O)cc2)cc1,4-((4-溴苯基)(4-甲酰基苯基)氨基)苯甲醛,aldehyde,False,0,False,2,0,0,commercial,YSCH0206,167859-41-8,C20H14BrNO2,True,False,True
+O=Cc1cc2ccccc2c(-c2c(O)c(C=O)cc3ccccc23)c1O,"(S)-2,2'-二羟基-1,1'-联萘基-3,3'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0135,141779-46-6,C22H14O4,True,False,True
+O=CCc1ccc(Br)cc1,4-溴苯乙醛,aldehyde,False,0,False,1,0,0,commercial,YSCH0237,27200-79-9,C8H7BrO,False,False,False
+O=Cc1ccc(-c2ccc(C=O)c(O)c2)cc1O,"3,3'-二羟基-1,1'-联苯-4,4'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSWG675,14969-32-5,C14H10O4,True,False,True
+COc1cc(-c2ccc(C=O)c(OC)c2)ccc1C=O,"3,3'-二甲氧基-1,1'-联苯-4,4'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSWG676,27343-98-2,C16H14O4,True,False,True
+CC(C)(C)c1cc(CCl)cc(C=O)c1O,3-(叔丁基)-5-(氯甲基)-2-羟基苯甲醛,aldehyde,False,0,False,1,0,0,commercial,YSZC1956,183017-88-1,C12H15ClO2,False,False,False
+O=Cc1ccc(C=O)s1,"2,5-噻吩二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSWG1128,932-95-6,C6H4O2S,True,False,True
+O=Cc1ccc(-c2ccc(-c3cc(-c4ccc(-c5ccc(C=O)cc5)cc4)c4ccc5c(-c6ccc(-c7ccc(C=O)cc7)cc6)cc(-c6ccc(-c7ccc(C=O)cc7)cc6)c6ccc3c4c65)cc2)cc1,"4',4'',4''',4''''-芘-1,3,6,8-四基四(1,1'-联苯-4-基甲醛)",aldehyde,False,0,False,4,0,0,commercial,YSWG1089,2734880-96-5,C68H46O4,True,False,True
+O=Cc1nc2c(s1)CCC2,"5,6-二氢-4H-环戊[d]噻唑-2-甲醛",aldehyde,False,0,False,1,0,0,commercial,YSZC2081,933728-60-0,C8H9NOS,False,False,False
+O=Cc1cc(O)cc(C=O)c1O,"2,5-二羟基对苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC2582,109486-06-8,C8H6O4,True,False,True
+COc1cc2c(-c3ccc(C=O)cc3)c3cc(OC)c(OC)cc3c(-c3ccc(C=O)cc3)c2cc1OC,"4,4',4'',4'''-四甲氧基蒽-9,10-二基二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC2690,494868-40-5,C38H30O6,True,False,True
+O=Cc1cc(C=O)cc(-c2ccc(-c3ccc(-c4cc(C=O)cc(C=O)c4)cc3)cc2)c1,"[1,1':4',1''-三联苯]-3,3'',5,5''-四甲醛",aldehyde,False,0,False,4,0,0,commercial,YSWC685,2459652-59-4,C24H14O4,True,False,True
+O=Cc1ccc(-c2cc(Cn3ccnc3)c(-c3ccc(C=O)cc3)cc2Cn2ccnc2)cc1,"2',5'-双((1H-咪唑-1-基)甲基)-[1,1':4',1''-三联苯]-4,4''-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC3009,2375720-19-5,C28H22N4O2,True,False,True
+CC1(C)OB(c2ccc(N(c3ccc(C=O)cc3)c3ccc(C=O)cc3)cc2)OC1(C)C,"4,4'-(4-(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)-1,4-亚苯基)二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC3169,2009169-65-5,C26H27BO4,True,False,True
+O=Cc1ccc2c(c1)S(=O)(=O)c1cc(C=O)ccc1-2,"二苯并[b,d]噻吩-3,7-二甲醛-5,5-二氧化物",aldehyde,False,0,False,2,0,0,commercial,YSCK0355,82487-47-6,C14H8O4S,True,False,True
+C[N+](C)(C)CCOc1cc(C=O)c(OCC[N+](C)(C)C)cc1C=O.[Br-].[Br-],"2,2'-((2,5-二甲酰基-1,4-亚苯基)双(氧基))双(N,N,N-三甲基乙烷-1-铵)溴化物",aldehyde,False,0,False,2,0,0,commercial,YSCK0361,2830594-03-9,C20H36Br2N2O4,True,False,True
+O=Cc1cc2ccccc2cc1C=O,"萘-2,3-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC3118,7149-49-7,C12H8O2,True,False,True
+O=Cc1c(Br)c(C=O)c(Br)c(C=O)c1Br,"1,3,5-三溴-2,4,6-苯甲醛",aldehyde,False,0,False,3,0,0,commercial,YSZCR005,191529-09-6,C7H3Br3O,True,False,True
+CCCCCCNC(=O)c1c(-c2ccc(C=O)cc2)c(C(=O)NCCCCCC)c(-c2ccc(C=O)cc2)c(C(=O)NCCCCCC)c1-c1ccc(C=O)cc1,"4,4'-二氨基-4''-甲基-N,N,N',N'-四辛基-1,1':4',1''-三联苯-2'',5''-二甲醛",aldehyde,False,0,False,3,0,0,commercial,YSZCR007,2413680-71-2,C53H82N2O2,True,False,True
+O=Cc1ccc(N(c2ccc(C=O)cc2)c2ccc(N(c3ccc(C=O)cc3)c3ccc(C=O)cc3)cc2)cc1,"4,4',4''-(1,4-亚苯基二亚氨基)四(1,1'-联苯-4-甲醛)",aldehyde,False,0,False,4,0,0,commercial,YSCH0083,854938-59-3,C52H34N2O4,True,False,True
+O=Cc1ccc(-c2ccc(C(c3ccc(-c4ccc(C=O)cc4)cc3)(c3ccc(-c4ccc(C=O)cc4)cc3)c3ccc(-c4ccc(C=O)cc4)cc3)cc2)cc1,"4',4''',4''''-亚甲基四(1,1'-联苯-4-甲醛)",aldehyde,False,0,False,4,0,0,commercial,YSZCR019,2507779-34-0,C49H32O4,True,False,True
+O=Cc1ccc(-c2cc3c(cc2-c2ccc(C=O)c(F)c2)C2c4cc(-c5ccc(C=O)c(F)c5)c(-c5ccc(C=O)c(F)c5)cc4C3c3cc(-c4ccc(C=O)c(F)c4)c(-c4ccc(C=O)c(F)c4)cc32)cc1F,"3,4',4'''-三氟-4'',4''''-(1,3-二羟基-9,10-二氢-9,10-乙基蒽-2,6-二基)双(1,1'-联苯-4-甲醛)",aldehyde,True,6,False,6,0,0,commercial,YSZCR020,2739864-54-9,C51H33F3O4,True,False,True
+O=Cc1ccc(-c2c(O)c(-c3ccc(C=O)cc3)c(-c3ccc(C=O)cc3)c(O)c2-c2ccc(C=O)cc2)cc1,"4',5'-双(4-甲酰苯基)-2,2'-二羟基-1,1':3',1''-三联苯-4,4''-二甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC3217,2566806-70-8,C34H22O6,True,False,True
+O=Cc1cc(C=O)cc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)c1,"5-(1,2,2-三苯基乙烯基)间苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC3137,2694864-53-2,C28H18O2,True,False,True
+O=Cc1cc(C=O)cc(-c2cccc(-c3cccc(-c4cc(C=O)cc(C=O)c4)c3)c2)c1,"[1,1':3',1''-三联苯]-3,3'',5,5''-四甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC3164,2459652-60-7,C24H12O4,True,False,True
+O=Cc1cc(C=O)cc(-c2cncc(-c3cc(C=O)cc(C=O)c3)c2)c1,"5,5'-(吡啶-3,5-二基)二间苯二甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC3166,2459652-62-9,C20H10N2O4,True,False,True
+O=Cc1cccc(C=O)c1C#Cc1cc(C#Cc2c(C=O)cccc2C=O)cc(C#Cc2c(C=O)cccc2C=O)c1,"2,2',2''-(苯-1,3,5-三基三(乙炔-2,1-二基))三苯甲醛",aldehyde,False,0,False,6,0,0,commercial,YSZC3172,1993470-35-1,C36H18O3,True,False,True
+O=Cc1ccccc1C#Cc1cc(C#Cc2ccccc2C=O)cc(C#Cc2ccccc2C=O)c1,"2,2',2''-(苯-1,3,5-三基三(乙炔-2,1-二基))三苯甲醛",aldehyde,False,0,False,3,0,0,commercial,YSZC3173,1993470-34-0,C36H18O3,True,False,True
+O=Cc1cc(C=O)c(Br)cc1Br,"4,6-二溴间苯二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC3177,97094-37-6,C8H4Br2O2,True,False,True
+C=Cc1ccc(-c2cc(C=O)cc(C=O)c2)cc1,"4'-乙烯基-[1,1'-联苯]-3,5-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC2649,1181812-85-0,C16H12O2,True,False,True
+O=Cc1ccc(N2CCN(c3ccc(C=O)cc3)CC2)cc1,"4,4'-(哌嗪-1,4-二基)二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC2201,10159-39-4,C18H18N2O2,True,False,True
+O=Cc1cc(-c2ccccn2)nc(-c2ccccn2)c1,"2,2':6',2''-三联吡啶-4-甲醛",aldehyde,False,0,False,1,0,0,commercial,YSCK0589,108295-45-0,C16H10N3O,False,False,False
+O=Cc1cccc(-c2cccc(C=O)c2)c1,"联苯-3,3'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCH0289,19800-47-6,C14H10O2,True,False,True
+CCCCC(CC)CN1C(=O)C2=C(c3ccc(C=O)s3)N(CC(CC)CCCC)C(=O)C2=C1c1ccc(C=O)s1,"5,5'-[2,5-双(2-乙基己基)-3,6-二氧代-2,3,5,6-四氢吡咯并[3,4-c]吡咯-1,4-二基]双(噻吩-2-甲酰亚胺)",aldehyde,False,0,False,2,0,0,commercial,YSCH0293,1239218-96-2,C44H58N4O4S2,True,False,True
+CCn1c2cc(C=O)ccc2c2ccc(C=O)cc21,"9-乙基-9H-咔唑-2,7-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC3298,1198182-98-7,C17H13NO2,True,False,True
+O=Cc1cc(Br)cc(C=O)n1,"4-溴吡啶-2,6-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC3299,128184-01-0,C7H4BrNO2,True,False,True
+O=Cc1ccc(-c2cc(C(=O)O)c(-c3ccc(C=O)cc3)cc2C(=O)O)cc1,"4,4''-二甲酰基-[1,1':4',1''-三联苯]-2',5'-二羧酸",aldehyde,False,0,False,2,0,0,commercial,YSZC548,2409130-70-5,C22H14O6,True,False,True
+O=Cc1cc(-c2ccc(C(=C(c3ccccc3)c3ccccc3)c3ccccc3)cc2)c(C=O)cc1-c1ccc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)cc1,"4,4''-双(1,2,2-三苯基乙烯基)-[1,1':4',1''-三联苯]-2',5'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0627,2222717-73-7,C56H38O2,True,False,True
+O=Cc1ccc(C(=CC=C(c2ccccc2)c2ccc(C=O)cc2)c2ccccc2)cc1,"4,4'-((1Z,3Z)-1,4-二苯基丁-1,3-二烯-1,4-二基)二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0631,2202766-47-8,C28H20O2,True,False,True
+Cc1ccc(-c2cc(C=O)c(-c3ccc(C)cc3)cc2C=O)cc1,"4,4''-二甲基-[1,1':4',1''-三联苯]-2',5'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0635,850859-98-2,C22H18O2,True,False,True
+COc1ccc(-c2cc(C=O)c(-c3ccc(OC)cc3)cc2C=O)cc1,"4,4''-二甲氧基-[1,1':4',1''-三联苯]-2',5'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0637,916651-12-2,C22H18O4,True,False,True
+O=Cc1cc(-c2ccc(N(c3ccccc3)c3ccccc3)cc2)c(C=O)cc1-c1ccc(N(c2ccccc2)c2ccccc2)cc1,"4,4''-双(二苯氨基)-[1,1':4',1''-三联苯]-2',5'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0639,1042941-53-6,C44H34N2O2,True,False,True
+O=Cc1ccc(-c2cc(-c3ccc(C=O)cc3)cc(-c3ccc(-c4cc(-c5ccc(C=O)cc5)cc(-c5ccc(C=O)cc5)c4)c4nsnc34)c2)cc1,"5,5''''-(苯并[c][1,2,5]噻二唑-4,7-二基)双([1,1':3',1''-三联苯]-4,4''-二甲醛)",aldehyde,False,0,False,4,0,0,commercial,YSCK0606,2757814-47-2,C42H22N2O4S,True,False,True
+CCN1c2ccc(C=O)cc2Sc2cc(C=O)ccc21,"10-乙基-10H-吩噻嗪-3,7-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0656,204977-17-3,C16H15NO2S,True,False,True
+CC(C)(C)c1ccc2c(c1)c1cc(C(C)(C)C)ccc1n2-c1ccc(-c2cc(C=O)c(-c3ccc(-n4c5ccc(C(C)(C)C)cc5c5cc(C(C)(C)C)ccc54)cc3)cc2C=O)cc1,"4,4''-双(3,6-二叔丁基-9H-咔唑-9-基)-[1,1':4',1''-三联苯]-2',5'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0662,2172631-09-1,C60H64N2O2,True,False,True
+O=Cc1cccc(-c2ccc3ccccc3n2)c1,"3,3'-(蒽-9,10-二基)二苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSCK0696,324751-00-0,C28H18O2,False,False,False
+O=Cc1cc(-c2cc(C(F)(F)F)cc(C(F)(F)F)c2)c(C=O)cc1-c1cc(C(F)(F)F)cc(C(F)(F)F)c1,"3,3',5,5'-tetrakis(trifluoromethyl)-[1,1':4',1''-terphenyl]-2,5'-dicarbaldehyde",aldehyde,True,12,True,2,0,0,commercial,YSZC1029,2368851-11-8,C24H12F12O2,True,False,True
+O=Cc1ccc2c(c1)OCCOCCOCCOCCO2,"2,3,5,6,8,9,11,12-octahydrobenzo[b][1,4,7,10,13]pentaoxacyclopentadecine-15-carbaldehyde",aldehyde,False,0,False,1,0,0,commercial,YSZC3666,60835-73-6,C17H22O6,False,False,False
+O=Cc1ccc(-c2c3nc(c(-c4ccc(C=O)cc4)c4ccc([nH]4)c(-c4ccc(C=O)cc4)c4nc(c(-c5ccc(C=O)cc5)c5ccc2[nH]5)C=C4)C=C3)cc1,四醛基苯基卟啉,aldehyde,False,0,False,4,0,0,commercial,YSWG058,150805-46-2,C48H38N4O4,True,False,True
+O=Cc1cc(I)c(C=O)cc1I,"2,5-diiodoterephthalaldehyde",aldehyde,False,0,False,2,0,0,commercial,YSZC1973,1231999-67-9,C8H4I2O2,True,False,True
+CC(C)(C)c1cc(C=O)cc(C=O)c1,5-(tert-butyl)isophthalaldehyde,aldehyde,False,0,False,2,0,0,commercial,YSZC3672,180740-69-6,C12H14O2,True,False,True
+O=Cc1ccc(-c2ccc(C=O)cn2)cc1,6-(4-formylphenyl)nicotinaldehyde,aldehyde,False,0,False,2,0,0,commercial,YSZC2779,885950-11-8,C13H10NO2,True,False,True
+O=Cc1ccc(-c2ccc3c(c2)C2(c4cc(-c5ccc(C=O)cc5)ccc4-3)c3cc(-c4ccc(C=O)cc4)ccc3-c3ccc(-c4ccc(C=O)cc4)cc32)cc1,"4,4',4'',4'''-(四苯基-2,7,10,15-四基)四苯甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC3970,2758191-87-4,C52H32O4,True,False,True
+O=Cc1ccc(N(c2ccc(N3c4ccccc4Sc4ccccc43)cc2)c2ccc(N3c4ccccc4Sc4ccccc43)cc2)cc1,"4-(N,N-双(4-(苯并噻唑基)苯基)氨基)苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSCK0809,943784-70-1,C31H21N3OS,False,False,False
+CC(C)(C)c1ccc2c(c1)c1cc(C(C)(C)C)ccc1n2-c1ccc(N(c2ccc(C=O)cc2)c2ccc(-n3c4ccc(C(C)(C)C)cc4c4cc(C(C)(C)C)ccc43)cc2)cc1,"4-(双(4-(3,6-二叔丁基-9H-咔唑-9-基)苯基)氨基)苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSCK0805,1660130-91-5,C55H57N3O,False,False,False
+O=Cc1ccc(N(c2ccc(-n3c4ccccc4c4ccccc43)cc2)c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1,4-(双(4-(9H-咔唑-9-基)苯基)氨基)苯甲醛,aldehyde,False,0,False,1,0,0,commercial,YSCK0807,943784-69-8,C37H25N3O,False,False,False
+O=Cc1ccc(-c2cnc3c(ccc4cc(-c5ccc(C=O)cc5)cnc43)c2)cc1,"4,4'-(1,10-菲咯啉-3,8-二基)二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0842,2368860-32-4,C26H16N2O2,True,False,True
+O=Cc1ccc(N2c3ccccc3Oc3ccccc32)cc1,4-(10H-吩噻嗪-10-基)苯甲醛,aldehyde,False,0,False,1,0,0,commercial,YSCK0847,2148301-47-5,C19H13NOS,False,False,False
+CCn1c2ccccc2c2ccc(C=O)cc21,9-乙基-9H-咔唑-2-甲醛,aldehyde,False,0,False,1,0,0,commercial,YSCK0857,56166-62-2,C15H13NO,False,False,False
+CCCCCCCCn1c2ccccc2c2ccc(C=O)cc21,9-辛基-9H-咔唑-2-甲醛,aldehyde,False,0,False,1,0,0,commercial,YSCK0863,1353668-21-9,C21H25NO,False,False,False
+Nc1ccc(-c2cc(-c3ccc(C=O)cc3)c(-c3ccc(N)cc3)cc2-c2ccc(C=O)cc2)cc1,"2',5'-双(4-氨基苯基)-[1,1':4',1''-三联苯]-4,4''-二甲醛",aldehyde-amine,False,0,False,2,2,0,commercial,YSZCR083,2583822-12-0,C30H24N2O2,True,True,True
+Nc1ccc(-c2cc(-c3ccc(N)cc3)c(-c3ccc(C=O)cc3)cc2-c2ccc(C=O)cc2)cc1,"4',6'-双(4-氨基苯基)-[1,1':3',1''-三联苯]-4,4''-二甲醛",aldehyde-amine,False,0,False,2,2,0,commercial,YSZCR084,2583822-09-5,C30H24N2O2,True,True,True
+Nc1ccc(-c2cc(-c3ccc(C=O)cc3)c(-c3ccc(C=O)cc3)cc2-c2ccc(N)cc2)cc1,"4',5'-双(4-氨基苯基)-[1,1':2',1''-三联苯]-4,4''-二甲醛",aldehyde-amine,False,0,False,2,2,0,commercial,YSZCR085,2583822-14-2,C30H24N2O2,True,True,True
+O=Cc1cccc(Oc2nc(Oc3cccc(C=O)c3)nc(Oc3cccc(C=O)c3)n2)c1,"3,3',3''-((1,3,5-三嗪-2,4,6-三基)三(氧基))三苯甲醛",aldehyde,False,0,False,3,0,0,commercial,YSZCR252,114567-98-5,C24H12N3O6,True,False,True
+O=Cc1ccc(-[n+]2ccc(-c3cc[n+](-c4ccc(C=O)cc4)cc3)cc2)cc1.[Br-].[Br-],"1,1'-双(4-甲酰基苯基)-[4,4'-联吡啶]-1,1'-二溴化物",aldehyde,False,0,False,2,0,0,commercial,YSZC3774,2393907-39-4,C24H18Br2N2O2,True,False,True
+O=Cc1ccc(N2c3ccc(C=O)cc3Sc3cc(C=O)ccc32)cc1,"10-(4-甲酰基苯基)-10H-吩噻嗪-3,7-二甲醛",aldehyde,False,0,False,3,0,0,commercial,YSCK0930,1787231-81-5,C20H13NO2S,True,False,True
+O=Cc1ccc(-c2cc3cc(-c4ccc(C=O)cc4)cc4c5cc(-c6ccc(C=O)cc6)cc6cc(-c7ccc(C=O)cc7)cc(c(c2)c34)c65)cc1,"4-[5,8,11-三(4-甲酰基苯基)菲-2-基]苯甲醛",aldehyde,False,0,False,4,0,0,commercial,YSCK0975,2616820-72-3,C44H26O3,True,False,True
+O=Cc1ccc(-c2ccc3[nH]c4ccc(-c5ccc(C=O)cc5)cc4c3c2)cc1,"4,4'-(9H-咔唑-3,6-二基)二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK0985,1380609-13-1,C26H17NO2,True,False,True
+O=Cc1[nH]nc2ccc(Br)cc12,5-溴吲哚-3-甲醛,aldehyde,False,0,False,1,0,0,commercial,YSZC3345,201227-38-5,C9H6BrNO,False,False,False
+O=Cc1cc(-c2ccc(Br)c(C=O)c2)ccc1Br,"4,4'-二溴-[1,1'-联苯]-3,3'-二甲醛",aldehyde,False,0,False,2,0,0,commercial,LCZCJ064,1919799-35-1,C14H8Br2O2,True,False,True
+O=Cc1ccc(-c2ccc(C(=O)O)cc2)cc1,"4-甲酰基-[1,1'-联苯]-4-羧酸",aldehyde,False,0,False,1,0,0,commercial,YSZC1934,70916-98-2,C14H10O3,False,False,False
+O=Cc1ccc(N(c2ccc(Br)cc2)c2ccc(Br)cc2)cc1,4-双(4-溴苯基)氨基苯甲醛,aldehyde,False,0,False,1,0,0,commercial,YSCK1150,25069-38-9,C19H15Br2NO,False,False,False
+CC(C)(C)c1ccc2c(c1)c1cc(C(C)(C)C)ccc1n2-c1ccc(C=O)cc1,"4-(3,6-二叔丁基-9H-咔唑-9-基)苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSCK1172,320575-24-4,C27H29NO,False,False,False
+CC(C)c1cc(C=O)cc(C(C)C)c1O,"4-羟基-3,5-二异丙基苯甲醛",aldehyde,False,0,False,1,0,0,commercial,YSWG1285,10537-86-7,C13H18O2,False,False,False
+O=Cc1ccc(-c2cc(C=O)cc(-c3cc(C=O)cc(-c4ccc(C=O)cc4)c3)c2)cc1,"1,1':3',1''-四联苯-4,4'',5,5''-四甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZCG132,2757248-24-9,C28H18O4,True,False,True
+COc1c(O)cc2c3c(ccc(-c4ccccc4)c13)C=CC2=O,"2'-羟基-1,1':3',1''-三联苯-4,4''-二甲醛",other,False,0,False,0,0,0,commercial,YSZCG133,2093335-33-0,C20H14O3,False,False,False
+O=Cc1ccc2ccc3c(C=O)ccc4ccc1c2c43,"芘-1,6-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC3932,252338-01-5,C16H10O2,True,False,True
+O=Cc1cncc(C=O)c1,"3,5-吡啶二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC3569,6221-04-1,C7H5NO2,True,False,True
+O=Cc1cc(C=O)[nH]n1,"1H-吡唑-3,5-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCK1392,148832-75-1,C5H4N2O2,True,False,True
+O=C(c1ccccc1)c1cc(C(=O)c2ccccc2)cc(C(=O)c2ccccc2)c1,"5-(4-甲酰基苯基)-1,1':3',1''-三联苯-3,4'',5-三甲醛",other,False,0,False,0,0,0,commercial,YSWG4335,nan,C27H18O3,False,False,False
+O=C(O)c1ccc(C#Cc2ccc(C#Cc3ccc(C(=O)O)cc3)cc2)cc1,"5,5''-(丁-1,3-二炔-1,4-二基)二间苯二甲醛",other,False,0,False,0,0,0,commercial,YSWG4319,nan,C24H14O4,False,False,False
+O=Cc1ccc(CN2CCN(Cc3ccc(C=O)cc3)CCN(Cc3ccc(C=O)cc3)CCN(Cc3ccc(C=O)cc3)CC2)cc1,"4,4',4'',4'''-(1,4,7,10-四氮杂环十二烷-1,4,7,10-四基)四(亚甲基)四苯甲醛",aldehyde,False,0,False,4,0,0,commercial,YSZC3893,1643532-25-5,nan,True,False,True
+O=Cc1cc2cc(C=O)c(O)cc2cc1O,"3,6-二羟基萘-2,7-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC6161,198145-98-1,nan,True,False,True
+O=Cc1cn2ccccc2n1,"咪唑[1,2-a]吡啶-2-甲醛",aldehyde,False,0,False,1,0,0,commercial,LCZC3970,118000-43-4,nan,False,False,False
+O=Cc1ccc(-c2cc(C=O)cc(-c3ccc(C=O)cc3)c2)cc1,"[1,1':3',1''-三联苯]-4,4',5'-三甲醛",aldehyde,False,0,False,3,0,0,commercial,YSZC6030,1977585-07-1,C21H14O3,True,False,True
+O=Cc1ccc2c(c1)C1(c3cc(C=O)ccc3-2)c2cc(C=O)ccc2-c2ccc(C=O)cc21,"2,2',7,7'-四醛基-9,9'-螺二芴",aldehyde,False,0,False,4,0,0,commercial,YSZC6060,124575-63-9,C29H16O4,True,False,True
+CCc1c(-c2ccc(C=O)cc2)c(CC)c(-c2ccc(C=O)cc2)c(CC)c1-c1ccc(C=O)cc1,"1,3,5-三(4-甲酰基苯基)苯",aldehyde,False,0,False,3,0,0,commercial,YSZC6095,2195343-69-0,C27H18O3,True,False,True
+O=C(O)C=Cc1cn(-c2ccccc2)nc1-c1ccc(-c2ccccc2)cc1,"5-(苯基偶氮基)-[1,1':3',1''-三联苯]-4,4''-二甲醛",other,False,0,False,0,0,0,commercial,YSZC6554,nan,C24H18N2O2,False,False,False
+O=Cc1ccccc1-c1ccc(-c2ccccc2C=O)cc1,"[1,1':4',1''-三联苯]-2,2''-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC6127,1334652-46-8,C20H14O2,True,False,True
+CCCCCCCCCCCCOc1cc(-c2ccc(C=O)cc2)c(OCCCCCCCCCCCC)cc1-c1ccc(C=O)cc1,"2',5'-双(十二烷氧基)-[1,1':4',1''-三联苯]-4,4''-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC6184,886448-84-6,C44H62O4,True,False,True
+CCCCCCCCOc1cc(-c2ccc(C=O)cc2)c(OCCCCCCCC)cc1-c1ccc(C=O)cc1,"2',5'-双(辛氧基)-[1,1':4',1''-三联苯]-4,4''-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC6185,180132-53-5,C36H46O4,True,False,True
+CCCCCCCCOc1c2cc(C=O)sc2c(OCCCCCCCC)c2cc(C=O)sc12,"4,8-二辛氧基-苯并[1,2-b:3,4-b']二噻吩-2,6-二醇",aldehyde,False,0,False,2,0,0,commercial,YSZC6441,1668554-22-0,C26H38O4S2,True,False,True
+O=Cc1ccc(-c2ccc(-c3ccc(C=O)s3)s2)s1,"2,2':5',2''-三噻吩-5,5''-二甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC4308,13130-50-2,C15H8O2S3,True,False,True
+O=Cc1ccccc1-c1cc(-c2ccccc2C=O)cc(-c2ccccc2C=O)c1,三(2-醛基苯基)苯,aldehyde,False,0,False,3,0,0,commercial,YSZC1054,87226-90-2,C27H18O3,True,False,True
+O=Cc1cccc(C(=C(c2ccccc2)c2ccccc2)c2cccc(C=O)c2)c1,"3,3'-(2,2-二苯乙烯基)-1,1-二苯甲醛",aldehyde,False,0,False,2,0,0,commercial,YSZC7095,2231618-36-1,C34H24O2,True,False,True
+O=Cc1ccc(N(c2ccc(C=O)cc2)c2ccc(-c3ccc(-c4ccc(N(c5ccc(C=O)cc5)c5ccc(C=O)cc5)cc4)c4nsnc34)cc2)cc1,"2,5-双(4-甲酰基苯基)噻唑",aldehyde,False,0,False,4,0,0,commercial,YSZC831,1446426-30-7,C17H12N2O2S,True,False,True
+COc1cc(C=CCO)ccc1OC1OC(CO)C(O)C(O)C1O,"1,2-双[2-(2-羧基乙氧基)乙氧基]苯",other,False,0,False,0,0,0,commercial,YSZC7306,nan,C16H22O8,False,False,False
+O=Cc1cc(OCCCS(=O)(=O)O)c(C=O)cc1OCCCS(=O)(=O)O,"3,3'-((2,5-二甲酰基-1,4-亚苯基)双(氧基))双(丙烷-1-磺酸)",aldehyde,False,0,False,2,0,0,commercial,YSZC5762,2690297-45-9,C14H18O10S2,True,False,True
+O=Cc1ccc(N2c3ccccc3N(c3ccc(C=O)cc3)c3ccccc32)cc1,三(4-甲酰基苯基)胺,aldehyde,False,0,False,2,0,0,commercial,YSZC6446,2241852-82-2,C21H15NO3,True,False,True
+O=Cc1ccc(N(c2ccc(C=O)cc2)c2ccc(-c3ccc(-c4ccc(N(c5ccc(C=O)cc5)c5ccc(C=O)cc5)cc4)cc3)cc2)cc1,"1,4-双(4-甲酰基苯基)-1,3-丁二烯",aldehyde,False,0,False,4,0,0,commercial,YSZC6933,2414345-71-2,C18H14O2,True,False,True
+O=Cc1ccc(N(c2ccc(C=O)cc2)c2ccc(-c3cc(C=O)c(-c4ccc(N(c5ccc(C=O)cc5)c5ccc(C=O)cc5)cc4)cc3C=O)cc2)cc1,"3,3',3'',3'''-(1,4-亚苯基)四(4-甲酰基苯基)胺",aldehyde,False,0,False,6,0,0,commercial,YSZC433,2097132-15-3,C44H28N2O4,True,False,True
+O=c1c2ccccc2cc(Br)c2ccccc12,9-溴蒽-10-甲醛,other,False,0,False,0,0,0,commercial,YSZC5098,nan,C15H9BrO,False,False,False
+CCc1c(C=O)c(CC)c(C=O)c(CC)c1C=O,"2,4,6-三甲基-1,3,5-苯三甲酸三甲酯",aldehyde,False,0,False,3,0,0,commercial,YSZC444,906565-55-7,C15H18O6,True,False,True
+Cc1cc(-c2ccc(C=O)nc2)c(C)cc1-c1ccc(C=O)nc1,"5,5'-(2,5-二甲基-1,4-苯基)二甲基吡啶醛",aldehyde,False,0,False,2,0,0,commercial,YSZC1522,1399191-67-3,nan,True,False,True
+O=Cc1cc(C=O)cc(-c2ccc(N(c3ccc(-c4cc(C=O)cc(C=O)c4)cc3)c3ccc(-c4cc(C=O)cc(C=O)c4)cc3)cc2)c1,"4',4''',4''''-三((1,1'-联苯]-3,6-二甲酰)",aldehyde,False,0,False,6,0,0,commercial,YSWG682,2030105-85-0,C36H24N2O6,True,False,True
+O=Cc1ccc(-c2ccc(-c3ccc(C=O)nc3)cc2)cn1,"5,5'-(1,4-亚苯基)二吡啶甲醛",aldehyde,False,0,False,2,0,0,commercial,YSCH0127,1399191-70-8,C18H12N2O2,True,False,True
+Cl.Cl.Cl.Nc1cc(N)cc(N)c1,"1,3,5-三氨基苯盐酸盐",amine,False,0,False,0,3,0,commercial,YSWG181,638-09-5,C6H12Cl3N3,False,True,True
+Cl.Cl.Cl.Cl.Nc1cc(N)c(N)cc1N,"1,2,4,5-苯四胺四盐酸盐",amine,False,0,False,0,4,0,commercial,YSWG014,4506-66-5,C6H14Cl4N4,False,True,True
+Nc1ccnc(-c2cc(N)ccn2)c1,"4,4'-二氨基-2,2'-联吡啶",amine,False,0,False,0,2,0,commercial,YSWG117,18511-69-8,C10H10N4,False,True,True
+C=Cc1cc(N)c(C=C)cc1N,"1,4-二氨基-2,5-二乙烯基苯",amine,False,0,False,0,2,0,commercial,YSZC241,1631999-89-7,C10H12N2,False,True,True
+Nc1ccc(N)c2[nH]ncc12,"1氢-吲唑-4,7-二胺",amine,False,0,False,0,2,0,commercial,YSZC103,918961-26-9,C7H8N4,False,True,True
+Nc1ccc(N)nc1,"2,5-二氨基吡啶",amine,False,0,False,0,2,0,commercial,YSZC148,4318-76-7,C5H7N3,False,True,True
+Nc1ccc(-c2ccc(N)cn2)nc1,"5,5'-二氨基-2,2'-联吡啶",amine,False,0,False,0,2,0,commercial,YSZC058,52382-48-6,C10H10N4,False,True,True
+Cc1cc(-c2ccc(N)c(C)c2)ccc1N,"4,4'-二氨基-3,3'-二甲基联苯",amine,False,0,False,0,2,0,commercial,YSWG200,119-93-7,C14H16N2,False,True,True
+COc1cc(-c2ccc(N)c(OC)c2)ccc1N,联大茴香胺,amine,False,0,False,0,2,0,commercial,YSWG201,119-90-4,C14H16N2O2,False,True,True
+Nc1ccc(-c2ccc(N)c(O)c2)cc1O,"3,3'-二羟基联苯胺",amine,False,0,False,0,2,0,commercial,YSWG019,2373-98-0,C12H12N2O2,False,True,True
+Cc1cc(-c2ccc(N)cc2)c(C)cc1-c1ccc(N)cc1,"2,5-二(4-氨基苯基)-1,4-二甲苯",amine,False,0,False,0,2,0,commercial,YSZC322,152219-88-0,C20H22N2,False,True,True
+Nc1ccc(-c2ccc(-c3ccc(N)cc3)c3nsnc23)cc1,"4,4'-(苯并[c][1,2,5]噻二唑-4,7-二基)二苯胺",amine,False,0,False,0,2,0,commercial,YSZC197,1203707-77-0,C18H14N4S,False,True,True
+N=c1nc2n3c(nc(N)nc3n1)NC(N)=N2,蜜勒胺,amine,False,0,False,0,2,0,commercial,YSWG128,1502-47-2,C6H9N11,False,True,True
+Nc1ccc2ccc3cccc4ccc1c2c34,1-氨基芘,amine,False,0,False,0,1,0,commercial,YSWG274,1606-67-3,C16H11N,False,False,False
+Nc1ccc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)cc1,"1-(4-氨基苯基)-1,2,2-三苯乙烯",amine,False,0,False,0,1,0,commercial,YSWG219,919789-80-3,C26H21N,False,False,False
+Cl.Cl.N=C(N)c1ccc(C(=N)N)cc1,"1,4-苯二甲脒二盐酸盐",amine,False,0,False,0,2,0,commercial,YSZC097,14401-56-0,C8H12Cl2N4,False,True,True
+Nc1ccc(N)c([N+](=O)[O-])c1,"2-硝基-1,4-苯二胺",amine,False,0,False,0,2,0,commercial,nan,5307-14-2,C6H7N3O2,False,True,True
+Nc1ccc(-c2ccc(N)c([N+](=O)[O-])c2)cc1[N+](=O)[O-],"3,3'-二硝基-4,4'-二氨基联苯",amine,False,0,False,0,2,0,commercial,YSWG376,6271-79-0,C12H10N4O4,False,True,True
+Nc1ccc(Oc2ccc(N)cc2)cc1,"4,4'-二氨基二苯醚",amine,False,0,False,0,2,0,commercial,YSWG195,101-80-4,C12H12N2O,False,True,True
+Nc1ccc(Oc2ccc(Oc3ccc(N)cc3)cc2)cc1,"1,4-双(4-氨基苯氧基)苯",amine,False,0,False,0,2,0,commercial,YSWG196,3491-12-1,C18H16N2O2,False,True,True
+Nc1ccc(Oc2cccc(Oc3ccc(N)cc3)c2)cc1,"1,3-二(4-氨基苯氧基)苯",amine,False,0,False,0,2,0,commercial,YSWG194,2479-46-1,C18H16N2O2,False,True,True
+Nc1cccc(Oc2cccc(Oc3cccc(N)c3)c2)c1,"1,3-双(3-氨基苯氧基)苯",amine,False,0,False,0,2,0,commercial,nan,10526-07-5,C18H16N2O2,False,True,True
+COc1cc(C(=O)NN)c(OC)cc1C(=O)NN,"2,5-二甲氨基对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSZC306,114503-42-3,C8H14N4O2,False,True,True
+NNC(=O)c1cc(OCc2ccccc2)c(C(=O)NN)cc1OCc1ccccc1,"(2,5-双(苄氧基)-1,4-亚苯基)双(酰肼)",amine,False,0,False,0,2,0,commercial,YSWG743,2413017-02-2,C20H22N4O2,False,True,True
+C#CCOc1cc(C(=O)NN)c(OCC#C)cc1C(=O)NN,"2,5-双(丙-2-炔-1-基氨基)对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSZC390,2564821-81-2,C12H14N4O2,False,True,True
+CCSCCCOc1cc(C(=O)NN)c(OCCCSCC)cc1C(=O)NN,"2,5-双(3-(乙硫基)丙氨基)对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSZC305,1591732-98-7,C16H26N4O2S2,False,True,True
+C=CCOc1cc(C(=O)NN)c(OCC=C)cc1C(=O)NN,"2,5-双(烯丙氧基)对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSZC314,2227151-69-9,C12H18N4O2,False,True,True
+Nc1cc(Br)c(N)cc1Br,"2,5-二溴对苯二胺",amine,False,0,False,0,2,0,commercial,YSZC145,25462-61-7,C6H6Br2N2,False,True,True
+Nc1ccc(-c2ccc(N)c(N)c2)cc1N,"3,3'-二氨基联苯胺",amine,False,0,False,0,4,0,commercial,YSWG211,91-95-2,C12H14N4,False,True,True
+Nc1ccc(C2(c3ccc(N)cc3)c3ccccc3-c3ccccc32)cc1,"9,9-双(4-氨基苯基)芴",amine,False,0,False,0,2,0,commercial,YSWG207,15499-84-0,C26H22N2,False,True,True
+Nc1ccc(-c2ccc(-c3ccc(N)cc3)c3[nH]cnc23)cc1,"4,4'-(1H-苯并[d]咪唑-4,7-二基)二苯胺",amine,False,0,False,0,2,0,commercial,YSZC257,1998160-90-9,C19H16N4,False,True,True
+Nc1cc2ccccc2cc1N,"2,3-二氨基萘",amine,False,0,False,0,2,0,commercial,YSZC182,771-97-1,C10H10N2,False,True,True
+CSc1cc(N)c(SC)cc1N,"2,5-二甲基巯基苯-1,4-二胺",amine,False,0,False,0,2,0,commercial,YSZC276,1678513-93-3,C8H12N2S2,False,True,True
+N#Cc1cc(N)c(C#N)cc1N,"1,4-二氨基-2,5-二氰基苯",amine,False,0,False,0,2,0,commercial,YSZC092,75636-88-3,C8H6N4,False,True,True
+Nc1c(N)c2cccnc2c2ncccc12,"5,6-二氨基-1,10-邻菲罗啉",amine,False,0,False,0,2,0,commercial,YSWG187,168646-54-6,C12H12N4,False,True,True
+Cl.Cl.Nc1cc(O)c(N)cc1O,"2,5-二氨基-1,4-二羟基苯二盐酸盐",amine,False,0,False,0,2,0,commercial,YSZC264,24171-03-7,C6H10Cl2N2O2,False,True,True
+Nc1ccc(-c2ccc(-c3nc(-c4ccc(-c5ccc(N)cc5)cc4)nc(-c4ccc(-c5ccc(N)cc5)cc4)n3)cc2)cc1,"4',4''',4'''-(1,3,5-三嗪-2,4,6-三基)三(([1,1'-联苯]-4-胺))",amine,False,0,False,0,3,0,commercial,YSZC005,2130745-76-3,C39H30N6,False,True,True
+Nc1ccc(-[n+]2ccc(-c3cc[n+](-c4ccc(N)cc4)cc3)cc2)cc1.[Cl-].[Cl-],"1,1'-双(4-氨基苯基)-[4,4'-联吡啶]-1,1'-二氯化物",amine,False,0,False,0,2,0,commercial,YSZC127,222973-24-2,C24H20Cl2N4,False,True,True
+Nc1ccc2c(c1)c(=O)c1c2c2c(=O)c3cc(N)ccc3c2c2c(=O)c3cc(N)ccc3c12,"2,7,12-三氨基-5H-二吲哚[1,2-a:1',2'-c]苝-5,10,15-三酮",amine,False,0,False,0,3,0,commercial,YSZC045,209112-55-0,C27H15N3O3,False,True,True
+Nc1ccc(NC(=O)c2cc(C(=O)Nc3ccc(N)cc3)cc(C(=O)Nc3ccc(N)cc3)c2)cc1,"苯-1,3,5-三羧酸三(4-氨基苯基)酰胺",amine,False,0,False,0,3,0,commercial,YSZC219,205653-12-9,C27H21N5O6,False,True,True
+Cl.Cl.Nc1cc(S)c(N)cc1S,"2,5-二氨基-1,4-苯二硫酸二盐酸盐",amine,False,0,False,0,2,0,commercial,YSWG173,75464-52-7,C6H10Cl2N2O6S2,False,True,True
+C#Cc1cc(N)c(C#C)cc1N,"2,6-二炔基对苯二胺",amine,False,0,False,0,2,0,commercial,YSZC108,1141727-54-9,C10H8N2,False,True,True
+NC(=O)Nc1ccc(NC(N)=O)cc1,"1,1'-(1,4-亚苯基)二脲",amine,False,0,False,0,2,0,commercial,YSZC243,1205-90-9,C8H10N4O2,False,True,True
+Nc1ccc2c(c1)S(=O)(=O)c1cc(N)ccc1-2,"3,7-二氨基苯并[b,d]噻吩-5,5-二氧化物",amine,False,0,False,0,2,0,commercial,YSZC142,6259-19-4,C8H8N2O2S,False,True,True
+NNC(=O)c1ccc(-c2c3nc(c(-c4ccc(C(=O)NN)cc4)c4ccc([nH]4)c(-c4ccc(C(=O)NN)cc4)c4nc(c(-c5ccc(C(=O)NN)cc5)c5ccc2[nH]5)C=C4)C=C3)cc1,"4,4',4'',4'''-(卟啉-5,10,15,20-四基)四(苯甲酰胺)",amine,False,0,False,0,4,0,commercial,YSZC037,323208-61-3,C48H34N8O4,False,True,True
+Nc1ccc(C#CC#Cc2ccc(N)cc2)cc1,"4,4'-(丁-1,3-二炔-1,4-二基)二苯胺",amine,False,0,False,0,2,0,commercial,YSZC011,30405-78-8,C16H12N2,False,True,True
+Cl.NN=C(NN)NN,三氨基胍盐酸盐,amine,False,0,False,0,3,0,commercial,YSZC233,5329-29-3,CH9N6Cl,False,True,True
+Nc1ccc(C#Cc2ccc(N)cc2)cc1,"4,4'-(1,2-亚乙炔基)二苯胺",amine,False,0,False,0,2,0,commercial,YSZC057,6052-15-9,C16H12N2,False,True,True
+Nc1cccc([Si]23O[Si]4(c5cccc(N)c5)O[Si]5(c6cccc(N)c6)O[Si](c6cccc(N)c6)(O2)O[Si]2(c6cccc(N)c6)O[Si](c6cccc(N)c6)(O3)O[Si](c3cccc(N)c3)(O4)O[Si](c3cccc(N)c3)(O5)O2)c1,八对氨基苯基-多面体低聚倍半硅氧烷,amine,False,0,False,0,8,0,commercial,YSSJ3451,518359-82-5,C48H48N8O12Si8,False,True,True
+Nc1ccc2c(c1)S(=O)(=O)c1cc3c(cc1-2)S(=O)(=O)c1cc(N)ccc1-3,"3,9-二氨基苯并[1,2-b:4,5-b']双[1]苯并噻吩-5,5,11,11-四氧化物",amine,False,0,False,0,2,0,commercial,YSZC124,2253969-12-7,C20H14N2O4S2,False,True,True
+Nc1ccc(-c2ccc(N)cc2C(=O)O)c(C(=O)O)c1,"4,4'-二氨基联苯-2,2'-二羧酸",amine,False,0,False,0,2,0,commercial,YSZC106,17557-76-5,C14H12N2O4,False,True,True
+Nc1ccc(-c2ccc(N)cc2C(F)(F)F)c(C(F)(F)F)c1,"2,2'-二(三氟甲基)-二氨基联苯",amine,True,6,True,0,2,0,commercial,YSWG084,341-58-2,C14H10F6N2,False,True,True
+COCCOCCOCCOc1cc(-c2ccc(N)cc2)c(OCCOCCOCCOC)cc1-c1ccc(N)cc1,"2,2'-双[2-(2-(2-甲氧基乙氧基)乙氧基)乙氧基]-[1,1':4',1''-三联苯]-4,4''-二胺",amine,False,0,False,0,2,0,commercial,YSZC1568,2172944-61-3,C32H44N2O8,False,True,True
+Nc1ccc(-c2cc(-c3ccccn3)nc(-c3ccccn3)c2)cc1,"4'-(4-氨基苯基)-2,2':6',2''-联三吡啶",amine,False,0,False,0,1,0,commercial,YSZC727,178265-65-1,C21H17N5,False,False,False
+Nc1ccc2[nH]c3ccc(N)cc3c2c1,"3,6-二氨基咔唑",amine,False,0,False,0,2,0,commercial,YSWG073,86-71-5,C12H11N3,False,True,True
+Nc1nc(-c2csc(N)n2)cs1,"2,2'-二氨基-4,4'-双噻唑",amine,False,0,False,0,2,0,commercial,YSWG034,58139-59-6,C6H6N4S2,False,True,True
+Cc1c(-c2ccc(N)cc2)c(C)c(-c2ccc(N)cc2)c(C)c1-c1ccc(N)cc1,"5,5'-(4-氨基苯基)-2',4'-二甲基-[1,1':3',1''-三联苯]-4,4''-二胺",amine,False,0,False,0,3,0,commercial,YSZC974,2642549-41-3,C26H26N4,False,True,True
+Cl.Cl.Nc1ccc(N)c(O)c1,"2,5-对二氨基苯酚盐酸盐",amine,False,0,False,0,2,0,commercial,YSWG005,89691-80-5,C6H9ClN2O,False,True,True
+Nc1cccc2c1c1cccc(N)c1c1cccc(N)c21,"1,3,5-三苯并菲三胺",amine,False,0,False,0,3,0,commercial,YSZC228,371786-11-7,C18H15N3,False,True,True
+Nc1ccc(N)c2ccccc12,"1,4-二胺萘",amine,False,0,False,0,2,0,commercial,YSWG314,2243-61-0,C10H10N2,False,True,True
+NC12CC3(N)CC(N)(C1)CC(N)(C2)C3,"1,3,5,7-四氨基金刚烷",amine,False,0,False,0,4,0,commercial,YSZC252,16004-77-6,C10H20N4,False,True,True
+Nc1ncnc(N)n1,"2,4-二氨基-1,3,5-三嗪",amine,False,0,False,0,2,0,commercial,YSWG323,504-08-5,C3H6N4,False,True,True
+Nc1c(N)c(Br)c2ccccc2c1Br,"1,4-二溴萘-2,3-二胺",amine,False,0,False,0,2,0,commercial,YSZC1095,103598-22-7,C10H8Br2N2,False,True,True
+NNC(=O)c1cc(O)c(C(=O)NN)cc1O,"2,5-二(肼基羰基)苯-1,4-二醇",amine,False,0,False,0,2,0,commercial,YSZC420,2245708-24-9,C8H10N4O4,False,True,True
+N#Cc1ccc(-c2ccc(N)cc2)cc1,4-氨基-4'-氰基联苯,amine,False,0,False,0,1,0,commercial,YSZC1326,4854-84-6,C13H10N2,False,False,False
+Nc1ccc2c(c1)OCCOCCOCCOCCO2,4'-氨基苯并-15-冠-5-醚,amine,False,0,False,0,1,0,commercial,YSZC426,60835-71-4,C14H21NO5,False,False,False
+Nc1ccc(-c2nnc(-c3ccc(N)cc3)o2)cc1,"2,5-二(4-氨基苯基)噻二唑",amine,False,0,False,0,2,0,commercial,YSWG101,2425-95-8,C14H12N4S,False,True,True
+Nc1ccc(-c2ccc(N)cc2[N+](=O)[O-])c([N+](=O)[O-])c1,"2,2'-二硝基联苯胺",amine,False,0,False,0,2,0,commercial,YSZC1297,5855-71-0,C12H10N4O4,False,True,True
+Nc1ccc(-c2ccc(-c3ccc(N)cc3)c3n[se]nc23)cc1,"4,4'-(苯并[c]硒吩-4,7-二基)二苯胺",amine,False,0,False,0,2,0,commercial,YSZC513,2722717-95-3,C16H12N2Se,False,True,True
+CC1(C)COC(c2ccc(N)cc2)OC1,"4-(5,5-二甲基-1,3-二噁烷-2-基)苯胺",amine,False,0,False,0,1,0,commercial,YSZC521,107708-70-3,C11H15NO2,False,False,False
+Nc1ccc(C(=C(c2ccccc2)c2ccc(N)cc2)c2ccccc2)cc1,"[1,2-二苯基-1,2-二(4-氨基苯基)]乙烯",amine,False,0,False,0,2,0,commercial,YSWG341,99094-20-9,C26H24N2,False,True,True
+Cl.Cl.Cl.Cl.N=C(N)c1ccc(C(c2ccc(C(=N)N)cc2)(c2ccc(C(=N)N)cc2)c2ccc(C(=N)N)cc2)cc1,"4,4',4''-亚甲基四(苯并咪唑胺)四盐酸盐",amine,False,0,False,0,4,0,commercial,YSZC451,2205867-69-0,C29H28Cl4N8,False,True,True
+Nc1cncc(N)c1,"吡啶-3,5-二胺",amine,False,0,False,0,2,0,commercial,YSWG442,4318-78-9,C5H7N3,False,True,True
+NNC(=O)c1ccc(N)cc1O,4-氨基水杨酰肼,amine,False,0,False,0,2,0,commercial,YSZC575,6946-29-8,C7H9N3O2,False,True,True
+Nc1cc(S(=O)(=O)O)c(N)cc1S(=O)(=O)O,"2,5-二氨基对苯二磺酸",amine,False,0,False,0,2,0,commercial,YSWG433,7139-89-1,C6H8N2O6S2,False,True,True
+Cn1cnc2c(-c3ccc(N)cc3)ccc(-c3ccc(N)cc3)c21,"4,4'-(1-甲基-1H-苯并[d]咪唑-4,7-二基)二苯胺",amine,False,0,False,0,2,0,commercial,YSZC580,2757731-54-5,C20H18N4,False,True,True
+NCc1ccc(-c2ccc(CN)cc2)cc1,"4,4'-二(氨甲基)联苯",amine,False,0,False,0,2,0,commercial,YSZC794,2457-28-5,C14H16N2,False,True,True
+Nc1ccc2c(c1)-c1nc-2nc2[n-]c(nc3nc(nc4[n-]c(n1)c1ccc(N)cc41)-c1ccc(N)cc1-3)c1ccc(N)cc21.[Zn+2],"锌(2+) 2,9,16,23-四氨基酞菁盐",amine,False,0,False,0,4,0,commercial,YSWG520,84097-37-0,C32H20N12Zn,False,True,True
+Cl.Cl.Cl.Cl.Cl.Cl.Nc1cc2c(cc1N)C1c3cc(N)c(N)cc3C2c2cc(N)c(N)cc21,"2,3,6,7,10,11,14,14-八氨基三苯并[1,2-c:3,4-c':5,6-c'']三嗪六盐酸盐",amine,False,0,False,0,6,0,commercial,YSZC740,1353682-29-7,C18H30N6Cl6,False,True,True
+Nc1nc2cc3sc(N)nc3cc2s1,"2,6-二氨基苯并[1,2-d:4,5-d']二噻唑",amine,False,0,False,0,2,0,commercial,YSZC561,16162-28-0,C6H4N4S2,False,True,True
+NC1=C(N)C(=O)C(N)=C(N)C1=O,"2,3,5,6-四氨基-1,4-环己二烯-1,4-二酮",amine,False,0,False,0,4,0,commercial,YSZC821,1128-13-8,C6H8N4O2,False,True,True
+Nc1cccc(-c2cc(-c3cccc(N)c3)cc(-c3cccc(N)c3)c2)c1,"5'-(3-氨基苯基)-[1,1':3',1''-三联苯]-3,3''-二胺",amine,False,0,False,0,3,0,commercial,YSZC1061,184650-02-0,C24H21N3,False,True,True
+Nc1cccc(C#Cc2cccc(N)c2)c1,"3,3'-(乙炔-1,2-二基)二苯胺",amine,False,0,False,0,2,0,commercial,YSZC877,102852-93-7,C14H12N2,False,True,True
+Nc1n[nH]c(-c2nc(N)n[nH]2)n1,"[3,3'-二-1,2,4-1H-三氮唑]-5,5'-二胺",amine,False,0,False,0,2,0,commercial,YSZC1120,22819-10-9,C6H8N10,False,True,True
+Nc1c2ccccc2cc2ccccc12,9-氨基蒽,amine,False,0,False,0,1,0,commercial,YSWG602,779-03-3,C14H11N,False,False,False
+NC1=C(N)C(=O)c2ccccc2C1=O,"2,3-二氨基-1,4-萘醌",amine,False,0,False,0,2,0,commercial,YSZC1219,13755-95-8,C10H8N2O2,False,True,True
+Cl.Cl.Cl.N=C(N)c1ccc(-c2cc(-c3ccc(C(=N)N)cc3)cc(-c3ccc(C(=N)N)cc3)c2)cc1,"5'-(4-氨基甲酰亚胺基苯基)-[1,1':3',1''-三联苯]-4,4''-二(羧酸酰胺)盐酸盐(1:3)",amine,False,0,False,0,3,0,commercial,YSZC947,2364456-55-1,C30H26N6O4,False,True,True
+Nc1ccc(-c2c3nc(c(-c4ccc(N)cc4)c4ccc([n-]4)c(-c4ccc(N)cc4)c4nc(c(-c5ccc(N)cc5)c5ccc2[n-]5)C=C4)C=C3)cc1.[Co+2],"5,10,15,20-四(4-氨基苯基)钴卟啉",amine,False,0,False,0,4,0,commercial,YSZC644,67201-98-3,C44H32CoN8,False,True,True
+CCCOc1cc(C#Cc2ccc(C(=O)NN)c(OCCC)c2)ccc1C(=O)NN,"4,4'-(乙烯-1,2-二基)双(2-丙氧基苯甲酰肼)",amine,False,0,False,0,2,0,commercial,YSZC845,2413016-99-4,C22H28N4O4,False,True,True
+N#Cc1cc(-c2ccc(N)c(C#N)c2)ccc1N,"4,4'-二氨基-[1,1'-联苯]-3,3'-二甲腈",amine,False,0,False,0,2,0,commercial,YSWG614,61382-01-2,C14H10N4,False,True,True
+NCCC[P+](c1ccccc1)(c1ccccc1)c1ccccc1,(3-氨基丙基)三苯基鏻,amine,False,0,False,0,1,0,commercial,YSZC1257,698967-00-9,C21H22NP,False,False,False
+Nc1ccc(-c2c3nc(c(-c4ccc(N)cc4)c4ccc([n-]4)c(-c4ccc(N)cc4)c4nc(c(-c5ccc(N)cc5)c5ccc2[n-]5)C=C4)C=C3)cc1.[Ni+2],四(4-氨基苯基)卟啉镍(II),amine,False,0,False,0,4,0,commercial,YSZC1100,67595-99-7,C44H32N8Ni,False,True,True
+[Br-].[Br-].c1cc[n+](CC[n+]2ccccc2)cc1,联苯胺氢溴酸盐,other,False,0,False,0,0,0,commercial,YSZC1328,nan,C12H14Br2N2,False,False,False
+Nc1ccc(-c2cc3c(cc2-c2ccc(N)cc2)C2c4cc(-c5ccc(N)cc5)c(-c5ccc(N)cc5)cc4C3c3cc(-c4ccc(N)cc4)c(-c4ccc(N)cc4)cc32)cc1,"4,4',4'',4'''-(9,10-二氢-9,10-[1,2]苯并蒽-2,3,6,7,14,15-六亚基)六苯胺",amine,False,0,False,0,6,0,commercial,YSZC1144,2899349-25-6,C66H48N6,False,True,True
+Nc1ccc(C#Cc2cc(C#Cc3ccc(N)cc3)c3ccc4c(C#Cc5ccc(N)cc5)cc(C#Cc5ccc(N)cc5)c5ccc2c3c54)cc1,"[4,4',4'',4'''-(芘-1,3,6,8-四基四(乙炔-2,1-二基))四苯胺]",amine,False,0,False,0,4,0,commercial,YSZC1416,1404196-75-3,C48H34N4,False,True,True
+Cn1cc(I)c(CN)n1,"3,5-二氨基吡啶氢碘酸盐",amine,False,0,False,0,1,0,commercial,YSWG619,nan,C5H8IN3,False,False,False
+Nc1ccc(-c2cc(-c3ccc(N)cc3)c(-c3ccc(N)cc3)cc2-c2ccc(N)cc2)cc1,"4',5''-双(4-氨基苯基)-[1,1':2',1''-三联苯]-4,4''-二胺",amine,False,0,False,0,4,0,commercial,YSZC969,2458125-05-6,C30H28N4,False,True,True
+CC(C)c1cc(-c2cc(C(C)C)c(N)c(C(C)C)c2)cc(C(C)C)c1N,"3,3',5,5'-四异丙基-[1,1'-联苯]-4,4'-二胺",amine,False,0,False,0,2,0,commercial,YSZC1375,186703-54-8,C24H36N2,False,True,True
+Nc1ccc(C2=C(c3ccc(N)cc3)SC(=C3SC(c4ccc(N)cc4)=C(c4ccc(N)cc4)S3)S2)cc1,"4,4',4'',4'''-{[2,2'-双(1,3-二硫杂环戊二烯亚基)]-4,4',5,5'-四基}四苯胺",amine,False,0,False,0,4,0,commercial,YSZC722,2413296-69-0,C30H28N4S4,False,True,True
+Nc1cc(-c2ccccn2)nc(-c2ccccn2)c1,"2,2':6',2''-三联吡啶-4'-胺",amine,False,0,False,0,1,0,commercial,YSWG030,193944-66-0,C15H12N4,False,False,False
+COC(=O)C1CC2(CCN(Cc3ccccc3)CC2)CCN1Cc1ccc(OC)cc1,"[4,4'-氨基-3(甲氧基)-3',3''-二甲氧基-2',4',6'-三甲基-1,1':3',1''-三联苯]-4,4''-二胺",other,False,0,False,0,0,0,commercial,YSZC965,275770-55-3,C26H34N2O3,False,False,False
+Cc1c(-c2ccc(N)cc2)c(-c2ccc(N)cc2)c(C)c(-c2ccc(N)cc2)c1-c1ccc(N)cc1,"4,4',4''-三甲基-1,3,5-三(4-氨基苯基)苯（TAPB-Me）",amine,False,0,False,0,4,0,commercial,YSZC1337,2522079-79-2,C27H27N3,False,True,True
+Nc1ccc(-c2cc3c4cc(-c5ccc(N)cc5)c(-c5ccc(N)cc5)cc4c4cc(-c5ccc(N)cc5)c(-c5ccc(N)cc5)cc4c3cc2-c2ccc(N)cc2)cc1,"4,4',4'',4'''-(三苯并菲-2,3,6,7,10,11-六基)四苯胺",amine,False,0,False,0,6,0,commercial,YSZC951,1374854-57-5,C48H36N8,False,True,True
+NN1C(=O)c2ccc3c4c(ccc(c24)C1=O)C(=O)N(N)C3=O,"2,7-二氨基苯并[1,2-d:4,5-d']二咪唑",amine,False,0,False,0,2,0,commercial,YSWG687,13821-25-5,C8H8N6,False,True,True
+N#Cc1cc(N)ccc1N,"2,5-二氨基苯甲腈",amine,False,0,False,0,2,0,commercial,YSWG726,14346-13-5,C7H7N3,False,True,True
+Nc1c(F)c(F)c(-c2c(F)c(F)c(N)c(F)c2F)c(F)c1F,"4,4'-二氨基八氟联苯",amine,True,8,False,0,2,0,commercial,YSWG727,1038-66-0,C12H2F8N2,False,True,True
+Nc1cc(Cl)c(-c2cc(Cl)c(N)cc2Cl)cc1Cl,"2,2',5,5'-四氯二苯胺",amine,False,0,False,0,2,0,commercial,YSWG728,15721-02-5,C12H7Cl4N,False,True,True
+Cc1c(C)c(N)c(C)c(C)c1N,四甲基对苯二胺,amine,False,0,False,0,2,0,commercial,YSWG730,3102-87-2,C10H20N2,False,True,True
+Nc1ccc(N)c(C(F)(F)F)c1,"2,3-三氟甲基-1,4-苯二胺",amine,True,3,True,0,2,0,commercial,YSWG731,364-13-6,C8H6F6N2,False,True,True
+Nc1cc(Cl)c(N)cc1Cl,"2,5-二氯-1,4-苯二胺",amine,False,0,False,0,2,0,commercial,YSWG733,20103-09-7,C6H8Cl2N2,False,True,True
+Nc1ccc(N2C(=O)c3ccc4c5c(ccc(c35)C2=O)C(=O)N(c2ccc(N)cc2)C4=O)cc1,"Benzo[lmn][3,8]菲咯啉-1,3,6,8(2H,7H)-四酮-2,7-双(4-氨基苯基)",amine,False,0,False,0,2,0,commercial,YSZC460,49546-11-4,C28H18N4O4,False,True,True
+Nc1cc2ccc3cc(N)cc4ccc(c1)c2c34,"芘-2,7-二胺",amine,False,0,False,0,2,0,commercial,YSZC1828,64535-41-7,C16H12N2,False,True,True
+Nc1ccc(-c2ccc(N(c3ccc(-c4ccc(N)cc4)cc3)c3ccc(-c4ccc(N)cc4)cc3)cc2)cc1,"N4,N4'-双(4'-氨基-[1,1'-联苯]-4-基)-[1,1'-联苯]-4,4'-二胺",amine,False,0,False,0,3,0,commercial,YSZC1944,2607105-89-3,C36H30N4,False,True,True
+NC(=O)c1cc(N)cc(N)c1,"3,5-二氨基苯甲酰胺",amine,False,0,False,0,3,0,commercial,YSCK0176,53882-15-8,C7H9N3O,False,True,True
+Cl.Cl.NCCCN,"1,3-丙二胺二盐酸盐",amine,False,0,False,0,2,0,commercial,YSZC2888,10517-44-9,C3H12Cl2N2,False,True,True
+Nc1cc2c(cc1N)-c1nc-2nc2[n-]c(nc3nc(nc4[n-]c(n1)c1cc(N)c(N)cc41)-c1cc(N)c(N)cc1-3)c1cc(N)c(N)cc21.[Ni+2],"2,3,9,10,16,17,23,24-辛氨基酞菁",amine,False,0,False,0,8,0,commercial,YSZC1803,455284-10-3,C32H24N12,False,True,True
+COCCOc1cc(C(=O)NN)c(OCCOC)cc1C(=O)NN,"2,5-双(2-甲氧基乙氧基)对苯二甲酰胺",amine,False,0,False,0,2,0,commercial,YSZC2202,2408841-97-2,C14H20N2O6,False,True,True
+NCCCN1CCCCCC1,3-氨基哌啶-1-丙胺,amine,False,0,False,0,1,0,commercial,YSZC1949,3437-33-0,C8H19N3,False,False,False
+N=c1cccc(N)n1O,"2,6-二氨基吡啶-1-氧化物",amine,False,0,False,0,1,0,commercial,YSCH0130,146538-81-0,C5H7N3O,False,False,False
+Nc1ccc(C(c2ccc(N)cc2)c2ccc(N)cc2)cc1,"4,4',4''-三氨基三苯甲烷",amine,False,0,False,0,3,0,commercial,YSCK0037,548-61-8,C19H19N3,False,True,True
+Nc1ccc(-c2ccncc2)cc1N,"4-(吡啶-4-基)苯-1,2-二胺",amine,False,0,False,0,2,0,commercial,YSZC2039,80420-88-8,C11H11N3,False,True,True
+NNc1ccc(-c2nc(-c3ccc(NN)cc3)nc(-c3ccc(NN)cc3)n2)cc1,"1,3,5-三(4-氨基苯基)-2,4,6-三嗪",amine,False,0,False,0,3,0,commercial,YSCK0102,804548-56-9,C21H18N6,False,True,True
+CCCCCCCCCCCCOc1cc(C(=O)NN)c(OCCCCCCCCCCCC)cc1C(=O)NN,"1,4-苯二甲酸-2,5-双(十二酰基)-二酰肼",amine,False,0,False,0,2,0,commercial,YSCK0104,165898-16-8,C32H56N4O4,False,True,True
+CCCCCCCCCCOc1cc(C(=O)NN)c(OCCCCCCCCCC)cc1C(=O)NN,"1,4-苯二甲酸-2,5-双(癸酰基)-1,4-二酰肼",amine,False,0,False,0,2,0,commercial,YSCK0106,694472-71-4,C28H48N4O4,False,True,True
+NNC(=O)c1ccc(Nc2nc(Nc3ccc(C(=O)NN)cc3)nc(Nc3ccc(C(=O)NN)cc3)n2)cc1,"4,4',4''-(1,3,5-三嗪-2,4,6-三基)三(氮亚甲基)三(苯甲酰肼)",amine,False,0,False,0,3,0,commercial,YSCK0112,1616285-61-0,C30H30N12O6,False,True,True
+CCCCCCCOc1cc(C(=O)NN)c(OCCCCCCC)cc1C(=O)NN,"2,5-双(十二酰氧基)对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSCK0116,1000591-49-0,C32H56N4O6,False,True,True
+CCCCOc1cc(C(=O)NN)c(OCCCC)cc1C(=O)NN,"2,5-二丁氧基对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSCK0118,1136292-72-2,C16H28N4O4,False,True,True
+CC(C)COc1cc(C(=O)NN)c(OCC(C)C)cc1C(=O)NN,"2,5-二异丁氧基对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSCK0120,2141975-31-5,C16H28N4O4,False,True,True
+CCCCCCCCOc1cc(C(=O)NN)c(OCCCCCCCC)cc1C(=O)NN,"2,5-二辛氧基对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSCK0122,215324-12-2,C24H44N4O4,False,True,True
+Cc1cc(-c2cc(C)c(N)c3ccccc23)c2ccccc2c1N,"3,3'-二甲基-4,4'-联萘-1,1'-二胺",amine,False,0,False,0,2,0,commercial,YSCK0145,13138-48-2,C22H20N2,False,True,True
+Nc1ccc(S(=O)(=O)c2ccc(N)c(N)c2)cc1N,"4,4'-磺酰基双(苯-3,2-二胺)",amine,False,0,False,0,4,0,commercial,YSCK0149,13224-79-8,C12H14N4O2S,False,True,True
+CCCCCCCCC1(CCCCCCCC)c2cc(N)ccc2-c2ccc(N)cc21,"9,9-二辛基-9H-芴-2,7-二胺",amine,False,0,False,0,2,0,commercial,YSCK0159,851042-10-9,C29H44N2,False,True,True
+Nc1ccc(-c2ccc3ccc(-c4ccc(N)cc4)cc3c2)cc1,"4,4'-(萘-2,7-二基)二苯胺",amine,False,0,False,0,2,0,commercial,YSZC991,1801204-93-2,C22H18N2,False,True,True
+Nc1ccc(NC(=S)Nc2ccc(N)cc2)cc1,"1,3-双(4-氨基苯基)硫脲",amine,False,0,False,0,2,0,commercial,YSZC2258,6268-26-4,C14H14N4S,False,True,True
+Nc1nc2c(s1)c1nc(N)sc1c1nc(N)sc21,"苯并[1,2-d:4,5-d']双噻唑-2,5,7-三胺",amine,False,0,False,0,3,0,commercial,YSZC2877,92403-27-5,C6H5N7S2,False,True,True
+CC(C)CCOc1cc(C(=O)NN)c(OCCC(C)C)cc1C(=O)NN,"2,5-双(异丙氨基羰基)对苯二甲酸二水合物",amine,False,0,False,0,2,0,commercial,YSCK0265,2413366-66-0,C16H24N2O8,False,True,True
+Nc1ccc(-c2cc(O)c(-c3ccc(N)cc3)cc2O)cc1,"4,4'-二氨基-1,1',4',1''-三联苯-2,5-二醇",amine,False,0,False,0,2,0,commercial,YSZC2610,34588-30-2,C18H16N2O2,False,True,True
+Nc1ccc(Cc2ccccc2N)cc1,2-(4-氨基苯基)苯胺,amine,False,0,False,0,2,0,commercial,YSSJ00835,1208-52-2,C12H12N2,False,True,True
+CCSCc1cc(-c2ccc(N)cc2)c(CSCC)cc1-c1ccc(N)cc1,"2,5'-双(乙硫基甲基)-[1,1':4',1''-三联苯]-4,4''-二胺",amine,False,0,False,0,2,0,commercial,YSCH0202,2231404-37-6,C24H28N2S2,False,True,True
+CCn1c2ccc(C)cc2c2cc(-c3nc4c(C)c(C(=O)O)ccc4n3CCOC)ccc21,"5'-(4-氨基苯基)-2',4',6'-三甲氧基-[1,1':3',1''-三联苯]-4,4''-二胺",other,False,0,False,0,0,0,commercial,YSZC3148,nan,C27H27N3O3,False,False,False
+Nc1cccc2cc3c(N)cccc3cc12,"1,5-二氨基蒽",amine,False,0,False,0,2,0,commercial,YSZCR309,79015-49-9,C14H12N2,False,True,True
+CCc1c(CN)c(CC)c(CN)c(CC)c1CN,"2,4,6-三乙基苯-1,3,5-三胺",amine,False,0,False,0,3,0,commercial,YSCK0359,149525-65-5,C12H21N3,False,True,True
+Nc1ccc(OP(=O)(O)Oc2ccc(N)cc2)cc1,双(4-氨基苯基)磷酸氢酯,amine,False,0,False,0,2,0,commercial,YSWG1208,407578-85-2,C12H13N2O3P,False,True,True
+NC(=O)Cc1ccncc1,4-吡啶乙酰胺,amine,False,0,False,0,1,0,commercial,YSCK0375,39640-62-5,C7H8N2O,False,False,False
+Nc1ccc(-c2ccc(C(c3ccc(-c4ccc(N)cc4)cc3)(c3ccc(-c4ccc(N)cc4)cc3)c3ccc(-c4ccc(N)cc4)cc3)cc2)cc1,"4,4',4'',4'''-四氨基四苯乙烯",amine,False,0,False,0,4,0,commercial,YSZCR017,2740557-60-0,C28H28N4,False,True,True
+Nc1ccc(-c2cc(C=Cc3cc(-c4ccc(N)cc4)cc(-c4ccc(N)cc4)c3)cc(-c3ccc(N)cc3)c2)cc1,"(E)-9,9'-二乙烯基-1,1'-双(1,1,3,1'-联苯基)-4,4'-二胺",amine,False,0,False,0,4,0,commercial,YSZCR022,2361424-80-6,C44H36N2,False,True,True
+Nc1ccc2nc3cc(N)ccc3cc2c1,"吖啶-2,6-二胺",amine,False,0,False,0,2,0,commercial,YSZC2650,3407-94-1,C13H11N3,False,True,True
+NCc1ccc(C(=C(c2ccccc2)c2ccc(CN)cc2)c2ccccc2)cc1,"[1,2-二苯基-1,2-二(4-氨甲基苯基)乙烯]",amine,False,0,False,0,2,0,commercial,YSCK0425,1054451-32-9,C28H28N2,False,True,True
+NCc1ccc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)cc1,"[1-(4-氨甲基苯基)-1,1,2-三苯基乙烯]",amine,False,0,False,0,1,0,commercial,YSCK0468,1504585-16-3,C27H24N2,False,False,False
+CCCCCCC(CCCC)CCCOc1cc(C(=O)NN)c(OCCCC(CCCC)CCCCCC)cc1C(=O)NN,"2,5-双(4-丁氧基)间苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSCK0574,2413366-64-8,C20H30N4O4,False,True,True
+CCCCCCCCCCCCCCCCOc1cc(C(=O)NN)c(OCCCCCCCCCCCCCCCC)cc1C(=O)NN,"2,5-双（十五烷氧基）对苯二酰肼",amine,False,0,False,0,2,0,commercial,YSCK0576,423176-17-4,C36H64N4O4,False,True,True
+CCCCC(CC)COc1cc(C(=O)NN)c(OC)cc1C(=O)NN,"2,5-双(辛-3-基氧基)对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSCK0578,423176-18-5,C24H44N4O4,False,True,True
+C=CCCOc1cc(C(=O)NN)c(OCCC=C)cc1C(=O)NN,"2,5-双(丁-3-烯-1-基氧基)对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSCK0580,2517829-09-1,C16H20N4O4,False,True,True
+CCCCCOc1cc(C(=O)NN)c(OCCCCC)cc1C(=O)NN,"2,5-双(戊氧基)对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSCK0582,2450942-48-8,C20H36N4O4,False,True,True
+Nc1c(-c2ccc(F)cc2)ccc(-c2ccc(F)cc2)c1N,"4,4''-二氟-1,1':4',1''-三联苯-2',3'-二胺",amine,True,2,False,0,2,0,commercial,YSZCS012,919282-39-6,C18H14F2N2,False,True,True
+COc1ccc(-c2ccc(-c3ccc(OC)cc3)c(N)c2N)cc1,"4,4''-二甲氧基-1,1':4',1''-三联苯-2',3'-二胺",amine,False,0,False,0,2,0,commercial,YSZCS014,867349-80-2,C20H20N2O2,False,True,True
+Nc1ccc([Se][Se]c2ccc(N)cc2)cc1,"4,4'-二硒醚二苯胺",amine,False,0,False,0,2,0,commercial,YSZC3145,35507-35-8,C12H12N2Se2,False,True,True
+CC(C)(c1ccc(N)cc1)c1ccc(N)cc1,"2,2'-双(4-氨基苯基)丙烷",amine,False,0,False,0,2,0,commercial,YSZC3152,2479-47-2,C15H18N2,False,True,True
+Nc1ccc(-c2ccc(N)c(Br)c2)cc1Br,"3,3'-二溴-[1,1'-联苯]-4,4'-二胺",amine,False,0,False,0,2,0,commercial,YSZC3161,34237-98-4,C12H10Br2N2,False,True,True
+Cl.N=C(N)c1ccc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)cc1,"4-(1,2,2-三苯基乙烯基)苯甲脒",amine,False,0,False,0,1,0,commercial,YSZC3167,2734780-03-9,C27H22N2,False,False,False
+CCCCCCCCCCOc1ccc(-c2cc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)c2)cc1,"4,4'-(4-(癸氧基)苯基)吡啶-2,6-二胺",amine,False,0,False,0,2,0,commercial,YSZC3170,2694833-06-0,C23H30N4O,False,True,True
+Nc1ccccc1C#Cc1cc(C#Cc2ccccc2N)cc(C#Cc2ccccc2N)c1,"2,2',2''-(苯-1,3,5-三基三(乙炔-2,1-二基))三苯胺",amine,False,0,False,0,3,0,commercial,YSZC3174,1027340-24-4,C30H21N3,False,True,True
+Nc1cc2c(cc1N)OCCOCCOc1cc(N)c(N)cc1OCCOCCO2,"6,7,9,10,12,13,15,16,18,19,21,22-十二氢二苯并[b,k][1,4,7,10,13,16,19,22]八氧杂环二十二碳烯-3,11-二胺",amine,False,0,False,0,4,0,commercial,YSZC3184,122942-39-6,C24H32N2O8,False,True,True
+Nc1ccc(-c2cc(-c3ccccc3)cc(-c3ccc(N)cc3)n2)cc1,"4,4'-(4-苯基吡啶-2,6-二基)二苯胺",amine,False,0,False,0,2,0,commercial,YSZC3189,312491-28-4,C24H19N3,False,True,True
+Nc1nc(N)nc(-c2ccc(-c3nc(N)nc(N)n3)cc2)n1,"6,6'-(1,4-亚苯基)双(1,3,5-三嗪-2,4-二胺)",amine,False,0,False,0,4,0,commercial,YSZC3208,5547-49-9,C12H12N12,False,True,True
+Nc1ccc(-n2c(=O)c3cc4c(=O)n(-c5ccc(N)cc5)c(=O)c4cc3c2=O)cc1,"2,6-双(4-氨基苯基)吡咯并[3,4-d]异吲哚-1,3,5,7(2H,6H)-四酮",amine,False,0,False,0,2,0,commercial,YSZC3210,49629-50-7,C28H18N4O4,False,True,True
+Nc1ccc(-c2cc(-c3ccc(N)cc3)c(O)c(-c3ccc(N)cc3)c2)cc1,"4,4''-二氨基-5-(4-氨基苯基)-[1,1':3',1''-三联苯]-2-醇",amine,False,0,False,0,3,0,commercial,YSZC3214,2271247-13-1,C24H21N3O,False,True,True
+CC(C)(C)OC(=O)N1CCCC1COc1c(-c2ccc(N)cc2)cc(-c2ccc(N)cc2)cc1-c1ccc(N)cc1,"叔丁基[2-((4,4''-二氨基-5-(4-氨基苯基)-[1,1':3',1''-三联苯]-4-基)氧基)乙基]氨基甲酸酯",amine,False,0,False,0,3,0,commercial,YSZC3215,2116475-68-2,C31H34N4O3,False,True,True
+Cc1cccc(C(=O)C(=O)c2ccc3ncnn3c2)n1,"2,3,6,7-四氨基蒽醌-9,10-二酮",other,False,0,False,0,0,0,commercial,YSCK0803,nan,C14H10N4O2,False,False,False
+COc1c(CN)c(OC)c(CN)c(OC)c1CN,"(2,4,6-三甲氧基苯-1,3,5-三基)三甲胺",amine,False,0,False,0,3,0,commercial,YSZC3221,1001404-25-6,C12H21N3O3,False,True,True
+COC(=O)C1CC(Oc2c(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)cc2-c2ccc(N)cc2)CN1C(=O)OC(C)(C)C,"(2S,4R)-1-叔丁基-2-甲基-4-((4,4''-二氨基-5-(4-氨基苯基)-[1,1':3',1''-三联苯]-4-基)氧基)吡咯烷-1,2-二甲酸酯",amine,False,0,False,0,3,0,commercial,YSZC3224,2116475-69-3,C36H42N4O5,False,True,True
+COC(=O)C1CC(OCc2c(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)cc2-c2ccc(N)cc2)CN1C(=O)OC(C)(C)C,"(2S,4S)-1-叔丁基-2-甲基-4-((4,4''-二氨基-5-(4-氨基苯基)-[1,1':3',1''-三联苯]-4-基)氧基)吡咯烷-1,2-二甲酸酯",amine,False,0,False,0,3,0,commercial,YSZC3225,2116475-70-6,C36H42N4O5,False,True,True
+Nc1ccc(-c2cc(Br)cc(-c3ccc(N)cc3)c2)cc1,"5'-溴-[1,1':3',1''-三联苯]-4,4''-二胺",amine,False,0,False,0,2,0,commercial,YSZC3267,2337335-29-0,C18H15BrN2,False,True,True
+Nc1ccc(-c2ccc(C(c3ccc(-c4ccc(N)cc4F)cc3)(c3ccc(-c4ccc(N)cc4F)cc3)c3ccc(-c4ccc(N)cc4F)cc3)cc2)c(F)c1,"4',4''',4''''',4'''''''-甲烷四基四(2-氟-1,1'-联苯)-4-胺",amine,True,4,False,0,4,0,commercial,YSZC3277,2739864-55-0,C49H36F4N4,False,True,True
+CC1(C)OB(c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)OC1(C)C,"5',4,4',5,5'-四甲基-1,3,2-二氧杂硼烷-2-基(1,1':3',1''-三联苯)-4,4''-二胺",amine,False,0,False,0,2,0,commercial,YSZC3265,nan,C24H27BN2O2,False,True,True
+N#Cc1sc2sc(C#N)c(N)c2c1N,"3,4-二氨基噻吩并[2,3-b]噻吩-2,5-二甲腈",amine,False,0,False,0,2,0,commercial,YSWG515,3954-26-5,C8H4N4S2,False,True,True
+NC1=CC(=O)C(N)=CC1=O,"2,5-二氨基-2,5-环己二烯-1,4-二酮",amine,False,0,False,0,2,0,commercial,YSCK0001,1521-06-8,C6H6N2O2,False,True,True
+Nc1ccc2cc3ccc(N)cc3nc2c1,"3,6-二氨基吖啶",amine,False,0,False,0,2,0,commercial,YSCHO132,92-62-6,C13H11N3,False,True,True
+Cl.Cl.Cl.Nc1cc2nc3cc(N)c(N)cc3nc2cc1N.Nc1cc2nc3cc(N)c(N)cc3nc2cc1N,"2,3,7,8-四氨基吩嗪盐酸盐",amine,False,0,False,0,8,0,commercial,YSWG908,260354-29-8,C12H12N6·1.5HCl,False,True,True
+Cn1ccnc1-c1nccn1CCCCCCN,"6-(1'-甲基-1H,1'H-2,2'-联咪唑-1-基)己-1-胺",amine,False,0,False,0,1,0,commercial,YSCHO297,874116-35-5,C13H23N5,False,False,False
+NNC(=O)c1ccc(-c2cc(-c3ccc(C(=O)NN)cc3)cc(-c3ccc(C(=O)NN)cc3)c2)cc1,"5,5'-(4-肼基羰基苯基)-[1,1':3',1''-三联苯]-4,4''-二甲酰肼",amine,False,0,False,0,3,0,commercial,YSZC1531,1332896-69-1,C28H26N6O4,False,True,True
+NNC(=O)c1ccc(-c2ccc(C(=O)NN)cn2)nc1,"[2,2'-联吡啶]-5,5'-二甲酰肼",amine,False,0,False,0,2,0,commercial,YSZC3430,63361-67-1,C12H10N6O2,False,True,True
+CSc1ccc(C(C)=O)c(N)c1,1-(2-氨基-4-(甲硫基)苯基)乙-1-酮,amine,False,0,False,0,1,0,commercial,YSCK0299,1566362-28-4,C9H11NOS,False,False,False
+Nc1cc2c(cc1N)OCCOCCOCCOCCO2,"2,3,5,6,8,9,11,12-八氢苯并[1,4,7,10,13]五氧杂环十五碳-15,16-二胺",amine,False,0,False,0,2,0,commercial,YSZC3650,102818-74-6,C16H24N2O5,False,True,True
+Nc1ccc(OCC(COc2ccc(N)cc2)(COc2ccc(N)cc2)COc2ccc(N)cc2)cc1,"4,4'-[2,2-双(4-氨基苯氧基)甲基]-1,3-丙二基]双(氧基)双苯胺",amine,False,0,False,0,4,0,commercial,YSZC286,60713-81-7,C29H32N4O4,False,True,True
+Nc1ccc2ccc3c(N)ccc4ccc1c2c43,"1,6-二氨基芘",amine,False,0,False,0,2,0,commercial,YSZC2830,14923-84-3,C16H12N2,False,True,True
+Nc1ccc(-c2ccc3c(c2)[nH]c2cc(-c4ccc(N)cc4)ccc23)cc1,"4,4'-(9H-咔唑-2,7-基)二苯胺",amine,False,0,False,0,2,0,commercial,YSCK0748,1902127-03-0,C24H19N3,False,True,True
+Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3cc(-c4cc(-c5ccc(N)cc5)cc(-c5ccc(N)cc5)c4)c4ccc5c(-c6cc(-c7ccc(N)cc7)cc(-c7ccc(N)cc7)c6)cc(-c6cc(-c7ccc(N)cc7)cc(-c7ccc(N)cc7)c6)c6ccc3c4c65)c2)cc1,"5,5',5'',5'''-(芘-1,3,6,8-四基)四{[1,1'-联苯]-4,4'-二胺}",amine,False,0,False,0,8,0,commercial,YSZC3661,2797253-55-3,C60H44N4,False,True,True
+CCc1c(CN)c(CC)c(CN)c(CC)c1CN.Cl.Cl.Cl,"2,4,6-三乙基-1,3,5-苯三胺三盐酸盐",amine,False,0,False,0,3,0,commercial,YSZC3423,190779-64-7,C12H24Cl3N3,False,True,True
+Nc1ccc(C(=O)C(=O)c2ccc(N)cc2)cc1,"1,2-双(4-氨基苯基)乙烷-1,2-二酮",amine,False,0,False,0,2,0,commercial,YSZCJ090,29602-15-1,C14H12N2O2,False,True,True
+NNC(=O)c1cc(Cc2ccccc2)cc(C(=O)NN)c1,5-苄基邻苯二甲酰肼,amine,False,0,False,0,2,0,commercial,YSZC4009,2113694-50-9,C15H16N4O2,False,True,True
+CCCOc1cc(-c2cc(-c3ccc(C(=O)NN)c(OCCC)c3)cc(-c3ccc(C(=O)NN)c(OCCC)c3)c2)ccc1C(=O)NN,"5'-(4-(羟基羰基)-3-异丙氧基苯基)-3,3''-二丙氧基-[1,1':3',1''-三联苯]-4,4''-二甲酰肼",amine,False,0,False,0,3,0,commercial,YSZC844,2413016-98-3,C39H44N4O8,False,True,True
+Nc1ccc(-c2ccc([N+](=O)[O-])cc2)cc1,4-氨基-4'-硝基联苯,amine,False,0,False,0,1,0,commercial,YSZC322,1211-40-1,C12H10N2O2,False,False,False
+Cc1c(C)c(N)c2[nH]cnc2c1N,"4,7-二氨基-5,6-二甲基苯并咪唑",amine,False,0,False,0,2,0,commercial,YSZCR181,85311-39-3,C9H12N4,False,True,True
+Nc1ccc(C#Cc2ccc(N(c3ccc(C#Cc4ccc(N)cc4)cc3)c3ccc(C#Cc4ccc(N)cc4)cc3)cc2)cc1,三(4-(4-氨基苯基)乙炔基苯基)胺,amine,False,0,False,0,3,0,commercial,YSZCR217,2166310-88-7,C42H30N4,False,True,True
+NNC(=O)c1ccc(N(c2ccc(C(=O)NN)cc2)c2ccc(C(=O)NN)cc2)cc1,"4,4',4''-次氮基三(苯甲酰肼)",amine,False,0,False,0,3,0,commercial,YSZCG112,223591-21-7,C21H21N7O3,False,True,True
+Nc1ccc2ccc(N)cc2c1,"2,7-萘二胺",amine,False,0,False,0,2,0,commercial,YSZCJ083,613-76-3,C10H10N2,False,True,True
+NNC(=O)c1ccc2ccc3ccc(C(=O)NN)nc3c2n1,"1,10-菲咯啉-2,9-二甲酰肼",amine,False,0,False,0,2,0,commercial,YSZC3776,137372-06-6,C14H12N6O2,False,True,True
+Nc1ccccc1CN(Cc1ccccc1N)Cc1ccccc1N,"2-氨基-N,N-双[(2-氨基苯基)甲基]苯甲胺",amine,False,0,False,0,3,0,commercial,YSCK0963,222638-73-5,C21H25N5,False,True,True
+Nc1ccc(-c2cc3cc(N)ccc3o2)cc1,2-(4-氨基苯基)-5-苯并呋喃胺,amine,False,0,False,0,2,0,commercial,YSZC3129,84102-58-9,C16H12N2O,False,True,True
+CC(C)(C)c1ccc2c(c1)c1cc(C(C)(C)C)ccc1n2-c1ccc(N)cc1,"9-(4-苯胺基)-3,6-二叔丁基咔唑",amine,False,0,False,0,1,0,commercial,YSCK1002,255829-30-2,C28H34N2,False,False,False
+Nc1ccc2c(c1)OCCOCCOCCOCCOCCO2,4'-氨基苯并-18-冠醚-6,amine,False,0,False,0,1,0,commercial,YSZC3372,68941-06-0,C14H21NO6,False,False,False
+COCCOCCOc1cc(C(=O)NN)c(OCCOCCOC)cc1C(=O)NN,"2,5-双[2-(2-甲氧基乙氧基)乙氧基]对苯二甲酰肼",amine,False,0,False,0,2,0,commercial,YSZC3781,121839-23-4,C20H32N4O8,False,True,True
+N#Cc1cc(N)c(N)cc1C#N,"4,5-二氨基邻苯二甲腈",amine,False,0,False,0,2,0,commercial,YSWG954,129365-93-1,C8H6N4,False,True,True
+Nc1ccc(C#Cc2ccc(C(=O)O)cc2)cc1,4-(4-氨基苯基乙炔基)苯甲酸,amine,False,0,False,0,1,0,commercial,YSZC3377,910467-92-4,C15H11NO2,False,False,False
+Cl.Cl.Cl.N=C(N)c1ccc(N(c2ccc(C(=N)N)cc2)c2ccc(C(=N)N)cc2)cc1,"4,4',4''-次氮基三苯甲脒盐酸盐",amine,False,0,False,0,3,0,commercial,YSCK1100,116082-39-4,C21H24Cl3N7,False,True,True
+Nc1ccc(-c2nnc(-c3ccc(N)cc3)s2)cc1,"4,4'-(1,3,4-噻二唑-2,5-二基)二苯胺",amine,False,0,False,0,2,0,commercial,YSCK1289,2642-62-8,C14H12N4S,False,True,True
+Cl.N=C(N)c1ccc2cc(C(=N)N)ccc2c1,"萘-2,6-二(甲脒)二盐酸盐",amine,False,0,False,0,2,0,commercial,YSCK1295,858436-70-1,C12H14Cl2N4,False,True,True
+Nc1c(F)c(F)c(-c2cc(-c3c(F)c(F)c(N)c(F)c3F)cc(-c3c(F)c(F)c(N)c(F)c3F)c2)c(F)c1F,"5-(4-氨基-2,3,5,6-四氟苯基)-2,2',3',3'',5,5',6,6'-八氟-[1,1':3',1''-三联苯]-4,4''-二胺",amine,True,12,False,0,3,0,commercial,YSCK1304,1872200-99-1,C24H8F12N3,False,True,True
+NC(=O)c1cc(C(N)=O)[nH]n1,"1H-吡唑-3,5-二甲酰胺",amine,False,0,False,0,2,0,commercial,YSZC3872,1397683-79-2,C3H4N4O2,False,True,True
+NCc1ccc(C2OCCO2)cc1,"(4-(1,3-二氧戊环-2-基)苯基)甲胺",amine,False,0,False,0,1,0,commercial,YSCK1241,104566-44-1,C9H11NO2,False,False,False
+C=Cc1ccc(CN)cc1,4-乙烯基苄胺,amine,False,0,False,0,1,0,commercial,YSZC3524,50325-49-0,C9H11N,False,False,False
+Nc1cccc(-c2nc(-c3cccc(N)c3)nc(-c3cccc(N)c3)n2)c1,"2,2',2''-(1,3,5-三嗪-2,4,6-三基)三苯胺",amine,False,0,False,0,3,0,commercial,YSZC1466,247171-74-0,C21H18N6,False,True,True
+Cc1ccc(-c2ccc(CN)cn2)nc1,"(5-甲基-[2,2'-联吡啶]-5-基)甲胺",amine,False,0,False,0,1,0,commercial,YSZC4295,227619-68-3,C11H13N3,False,False,False
+Nc1ccc(Oc2ccc(C3(c4ccc(Oc5ccc(N)cc5)cc4)c4ccccc4-c4ccccc43)cc2)cc1,"4,4'-(((9H-芴-9,9-二基)双(4,1-亚苯基))双(氧))二苯胺",amine,False,0,False,0,2,0,commercial,LCZC3232,47823-88-1,C38H30N2O2,False,True,True
+NNC(=O)c1cc(C(=O)NN)c(C(=O)NN)cc1C(=O)NN,"苯-1,2,4,5-四甲酰肼",amine,False,0,False,0,4,0,commercial,YSWG4323,24936-04-7,C10H10N8O4,False,True,True
+Nc1ccc(-c2ccc(N)nc2)cc1,5-(4-氨基苯基)嘧啶-2-胺,amine,False,0,False,0,2,0,commercial,YSWG4325,96721-87-8,C10H10N4,False,True,True
+Nc1ccc(-c2cnc3c(ccc4cc(-c5ccc(N)cc5)cnc43)c2)cc1,"3,8-二(4-氨基苯基)-1,10-邻菲罗啉",amine,False,0,False,0,2,0,commercial,YSZC6004,2387378-83-6,C28H22N4,False,True,True
+NNC(=O)c1cc(C(=O)O)cc(C(=O)NN)c1,"3,5-二肼基羰基苯甲酸",amine,False,0,False,0,2,0,commercial,YSZC3547,2618458-94-7,C9H8N4O4,False,True,True
+Nc1cc(C(=O)O)cc2c(N)cc(C(=O)O)cc12,"4,8-二氨基-2,6-萘二甲酸",amine,False,0,False,0,2,0,commercial,YSZC3912,2226204-96-0,C12H10N2O4,False,True,True
+Nc1ccc(N(c2ccc(N)cc2)c2ccc(-c3ccc(N(c4ccc(N)cc4)c4ccc(N)cc4)cc3)cc2)cc1,"N1,N1'-([1,1'-联苯]-4,4'-二基)双(N1-(4-氨基苯基)苯-1,4-二胺)",amine,False,0,False,0,4,0,commercial,YSZC5022,3547-23-7,C36H32N6,False,True,True
+Nc1ccc2cc3ccccc3cc2c1,2-氨基蒽,amine,False,0,False,0,1,0,commercial,YSZC6231,613-13-8,C14H11N,False,False,False
+Nc1c(N)c2ccccc2c2ccccc12,"9,10-二氨基菲",amine,False,0,False,0,2,0,commercial,YSZC6218,53348-04-2,C14H12N2,False,True,True
+Nc1ccc(-c2cc(-c3ccc(N)nc3)cc(-c3ccc(N)nc3)c2)cn1,"5,5',5''-(苯-1,3,5-三基)三(吡啶-2-胺)",amine,False,0,False,0,3,0,commercial,YSZC5698,2757085-59-7,C21H21N6,False,True,True
+Nc1ccc(-c2ccc(N)cn2)cc1,6-(4-氨基苯基)吡啶-3-胺,amine,False,0,False,0,2,0,commercial,YSZC5747,34295-27-7,C11H11N3,False,True,True
+Nc1cc(N)c(N)cn1,"2,4,5-三氨基吡啶",amine,False,0,False,0,3,0,commercial,YSZC5776,23244-87-3,C5H8N4,False,True,True
+CCCCCCCCCCCCC1(CCCCCCCCCCCC)c2cc(N)ccc2-c2ccc(N)cc21,"9,9-二辛基-2,7-二氨基芴",amine,False,0,False,0,2,0,commercial,YSZC5665,916764-64-2,C29H44N2,False,True,True
+Nc1ccc(-c2nc(-c3ccc(N)s3)nc(-c3ccc(N)s3)n2)s1,"5,5',5''-(1,3,5-三嗪-2,4,6-三基)三(噻吩-2-胺)",amine,False,0,False,0,3,0,commercial,YSZC0378,374692-91-8,C15H15N6S3,False,True,True
+Cc1cc(C)c(N)cc1N,"2,4-二甲基-1,5-苯二胺",amine,False,0,False,0,2,0,commercial,YSZC6100,3134-10-9,C8H12N2,False,True,True
+Nc1ccc(-c2ccc(N)c(F)c2)cc1F,"4,4'-二氨基-3,3'-二氟联苯",amine,True,2,False,0,2,0,commercial,YSZC6102,448-97-5,C12H10F2N2,False,True,True
+Nc1ccc(-c2ccc(-c3ccc(N)nc3)cc2)cn1,"5,5'-(1,4-亚苯基)双(吡啶-2-胺)",amine,False,0,False,0,2,0,commercial,YSZC6128,2375582-48-0,C16H14N4,False,True,True
+Nc1ccc(C#Cc2ccc(-c3nc(-c4ccc(C#Cc5ccc(N)cc5)cc4)nc(-c4ccc(C#Cc5ccc(N)cc5)cc4)n3)cc2)cc1,"4,4',4''-(((1,3,5-三嗪-2,4,6-三基)三(苯-4,1-二基))三(乙炔-2,1-二基))三苯胺",amine,False,0,False,0,3,0,commercial,YSZC6242,2803476-79-9,C45H27N6,False,True,True
+COC(=O)c1nn(-c2ccc(C(C)(C)C)cc2)c(=O)cc1O,"4,4'-二氨基-[1,1'-联苯]-2,2'-二羧酸二甲酯",other,False,0,False,0,0,0,commercial,YSZC6244,149035-34-2,C16H18N2O4,False,False,False
+NC(=O)c1cc(C(N)=O)cc(C(N)=O)c1,均苯三甲酰胺,amine,False,0,False,0,3,0,commercial,YSZC4953,60541-32-4,C9H9N3O3,False,True,True
+COC(=O)c1cc(N)ccc1N,"2,5-二氨基苯甲酸甲酯",amine,False,0,False,0,2,0,commercial,YSZC6281,49592-84-9,C8H10N2O2,False,True,True
+Nc1nc(N)nc(-c2ccc(-c3c4nc(c(-c5ccc(-c6nc(N)nc(N)n6)cc5)c5ccc([nH]5)c(-c5ccc(-c6nc(N)nc(N)n6)cc5)c5nc(c(-c6ccc(-c7nc(N)nc(N)n7)cc6)c6ccc3[nH]6)C=C5)C=C4)cc2)n1,"6,6',6'',6'''-(卟啉-5,10,15,20-四基)四(四(苯-4,1,1-二基)四(1,3,5-三嗪-2,4-二胺)",amine,False,0,False,0,8,0,commercial,YSZC6359,297148-01-7,C108H72N24,False,True,True
+NNC(=O)c1ccc(-c2nc(-c3ccc(C(=O)NN)cc3)nc(-c3ccc(C(=O)NN)cc3)n2)cc1,"4,4',4''-(1,3,6-三嗪-2,4,6-三基)三(苯甲酰胺)",amine,False,0,False,0,3,0,commercial,YSZC6829,1332896-70-4,C24H18N6O3,False,True,True
+Nc1cc2c(cc1N)-c1nc-2nc2[n-]c(nc3nc(nc4[n-]c(n1)c1cc(N)c(N)cc41)-c1cc(N)c(N)cc1-3)c1cc(N)c(N)cc21.[Co+2],"2,3,9,10,16,17,23,24-八(氨基)酞菁钴(II)",amine,False,0,False,0,8,0,commercial,YSZC7088,455284-08-9,C32H24CoN16,False,True,True
+Nc1cc2c(cc1N)-c1nc-2nc2[n-]c(nc3nc(nc4[n-]c(n1)c1cc(N)c(N)cc41)-c1cc(N)c(N)cc1-3)c1cc(N)c(N)cc21.[Fe+2],"2,3,9,10,16,17,23,24-八(氨基)酞菁铁(II)",amine,False,0,False,0,8,0,commercial,YSZC7089,2414362-16-4,C32H24FeN16,False,True,True
+Nc1cc2c(cc1N)-c1nc-2nc2[n-]c(nc3nc(nc4[n-]c(n1)c1cc(N)c(N)cc41)-c1cc(N)c(N)cc1-3)c1cc(N)c(N)cc21.[Cu+2],"2,3,9,10,16,17,23,24-八(氨基)酞菁铜(II)",amine,False,0,False,0,8,0,commercial,YSZC3245,455284-06-7,C32H24CuN16,False,True,True
+Cc1n[nH]c(C)c1C(=O)NN,"3,5-二甲基-1H-吡唑-4-甲酰胺",amine,False,0,False,0,1,0,commercial,YSZC8016,98484-97-0,C6H9N3O,False,False,False
+Nc1ccc(-c2ccc3c(c2)C2(c4cc(-c5ccc(N)cc5)ccc4-3)c3cc(-c4ccc(N)cc4)ccc3-c3ccc(-c4ccc(N)cc4)cc32)cc1,"4,4',4'',4'''-(9,9'-螺双[芴]-2,2',7,7'-四基)四苯胺",amine,False,0,False,0,4,0,commercial,YSZC8032,1632050-37-3,C48H36N4,False,True,True
+Nc1nsnc1N,"1,2,4-噻二唑-3,4-二胺",amine,False,0,False,0,2,0,commercial,LCZC7004,55904-36-4,C2H4N4S,False,True,True
+Nc1ccc(C=Cc2ccc(N)cc2)cc1,"1,2-双(4-氨基苯基)乙烷",amine,False,0,False,0,2,0,commercial,YSZC4318,621-96-5,C14H16N2,False,True,True
+Nc1cc(I)cc(I)c1,"2,5-二碘苯胺",amine,False,0,False,0,1,0,commercial,YSZC7301,35122-96-4,C6H5I2N,False,False,False
+Nc1cc2c(cc1N)-c1ccccc1C2,"2,7-二氨基芴",amine,False,0,False,0,2,0,commercial,YSZC7225,49670-63-5,C13H12N2,False,True,True
+Nc1ccc(-c2c3nc(c(-c4ccc(N)cc4)c4ccc([n-]4)c(-c4ccc(N)cc4)c4nc(c(-c5ccc(N)cc5)c5ccc2[n-]5)C=C4)C=C3)cc1.[Mn+2],"5,10,15,20-四(4-氨基苯基)卟啉锰(II)",amine,False,0,False,0,4,0,commercial,YSZC6118,71547-21-2,C44H32MnN8,False,True,True
+Nc1ccc2c(c1)-c1nc-2nc2[n-]c(nc3nc(nc4[n-]c(n1)c1ccc(N)cc41)-c1ccc(N)cc1-3)c1ccc(N)cc21.[Cu+2],"5,10,15,20-四(4-氨基苯基)卟啉铜(II)",amine,False,0,False,0,4,0,commercial,YSZC8077,14654-63-8,C44H32CuN8,False,True,True
+N#N,"N,N'-双(2-溴-2-丙烯基)对苯二甲酰肼",other,False,0,False,0,0,0,commercial,YSZC7617,nan,C14H16Br2N4O2,False,False,False
+COC(=O)c1ccc(Nc2ccccc2)c([N+](=O)[O-])c1,"2,2'-二氨基-4,4'-联苯二甲酸",other,False,0,False,0,0,0,commercial,YSZC7869,nan,C14H12N2O4,False,False,False
+Nc1ncc(Br)c(N)n1,四(4-氨基苯基)甲烷,amine,False,0,False,0,2,0,commercial,YSZC4987,1004-01-9,C25H24N4,False,True,True
+COc1ccc(Nc2ccc(N)cc2)cc1,"4,4',4''-三氨基三苯胺",amine,False,0,False,0,1,0,commercial,YSZC6032,101-64-4,C18H18N4,False,False,False
+Nc1ccc(ON2P(Oc3ccc(N)cc3)N=P(Oc3ccc(N)cc3)(Oc3ccc(N)cc3)N(Oc3ccc(N)cc3)P2Oc2ccc(N)cc2)cc1,六(4-氨基苯氧基)环三磷腈,amine,False,0,False,0,6,0,commercial,YSZC7606,1000397-54-7,C36H36N9O6P3,False,True,True
+Cl.Cl.NCCNc1cccc2ccccc12,"9,10-二(氨基甲基)蒽",amine,False,0,False,0,1,0,commercial,YSWG1284,1465-25-4,C16H14N2,False,False,False
+N=S(=N)(c1ccccc1)c1ccccc1,"4,4'-二氨基二苯硫醚",other,False,0,False,0,0,0,commercial,YSZC01580,nan,C12H12N2S,False,False,False
+Nc1cc(C(=O)O)ccc1-c1ccc(-c2ccc(C(=O)O)cc2N)cc1,"2,2'-二氨基-1,1':4',1''-三联苯-4,4''-二羧酸",amine,False,0,False,0,2,0,commercial,YSZC6014,2824235-49-4,C20H16N2O4,False,True,True
+Nc1cc(-c2cccs2)c(N)cc1-c1cccs1,"2,5-二(噻吩-2-基)苯-1,4-二胺",amine,False,0,False,0,2,0,commercial,YSZC1154,1473358-11-0,C14H12N2S2,False,True,True
+Cc1c(COc2ccc(N)cc2)c(C)c(COc2ccc(N)cc2)c(C)c1COc1ccc(N)cc1,"4,4',4''-((2,4,6-三甲基苯-1,3,5-三基)三(亚甲基))三(氧基)三苯胺",amine,False,0,False,0,3,0,commercial,YSZC1606,1419639-46-5,C30H35N3O3,False,True,True
+CC(C)(C)c1ccnc(-c2ccc(F)nc2F)c1,"2,2'-二氟-4,4'-二氨基-5,5'-二甲基-1,1'-联苯",other,True,2,False,0,0,0,commercial,YSZC7233,nan,C14H14F2N2,False,False,False
+Nc1ccc(-c2ccc3ccc4c(-c5ccc(N)cc5)ccc5ccc2c3c54)cc1,"4,4'-(芘-1,6-二基)二苯胺",amine,False,0,False,0,2,0,commercial,YSZC1702,1634668-56-6,C28H16N2,False,True,True
+O=C(Nc1ccccc1)Nc1cccc([N+](=O)[O-])c1,4-氨基-3-((吡啶-3-基)氨基甲酰基)苯甲酸,other,False,0,False,0,0,0,commercial,YSZC7771,nan,C13H11N3O3,False,False,False
+Nc1cc(C(=O)O)ccc1-c1ccncc1,3-氨基-4-(吡啶-4-基)苯甲酸,amine,False,0,False,0,1,0,commercial,YSZC7758,2138118-95-1,C12H10N2O2,False,False,False
+Nc1ccc2c(c1)CN1CN2Cc2cc(N)ccc21,"6H,12H-5,11-甲桥二苯并[b,f][1,5]二氮杂环辛-2,8-二胺",amine,False,0,False,0,2,0,commercial,YSZC0699,938045-95-5,C17H20N4,False,True,True
+Nc1ccc2ccccc2c1-c1c(N)ccc2ccccc12,"1,1'-联萘-4,4'-二胺",amine,False,0,False,0,2,0,commercial,YSZC4499,nan,C20H16N2,False,True,True
+Nc1ccc(-c2nn[nH]n2)cc1,5-(4-氨基苯基)-1H-四唑,amine,False,0,False,0,1,0,commercial,YSZC2736,46047-18-1,C7H7N5,False,False,False

@@ -1,0 +1,18 @@
+# PDF 解析
+pymupdf
+pdfplumber
+
+# API 调用
+requests
+
+# 报告
+python-docx
+
+# 可视化
+plotly
+
+# 数据存储
+pyyaml
+
+# 以下依赖已在 conda 环境 dphuanjing 中安装：
+# deepchem, rdkit, pandas, numpy, scikit-learn, xgboost, matplotlib

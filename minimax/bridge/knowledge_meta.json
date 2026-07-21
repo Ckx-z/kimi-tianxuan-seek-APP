@@ -1,0 +1,20 @@
+{
+  "indexed_at": "2026-07-13 11:03:45",
+  "total_records": 1791,
+  "embedding_model": "embo-01",
+  "dim": 1536,
+  "chunk_size": 500,
+  "chunk_overlap": 100,
+  "files": [
+    "知识库\\侯老师实验\\sl-884-anie202421555-sup-0001-misc_information.pdf",
+    "知识库\\侯老师实验\\侯盛怀德国应化.pdf",
+    "知识库\\文献阅读\\调节剂与溶剂诱导聚合构筑功能化共价有机框架薄膜\\41467_2024_55114_MOESM2_ESM.pdf",
+    "知识库\\文献阅读\\调节剂与溶剂诱导聚合构筑功能化共价有机框架薄膜\\s41467-024-55114-z.pdf",
+    "知识库\\机器学习\\Chemist-GuidedHuman−AIWorkflowforCovalentOrganic FrameworkSynthesis\\Chemist-GuidedHuman−AIWorkflowforCovalentOrganic FrameworkSynthesis.pdf",
+    "知识库\\机器学习\\Chemist-GuidedHuman−AIWorkflowforCovalentOrganic FrameworkSynthesis\\ja5c20068_si_001 (1).pdf",
+    "知识库\\机器学习\\nature\\41467_2026_69549_MOESM1_ESM.pdf",
+    "知识库\\机器学习\\nature\\s41467-026-69549-z (1).pdf",
+    "知识库\\机理\\Belowich-2012-Dynamic-imine-chemistry.pdf",
+    "知识库\\自组装膜\\自组装COF膜文献综述_v2.docx"
+  ]
+}
