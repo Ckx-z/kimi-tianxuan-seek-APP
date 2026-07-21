@@ -1,4 +1,11 @@
-"""一键启动 App：启动 Gradio 服务并自动打开浏览器。"""
+"""一键启动 App：启动 Gradio 服务并自动打开浏览器。
+
+.. deprecated::
+    【已废弃】本脚本是历史遗留入口，请勿继续使用。
+    新方式：双击 `启动COF推荐.vbs`（经 `silent_launch.py`，具备单实例锁 +
+    PID 文件重启语义，可杀旧实例、防双击抢端口）；调试时用 `调试启动.bat`。
+    本文件仅保留作参考，后续可能删除。
+"""
 
 from __future__ import annotations
 

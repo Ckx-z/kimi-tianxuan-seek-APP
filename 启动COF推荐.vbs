@@ -1,7 +1,9 @@
 ' COF Film App - silent launcher (double-click this file, no console window)
 ' Starts the App in background via pythonw and opens the browser automatically.
+' Restart semantics: if an old instance is running it is killed first (double-click = restart to latest code).
+' Single-instance lock prevents double-click races on port 7860.
 ' Errors are shown as popup dialogs by silent_launch.py.
-' For debugging with live terminal logs, use start_app.bat instead.
+' For debugging with live terminal logs, use 调试启动.bat instead.
 
 Option Explicit
 

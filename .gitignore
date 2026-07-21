@@ -90,3 +90,4 @@ minimax/run_indexer.bat
 minimax/run_indexer.vbs
 minimax/run_indexer_v2.vbs
 minimax/_tmp/
+logs/*.pid

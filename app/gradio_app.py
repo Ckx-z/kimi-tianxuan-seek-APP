@@ -693,16 +693,25 @@ CUSTOM_CSS = """
 .score-big { font-size: 2.6rem; font-weight: 700; line-height: 1.15; }
 .score-std { font-size: 1.05rem; font-weight: 400; color: #64748b; }
 .placeholder-page { padding: 24px; text-align: center; color: #64748b; }
+/* 中文字体栈放在 CSS 里：theme 的 font= 字符串参数会触发 gradio 6.20
+   launch() 主题比较 bug（fonts.py __eq__: 'str' object has no attribute 'name'） */
+body, .gradio-container {
+    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+}
 """
 
 
 def _build_theme() -> gr.themes.Soft:
-    """深青/石墨学术系主题（方案第 5 节）。"""
+    """深青/石墨学术系主题（方案第 5 节）。
+
+    注意：不要传 font= 字符串列表 —— gradio 6.20 的 launch() 会把本主题与
+    内置主题逐个 to_dict() 比较，Font.__eq__ 遇到 str 直接 AttributeError
+    （'str' object has no attribute 'name'），App 启动即崩。字体见 CUSTOM_CSS。
+    """
     return gr.themes.Soft(
         primary_hue=gr.themes.colors.teal,
         secondary_hue=gr.themes.colors.cyan,
         neutral_hue=gr.themes.colors.slate,
-        font=["Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
     )
 
 

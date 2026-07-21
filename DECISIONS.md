@@ -549,3 +549,16 @@
 | 6. 上下文丢失 | D06 | 五份活文档+首读尾写工作流 |
 | 7. CLAUDE.md不更新 | D06 | 活文档替代，随项目演化 |
 | 8. RF像相似度排序 | D02 | 描述符尺度归一化，非模型问题 |
+
+---
+
+## D28：两仓库合并（subtree 保留历史）+ 启动器单实例重启语义 + gradio 6.20 theme font 规避
+
+**日期**：2026-07-21
+**决策**：
+1. minimax（shiyandiedai）以 `git subtree add --prefix=minimax` 并入主仓库，保留全部 25 个提交历史；物理资产（知识库 850MB、向量索引 7GB+）复制但不入库；shiyandiedai 挂迁移公告归档
+2. App 启动器改为单实例（命名 mutex）+ 重启语义（PID 文件，双击=杀旧启新），杜绝旧代码进程占位与双击竞态
+3. gradio 6.20 主题不使用 `font=` 字符串参数（launch() 内置主题比较会崩），中文字体栈放 CUSTOM_CSS
+
+**原因**：两项目经 data/rag_export/ 契约已事实耦合，分仓维护成本高；启动器事故（旧进程占位+竞态）导致用户 App 不可用；theme font bug 是新代码起不来的第二根因。
+**何时复盘**：gradio 大版本升级时复查 theme 兼容；旧 minimax 文件夹删除后 remove minimax-local 远程。
