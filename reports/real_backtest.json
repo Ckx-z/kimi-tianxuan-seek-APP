@@ -1,0 +1,1967 @@
+{
+ "predictions_file": "real_backtest_predictions.json",
+ "summary": {
+  "n_done_total": 14,
+  "n_done_predictable": 13,
+  "n_done_skipped": [
+   {
+    "id": "C",
+    "reason": "单体待确认: ['H3']"
+   }
+  ],
+  "outcomes": {
+   "fail": 12,
+   "partial": 1
+  },
+  "paired_old_vs_new": {
+   "pairs": [
+    "A",
+    "A2",
+    "B",
+    "D",
+    "E",
+    "F"
+   ],
+   "old_mean": 0.6865,
+   "new_mean": 0.2535,
+   "brier_old": 0.4893,
+   "brier_new": 0.1124,
+   "brier_old_incl_C": 0.4196
+  },
+  "threshold_0.5": {
+   "new_fail_below": 10,
+   "new_fail_above": [
+    "A1",
+    "A8"
+   ],
+   "new_fail_avoidance_rate": 0.8333,
+   "old_high_all_failed": [
+    "A",
+    "A2",
+    "B",
+    "D",
+    "E"
+   ],
+   "old_low_correct_avoidance": [
+    "C",
+    "F"
+   ]
+  },
+  "a5_rank_among_done": 1,
+  "a5_tied_experiments": 3,
+  "score_distributions": {
+   "scheme13": {
+    "n": 13,
+    "min": 0.030980687588453293,
+    "max": 0.6990079283714294,
+    "mean": 0.39301828610209316,
+    "n_above_0.5": 8
+   },
+   "planned8_new": {
+    "n": 8,
+    "min": 0.04454907774925232,
+    "max": 0.7171049118041992,
+    "mean": 0.47593344608321786,
+    "n_above_0.5": 5
+   },
+   "planned8_old_gnn": {
+    "n": 8,
+    "min": 0.618,
+    "max": 0.803,
+    "mean": 0.7106250000000001,
+    "n_above_0.5": 8
+   }
+  }
+ },
+ "done": [
+  {
+   "node": "TAPB",
+   "linker": "A6",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(-c2ccc(C(F)(F)F)cc2)c(C=O)cc1-c1ccc(C(F)(F)F)cc1",
+   "amine_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+   "tree_probability": 0.4656892418861389,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.4656892418861389,
+   "prob_tree_v4_noTE": 0.563418984413147,
+   "elapsed_s": 0.47,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0065
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0058
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0054
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0572
+    },
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0446
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.0073
+    }
+   ],
+   "id": "A",
+   "old_gnn_pred": 0.8194,
+   "outcome": "fail",
+   "note": "乙酸误加 18M 过量、加料顺序错"
+  },
+  {
+   "node": "TAPT",
+   "linker": "A6",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(-c2ccc(C(F)(F)F)cc2)c(C=O)cc1-c1ccc(C(F)(F)F)cc1",
+   "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "tree_probability": 0.5240750908851624,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.5240750908851624,
+   "prob_tree_v4_noTE": 0.5135886669158936,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0104
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0044
+    },
+    {
+     "feature": "int_diff_tpsa_per_site",
+     "label_zh": "醛-胺差·每位点极性表面积",
+     "shap": 0.0036
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0428
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0268
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.007
+    }
+   ],
+   "id": "A1",
+   "old_gnn_pred": null,
+   "outcome": "fail",
+   "note": "两段加料；膜一碰就碎"
+  },
+  {
+   "node": "TAPB",
+   "linker": "A6",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(-c2ccc(C(F)(F)F)cc2)c(C=O)cc1-c1ccc(C(F)(F)F)cc1",
+   "amine_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+   "tree_probability": 0.4656892418861389,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.4656892418861389,
+   "prob_tree_v4_noTE": 0.563418984413147,
+   "elapsed_s": 0.07,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0065
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0058
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0054
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0572
+    },
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0446
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.0073
+    }
+   ],
+   "id": "A2",
+   "old_gnn_pred": 0.8194,
+   "outcome": "fail",
+   "note": "A 的重试（先自聚再加第二组分）"
+  },
+  {
+   "node": "TAPT",
+   "linker": "A6",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(-c2ccc(C(F)(F)F)cc2)c(C=O)cc1-c1ccc(C(F)(F)F)cc1",
+   "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "tree_probability": 0.5240750908851624,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.5240750908851624,
+   "prob_tree_v4_noTE": 0.5135886669158936,
+   "elapsed_s": 0.07,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0104
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0044
+    },
+    {
+     "feature": "int_diff_tpsa_per_site",
+     "label_zh": "醛-胺差·每位点极性表面积",
+     "shap": 0.0036
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0428
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0268
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.007
+    }
+   ],
+   "id": "A5",
+   "old_gnn_pred": null,
+   "outcome": "partial",
+   "note": "与 A1 类似但相对最好（14 组中唯一稍好）"
+  },
+  {
+   "node": "TAPT",
+   "linker": "A6",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(-c2ccc(C(F)(F)F)cc2)c(C=O)cc1-c1ccc(C(F)(F)F)cc1",
+   "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "tree_probability": 0.5240750908851624,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.5240750908851624,
+   "prob_tree_v4_noTE": 0.5135886669158936,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0104
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0044
+    },
+    {
+     "feature": "int_diff_tpsa_per_site",
+     "label_zh": "醛-胺差·每位点极性表面积",
+     "shap": 0.0036
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0428
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0268
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.007
+    }
+   ],
+   "id": "A8",
+   "old_gnn_pred": null,
+   "outcome": "fail",
+   "note": "v3.9 标准流程重试，仍未有效成膜"
+  },
+  {
+   "node": "TAPB",
+   "linker": "A7",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(-c2cc(C(F)(F)F)cc(C(F)(F)F)c2)c(C=O)cc1-c1cc(C(F)(F)F)cc(C(F)(F)F)c1",
+   "amine_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+   "tree_probability": 0.010304056107997894,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.010304056107997894,
+   "prob_tree_v4_noTE": 0.6015217304229736,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0037
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0034
+    },
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0025
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.59
+    },
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0098
+    },
+    {
+     "feature": "amine_3d_pmi_i1_i3",
+     "label_zh": "胺 3D·主惯性轴比 I1/I3（延展度）",
+     "shap": -0.0072
+    }
+   ],
+   "id": "B",
+   "old_gnn_pred": 0.809,
+   "outcome": "fail",
+   "note": "乙酸误加 18M 过量、加料顺序错"
+  },
+  {
+   "node": "TFPT",
+   "linker": "H3",
+   "status": "skipped",
+   "reason": "单体待确认: ['H3']",
+   "id": "C",
+   "old_gnn_pred": 0.04,
+   "outcome": "fail",
+   "note": "旧模型标注'预测不可靠，不适合非标准官能团'；H3 结构待确认"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B5",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1ccc(-c2ccc(N)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "tree_probability": 0.030980687588453293,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.030980687588453293,
+   "prob_tree_v4_noTE": 0.3975468575954437,
+   "elapsed_s": 0.13,
+   "top_positive": [
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0054
+    },
+    {
+     "feature": "int_ratio_n_heavy_per_site",
+     "label_zh": "醛/胺比·每位点重原子数",
+     "shap": 0.0036
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0035
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.5734
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0272
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.0047
+    }
+   ],
+   "id": "D",
+   "old_gnn_pred": 0.596,
+   "outcome": "fail",
+   "note": "乙酸误加 18M、苯胺量与方案不符"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B5",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1ccc(-c2ccc(N)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "tree_probability": 0.030980687588453293,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.030980687588453293,
+   "prob_tree_v4_noTE": 0.3975468575954437,
+   "elapsed_s": 0.13,
+   "top_positive": [
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0054
+    },
+    {
+     "feature": "int_ratio_n_heavy_per_site",
+     "label_zh": "醛/胺比·每位点重原子数",
+     "shap": 0.0036
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0035
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.5734
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0272
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.0047
+    }
+   ],
+   "id": "D3",
+   "old_gnn_pred": null,
+   "outcome": "fail",
+   "note": "放大 1.5 倍+12M 乙酸；黑色贴壁膜逐渐消失"
+  },
+  {
+   "node": "TFPB",
+   "linker": "B5",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2cc(-c3ccc(C=O)cc3)cc(-c3ccc(C=O)cc3)c2)cc1",
+   "amine_smiles": "Nc1ccc(-c2ccc(N)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "tree_probability": 0.12857171893119812,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.12857171893119812,
+   "prob_tree_v4_noTE": 0.687412679195404,
+   "elapsed_s": 0.11,
+   "top_positive": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": 0.0217
+    },
+    {
+     "feature": "int_ratio_mw_per_site",
+     "label_zh": "醛/胺比·每位点分子量",
+     "shap": 0.0048
+    },
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0036
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.5445
+    },
+    {
+     "feature": "int_ratio_n_rotatable",
+     "label_zh": "醛/胺比·可旋转键数",
+     "shap": -0.006
+    },
+    {
+     "feature": "rule_F_on_amine",
+     "label_zh": "规则·胺上含氟",
+     "shap": -0.0047
+    }
+   ],
+   "id": "D4",
+   "old_gnn_pred": null,
+   "outcome": "fail",
+   "note": "开盖爆沸氯仿流失；未形成薄膜和沉淀"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B5",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1ccc(-c2ccc(N)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "tree_probability": 0.030980687588453293,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.030980687588453293,
+   "prob_tree_v4_noTE": 0.3975468575954437,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0054
+    },
+    {
+     "feature": "int_ratio_n_heavy_per_site",
+     "label_zh": "醛/胺比·每位点重原子数",
+     "shap": 0.0036
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0035
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.5734
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0272
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.0047
+    }
+   ],
+   "id": "D7",
+   "old_gnn_pred": null,
+   "outcome": "fail",
+   "note": "粉末贴壁，非常易碎"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B5",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1ccc(-c2ccc(N)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "tree_probability": 0.030980687588453293,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.030980687588453293,
+   "prob_tree_v4_noTE": 0.3975468575954437,
+   "elapsed_s": 0.07,
+   "top_positive": [
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0054
+    },
+    {
+     "feature": "int_ratio_n_heavy_per_site",
+     "label_zh": "醛/胺比·每位点重原子数",
+     "shap": 0.0036
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0035
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.5734
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0272
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.0047
+    }
+   ],
+   "id": "D9",
+   "old_gnn_pred": null,
+   "outcome": "fail",
+   "note": "D 的 3 倍放大；薄膜碳化迹象"
+  },
+  {
+   "node": "TAPB",
+   "linker": "A3",
+   "status": "ok",
+   "ald_smiles": "O=Cc1c(F)c(F)c(-c2c(F)c(F)c(C=O)c(F)c2F)c(F)c1F",
+   "amine_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+   "tree_probability": 0.4852336347103119,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.4852336347103119,
+   "prob_tree_v4_noTE": 0.6736879348754883,
+   "elapsed_s": 0.19,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0059
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0059
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0057
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0567
+    },
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0389
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.008
+    }
+   ],
+   "id": "E",
+   "old_gnn_pred": 0.589,
+   "outcome": "fail",
+   "note": "乙酸误加 18M 过量、加料顺序错"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B4",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1c(F)c(F)c(-c2c(F)c(F)c(N)c(F)c2F)c(F)c1F",
+   "tree_probability": 0.06317093223333359,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.06317093223333359,
+   "prob_tree_v4_noTE": 0.3481656610965729,
+   "elapsed_s": 0.09,
+   "top_positive": [
+    {
+     "feature": "int_ratio_mw_per_site",
+     "label_zh": "醛/胺比·每位点分子量",
+     "shap": 0.0053
+    },
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.005
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0046
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.571
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0228
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.0041
+    }
+   ],
+   "id": "F",
+   "old_gnn_pred": 0.486,
+   "outcome": "fail",
+   "note": "乙酸误加 18M 过量、加料顺序错"
+  }
+ ],
+ "planned": [
+  {
+   "node": "TAPB",
+   "linker": "A5",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(C(F)(F)F)c(C=O)cc1C(F)(F)F",
+   "amine_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+   "tree_probability": 0.5597296357154846,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.5597296357154846,
+   "prob_tree_v4_noTE": 0.6755392551422119,
+   "elapsed_s": 0.21,
+   "top_positive": [
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0081
+    },
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0069
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.006
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0514
+    },
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0247
+    },
+    {
+     "feature": "int_diff_mw_per_site",
+     "label_zh": "醛-胺差·每位点分子量",
+     "shap": -0.0058
+    }
+   ],
+   "id": "G",
+   "old_gnn_pred": 0.794,
+   "outcome": "not_recorded",
+   "alt_node_prediction": {
+    "node": "TAPT",
+    "tree_probability": 0.6242913007736206,
+    "route_production": "ald_unseen",
+    "route_canonical": "ald_unseen"
+   }
+  },
+  {
+   "node": "TAPB",
+   "linker": "A4",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2ccc(C=O)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "amine_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+   "tree_probability": 0.4932403862476349,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.4932403862476349,
+   "prob_tree_v4_noTE": 0.6182017922401428,
+   "elapsed_s": 0.4,
+   "top_positive": [
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0071
+    },
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0059
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0058
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0569
+    },
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0382
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.007
+    }
+   ],
+   "id": "H",
+   "old_gnn_pred": 0.803,
+   "outcome": "not_recorded",
+   "alt_node_prediction": {
+    "node": "TAPT",
+    "tree_probability": 0.5372334718704224,
+    "route_production": "ald_unseen",
+    "route_canonical": "ald_unseen"
+   }
+  },
+  {
+   "node": "TAPB",
+   "linker": "A1",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(F)c(C=O)cc1F",
+   "amine_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+   "tree_probability": 0.6340347528457642,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.6340347528457642,
+   "prob_tree_v4_noTE": 0.7799050807952881,
+   "elapsed_s": 0.21,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0087
+    },
+    {
+     "feature": "ald_3d_mol_volume",
+     "label_zh": "醛 3D·分子体积",
+     "shap": 0.0054
+    },
+    {
+     "feature": "int_diff_mw_per_site",
+     "label_zh": "醛-胺差·每位点分子量",
+     "shap": 0.0054
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0208
+    },
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.014
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.0095
+    }
+   ],
+   "id": "I",
+   "old_gnn_pred": 0.618,
+   "outcome": "not_recorded",
+   "alt_node_prediction": {
+    "node": "TAPT",
+    "tree_probability": 0.6461153626441956,
+    "route_production": "ald_unseen",
+    "route_canonical": "ald_unseen"
+   }
+  },
+  {
+   "node": "TAPB",
+   "linker": "A2",
+   "status": "ok",
+   "ald_smiles": "O=Cc1c(F)c(F)c(C=O)c(F)c1F",
+   "amine_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+   "tree_probability": 0.7171049118041992,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.7171049118041992,
+   "prob_tree_v4_noTE": 0.7327973246574402,
+   "elapsed_s": 0.12,
+   "top_positive": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": 0.0545
+    },
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": 0.0229
+    },
+    {
+     "feature": "int_hadamard_logp",
+     "label_zh": "醛×胺·脂溶性(LogP)",
+     "shap": 0.0046
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": -0.0058
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.0052
+    },
+    {
+     "feature": "rule_e_favorable",
+     "label_zh": "规则·电子效应有利",
+     "shap": -0.0043
+    }
+   ],
+   "id": "J",
+   "old_gnn_pred": 0.643,
+   "outcome": "not_recorded",
+   "alt_node_prediction": {
+    "node": "TAPT",
+    "tree_probability": 0.6990079283714294,
+    "route_production": "in_pool",
+    "route_canonical": "in_pool"
+   }
+  },
+  {
+   "node": "TFPT",
+   "linker": "B6",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1ccc(N)c(C(F)(F)F)c1",
+   "tree_probability": 0.052607644349336624,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.052607644349336624,
+   "prob_tree_v4_noTE": 0.38695892691612244,
+   "elapsed_s": 0.13,
+   "top_positive": [
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0056
+    },
+    {
+     "feature": "int_ratio_n_heavy",
+     "label_zh": "醛/胺比·重原子数",
+     "shap": 0.0044
+    },
+    {
+     "feature": "amine_3d_pmi_i2_i3",
+     "label_zh": "胺 3D·主惯性轴比 I2/I3（不对称度）",
+     "shap": 0.004
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.5752
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0257
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.0043
+    }
+   ],
+   "id": "K",
+   "old_gnn_pred": 0.645,
+   "outcome": "not_recorded"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B1",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1cc(F)c(N)cc1F",
+   "tree_probability": 0.6546818017959595,
+   "tree_model_name": "tree_v4",
+   "route_production": "amine_unseen",
+   "route_canonical": "amine_unseen",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": false,
+   "route_reason": "含未见单体（胺）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.6546818017959595,
+   "prob_tree_v4_noTE": 0.387827605009079,
+   "elapsed_s": 0.24,
+   "top_positive": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": 0.0261
+    },
+    {
+     "feature": "int_ratio_n_heavy",
+     "label_zh": "醛/胺比·重原子数",
+     "shap": 0.008
+    },
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0069
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.01
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": -0.0065
+    },
+    {
+     "feature": "amine_3d_pmi_i2_i3",
+     "label_zh": "胺 3D·主惯性轴比 I2/I3（不对称度）",
+     "shap": -0.0062
+    }
+   ],
+   "id": "L",
+   "old_gnn_pred": 0.784,
+   "outcome": "not_recorded"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B2",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1c(F)c(F)c(N)c(F)c1F",
+   "tree_probability": 0.6515193581581116,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.6515193581581116,
+   "prob_tree_v4_noTE": 0.4189583659172058,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": 0.0378
+    },
+    {
+     "feature": "int_ratio_n_heavy",
+     "label_zh": "醛/胺比·重原子数",
+     "shap": 0.0072
+    },
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0055
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0134
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.006
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.005
+    }
+   ],
+   "id": "M",
+   "old_gnn_pred": 0.771,
+   "outcome": "not_recorded"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B3",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1ccc(-c2ccc(N)c(F)c2)cc1F",
+   "tree_probability": 0.04454907774925232,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.04454907774925232,
+   "prob_tree_v4_noTE": 0.4526166319847107,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0052
+    },
+    {
+     "feature": "int_ratio_n_heavy",
+     "label_zh": "醛/胺比·重原子数",
+     "shap": 0.0044
+    },
+    {
+     "feature": "amine_3d_pmi_i2_i3",
+     "label_zh": "胺 3D·主惯性轴比 I2/I3（不对称度）",
+     "shap": 0.0031
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.5718
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0231
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.004
+    }
+   ],
+   "id": "N",
+   "old_gnn_pred": 0.627,
+   "outcome": "not_recorded"
+  }
+ ],
+ "scheme17": [
+  {
+   "node": "TAPT",
+   "linker": "A5",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(C(F)(F)F)c(C=O)cc1C(F)(F)F",
+   "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "tree_probability": 0.6242913007736206,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.6242913007736206,
+   "prob_tree_v4_noTE": 0.7299848198890686,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0119
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0061
+    },
+    {
+     "feature": "amine_3d_pmi_i1_i3",
+     "label_zh": "胺 3D·主惯性轴比 I1/I3（延展度）",
+     "shap": 0.0049
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.026
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0223
+    },
+    {
+     "feature": "rule_F_on_ald",
+     "label_zh": "规则·醛上含氟",
+     "shap": -0.0052
+    }
+   ],
+   "id": "G1-S1"
+  },
+  {
+   "node": "TAPT",
+   "linker": "A4",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2ccc(C=O)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "tree_probability": 0.5372334718704224,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.5372334718704224,
+   "prob_tree_v4_noTE": 0.5125958919525146,
+   "elapsed_s": 0.07,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0099
+    },
+    {
+     "feature": "int_hadamard_tpsa_per_site",
+     "label_zh": "醛×胺·每位点极性表面积",
+     "shap": 0.0048
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0047
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0413
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0261
+    },
+    {
+     "feature": "int_ratio_logp",
+     "label_zh": "醛/胺比·脂溶性(LogP)",
+     "shap": -0.0066
+    }
+   ],
+   "id": "G1-S2"
+  },
+  {
+   "node": "TAPT",
+   "linker": "A6",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(-c2ccc(C(F)(F)F)cc2)c(C=O)cc1-c1ccc(C(F)(F)F)cc1",
+   "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "tree_probability": 0.5240750908851624,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.5240750908851624,
+   "prob_tree_v4_noTE": 0.5135886669158936,
+   "elapsed_s": 0.11,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0104
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0044
+    },
+    {
+     "feature": "int_diff_tpsa_per_site",
+     "label_zh": "醛-胺差·每位点极性表面积",
+     "shap": 0.0036
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0428
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0268
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.007
+    }
+   ],
+   "id": "G1-S3"
+  },
+  {
+   "node": "TAPT",
+   "linker": "A7",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(-c2cc(C(F)(F)F)cc(C(F)(F)F)c2)c(C=O)cc1-c1cc(C(F)(F)F)cc(C(F)(F)F)c1",
+   "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "tree_probability": 0.031583335250616074,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.031583335250616074,
+   "prob_tree_v4_noTE": 0.5466234087944031,
+   "elapsed_s": 0.1,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0042
+    },
+    {
+     "feature": "ald_3d_radius_ratio",
+     "label_zh": "醛 3D·最大/最小半径比（伸展程度）",
+     "shap": 0.0029
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0025
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.5722
+    },
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0145
+    },
+    {
+     "feature": "amine_3d_pmi_i1_i3",
+     "label_zh": "胺 3D·主惯性轴比 I1/I3（延展度）",
+     "shap": -0.0063
+    }
+   ],
+   "id": "G1-S4"
+  },
+  {
+   "node": "TAPT",
+   "linker": "A1",
+   "status": "ok",
+   "ald_smiles": "O=Cc1cc(F)c(C=O)cc1F",
+   "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "tree_probability": 0.6461153626441956,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.6461153626441956,
+   "prob_tree_v4_noTE": 0.808282732963562,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0114
+    },
+    {
+     "feature": "ald_3d_mol_volume",
+     "label_zh": "醛 3D·分子体积",
+     "shap": 0.0051
+    },
+    {
+     "feature": "int_diff_mw_per_site",
+     "label_zh": "醛-胺差·每位点分子量",
+     "shap": 0.0048
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0272
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.0094
+    },
+    {
+     "feature": "amine_ring_frac",
+     "label_zh": "胺·环原子占比",
+     "shap": -0.006
+    }
+   ],
+   "id": "G2-S1"
+  },
+  {
+   "node": "TAPT",
+   "linker": "A2",
+   "status": "ok",
+   "ald_smiles": "O=Cc1c(F)c(F)c(C=O)c(F)c1F",
+   "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "tree_probability": 0.6990079283714294,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.6990079283714294,
+   "prob_tree_v4_noTE": 0.749994695186615,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": 0.0571
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0043
+    },
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.0031
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "amine_3d_pmi_i2_i3",
+     "label_zh": "胺 3D·主惯性轴比 I2/I3（不对称度）",
+     "shap": -0.0049
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.0043
+    },
+    {
+     "feature": "amine_has_heterocycle",
+     "label_zh": "胺·含杂环",
+     "shap": -0.0038
+    }
+   ],
+   "id": "G2-S2"
+  },
+  {
+   "node": "TAPT",
+   "linker": "A3",
+   "status": "ok",
+   "ald_smiles": "O=Cc1c(F)c(F)c(-c2c(F)c(F)c(C=O)c(F)c2F)c(F)c1F",
+   "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "tree_probability": 0.5494217276573181,
+   "tree_model_name": "tree_v4",
+   "route_production": "ald_unseen",
+   "route_canonical": "ald_unseen",
+   "ald_seen_canonical": false,
+   "amine_seen_canonical": true,
+   "route_reason": "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.5494217276573181,
+   "prob_tree_v4_noTE": 0.5254579782485962,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "amine_3d_radius_gyration",
+     "label_zh": "胺 3D·回转半径",
+     "shap": 0.01
+    },
+    {
+     "feature": "int_hadamard_tpsa_per_site",
+     "label_zh": "醛×胺·每位点极性表面积",
+     "shap": 0.0049
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0039
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0373
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0259
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.0069
+    }
+   ],
+   "id": "G2-S3"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B6",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1ccc(N)c(C(F)(F)F)c1",
+   "tree_probability": 0.052607644349336624,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.052607644349336624,
+   "prob_tree_v4_noTE": 0.38695892691612244,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0056
+    },
+    {
+     "feature": "int_ratio_n_heavy",
+     "label_zh": "醛/胺比·重原子数",
+     "shap": 0.0044
+    },
+    {
+     "feature": "amine_3d_pmi_i2_i3",
+     "label_zh": "胺 3D·主惯性轴比 I2/I3（不对称度）",
+     "shap": 0.004
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.5752
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0257
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.0043
+    }
+   ],
+   "id": "G3-S1"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B5",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1ccc(-c2ccc(N)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "tree_probability": 0.030980687588453293,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.030980687588453293,
+   "prob_tree_v4_noTE": 0.3975468575954437,
+   "elapsed_s": 0.09,
+   "top_positive": [
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0054
+    },
+    {
+     "feature": "int_ratio_n_heavy_per_site",
+     "label_zh": "醛/胺比·每位点重原子数",
+     "shap": 0.0036
+    },
+    {
+     "feature": "int_hadamard_n_heavy_per_site",
+     "label_zh": "醛×胺·每位点重原子数",
+     "shap": 0.0035
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.5734
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0272
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.0047
+    }
+   ],
+   "id": "G3-S2"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B1",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1cc(F)c(N)cc1F",
+   "tree_probability": 0.6546818017959595,
+   "tree_model_name": "tree_v4",
+   "route_production": "amine_unseen",
+   "route_canonical": "amine_unseen",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": false,
+   "route_reason": "含未见单体（胺）但非双未见 → tree_v4（沿用池内模型）",
+   "prob_tree_v4": 0.6546818017959595,
+   "prob_tree_v4_noTE": 0.387827605009079,
+   "elapsed_s": 0.07,
+   "top_positive": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": 0.0261
+    },
+    {
+     "feature": "int_ratio_n_heavy",
+     "label_zh": "醛/胺比·重原子数",
+     "shap": 0.008
+    },
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0069
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.01
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": -0.0065
+    },
+    {
+     "feature": "amine_3d_pmi_i2_i3",
+     "label_zh": "胺 3D·主惯性轴比 I2/I3（不对称度）",
+     "shap": -0.0062
+    }
+   ],
+   "id": "G4-S1"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B2",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1c(F)c(F)c(N)c(F)c1F",
+   "tree_probability": 0.6515193581581116,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.6515193581581116,
+   "prob_tree_v4_noTE": 0.4189583659172058,
+   "elapsed_s": 0.07,
+   "top_positive": [
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": 0.0378
+    },
+    {
+     "feature": "int_ratio_n_heavy",
+     "label_zh": "醛/胺比·重原子数",
+     "shap": 0.0072
+    },
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0055
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.0134
+    },
+    {
+     "feature": "int_hadamard_mw",
+     "label_zh": "醛×胺·分子量",
+     "shap": -0.006
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.005
+    }
+   ],
+   "id": "G4-S2"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B3",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1ccc(-c2ccc(N)c(F)c2)cc1F",
+   "tree_probability": 0.04454907774925232,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.04454907774925232,
+   "prob_tree_v4_noTE": 0.4526166319847107,
+   "elapsed_s": 0.08,
+   "top_positive": [
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.0052
+    },
+    {
+     "feature": "int_ratio_n_heavy",
+     "label_zh": "醛/胺比·重原子数",
+     "shap": 0.0044
+    },
+    {
+     "feature": "amine_3d_pmi_i2_i3",
+     "label_zh": "胺 3D·主惯性轴比 I2/I3（不对称度）",
+     "shap": 0.0031
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.5718
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0231
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.004
+    }
+   ],
+   "id": "G4-S3"
+  },
+  {
+   "node": "TFPT",
+   "linker": "B4",
+   "status": "ok",
+   "ald_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "amine_smiles": "Nc1c(F)c(F)c(-c2c(F)c(F)c(N)c(F)c2F)c(F)c1F",
+   "tree_probability": 0.06317093223333359,
+   "tree_model_name": "tree_v4",
+   "route_production": "in_pool",
+   "route_canonical": "in_pool",
+   "ald_seen_canonical": true,
+   "amine_seen_canonical": true,
+   "route_reason": "已知单体组合 → tree_v4（含历史先验）",
+   "prob_tree_v4": 0.06317093223333359,
+   "prob_tree_v4_noTE": 0.3481656610965729,
+   "elapsed_s": 0.07,
+   "top_positive": [
+    {
+     "feature": "int_ratio_mw_per_site",
+     "label_zh": "醛/胺比·每位点分子量",
+     "shap": 0.0053
+    },
+    {
+     "feature": "int_ratio_tpsa",
+     "label_zh": "醛/胺比·极性表面积(TPSA)",
+     "shap": 0.005
+    },
+    {
+     "feature": "int_hadamard_mw_per_site",
+     "label_zh": "醛×胺·每位点分子量",
+     "shap": 0.0046
+    }
+   ],
+   "top_negative": [
+    {
+     "feature": "te_amine_film_rate",
+     "label_zh": "先验·胺历史成膜率",
+     "shap": -0.571
+    },
+    {
+     "feature": "te_ald_film_rate",
+     "label_zh": "先验·醛历史成膜率",
+     "shap": -0.0228
+    },
+    {
+     "feature": "ald_3d_radius_gyration",
+     "label_zh": "醛 3D·回转半径",
+     "shap": -0.0041
+    }
+   ],
+   "id": "G4-S4"
+  },
+  {
+   "node": "TFPT",
+   "linker": "H1",
+   "status": "skipped",
+   "reason": "单体待确认: ['H1']",
+   "id": "G5-S1"
+  },
+  {
+   "node": "TFPT",
+   "linker": "H2",
+   "status": "skipped",
+   "reason": "单体待确认: ['H2']",
+   "id": "G5-S2"
+  },
+  {
+   "node": "TFPT",
+   "linker": "H3",
+   "status": "skipped",
+   "reason": "单体待确认: ['H3']",
+   "id": "G5-S3"
+  },
+  {
+   "node": "TFPT",
+   "linker": "H4",
+   "status": "skipped",
+   "reason": "单体待确认: ['H4']",
+   "id": "G5-S4"
+  }
+ ]
+}

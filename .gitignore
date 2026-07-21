@@ -64,3 +64,6 @@ Thumbs.db
 
 # 会话状态（实时状态，不提交到 git）
 .agents/session_state.yaml
+
+# 阶段 14 真实回测：大体积原始实验记录副本（10MB，不入 git，本地保留）
+data/experimental_refs/实验ABCDEF.docx

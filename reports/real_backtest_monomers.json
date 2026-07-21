@@ -1,0 +1,353 @@
+{
+ "monomers": {
+  "TAPT": {
+   "id": "TAPT",
+   "type": "amine_node",
+   "docx_name": "2,4,6-三(4-氨基苯基)-1,3,5-三嗪",
+   "cas_in_record": "14544-47-9",
+   "candidate_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "canonical_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+   "rdkit_mw": 354.4170000000001,
+   "docx_mw": 354.41,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline-15N",
+     "cas": NaN,
+     "n_papers": 37
+    }
+   ],
+   "status": "resolved"
+  },
+  "TFPT": {
+   "id": "TFPT",
+   "type": "aldehyde_node",
+   "docx_name": "2,4,6-三(4-甲酰基苯基)-1,3,5-三嗪",
+   "cas_in_record": "443922-06-3",
+   "candidate_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "canonical_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+   "rdkit_mw": 393.4020000000001,
+   "docx_mw": 393.42,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "4,4',4''-(1,3,5-triazine-2,4,6-triyl)tribenzaldehyde",
+     "cas": NaN,
+     "n_papers": 21
+    }
+   ],
+   "status": "resolved"
+  },
+  "TAPB": {
+   "id": "TAPB",
+   "type": "amine_node",
+   "docx_name": "1,3,5-三(4-氨基苯基)苯（实验记录实节点）",
+   "cas_in_record": "118727-34-7",
+   "candidate_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+   "canonical_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+   "rdkit_mw": 351.4530000000001,
+   "docx_mw": 351.44,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "1,3,5-tris(4-aminophenyl)benzene",
+     "cas": NaN,
+     "n_papers": 110
+    }
+   ],
+   "status": "resolved"
+  },
+  "TFPB": {
+   "id": "TFPB",
+   "type": "aldehyde_node",
+   "docx_name": "1,3,5-三(4-甲酰基苯基)苯（D4 实节点）",
+   "cas_in_record": "118688-53-2",
+   "candidate_smiles": "O=Cc1ccc(-c2cc(-c3ccc(C=O)cc3)cc(-c3ccc(C=O)cc3)c2)cc1",
+   "canonical_smiles": "O=Cc1ccc(-c2cc(-c3ccc(C=O)cc3)cc(-c3ccc(C=O)cc3)c2)cc1",
+   "rdkit_mw": 390.4380000000001,
+   "docx_mw": 390.43,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "1,3,5-tris(4-formylphenyl)benzene",
+     "cas": NaN,
+     "n_papers": 21
+    }
+   ],
+   "status": "resolved"
+  },
+  "A1": {
+   "id": "A1",
+   "type": "aldehyde",
+   "docx_name": "2,5-二氟对苯二甲醛",
+   "cas_in_record": "608145-27-3",
+   "candidate_smiles": "O=Cc1cc(F)c(C=O)cc1F",
+   "canonical_smiles": "O=Cc1cc(F)c(C=O)cc1F",
+   "rdkit_mw": 170.11399999999998,
+   "docx_mw": 170.11,
+   "mw_check": true,
+   "pool_matches": [],
+   "status": "resolved"
+  },
+  "A2": {
+   "id": "A2",
+   "type": "aldehyde",
+   "docx_name": "2,3,5,6-四氟对苯二甲醛",
+   "cas_in_record": "3217-47-8",
+   "candidate_smiles": "O=Cc1c(F)c(F)c(C=O)c(F)c1F",
+   "canonical_smiles": "O=Cc1c(F)c(F)c(C=O)c(F)c1F",
+   "rdkit_mw": 206.09399999999997,
+   "docx_mw": 206.1,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "2,3,5,6-tetrafluorobenzene-1,4-dicarboxaldehyde",
+     "cas": NaN,
+     "n_papers": 15
+    }
+   ],
+   "status": "resolved"
+  },
+  "A3": {
+   "id": "A3",
+   "type": "aldehyde",
+   "docx_name": "2,2',3,3',5,5',6,6'-八氟-4,4'-联苯二甲醛",
+   "cas_in_record": "2640813-40-5",
+   "candidate_smiles": "O=Cc1c(F)c(F)c(-c2c(F)c(F)c(C=O)c(F)c2F)c(F)c1F",
+   "canonical_smiles": "O=Cc1c(F)c(F)c(-c2c(F)c(F)c(C=O)c(F)c2F)c(F)c1F",
+   "rdkit_mw": 354.152,
+   "docx_mw": 354.14,
+   "mw_check": true,
+   "pool_matches": [],
+   "status": "resolved"
+  },
+  "A4": {
+   "id": "A4",
+   "type": "aldehyde",
+   "docx_name": "2,2'-双(三氟甲基)-4,4'-联苯二甲醛",
+   "cas_in_record": "1271813-32-1",
+   "candidate_smiles": "O=Cc1ccc(-c2ccc(C=O)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "canonical_smiles": "O=Cc1ccc(-c2ccc(C=O)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "rdkit_mw": 346.22599999999994,
+   "docx_mw": 346.23,
+   "mw_check": true,
+   "pool_matches": [],
+   "status": "resolved"
+  },
+  "A5": {
+   "id": "A5",
+   "type": "aldehyde",
+   "docx_name": "2,5-双(三氟甲基)对苯二甲醛",
+   "cas_in_record": "847450-39-9",
+   "candidate_smiles": "O=Cc1cc(C(F)(F)F)c(C=O)cc1C(F)(F)F",
+   "canonical_smiles": "O=Cc1cc(C(F)(F)F)c(C=O)cc1C(F)(F)F",
+   "rdkit_mw": 270.128,
+   "docx_mw": 270.13,
+   "mw_check": true,
+   "pool_matches": [],
+   "status": "resolved"
+  },
+  "A6": {
+   "id": "A6",
+   "type": "aldehyde",
+   "docx_name": "4,4''-双(三氟甲基)-2',5'-二甲酰基对三联苯",
+   "cas_in_record": "1300701-03-4",
+   "candidate_smiles": "O=Cc1cc(-c2ccc(C(F)(F)F)cc2)c(C=O)cc1-c1ccc(C(F)(F)F)cc1",
+   "canonical_smiles": "O=Cc1cc(-c2ccc(C(F)(F)F)cc2)c(C=O)cc1-c1ccc(C(F)(F)F)cc1",
+   "rdkit_mw": 422.324,
+   "docx_mw": 422.37,
+   "mw_check": true,
+   "pool_matches": [],
+   "status": "resolved"
+  },
+  "A7": {
+   "id": "A7",
+   "type": "aldehyde",
+   "docx_name": "3,3'',5,5''-四(三氟甲基)-2',5'-二甲酰基对三联苯",
+   "cas_in_record": "2368851-11-8",
+   "candidate_smiles": "O=Cc1cc(-c2cc(C(F)(F)F)cc(C(F)(F)F)c2)c(C=O)cc1-c1cc(C(F)(F)F)cc(C(F)(F)F)c1",
+   "canonical_smiles": "O=Cc1cc(-c2cc(C(F)(F)F)cc(C(F)(F)F)c2)c(C=O)cc1-c1cc(C(F)(F)F)cc(C(F)(F)F)c1",
+   "rdkit_mw": 558.3180000000002,
+   "docx_mw": 558.34,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "3,3',5,5'-tetrakis(trifluoromethyl)-[1,1':4',1''-terphenyl]-2,5'-dicarbaldehyde",
+     "cas": "2368851-11-8",
+     "n_papers": 0
+    }
+   ],
+   "status": "resolved"
+  },
+  "B1": {
+   "id": "B1",
+   "type": "amine",
+   "docx_name": "1,4-二氨基-2,5-二氟苯",
+   "cas_in_record": "698-52-2",
+   "candidate_smiles": "Nc1cc(F)c(N)cc1F",
+   "canonical_smiles": "Nc1cc(F)c(N)cc1F",
+   "rdkit_mw": 144.124,
+   "docx_mw": 144.12,
+   "mw_check": true,
+   "pool_matches": [],
+   "status": "resolved"
+  },
+  "B2": {
+   "id": "B2",
+   "type": "amine",
+   "docx_name": "1,4-二氨基-2,3,5,6-四氟苯",
+   "cas_in_record": "1198-64-7",
+   "candidate_smiles": "Nc1c(F)c(F)c(N)c(F)c1F",
+   "canonical_smiles": "Nc1c(F)c(F)c(N)c(F)c1F",
+   "rdkit_mw": 180.10399999999998,
+   "docx_mw": 180.11,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "2,3,5,6-tetrafluoro-1,4-phenylenediamine",
+     "cas": NaN,
+     "n_papers": 1
+    }
+   ],
+   "status": "resolved"
+  },
+  "B3": {
+   "id": "B3",
+   "type": "amine",
+   "docx_name": "3,3'-二氟-4,4'-联苯二胺",
+   "cas_in_record": "316-64-3",
+   "candidate_smiles": "Nc1ccc(-c2ccc(N)c(F)c2)cc1F",
+   "canonical_smiles": "Nc1ccc(-c2ccc(N)c(F)c2)cc1F",
+   "rdkit_mw": 220.22199999999995,
+   "docx_mw": 220.22,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "4,4'-二氨基-3,3'-二氟联苯",
+     "cas": "448-97-5",
+     "n_papers": 0
+    }
+   ],
+   "status": "resolved"
+  },
+  "B4": {
+   "id": "B4",
+   "type": "amine",
+   "docx_name": "2,2',3,3',5,5',6,6'-八氟-4,4'-联苯二胺",
+   "cas_in_record": "1038-66-0",
+   "candidate_smiles": "Nc1c(F)c(F)c(-c2c(F)c(F)c(N)c(F)c2F)c(F)c1F",
+   "canonical_smiles": "Nc1c(F)c(F)c(-c2c(F)c(F)c(N)c(F)c2F)c(F)c1F",
+   "rdkit_mw": 328.162,
+   "docx_mw": 328.16,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "4,4'-二氨基八氟联苯",
+     "cas": "1038-66-0",
+     "n_papers": 0
+    }
+   ],
+   "status": "resolved"
+  },
+  "B5": {
+   "id": "B5",
+   "type": "amine",
+   "docx_name": "2,2'-双(三氟甲基)-4,4'-联苯二胺",
+   "cas_in_record": "341-58-2",
+   "candidate_smiles": "Nc1ccc(-c2ccc(N)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "canonical_smiles": "Nc1ccc(-c2ccc(N)cc2C(F)(F)F)c(C(F)(F)F)c1",
+   "rdkit_mw": 320.23599999999993,
+   "docx_mw": 320.24,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "2,2'-二(三氟甲基)-二氨基联苯",
+     "cas": "341-58-2",
+     "n_papers": 0
+    }
+   ],
+   "status": "resolved"
+  },
+  "B6": {
+   "id": "B6",
+   "type": "amine",
+   "docx_name": "2,5-二氨基三氟甲苯",
+   "cas_in_record": "364-13-6",
+   "candidate_smiles": "Nc1ccc(N)c(C(F)(F)F)c1",
+   "canonical_smiles": "Nc1ccc(N)c(C(F)(F)F)c1",
+   "rdkit_mw": 176.14100000000002,
+   "docx_mw": 176.14,
+   "mw_check": true,
+   "pool_matches": [
+    {
+     "best_name": "2,3-三氟甲基-1,4-苯二胺",
+     "cas": "364-13-6",
+     "n_papers": 0
+    }
+   ],
+   "status": "resolved"
+  },
+  "H1": {
+   "id": "H1",
+   "type": "hydrazide",
+   "docx_name": "1,4-双(酰肼基)-2,5-双(2,2,3,3,3-五氟丙氧基)苯",
+   "cas_in_record": null,
+   "candidate_smiles": "NNC(=O)c1cc(OCC(F)(F)C(F)(F)F)c(C(=O)NN)cc1OCC(F)(F)C(F)(F)F",
+   "canonical_smiles": "NNC(=O)c1cc(OCC(F)(F)C(F)(F)F)c(C(=O)NN)cc1OCC(F)(F)C(F)(F)F",
+   "rdkit_mw": 490.2540000000001,
+   "docx_mw": null,
+   "mw_check": null,
+   "pool_matches": [],
+   "status": "pending_confirmation",
+   "issue": "按方案化学名构建的结构计算 MW=490.25，与实验记录 CAS 标注 MW=None 不一致（若 docx_mw 为空则为未标注）；H 系列实际结构需用户确认"
+  },
+  "H2": {
+   "id": "H2",
+   "type": "hydrazide",
+   "docx_name": "1,4-双(酰肼基)-2,5-双(2,2,3,3,4,4,4-七氟丁氧基)苯",
+   "cas_in_record": null,
+   "candidate_smiles": "NNC(=O)c1cc(OCC(F)(F)C(F)(F)C(F)(F)F)c(C(=O)NN)cc1OCC(F)(F)C(F)(F)C(F)(F)F",
+   "canonical_smiles": "NNC(=O)c1cc(OCC(F)(F)C(F)(F)C(F)(F)F)c(C(=O)NN)cc1OCC(F)(F)C(F)(F)C(F)(F)F",
+   "rdkit_mw": 590.2680000000003,
+   "docx_mw": 662.3,
+   "mw_check": false,
+   "pool_matches": [],
+   "status": "pending_confirmation",
+   "issue": "按方案化学名构建的结构计算 MW=590.27，与实验记录 CAS 标注 MW=662.3 不一致（若 docx_mw 为空则为未标注）；H 系列实际结构需用户确认"
+  },
+  "H3": {
+   "id": "H3",
+   "type": "hydrazide",
+   "docx_name": "1,4-双(酰肼基)-2,5-双(2,2,3,3,4,4,5,5,5-九氟戊氧基)苯",
+   "cas_in_record": "2569674-66-2",
+   "candidate_smiles": "NNC(=O)c1cc(OCC(F)(F)C(F)(F)C(F)(F)C(F)(F)F)c(C(=O)NN)cc1OCC(F)(F)C(F)(F)C(F)(F)C(F)(F)F",
+   "canonical_smiles": "NNC(=O)c1cc(OCC(F)(F)C(F)(F)C(F)(F)C(F)(F)F)c(C(=O)NN)cc1OCC(F)(F)C(F)(F)C(F)(F)C(F)(F)F",
+   "rdkit_mw": 690.2820000000004,
+   "docx_mw": 918.37,
+   "mw_check": false,
+   "pool_matches": [],
+   "status": "pending_confirmation",
+   "issue": "按方案化学名构建的结构计算 MW=690.28，与实验记录 CAS 标注 MW=918.37 不一致（若 docx_mw 为空则为未标注）；H 系列实际结构需用户确认"
+  },
+  "H4": {
+   "id": "H4",
+   "type": "hydrazide",
+   "docx_name": "1,4-双(酰肼基)-2,5-双(2,2,3,3,4,4,5,5,6,6,6-十一氟己氧基)苯",
+   "cas_in_record": null,
+   "candidate_smiles": "NNC(=O)c1cc(OCC(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)F)c(C(=O)NN)cc1OCC(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)F",
+   "canonical_smiles": "NNC(=O)c1cc(OCC(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)F)c(C(=O)NN)cc1OCC(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)F",
+   "rdkit_mw": 790.2960000000004,
+   "docx_mw": null,
+   "mw_check": null,
+   "pool_matches": [],
+   "status": "pending_confirmation",
+   "issue": "按方案化学名构建的结构计算 MW=790.30，与实验记录 CAS 标注 MW=None 不一致（若 docx_mw 为空则为未标注）；H 系列实际结构需用户确认"
+  }
+ },
+ "pending_confirmation": [
+  "H1",
+  "H2",
+  "H3",
+  "H4"
+ ]
+}
