@@ -25,6 +25,9 @@ data/raw/*.json
 data/interim/*.csv
 data/interim/3d_cache/
 data/interim/gnn_emb_v53_index.json
+data/interim/stage13b_tmp/
+data/interim/stage13b_folds.json
+data/interim/gnn_foldb_meta_s*.json
 data/processed/*.csv
 data/external/*.csv
 *.pkl

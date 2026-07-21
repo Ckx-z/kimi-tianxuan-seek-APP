@@ -272,10 +272,32 @@ sessions:
     test_status: { passed: 57, failed: 0 }
     blockers: []
     status: "completed"
+  - id: "2026-07-21-02"
+    date: "2026-07-21"
+    title: "阶段 13 阶段 B：逐折重训 GNN（闭卷）判定——路线证伪关闭（exp_010，D25）"
+    summary: "按 D24 预案执行闭卷重考：复用旧项目 train_v4.py 训练组件（PairDataset/V4Trainer/FocalLoss，等权+3D全零与 v5.3 实际训练行为逐位一致，其频率降权/分层因字符串 bug 从未生效），每个双留出折只用训练行从零重训 GNN（绝不加载 v5.3 权重，2.5-6.8 min/折，3 种子 15 折 ~80 min，断点续跑）。抓到并修复严重 bug：dual_holdout_folds 折分组依赖 pandas value_counts 顺序、跨 pandas 版本（py3.8/py3.12）漂移（fold0 验证集 104 vs 122）→ 折定义单一真源 stage13b_folds.json。闭卷判定：pair_plus 双留出 3 种子均值 0.6480 vs 基线 0.6824（−0.034，逐种子 −0.039/−0.061/−0.004 全负）→ FALSIFIED，阶段 A +0.16 判为配对标签记忆，GNN embedding 迁移路线关闭（D25）。闭卷对照：GNN 端到端 0.6317 < 描述符树 0.6824（双未见树终审胜 GNN）；fold3 闭卷全线 ~0.36。DECISIONS 追加 D25，exp_010 留档，PROJECT_STATE 阶段 13 收官。App/路由未动。"
+    files_modified:
+      - scripts/stage13b_fold_retrain.py
+      - scripts/stage13b_fold_eval.py
+      - data/interim/stage13b_folds.json
+      - reports/gnn_embedding_foldb_eval.json
+      - EXPERIMENTS/exp_010.md
+      - DECISIONS.md
+      - PROJECT_STATE.md
+      - SESSION_START.md
+      - README.md
+      - DAILY_LOG/2026-07-21.md
+      - DAILY_LOG/2026-07-21_human.md
+    decisions_made:
+      - "D25: GNN embedding 迁移阶段 B 闭卷证伪，路线关闭；阶段 A 增益判为配对标签记忆；双未见场景树胜 GNN（0.6824 vs 0.6317）"
+    models_trained: []
+    test_status: { passed: 57, failed: 0 }
+    blockers: []
+    status: "completed"
 
 # 快速统计
-total_sessions: 10
-completed_sessions: 10
+total_sessions: 11
+completed_sessions: 11
 in_progress_sessions: 0
 models_trained_total: 9
-decisions_made_total: 24
+decisions_made_total: 25
