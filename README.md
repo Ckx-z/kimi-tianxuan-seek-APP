@@ -33,8 +33,11 @@ minimax/
 │   └── HOW_TO_FILL.md          # 反馈 CSV 填表指南
 │
 ├── bridge/                     # 两系统的连接层
-│   ├── search_local_pdfs.py    # RAG 检索 (CAS + 历史反馈 + embedding)
-│   ├── generate_proposal.py    # docx 生成器 (中文模板 + 自动插图)
+│   ├── search_local_pdfs.py    # RAG 检索 (5 路召回: CAS + 历史 + 核心/tianxuan embedding + 关键词)
+│   ├── generate_proposal.py    # docx 生成器 (中文模板 + GraphRAG v2 证据)
+│   ├── fast_search.py          # 高性能 tianxuan 二进制向量检索
+│   ├── build_tianxuan_matrix.py # JSONL → 二进制向量索引构建
+│   ├── graphrag_v2/            # GraphRAG v2 (NL2Graph + 路由 + 社区 + 多跳)
 │   ├── inspect_abcdef.py       # ABCDEF 巡查工具 (识别新增完成)
 │   ├── index_knowledge.py      # 知识库 PDF/docx → embedding 索引
 │   ├── update_daily.py         # 每日 22:00 日报生成 + git commit
@@ -42,8 +45,11 @@ minimax/
 │   ├── install_pre_commit_hook.py # 一键安装 pre-commit hook
 │   ├── llm_config.yaml         # LLM 路由 (主 MiniMax + 备 Kimi 2.7)
 │   ├── cas_image_map.json      # CAS → 结构式图片映射
-│   ├── knowledge_index.jsonl   # 知识库 embedding 索引 (1791 chunks, gitignored)
-│   ├── knowledge_meta.json     # 索引元数据
+│   ├── knowledge_index.jsonl   # 核心知识库 embedding 索引 (1791 chunks, gitignored)
+│   ├── knowledge_index_tianxuan.jsonl # tianxuan 全库索引 (282057 chunks, 5.8GB, gitignored)
+│   ├── tianxuan_vectors.bin    # 二进制向量索引 (1.7GB, gitignored)
+│   ├── tianxuan_meta.json      # tianxuan 元数据 (200MB, gitignored)
+│   ├── test_integration.py     # 集成测试 (12 cases)
 │   ├── _build_reagent_db.py    # 从 xlsx 重建 reagent_db.json
 │   └── _copy_predict.py        # 从 tianxuan-seek 复制最小集
 │
@@ -146,21 +152,23 @@ $env:MINIMAX_API_KEY = "你的 MiniMax API key"
 
 ---
 
-## 当前状态 (2026-07-13)
+## 当前状态 (2026-07-17)
 
 ✅ 已完成:
-- 实验 ABCDEF 6 条入库 feedback_db.csv
-- 8 个进行中实验状态板
-- 失败应对 Playbook
-- tianxuan-seek 最小集复制 + predict/_check_env.py
-- RAG 检索 (4 路召回: CAS + 历史 + embedding + 关键词)
-- docx 生成器 (中文模板 + 自动插图 + 加料顺序修正 + 1.5 倍行距)
+- 实验 ABCDEF 14 条入库 feedback_db.csv
+- 失败分类体系 (A-G) + Playbook + 进行中状态板
+- tianxuan-seek 全库 2468 PDF embedding 索引 (282057 chunks, 5.8 GB)
+- **二进制向量索引** (1.7 GB bin + 200 MB meta) 实现亚秒级检索
+- **GraphRAG v2** 集成到方案生成 (NL2Graph + 动态路由 + 多模态重排 + v1 fallback)
+- RAG 检索 (5 路召回: CAS + 历史 + 核心 embedding + **tianxuan 全库 embedding** + 关键词)
+- docx 生成器 (中文模板 + 自动插图 + 加料顺序修正 + 1.5 倍行距 + GraphRAG v2 证据)
+- 12 个集成测试全部通过
 - 知识库核心 10 篇 PDF/docx embedding 索引 (1791 chunks)
 - 每日日报 + git commit (cron job)
 - ABCDEF 巡查工具 (inspect_abcdef.py)
+- pre-commit hook (敏感信息扫描)
 
 ⏸ 等待用户:
-- 安装 predict 依赖 (conda env dphuanjing)
+- 上传最新实验反馈 (in_progress.md 停在 7/11)
 - 手动 git push 到 GitHub
-- 上传最新实验反馈
-- 轮换 Kimi + MiniMax API key (截图里明文暴露了)
+- 清理 git history (知识库 PDF 在前 6 个 commit)
