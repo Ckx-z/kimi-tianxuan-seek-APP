@@ -35,6 +35,8 @@ PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(HERE))
 from search_local_pdfs import search as rag_search, format_results_for_prompt
 from query_graphrag import query as graphrag_query
+from graphrag_v2 import GraphRAGv2, print_result as g2_print_result
+import io
 
 # ---- 中文格式 ----
 CN_FONT = '宋体'
@@ -235,10 +237,21 @@ def generate(aldehyde_cas, amine_cas, related_failure_id=None,
     })
     rag_text = format_results_for_prompt(rag_results)
 
-    # GraphRAG 检索 (补充 954 篇文献的实体关联)
-    graphrag_query_text = f'{target_node_prefix} {ami["name_short"]} 膜 120°C'
-    graphrag_results = graphrag_query(graphrag_query_text, verbose=False)
-    graphrag_text = format_graphrag_results(graphrag_results)
+    # GraphRAG v2 检索 (NL2Graph + 动态路由 + 多跳推理 + 社区摘要)
+    graphrag_query_text = f'{target_node_prefix} {ami.get("name_short", "")} 亚胺COF膜 合成条件 溶剂 温度'
+    g2 = GraphRAGv2()
+    try:
+        g2_result = g2.query(graphrag_query_text, verbose=False)
+        # 捕获 print_result 输出为字符串
+        buf = io.StringIO()
+        import contextlib
+        with contextlib.redirect_stdout(buf):
+            g2_print_result(g2_result, top_n=5)
+        graphrag_text = buf.getvalue()
+    except Exception as e:
+        # fallback 到 v1
+        graphrag_results = graphrag_query(graphrag_query_text, verbose=False)
+        graphrag_text = format_graphrag_results(graphrag_results) + f'\n(GraphRAG v2 不可用, 退化到 v1: {e})'
 
     # ---- 创建文档 ----
     doc = Document()
