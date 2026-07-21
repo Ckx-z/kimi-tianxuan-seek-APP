@@ -67,3 +67,8 @@ Thumbs.db
 
 # 阶段 14 真实回测：大体积原始实验记录副本（10MB，不入 git，本地保留）
 data/experimental_refs/实验ABCDEF.docx
+
+# P1 运行时产物
+data/prediction_log.jsonl
+data/cas_cache.json
+reports/exports/

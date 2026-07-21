@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "record_type": "suggestion",
+  "suggestion_id": "sug_20260721_001",
+  "favorite_id": "fav_20260721_001",
+  "type": "condition_adjust",
+  "payload": {
+    "adjustments": [
+      {
+        "field": "catalyst",
+        "from": "6M 乙酸 0.2 mL",
+        "to": "6M 乙酸 0.1 mL（减半）",
+        "rationale": "同体系历史失败记录显示酸过量导致液面上方异相成核，减半酸量并严格核对浓度（6M≠18M）"
+      },
+      {
+        "field": "addition_order",
+        "from": "先醛+苯胺，后胺，最后乙酸",
+        "to": "维持该顺序，逐步滴加乙酸并摇匀",
+        "rationale": "防错清单：加料顺序反是上一轮 Class E 失败的直接根因"
+      }
+    ]
+  },
+  "evidence_refs": [
+    {"kind": "experiment_record", "ref": "rec_20260721_001", "note": "同单体对上一轮 Class E 失败"},
+    {"kind": "literature", "ref": "DOI:10.1002/anie.202421555", "note": "侯老师调制剂双介导方案的酸量区间"},
+    {"kind": "prediction", "ref": "pred_20260721_0001", "note": "池内打分 0.699±0.041，体系本身可行"}
+  ],
+  "created_at": "2026-07-21T22:05:00+08:00",
+  "status": "new"
+}

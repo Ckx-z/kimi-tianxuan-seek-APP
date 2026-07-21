@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "record_type": "experiment_record",
+  "record_id": "rec_20260721_001",
+  "favorite_id": "fav_20260721_001",
+  "aldehyde": {
+    "smiles": "O=Cc1cc(C=O)cc(-c2nc(-c3cc(C=O)cc(C=O)c3)nc(-c3cc(C=O)cc(C=O)c3)n2)c1",
+    "cas": "443922-06-3",
+    "name": "TFPT"
+  },
+  "amine": {
+    "smiles": "Nc1cc(N)cc(-c2nc(-c3cc(N)cc(N)c3)nc(-c3cc(N)cc(N)c3)n2)c1",
+    "cas": "14544-47-9",
+    "name": "TAPT"
+  },
+  "prediction_id": "pred_20260721_0001",
+  "prediction_snapshot": {"score": 0.699, "std": 0.041, "ood": "none"},
+  "conditions": {
+    "solvent": "甲苯",
+    "modulator": "苯胺 13.7 μL",
+    "catalyst": "6M 乙酸 0.2 mL",
+    "temperature_c": 120,
+    "time_days": 3,
+    "vessel": "35 mL Pyrex 管",
+    "addition_order": "先醛+苯胺，后胺，最后乙酸"
+  },
+  "outcome": "partial",
+  "failure_class": "E",
+  "strength": "液面上方玻璃壁附着固体，不连续且粗糙，易碎",
+  "notes": "乙酸误用 18M，应为 6M；加料顺序与方案不符",
+  "attachments": [],
+  "operator": "ckx",
+  "date": "2026-07-21",
+  "minimax_plan_no": null
+}

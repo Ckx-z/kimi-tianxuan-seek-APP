@@ -1,7 +1,7 @@
 # PROJECT_STATE — 项目当前状态
 
 > ⭐ **这是每次会话的第一份必读文件**。会话开头读它进入状态，结尾更新它。
-> 最后更新：2026-07-21（阶段 15：P2 三件套——bagging 不确定度 + OOD 三级制 +「打分非概率」口径（D27），H 组识别闭环就位）
+> 最后更新：2026-07-21（阶段 16：App 重设计 P1——五标签页骨架 + 美化 + CAS 查询 + 批量排序 + 预测日志；minimax RAG 契约对接就位）
 
 ---
 
@@ -35,6 +35,15 @@
 | **阶段 13** | **GNN embedding 迁移：阶段 A 过门槛 → 阶段 B 闭卷证伪，路线关闭** | ✅ **已完成** |
 | **阶段 14** | **真实回测：14 组已做实验三方对照（新模型 vs 旧 GNN 当年预测 vs 真实结果）** | ✅ **已完成** |
 | **阶段 15** | **P2：打分 + 不确定性 + OOD 三件套（bagging 集成 / OOD 三级制 / 打分非概率口径）** | ✅ **已完成** |
+| **阶段 16** | **App 重设计 P1：五标签页骨架 + 视觉美化 + 页①（SMILES/CAS/内置库查询 + 相似案例）+ 页②批量排序 + 预测日志；minimax RAG 契约对接** | ✅ **已完成** |
+
+**阶段 16 要点（2026-07-21）**：
+- 前端全量重写（`app/gradio_app.py` 284→870 行）：`gr.themes.Soft` 深青/石墨学术主题、色彩语义（⛔/⚠️/✓）、五标签页骨架（③收藏夹 ④实验记录 ⑤RAG 迭代为占位，P2/P3 期做）
+- 页①：三种输入（SMILES 直输 / CAS 号 PubChem 解析+缓存 / 内置单体库 17 个下拉点选）+ 相似成膜案例（Morgan Tanimoto，含 paper_id）
+- 页②：批量排序（库多选/粘贴/CSV → 排序表 → 导出 CSV），逐对预测 + OOD 沉底
+- 预测日志 `data/prediction_log.jsonl`（schema_version=1，支撑 D23 复盘点）
+- RAG 对接：`data/rag_export/` 三 schema 契约（prediction/experiment_record/suggestion）+ minimax 侧 `docs/COF_APP_CONTRACT.md` + `adapters/cof_app_ingest.py`（**minimax 改动未 commit，待用户审**）
+- 测试 77 → **113 passed**；依据文档：`docs/APP_REDESIGN_PROPOSAL.md`
 
 **阶段 6 子任务（记忆系统建设）**：
 - [x] 创建 `.agents/` 目录

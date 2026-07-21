@@ -1,0 +1,121 @@
+[
+ {
+  "name": "A1",
+  "role": "aldehyde",
+  "cas": "608145-27-3",
+  "smiles": "O=Cc1cc(F)c(C=O)cc1F",
+  "short_desc": "2,5-二氟对苯二甲醛"
+ },
+ {
+  "name": "A2",
+  "role": "aldehyde",
+  "cas": "3217-47-8",
+  "smiles": "O=Cc1c(F)c(F)c(C=O)c(F)c1F",
+  "short_desc": "2,3,5,6-四氟对苯二甲醛"
+ },
+ {
+  "name": "A3",
+  "role": "aldehyde",
+  "cas": "2640813-40-5",
+  "smiles": "O=Cc1c(F)c(F)c(-c2c(F)c(F)c(C=O)c(F)c2F)c(F)c1F",
+  "short_desc": "2,2',3,3',5,5',6,6'-八氟-4,4'-联苯二甲醛"
+ },
+ {
+  "name": "A4",
+  "role": "aldehyde",
+  "cas": "1271813-32-1",
+  "smiles": "O=Cc1ccc(-c2ccc(C=O)cc2C(F)(F)F)c(C(F)(F)F)c1",
+  "short_desc": "2,2'-双(三氟甲基)-4,4'-联苯二甲醛"
+ },
+ {
+  "name": "A5",
+  "role": "aldehyde",
+  "cas": "847450-39-9",
+  "smiles": "O=Cc1cc(C(F)(F)F)c(C=O)cc1C(F)(F)F",
+  "short_desc": "2,5-双(三氟甲基)对苯二甲醛"
+ },
+ {
+  "name": "A6",
+  "role": "aldehyde",
+  "cas": "1300701-03-4",
+  "smiles": "O=Cc1cc(-c2ccc(C(F)(F)F)cc2)c(C=O)cc1-c1ccc(C(F)(F)F)cc1",
+  "short_desc": "4,4''-双(三氟甲基)-2',5'-二甲酰基对三联苯"
+ },
+ {
+  "name": "A7",
+  "role": "aldehyde",
+  "cas": "2368851-11-8",
+  "smiles": "O=Cc1cc(-c2cc(C(F)(F)F)cc(C(F)(F)F)c2)c(C=O)cc1-c1cc(C(F)(F)F)cc(C(F)(F)F)c1",
+  "short_desc": "3,3'',5,5''-四(三氟甲基)-2',5'-二甲酰基对三联苯"
+ },
+ {
+  "name": "B1",
+  "role": "amine",
+  "cas": "698-52-2",
+  "smiles": "Nc1cc(F)c(N)cc1F",
+  "short_desc": "1,4-二氨基-2,5-二氟苯"
+ },
+ {
+  "name": "B2",
+  "role": "amine",
+  "cas": "1198-64-7",
+  "smiles": "Nc1c(F)c(F)c(N)c(F)c1F",
+  "short_desc": "1,4-二氨基-2,3,5,6-四氟苯"
+ },
+ {
+  "name": "B3",
+  "role": "amine",
+  "cas": "316-64-3",
+  "smiles": "Nc1ccc(-c2ccc(N)c(F)c2)cc1F",
+  "short_desc": "3,3'-二氟-4,4'-联苯二胺"
+ },
+ {
+  "name": "B4",
+  "role": "amine",
+  "cas": "1038-66-0",
+  "smiles": "Nc1c(F)c(F)c(-c2c(F)c(F)c(N)c(F)c2F)c(F)c1F",
+  "short_desc": "2,2',3,3',5,5',6,6'-八氟-4,4'-联苯二胺"
+ },
+ {
+  "name": "B5",
+  "role": "amine",
+  "cas": "341-58-2",
+  "smiles": "Nc1ccc(-c2ccc(N)cc2C(F)(F)F)c(C(F)(F)F)c1",
+  "short_desc": "2,2'-双(三氟甲基)-4,4'-联苯二胺"
+ },
+ {
+  "name": "B6",
+  "role": "amine",
+  "cas": "364-13-6",
+  "smiles": "Nc1ccc(N)c(C(F)(F)F)c1",
+  "short_desc": "2,5-二氨基三氟甲苯"
+ },
+ {
+  "name": "TAPB",
+  "role": "amine",
+  "cas": "118727-34-7",
+  "smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+  "short_desc": "1,3,5-三(4-氨基苯基)苯"
+ },
+ {
+  "name": "TAPT",
+  "role": "amine",
+  "cas": "14544-47-9",
+  "smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+  "short_desc": "2,4,6-三(4-氨基苯基)-1,3,5-三嗪"
+ },
+ {
+  "name": "TFPB",
+  "role": "aldehyde",
+  "cas": "118688-53-2",
+  "smiles": "O=Cc1ccc(-c2cc(-c3ccc(C=O)cc3)cc(-c3ccc(C=O)cc3)c2)cc1",
+  "short_desc": "1,3,5-三(4-甲酰基苯基)苯"
+ },
+ {
+  "name": "TFPT",
+  "role": "aldehyde",
+  "cas": "443922-06-3",
+  "smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+  "short_desc": "2,4,6-三(4-甲酰基苯基)-1,3,5-三嗪"
+ }
+]
