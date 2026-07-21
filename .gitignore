@@ -72,3 +72,21 @@ data/experimental_refs/实验ABCDEF.docx
 data/prediction_log.jsonl
 data/cas_cache.json
 reports/exports/
+
+# ===== minimax/（实验迭代 RAG 模块，subtree 合并自 shiyandiedai）=====
+# 本地文献知识库（私人下载的 PDF，不入版本控制）
+minimax/知识库/
+# 本地索引与大体积数据文件
+minimax/bridge/knowledge_index_tianxuan.jsonl
+minimax/bridge/tianxuan_vectors.bin
+minimax/bridge/tianxuan_meta.json
+minimax/bridge/tianxuan_norms.bin
+minimax/bridge/indexer_*.log
+minimax/bridge/run_log.txt
+minimax/bridge/graphrag_v2/cached/
+minimax/graphrag/graph_v2.pkl
+# minimax 本地启动脚本与临时目录
+minimax/run_indexer.bat
+minimax/run_indexer.vbs
+minimax/run_indexer_v2.vbs
+minimax/_tmp/

@@ -14,9 +14,10 @@
 - ✅ **化学结构图**：醛/胺单体 2D 结构 + 亚胺缩合产物骨架（RDKit 渲染，非法 SMILES 优雅降级）
 - ✅ 推荐实验条件 / 溶液配比（基于规则 + 历史案例）
 - ✅ 生成 Word 实验报告（内嵌单体结构图）
-- ✅ 双击 `start_app.vbs` 无窗口静默启动，自动打开浏览器
+- ✅ 双击 `启动COF推荐.vbs` 无窗口静默启动，自动打开浏览器（桌面快捷方式 `COF成膜推荐.lnk`）
 - ✅ GNN v5.3 通过 subprocess 接入（PR-AUC 0.784）
-- ✅ 测试 57 项全部通过
+- ✅ 测试 113 项全部通过
+- ✅ **minimax RAG 模块已合并**（`minimax/`，subtree 保留全部提交历史），经 `data/rag_export/` 契约对接
 
 ### 当前模型一览
 
@@ -33,14 +34,34 @@
 
 ---
 
+## 项目组成
+
+本仓库是两个模块合并后的唯一主线（GitHub: `kimi-tianxuan-seek-APP`）：
+
+| 模块 | 定位 | 说明 |
+|---|---|---|
+| 主模块（仓库根） | **打分与交付** | Gradio App + XGBoost 双模型路由 + GNN v5.3 对照，输出成膜概率、打分理由、结构图、Word 报告 |
+| `minimax/` | **RAG 迭代** | 实验迭代 RAG 项目（原 `shiyandiedai` 仓库，subtree 合并保留全部历史），含 `predict/`（预测）、`experiment/`（实验）、`bridge/`（GraphRAG v2 检索与方案生成）、`adapters/`（契约摄入适配器） |
+
+两模块经 **`data/rag_export/` 数据契约**对接：App 侧按契约导出预测/反馈数据，minimax 侧 `adapters/cof_app_ingest.py` 摄入，用于 RAG 检索与实验方案迭代。契约文档见 `minimax/docs/COF_APP_CONTRACT.md`。
+
+---
+
 ## 目录结构
 
 ```
 全新机器学习实验/
 ├── app/gradio_app.py              # Gradio App 入口（概率 + 打分理由 + 结构图）
-├── start_app.vbs                  # 双击无窗口启动（推荐）
-├── start_app.bat                  # 调试启动（终端可见日志）
+├── 启动COF推荐.vbs                # 双击无窗口启动（推荐）
+├── 调试启动.bat                   # 调试启动（终端可见日志）
 ├── silent_launch.py               # 静默启动器（vbs 调用）
+├── minimax/                       # 实验迭代 RAG 模块（原 shiyandiedai 仓库）
+│   ├── predict/                   # 预测脚本与模型权重
+│   ├── experiment/                # 实验记录与迭代
+│   ├── bridge/                    # GraphRAG v2 索引/检索/方案生成 + 集成测试
+│   ├── adapters/                  # COF App 数据契约摄入适配器
+│   ├── docs/                      # 含 COF_APP_CONTRACT 契约文档
+│   └── 知识库/                    # 本地文献 PDF（~850MB，不入 git）
 ├── src/
 │   ├── predictor/                 # 预测层（树模型路由 + GNN subprocess）
 │   ├── condition_recommender/     # 条件推荐层（规则 + 案例）
@@ -52,14 +73,15 @@
 ├── scripts/                       # 评估/消融/校准/补全脚本（stage11/12 系列）
 ├── data/raw/                      # 训练数据（复制自旧项目）
 ├── data/interim/                  # 中间产物（条件补全 CSV、特征缓存）
+├── data/rag_export/               # App → minimax 数据契约导出目录
 ├── models/                        # 模型权重（.pkl 不入库）+ monomer_pool.json
 ├── reports/                       # 实验指标 JSON + 归因报告 + 生成的 docx
 ├── PROJECT_STATE.md               # 项目当前状态（必读）
 ├── SESSION_START.md               # 会话启动清单
-├── DECISIONS.md                   # 关键决策记录（D1-D23）
+├── DECISIONS.md                   # 关键决策记录（D1-D27）
 ├── DATA_DICT.md                   # 数据字典
 ├── DAILY_LOG/                     # 日报（AI 版 + 人版双轨）
-└── EXPERIMENTS/                   # 实验记录（exp_001-exp_008）
+└── EXPERIMENTS/                   # 实验记录（exp_001-exp_012）
 ```
 
 ---
@@ -92,16 +114,16 @@ pip install gradio python-docx xgboost rdkit shap joblib pandas scikit-learn
 
 ## 快速启动
 
-### 方式 1：双击 `start_app.vbs`（推荐，无窗口启动）
+### 方式 1：双击 `启动COF推荐.vbs`（推荐，无窗口启动）
 
-直接双击 `start_app.vbs`：
+直接双击 `启动COF推荐.vbs`（或桌面快捷方式 `COF成膜推荐.lnk`，带定制图标）：
 
 - **无任何黑色终端窗口**，App 在后台静默运行
 - 自动打开浏览器到 `http://127.0.0.1:7860`
 - 若 App 已在运行，双击只会再打开一个浏览器标签页，不会重复启动
 - 启动失败（依赖缺失、进程异常退出、超时等）会**弹出错误提示框**，详细日志见 `logs/app_launch.log` 和 `logs/gradio_app.log`
 
-### 方式 2：双击 `start_app.bat`（调试用）
+### 方式 2：双击 `调试启动.bat`（调试用）
 
 会打开独立终端窗口运行，可在终端里查看实时日志（含 RDKit 调试信息）；关掉窗口即关闭 App。
 
@@ -122,8 +144,8 @@ Running on local URL:  http://127.0.0.1:7860
 
 ### 打不开怎么办？
 
-1. **静默启动失败**——看弹窗提示与 `logs/gradio_app.log` 末尾的报错；或改用 `start_app.bat` 在终端里直接看报错
-2. **端口被占用**——`start_app.vbs` 会自动复用已运行的实例；如需换端口，改 `app/gradio_app.py` 最后一行 `server_port=7861`
+1. **静默启动失败**——看弹窗提示与 `logs/gradio_app.log` 末尾的报错；或改用 `调试启动.bat` 在终端里直接看报错
+2. **端口被占用**——`启动COF推荐.vbs` 会自动复用已运行的实例；如需换端口，改 `app/gradio_app.py` 最后一行 `server_port=7861`
 3. **防火墙拦截**——允许 Python 访问本地网络
 4. **首次启动慢**——等 10-30 秒（模型加载期间浏览器可能暂时打不开，稍等刷新即可）
 
@@ -158,7 +180,7 @@ cd "C:\Users\ckx\Desktop\全新机器学习实验"
 E:\ANACONDA\python.exe -m pytest tests/ -v
 ```
 
-当前 **57 项测试全部通过**，覆盖：描述符计算、条件推荐、树模型训练/预测、Word 报告生成、数据导入、SHAP 归因（含 TE 模型）、双模型路由、分子渲染、RDKit 日志行为。
+当前 **113 项测试全部通过**，覆盖：描述符计算、条件推荐、树模型训练/预测、Word 报告生成、数据导入、SHAP 归因（含 TE 模型）、双模型路由、分子渲染、RDKit 日志行为、CAS 查询、批量排序、rag_export 契约。minimax 模块自带集成测试见 `minimax/bridge/test_integration.py`（独立运行）。
 
 ---
 
