@@ -93,18 +93,40 @@ def generate_report(
     # 单体 2D 结构图（解析失败自动降级为文字提示）
     _add_structure_images(doc, ald_smiles, amine_smiles)
 
-    # 2. 成膜概率预测
-    doc.add_heading("2. 成膜概率预测", level=1)
-    pred_table = doc.add_table(rows=4, cols=2)
-    pred_table.style = "Light Grid Accent 1"
-    pred_table.rows[0].cells[0].text = "模型"
-    pred_table.rows[0].cells[1].text = "成膜概率"
-    pred_table.rows[1].cells[0].text = "GNN v5.3"
-    pred_table.rows[1].cells[1].text = _safe_text(prediction.get("gnn_probability", "N/A"))
-    pred_table.rows[2].cells[0].text = "树模型"
-    pred_table.rows[2].cells[1].text = _safe_text(prediction.get("tree_probability", "N/A"))
-    pred_table.rows[3].cells[0].text = "综合概率"
-    pred_table.rows[3].cells[1].text = _safe_text(prediction.get("ensemble_probability", "N/A"))
+    # 2. 成膜打分（倾向性）
+    doc.add_heading("2. 成膜打分（倾向性）", level=1)
+    doc.add_paragraph("说明：四级软标签上的倾向性打分，非严格概率；对反应条件不敏感。")
+    ood = prediction.get("ood") or {}
+    ood_level = ood.get("level", "none")
+    if ood_level == "out":
+        doc.add_paragraph(
+            "⛔ OOD 检出（模型不适用）：" + "；".join(ood.get("reasons") or [])
+            + "。该组合不在模型化学适用域内，不输出打分。")
+    else:
+        score_std = prediction.get("score_std")
+        std_txt = f" ± {score_std:.3f}" if score_std else ""
+        pred_table = doc.add_table(rows=4, cols=2)
+        pred_table.style = "Light Grid Accent 1"
+        pred_table.rows[0].cells[0].text = "模型"
+        pred_table.rows[0].cells[1].text = "成膜打分（倾向性）"
+        pred_table.rows[1].cells[0].text = "GNN v5.3"
+        pred_table.rows[1].cells[1].text = _safe_text(prediction.get("gnn_probability", "N/A"))
+        pred_table.rows[2].cells[0].text = "树模型（bagging 集成）"
+        tree_val = prediction.get("tree_probability", "N/A")
+        pred_table.rows[2].cells[1].text = (
+            f"{tree_val}{std_txt}" if tree_val != "N/A" else "N/A")
+        pred_table.rows[3].cells[0].text = "综合打分"
+        ens_val = prediction.get("ensemble_probability", "N/A")
+        pred_table.rows[3].cells[1].text = (
+            f"{ens_val}{std_txt}" if ens_val != "N/A" else "N/A")
+        if score_std:
+            doc.add_paragraph(
+                f"不确定度说明：± {score_std:.3f} 为 5 种子 bagging 集成成员预测的标准差"
+                "（认知不确定度），std 越大表示模型对该样本分歧越大。")
+        if ood_level == "warning":
+            doc.add_paragraph(
+                "⚠️ OOD 提示：" + "；".join(ood.get("reasons") or [])
+                + "。打分可信度降低，建议结合实验经验谨慎参考。")
 
     # 3. 推荐实验条件
     doc.add_heading("3. 推荐实验条件", level=1)

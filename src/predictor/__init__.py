@@ -82,8 +82,23 @@ class FilmPredictor:
         return self.tree, None
 
     def predict(self, ald_smiles: str, amine_smiles: str) -> dict:
-        """预测成膜概率，返回包含各模型结果的字典。"""
+        """预测成膜打分（倾向性），返回各模型结果 + 不确定度 + OOD 状态。
+
+        新增键（P2 / D27）：
+        - tree_std / score_std：bagging 集成成员 std（认知不确定度）
+        - ood：{"level": none/warning/out, "reasons": [...]}——
+          out（非标准官能团等）时前端应显示「模型不适用」而非硬报分数
+        """
         result = {"ald_smiles": ald_smiles, "amine_smiles": amine_smiles}
+
+        # OOD 检测（三级制；官能团检查不依赖模型，始终执行）
+        try:
+            from .ood import check_ood
+            pool = self.router.pool if (self.router is not None) else None
+            result["ood"] = check_ood(ald_smiles, amine_smiles, pool=pool)
+        except Exception as e:
+            result["ood"] = {"level": "none", "reasons": [],
+                             "checks": {}, "ood_error": str(e)}
 
         if self.gnn_available:
             try:
@@ -99,13 +114,18 @@ class FilmPredictor:
                 if self.router is not None:
                     info = self.router.predict_with_info(ald_smiles, amine_smiles)
                     result["tree_probability"] = info["probability"]
+                    result["tree_std"] = info.get("std", 0.0)
                     result["tree_model_name"] = info["model_name"]
                     result["tree_route"] = info["route"]
                     result["tree_route_reason"] = info["route_reason"]
                 else:
-                    tree_prob = self.tree.predict_single(ald_smiles, amine_smiles)
+                    tree_prob, tree_std = self.tree.predict_single_with_std(
+                        ald_smiles, amine_smiles)
                     result["tree_probability"] = tree_prob
+                    result["tree_std"] = tree_std
                     result["tree_model_name"] = self.tree.model_path.stem
+                # score_std：树模型 bagging 成员 std（认知不确定度主口径）
+                result["score_std"] = result["tree_std"]
             except Exception as e:
                 result["tree_error"] = str(e)
                 self.tree_available = False

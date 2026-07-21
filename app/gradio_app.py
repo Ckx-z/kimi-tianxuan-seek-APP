@@ -113,6 +113,19 @@ def _structure_images(ald_smiles: str, amine_smiles: str):
     return ald_img, amine_img, product_img, note_text
 
 
+def _format_ood_banner(ood: dict) -> str:
+    """OOD 状态横幅：warning 黄条 / out 红条（中文原因）。"""
+    if not ood:
+        return ""
+    level = ood.get("level", "none")
+    reasons = "；".join(ood.get("reasons") or [])
+    if level == "out":
+        return f"> ⛔ **模型不适用**（OOD 检出）：{reasons}\n\n"
+    if level == "warning":
+        return f"> ⚠️ **OOD 提示**：{reasons}\n\n"
+    return ""
+
+
 def predict(ald_smiles: str, amine_smiles: str):
     """预测 + 结构图 + 推荐条件 + 打分理由的 Gradio 回调函数。"""
     if not ald_smiles.strip() or not amine_smiles.strip():
@@ -125,24 +138,43 @@ def predict(ald_smiles: str, amine_smiles: str):
     # 条件推荐
     conditions = recommend(ald_smiles.strip(), amine_smiles.strip())
 
-    # 格式化概率输出
-    prob_text = "### 成膜概率预测\n\n"
-    if "gnn_probability" in pred_result:
-        prob_text += f"- **GNN v5.3**: {pred_result['gnn_probability']:.3f}"
-        if "gnn_std" in pred_result:
-            prob_text += f" (±{pred_result['gnn_std']:.3f})"
-        prob_text += "\n"
-    elif "gnn_error" in pred_result:
-        prob_text += f"- **GNN v5.3**: ⚠️ 不可用（{_brief_error(pred_result['gnn_error'])}）\n"
-    if "tree_probability" in pred_result:
-        tree_name = pred_result.get("tree_model_name", "")
-        prob_text += f"- **树模型 ({tree_name})**: {pred_result['tree_probability']:.3f}\n"
-        if pred_result.get("tree_route_reason"):
-            prob_text += f"  - 模型路由：{pred_result['tree_route_reason']}\n"
-    elif "tree_error" in pred_result:
-        prob_text += f"- **树模型**: ⚠️ 不可用（{_brief_error(pred_result['tree_error'])}）\n"
-    if pred_result.get("ensemble_probability") is not None:
-        prob_text += f"- **综合概率**: {pred_result['ensemble_probability']:.3f}\n"
+    # OOD 状态（三级制，D27）：out → 不显示分数，显示「模型不适用」+ 原因
+    ood = pred_result.get("ood") or {}
+    ood_out = ood.get("level") == "out"
+
+    # 格式化打分输出（口径：倾向性打分，非严格概率——论文口径 D27）
+    prob_text = "### 成膜打分（倾向性）\n\n"
+    prob_text += "> 四级软标签上的倾向性打分，非严格概率；对反应条件不敏感。\n\n"
+    banner = _format_ood_banner(ood)
+    if banner:
+        prob_text += banner
+    if ood_out:
+        # ⛔ 红条：GNN 与树模型同挂 OOD 状态，一律不出分数
+        prob_text += ("**GNN 与树模型均不对该组合输出打分**——"
+                      "该单体不在模型的化学适用域内，任何数字都不可信。\n")
+    else:
+        if "gnn_probability" in pred_result:
+            prob_text += f"- **GNN v5.3**: {pred_result['gnn_probability']:.3f}"
+            if "gnn_std" in pred_result:
+                prob_text += f" (±{pred_result['gnn_std']:.3f})"
+            prob_text += "\n"
+        elif "gnn_error" in pred_result:
+            prob_text += f"- **GNN v5.3**: ⚠️ 不可用（{_brief_error(pred_result['gnn_error'])}）\n"
+        if "tree_probability" in pred_result:
+            tree_name = pred_result.get("tree_model_name", "")
+            prob_text += f"- **树模型 ({tree_name})**: {pred_result['tree_probability']:.3f}"
+            if pred_result.get("score_std"):
+                prob_text += f" (±{pred_result['score_std']:.3f})"
+            prob_text += "\n"
+            if pred_result.get("tree_route_reason"):
+                prob_text += f"  - 模型路由：{pred_result['tree_route_reason']}\n"
+        elif "tree_error" in pred_result:
+            prob_text += f"- **树模型**: ⚠️ 不可用（{_brief_error(pred_result['tree_error'])}）\n"
+        if pred_result.get("ensemble_probability") is not None:
+            prob_text += f"- **综合打分**: {pred_result['ensemble_probability']:.3f}"
+            if pred_result.get("score_std"):
+                prob_text += f" (±{pred_result['score_std']:.3f})"
+            prob_text += "\n"
 
     # 格式化条件输出
     cond_text = "### 推荐实验条件\n\n"
@@ -157,8 +189,13 @@ def predict(ald_smiles: str, amine_smiles: str):
     cond_text += f"**相似历史案例**: {conditions.get('case_description', 'N/A')} "
     cond_text += f"(相似度 {conditions.get('case_similarity_score', 0):.2f})\n"
 
-    # 打分理由（SHAP 归因，基于实际加载的树模型）
-    explain_text = _explain_tree_score(predictor, ald_smiles.strip(), amine_smiles.strip())
+    # 打分理由（SHAP 归因，基于实际加载的树模型）；ood=out 时不显示理由
+    if ood_out:
+        explain_text = ("### 打分理由（SHAP 归因）\n\n"
+                        "⛔ OOD 检出（模型不适用），不提供打分理由——"
+                        "对不适用样本解释一个不存在的分数没有意义。")
+    else:
+        explain_text = _explain_tree_score(predictor, ald_smiles.strip(), amine_smiles.strip())
 
     # 单体结构图 + 缩合产物骨架图（解析失败优雅降级）
     ald_img, amine_img, product_img, struct_note = _structure_images(
@@ -192,8 +229,10 @@ def create_app() -> gr.Blocks:
     with gr.Blocks(title="COF 成膜实验指导系统") as app:
         gr.Markdown("# COF 成膜实验指导系统")
         gr.Markdown(
-            "输入醛和胺单体的 SMILES，系统将预测成膜概率、给出打分理由（SHAP 归因）、"
+            "输入醛和胺单体的 SMILES，系统将给出成膜打分（倾向性）、打分理由（SHAP 归因）、"
             "推荐实验条件，并生成 Word 实验报告。"
+            "打分附带 ± 认知不确定度；检出 OOD（非标准官能团 / 双未见 / 特征超分布）时"
+            "会以 ⚠️/⛔ 提示，⛔ 时不输出分数。"
         )
 
         with gr.Row():
@@ -208,11 +247,11 @@ def create_app() -> gr.Blocks:
                     placeholder="例如：Nc1ccc(N)cc1",
                     value="Nc1ccc(N)cc1",
                 )
-                predict_btn = gr.Button("预测成膜概率", variant="primary")
+                predict_btn = gr.Button("预测成膜打分", variant="primary")
                 report_btn = gr.Button("生成 Word 实验报告")
 
             with gr.Column():
-                prob_output = gr.Markdown(label="成膜概率")
+                prob_output = gr.Markdown(label="成膜打分（倾向性）")
                 cond_output = gr.Markdown(label="推荐实验条件")
                 explain_output = gr.Markdown(label="打分理由")
                 report_output = gr.File(label="实验报告")

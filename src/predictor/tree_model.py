@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import LeaveOneGroupOut
 from xgboost import XGBRegressor
@@ -45,6 +46,9 @@ class TreeFilmPredictor:
     def __init__(self, model_path: str | Path | None = None):
         self.model_path = Path(model_path) if model_path else MODELS_DIR / "tree_baseline.pkl"
         self.model = None
+        # 集成模式（stage15 起，自描述 pkl 含 "ensemble" 键）：成员模型列表，
+        # self.model 保留为成员[0]，供 SHAP 归因等单模型消费方继续使用（向后兼容）
+        self.ensemble: list | None = None
         self.feature_cols = None
         # 特征开关（use_rules / use_3d 等），加载模型时从 pkl 内的 metrics 恢复
         self.feature_flags: dict = {}
@@ -135,11 +139,8 @@ class TreeFilmPredictor:
             "n_features": len(self.feature_cols),
         }
 
-    def predict(self, df: pd.DataFrame) -> pd.Series:
-        """预测成膜概率。"""
-        if self.model is None:
-            self.load()
-        df = df.dropna(subset=["aldehyde_smiles", "amine_smiles"]).reset_index(drop=True)
+    def _featurize(self, df: pd.DataFrame) -> pd.DataFrame:
+        """按模型自描述配置生成特征矩阵（列与训练时对齐）。"""
         X = featurize_dataframe(df, **self.feature_flags)
         # tree_v4 起：pkl 内含 te_rates 时，把单体历史成膜率先验补为特征列
         # （未见过的单体回退全量全局均值；旧 pkl 无 te_rates 则跳过，向后兼容）
@@ -153,15 +154,46 @@ class TreeFilmPredictor:
             fp_df = featurize_fingerprints(df, **self.fp_params)
             X = pd.concat([X, fp_df], axis=1)
         # reindex 保证列与训练时一致：3D 计算失败的样本/缺失列一律补 0
-        X_num = X.reindex(columns=self.feature_cols).fillna(0)
+        return X.reindex(columns=self.feature_cols).fillna(0)
+
+    def predict(self, df: pd.DataFrame) -> pd.Series:
+        """预测成膜概率（集成模式返回成员均值）。"""
+        mean, _ = self.predict_with_std(df)
+        return mean
+
+    def predict_with_std(self, df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+        """预测并返回 (均值, 成员标准差)。
+
+        单模型 pkl：std 恒为 0（无认知不确定度信息，向后兼容）。
+        集成 pkl（stage15 起）：std = 5 个 bagging 成员预测的标准差，
+        作为认知不确定度（模型内部对该样本的分歧）。
+        """
+        if self.model is None:
+            self.load()
+        df = df.dropna(subset=["aldehyde_smiles", "amine_smiles"]).reset_index(drop=True)
+        X_num = self._featurize(df)
+        if self.ensemble is not None:
+            all_preds = np.vstack([m.predict(X_num) for m in self.ensemble])
+            mean = all_preds.mean(axis=0)
+            std = all_preds.std(axis=0)
+        else:
+            mean = self.model.predict(X_num)
+            std = np.zeros(len(df))
         # 回归输出可能略超出 [0, 1]，按概率语义裁剪
-        preds = self.model.predict(X_num).clip(0.0, 1.0)
-        return pd.Series(preds, index=df.index, name="film_probability")
+        mean = np.clip(mean, 0.0, 1.0)
+        return (pd.Series(mean, index=df.index, name="film_probability"),
+                pd.Series(std, index=df.index, name="film_score_std"))
 
     def predict_single(self, ald_smiles: str, amine_smiles: str) -> float:
         """预测单个单体对。"""
         df = pd.DataFrame({"aldehyde_smiles": [ald_smiles], "amine_smiles": [amine_smiles]})
         return float(self.predict(df).iloc[0])
+
+    def predict_single_with_std(self, ald_smiles: str, amine_smiles: str) -> tuple[float, float]:
+        """预测单个单体对，返回 (均值, 成员标准差)。"""
+        df = pd.DataFrame({"aldehyde_smiles": [ald_smiles], "amine_smiles": [amine_smiles]})
+        mean, std = self.predict_with_std(df)
+        return float(mean.iloc[0]), float(std.iloc[0])
 
     def save(self) -> None:
         """保存模型。"""
@@ -174,7 +206,14 @@ class TreeFilmPredictor:
         if not self.model_path.exists():
             raise FileNotFoundError(f"找不到模型文件：{self.model_path}。请先训练。")
         data = joblib.load(self.model_path)
-        self.model = data["model"]
+        # 集成 pkl（stage15 起，自描述 "ensemble" 键）；
+        # 单模型 pkl 走原路径（向后兼容）
+        if "ensemble" in data:
+            self.ensemble = data["ensemble"]
+            self.model = self.ensemble[0]  # 供 SHAP 归因等单模型消费方使用
+        else:
+            self.ensemble = None
+            self.model = data["model"]
         self.feature_cols = data["feature_cols"]
         # 从训练指标恢复特征开关（tree_v2 及更早的 pkl 无此记录，保持默认特征）
         metrics = data.get("metrics") or {}

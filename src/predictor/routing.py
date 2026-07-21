@@ -23,9 +23,10 @@ from pathlib import Path
 
 from .tree_model import MODELS_DIR, TreeFilmPredictor
 
-# 路由资产默认路径
-POOL_MODEL_PATH = MODELS_DIR / "tree_v4.pkl"
-EXTRAP_MODEL_PATH = MODELS_DIR / "tree_v4_noTE.pkl"
+# 路由资产默认路径（stage15 起切换为 5 种子 bagging 集成，D27：
+# 预测输出 mean ± std，std 作为认知不确定度；单模型 pkl 保留可显式回退）
+POOL_MODEL_PATH = MODELS_DIR / "tree_v4_ens.pkl"
+EXTRAP_MODEL_PATH = MODELS_DIR / "tree_v4_noTE_ens.pkl"
 MONOMER_POOL_PATH = MODELS_DIR / "monomer_pool.json"
 
 # 路由键
@@ -36,10 +37,10 @@ ROUTE_BOTH_UNSEEN = "both_unseen"
 
 # 路由原因（中文，供 App 前端展示）
 _ROUTE_REASONS_ZH = {
-    ROUTE_IN_POOL: "已知单体组合 → tree_v4（含历史先验）",
-    ROUTE_ALD_UNSEEN: "含未见单体（醛）但非双未见 → tree_v4（沿用池内模型）",
-    ROUTE_AMINE_UNSEEN: "含未见单体（胺）但非双未见 → tree_v4（沿用池内模型）",
-    ROUTE_BOTH_UNSEEN: "双未见单体（醛/胺均未见）→ tree_v4_noTE（外推模式）",
+    ROUTE_IN_POOL: "已知单体组合 → tree_v4 集成（含历史先验，5 种子 bagging）",
+    ROUTE_ALD_UNSEEN: "含未见单体（醛）但非双未见 → tree_v4 集成（沿用池内模型）",
+    ROUTE_AMINE_UNSEEN: "含未见单体（胺）但非双未见 → tree_v4 集成（沿用池内模型）",
+    ROUTE_BOTH_UNSEEN: "双未见单体（醛/胺均未见）→ tree_v4_noTE 集成（外推模式）",
 }
 
 
@@ -108,11 +109,12 @@ class RoutedTreePredictor:
         return model, key, _ROUTE_REASONS_ZH[key]
 
     def predict_with_info(self, ald_smiles: str, amine_smiles: str) -> dict:
-        """路由预测，返回概率 + 实际使用模型 + 路由原因。"""
+        """路由预测，返回概率均值 + 成员 std（认知不确定度）+ 实际使用模型 + 路由原因。"""
         model, key, reason = self.route_for(ald_smiles, amine_smiles)
-        prob = model.predict_single(ald_smiles, amine_smiles)
+        prob, std = model.predict_single_with_std(ald_smiles, amine_smiles)
         return {
             "probability": prob,
+            "std": std,
             "model_name": model.model_path.stem,
             "route": key,
             "route_reason": reason,
