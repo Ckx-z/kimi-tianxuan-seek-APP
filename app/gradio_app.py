@@ -12,9 +12,10 @@
 - ⑤ 方案迭代（RAG 对接）：实验记录时间线摘要 + RAG 建议卡片回显
   （src.rag.suggestions，未就位时优雅降级为占位提示）。
 
-打分口径（Bug 修复，任何位置不许取 max）：主展示分数一律 = 路由树模型
-打分（±std）；GNN 仅为对照参考；综合分为两者平均，仅对照展示并明确标注；
-树模型未出分时显示提示，绝不用 GNN/综合分冒充主分数。
+打分口径（两模型较高值）：主展示分数 = max(路由树模型分, GNN 分)（±std）；
+仅一方出分时用出分者并标注来源；都未出分显示未出分提示；属乐观召回口径，
+高分请结合 OOD 与不确定度判断；OOD=out ⛔ 时一律不出分（⛔ 优先于打分）。
+综合分为两者平均，仅对照展示并明确标注。
 
 依赖的并行后端模块均为懒加载 + 优雅降级：模块未就位时对应板块显示提示而
 不报错。P1 后端：src/utils/cas_lookup.py、src/utils/predict_log.py、
@@ -139,27 +140,48 @@ def _log_prediction(record: dict) -> bool:
         return False
 
 
-def _main_tree_score(pred_result: dict) -> float | None:
-    """主分数统一口径：主展示分数一律取路由树模型打分。
+def _headline_score(pred_result: dict) -> tuple[float | None, str | None]:
+    """主分数统一口径（两模型较高值）：主展示分数 = max(路由树模型分, GNN 分)。
 
-    绝不取 max(GNN, 树, 综合)，也不在树模型缺席时用综合/GNN 冒充主分数——
-    树模型未出分时返回 None，由展示层明确提示。GNN 仅为对照参考，
-    综合分为两者平均，仅对照展示。
+    返回 (score, source)：source ∈ {"both", "tree", "gnn", None}——
+    两模型均出分时取较高者（source="both"）；仅一方出分时用出分者，
+    由展示层标注来源；都未出分返回 (None, None)，由展示层明确提示。
+
+    属乐观召回口径：高分需结合 OOD 与不确定度判断；OOD=out 时由调用方
+    保证不出分（⛔ 优先于打分）。综合分（两者平均）仅对照展示，不作主分数。
     """
-    score = (pred_result or {}).get("tree_probability")
-    return score if isinstance(score, (int, float)) else None
+    pred_result = pred_result or {}
+    tree = pred_result.get("tree_probability")
+    gnn = pred_result.get("gnn_probability")
+    tree = tree if isinstance(tree, (int, float)) else None
+    gnn = gnn if isinstance(gnn, (int, float)) else None
+    if tree is not None and gnn is not None:
+        return max(tree, gnn), "both"
+    if tree is not None:
+        return tree, "tree"
+    if gnn is not None:
+        return gnn, "gnn"
+    return None, None
 
 
 def _build_log_record(ald_smiles: str, amine_smiles: str, pred_result: dict,
                       source: str) -> dict:
-    """按数据契约（方案第 6 节）组装 prediction 日志记录。"""
+    """按数据契约（方案第 6 节）组装 prediction 日志记录。
+
+    score 为主分数（两模型较高值口径，score_policy 注明）；tree_score /
+    gnn_score 保留分量便于溯源；ood.level=="out" 时 score 置 null（⛔ 优先于
+    打分，契约要求）。"""
     ood = pred_result.get("ood") or {}
+    score, _ = _headline_score(pred_result)
     return {
         "schema_version": "1.0",
         "type": "prediction",
         "ald_smiles": ald_smiles,
         "amine_smiles": amine_smiles,
-        "score": _main_tree_score(pred_result),
+        "score": None if ood.get("level") == "out" else score,
+        "score_policy": "max_tree_gnn",
+        "tree_score": pred_result.get("tree_probability"),
+        "gnn_score": pred_result.get("gnn_probability"),
         "std": pred_result.get("score_std"),
         "arm": pred_result.get("tree_model_name"),
         "route": pred_result.get("tree_route"),
@@ -433,17 +455,23 @@ def predict(ald_smiles: str, amine_smiles: str):
     ood_out = ood.get("level") == "out"
 
     # 格式化打分输出（口径：倾向性打分，非严格概率——论文口径 D27；
-    # 主分数 = 路由树模型打分，任何位置不许取 max / 不用 GNN 或综合分冒充）
+    # 主分数 = 两模型较高值 max(树模型, GNN)，乐观召回口径，附护栏标注）
     prob_text = ""
     if not ood_out:
-        main_score = _main_tree_score(pred_result)
+        main_score, main_src = _headline_score(pred_result)
         if main_score is not None:
-            prob_text += _big_score_html(main_score, pred_result.get("score_std")) + "\n\n"
+            src_tag = {"both": "两模型较高值",
+                       "tree": "两模型较高值 · 仅树模型出分",
+                       "gnn": "两模型较高值 · 仅 GNN 出分"}[main_src]
+            prob_text += _big_score_html(main_score, pred_result.get("score_std"))
+            prob_text += f'<div class="score-tag">{src_tag}</div>\n\n'
         else:
-            prob_text += ("> ⚠️ 树模型未出分——主分数仅采用路由树模型口径，"
-                          "不以 GNN 或综合分代替（对照分见下）。\n\n")
+            prob_text += ("> ⚠️ 树模型与 GNN 均未出分——主分数（两模型较高值口径）"
+                          "无可用来源，不出分（各模型状态见下）。\n\n")
     prob_text += "### 成膜打分（倾向性）\n\n"
     prob_text += "> 四级软标签上的倾向性打分，非严格概率；对反应条件不敏感。\n\n"
+    prob_text += ("> 主分数取两模型较高者，属乐观召回口径，"
+                  "高分请结合 OOD 与不确定度判断。\n\n")
     banner = _format_ood_banner(ood)
     if banner:
         prob_text += banner
@@ -543,7 +571,7 @@ def cas_fill(cas: str, role: str):
 # 页② 批量排序：回调
 # ---------------------------------------------------------------------------
 
-BATCH_HEADERS = ["醛", "胺", "成膜打分（倾向性）", "±std", "路由臂", "OOD", "Top 理由"]
+BATCH_HEADERS = ["醛", "胺", "成膜打分（倾向性·较高值）", "±std", "路由臂", "OOD", "Top 理由"]
 
 
 def _parse_pairs(ald_choices, amine_choices, pasted_text, csv_file) -> tuple[list, list]:
@@ -642,10 +670,10 @@ def batch_predict(ald_choices, amine_choices, pasted_text, csv_file):
         if level == "out":
             score, std, reason = None, None, "OOD 不适用，不出分"
         else:
-            score = _main_tree_score(pred)
+            score, score_src = _headline_score(pred)
             std = pred.get("score_std")
             if score is None:
-                reason = "树模型未出分（主分数不取 GNN/综合代替）"
+                reason = "两模型均未出分（较高值口径无来源，不出分）"
             else:
                 reason = _one_line_reason(predictor, ald, amine)
         rows.append({
@@ -706,7 +734,7 @@ def export_batch_csv(state: dict) -> str | None:
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
         writer.writerow(["醛SMILES", "胺SMILES", "醛名称", "胺名称",
-                         "成膜打分（倾向性）", "std", "路由臂", "OOD状态", "Top理由"])
+                         "成膜打分（倾向性·较高值）", "std", "路由臂", "OOD状态", "Top理由"])
         for r in rows:
             writer.writerow([
                 r["ald"], r["amine"], r["ald_name"], r["amine_name"],
@@ -793,17 +821,22 @@ def _fav_delete(fid):
 
 
 def _snapshot_payload(pred: dict) -> dict:
-    """FilmPredictor 原始返回 → 任务1 update_prediction_snapshot 期望的
-    {score, std, arm, ood} 快照口径（ood 为 level 字符串；⛔ out 时 score=None）。"""
+    """FilmPredictor 原始返回 → 任务1 update_prediction_snapshot 期望的快照口径。
+
+    score 为主分数（两模型较高值，score_policy 注明口径）；tree_score /
+    gnn_score 保留分量便于溯源；ood 为 level 字符串；⛔ out 时 score=None。"""
     pred = pred or {}
     ood = pred.get("ood") or {}
     level = ood.get("level", "none") if isinstance(ood, dict) else str(ood or "none")
-    score = _main_tree_score(pred)
+    score, _ = _headline_score(pred)
     return {
         "score": None if level == "out" else score,
         "std": pred.get("score_std"),
         "arm": pred.get("tree_model_name", ""),
         "ood": level,
+        "score_policy": "max_tree_gnn",
+        "tree_score": pred.get("tree_probability"),
+        "gnn_score": pred.get("gnn_probability"),
     }
 
 
@@ -1297,11 +1330,14 @@ def refresh_favorites():
 def _snapshot_markdown(fav: dict) -> str:
     score, std, ood_level, date = _fav_snapshot(fav)
     date_txt = f"（{date}）" if date else ""
+    snap = fav.get("latest_prediction") or fav.get("prediction_snapshot") or {}
+    policy_txt = ("　口径：两模型较高值"
+                  if snap.get("score_policy") == "max_tree_gnn" else "")
     if ood_level == "out":
         return f"**最新预测快照**：⛔ OOD 不适用（不出分）{date_txt}"
     if not isinstance(score, (int, float)):
         return "*尚无预测快照——可点击下方「重新打分」。*"
-    return (f"**最新预测快照**：{_big_score_html(score, std)}　"
+    return (f"**最新预测快照**：{_big_score_html(score, std)}{policy_txt}　"
             f"OOD：{_ood_label(ood_level)}{date_txt}")
 
 
@@ -1311,11 +1347,11 @@ def _pred_snapshot_markdown(pred: dict) -> str:
     level = ood.get("level", "none")
     if level == "out":
         return "**最新预测快照**：⛔ OOD 不适用（不出分）（刚刚）"
-    score = _main_tree_score(pred)
+    score, _ = _headline_score(pred)
     if not isinstance(score, (int, float)):
-        return "*重新打分未出分。*"
+        return "*重新打分未出分（两模型均未出分）。*"
     return (f"**最新预测快照**：{_big_score_html(score, pred.get('score_std'))}　"
-            f"OOD：{_ood_label(level)}（刚刚）")
+            f"口径：两模型较高值　OOD：{_ood_label(level)}（刚刚）")
 
 
 def show_favorite_detail(fid: str):
@@ -1647,6 +1683,10 @@ CUSTOM_CSS = """
 }
 .score-big { font-size: 2.6rem; font-weight: 700; line-height: 1.15; }
 .score-std { font-size: 1.05rem; font-weight: 400; color: #64748b; }
+.score-tag {
+    display: inline-block; margin-top: 2px; padding: 2px 10px; border-radius: 999px;
+    background: #f1f5f9; color: #475569; font-size: 0.82rem; font-weight: 500;
+}
 .placeholder-page { padding: 24px; text-align: center; color: #64748b; }
 /* P2：收藏卡片墙 / 方案卡 / 文献标签 / 实验记录时间线 */
 .fav-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
@@ -1847,6 +1887,9 @@ def create_app() -> gr.Blocks:
                     filter_ctrl = gr.Radio(
                         ["全部", "隐藏 ⛔ 不适用", "仅看 ✓ 池内"],
                         value="全部", label="OOD 过滤")
+                gr.Markdown(
+                    "*分数口径：排序分数 = 树模型与 GNN 两模型较高值（乐观召回口径），"
+                    "高分请结合 OOD 与不确定度判断；⛔ OOD 不适用不出分。*")
                 batch_state = gr.State({"rows": []})
                 batch_table = gr.Dataframe(
                     headers=BATCH_HEADERS, value=[], interactive=False, wrap=True,

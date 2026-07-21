@@ -280,7 +280,9 @@ def delete_favorite(fav_id: str) -> bool:
 def update_prediction_snapshot(fav_id: str, prediction: dict) -> dict:
     """页①打分后回写最新打分快照到 latest_prediction，返回更新后的条目。
 
-    prediction 取 {score, std, arm, ood} 四个字段，自动补 date。
+    prediction 取 {score, std, arm, ood} 四个字段，自动补 date；
+    可选透传 {score_policy, tree_score, gnn_score} 口径溯源字段
+    （两模型较高值口径；旧调用方不传则省略，向后兼容）。
     条目不存在时抛 KeyError。
     """
     fav = get_favorite(fav_id)
@@ -294,6 +296,9 @@ def update_prediction_snapshot(fav_id: str, prediction: dict) -> dict:
         "ood": prediction.get("ood", ""),
         "date": _now_iso(),
     }
+    for k in ("score_policy", "tree_score", "gnn_score"):
+        if prediction.get(k) is not None:
+            fav["latest_prediction"][k] = prediction[k]
     return _write(fav)
 
 

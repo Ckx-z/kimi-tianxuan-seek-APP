@@ -207,7 +207,7 @@ class TestBatchPredict:
         path = gradio_app.export_batch_csv(state)
         assert path and Path(path).exists()
         content = Path(path).read_text(encoding="utf-8-sig")
-        assert "成膜打分（倾向性）" in content and "good_ald" in content
+        assert "成膜打分（倾向性·较高值）" in content and "good_ald" in content
         assert gradio_app.export_batch_csv({"rows": []}) is None
 
 
@@ -505,12 +505,12 @@ class TestRecordsPage:
 
 
 # ---------------------------------------------------------------------------
-# Bug 1 回归：主分数口径 —— 主展示分数 == 路由树模型分，任何位置不取 max
+# 主分数口径（两模型较高值）：主展示分数 == max(树模型分, GNN 分) + 护栏标注
 # ---------------------------------------------------------------------------
 
 class TestMainScoreContract:
-    """树 0.30 / GNN 0.90 / 综合 0.60 三分离：主分数必须是 0.30（树），
-    取 max 会得 0.90，取综合会得 0.60——均可被断言区分。"""
+    """树 0.30 / GNN 0.90 / 综合 0.60 三分离：主分数必须是 0.90（较高值），
+    取树会得 0.30、取综合会得 0.60——均可被断言区分。"""
 
     @staticmethod
     def _pred(ald, amine):
@@ -541,36 +541,10 @@ class TestMainScoreContract:
         monkeypatch.setattr(gradio_app, "_one_line_reason",
                             lambda p, a, b: "某特征 推高打分")
 
-    def test_headline_is_tree_not_max(self, pred_stub):
-        prob_text = gradio_app.predict("Aald", "Bami")[0]
-        headline = prob_text.split("### 成膜打分")[0]
-        assert "0.300" in headline      # 主分数 = 路由树模型分
-        assert "0.900" not in headline  # 不取 max(GNN,…)
-        assert "0.600" not in headline  # 不用综合分冒充
-        # GNN / 综合仅作对照，且综合明确标注
-        assert "**GNN v5.3**: 0.900" in prob_text
-        assert "综合打分（树与 GNN 平均，仅对照参考）" in prob_text
-
-    def test_batch_score_is_tree_not_max(self, pred_stub):
-        state, table, _ = gradio_app.batch_predict([], [], "Aald,Bami", None)
-        assert state["rows"][0]["score"] == 0.30
-        assert table[0][2] == 0.3
-
-    def test_snapshot_payload_is_tree_not_max(self):
-        payload = gradio_app._snapshot_payload(self._pred("A", "B"))
-        assert payload["score"] == 0.30
-
-    def test_log_record_is_tree_not_max(self, monkeypatch):
-        rec = gradio_app._build_log_record("A", "B", self._pred("A", "B"), "single")
-        assert rec["score"] == 0.30
-
-    def test_tree_missing_no_substitute(self, monkeypatch):
-        """树模型未出分时：主分数区给提示，绝不拿 GNN/综合顶替。"""
-        pred = self._pred("A", "B")
-        del pred["tree_probability"]
-
+    def _custom_stub(self, monkeypatch, pred):
+        """用指定 pred 替换预测器（其余封装与 pred_stub 一致）。"""
         class _P2:
-            tree_available = False
+            tree_available = True
 
             def predict(self, a, b):
                 return dict(pred)
@@ -582,13 +556,104 @@ class TestMainScoreContract:
                             lambda a, b: (None, None, None, ""))
         monkeypatch.setattr(gradio_app, "_find_similar_cases",
                             lambda a, b, top_k=3: ([], None))
+        monkeypatch.setattr(gradio_app, "_one_line_reason",
+                            lambda p, a, b: "某特征 推高打分")
+
+    def test_headline_is_max_of_two_models(self, pred_stub):
         prob_text = gradio_app.predict("Aald", "Bami")[0]
         headline = prob_text.split("### 成膜打分")[0]
-        assert "树模型未出分" in headline
+        assert "0.900" in headline      # 主分数 = max(树 0.30, GNN 0.90)
+        assert "0.300" not in headline  # 不是树模型分
+        assert "0.600" not in headline  # 不用综合分冒充
+        assert "两模型较高值" in headline  # 护栏标注
+        # 下方并列：树模型分（±std，含路由臂）、GNN 分、来源说明
+        assert "**树模型 (tree_v4_ens)**: 0.300" in prob_text
+        assert "**GNN v5.3**: 0.900" in prob_text
+        assert "主分数取两模型较高者，属乐观召回口径" in prob_text
+        assert "综合打分（树与 GNN 平均，仅对照参考）" in prob_text
+
+    def test_headline_tree_higher(self, pred_stub, monkeypatch):
+        """树更高时主分数取树——验证 max 双向，而非恒取 GNN。"""
+        pred = self._pred("A", "B")
+        pred["tree_probability"], pred["gnn_probability"] = 0.95, 0.30
+        self._custom_stub(monkeypatch, pred)
+        prob_text = gradio_app.predict("Aald", "Bami")[0]
+        headline = prob_text.split("### 成膜打分")[0]
+        assert "0.950" in headline and "两模型较高值" in headline
+        assert "0.300" not in headline
+
+    def test_batch_score_is_max(self, pred_stub):
+        state, table, _ = gradio_app.batch_predict([], [], "Aald,Bami", None)
+        assert state["rows"][0]["score"] == 0.90
+        assert table[0][2] == 0.9
+
+    def test_snapshot_payload_is_max_with_policy(self):
+        payload = gradio_app._snapshot_payload(self._pred("A", "B"))
+        assert payload["score"] == 0.90
+        assert payload["score_policy"] == "max_tree_gnn"
+        assert payload["tree_score"] == 0.30 and payload["gnn_score"] == 0.90
+
+    def test_log_record_is_max_with_policy(self):
+        rec = gradio_app._build_log_record("A", "B", self._pred("A", "B"), "single")
+        assert rec["score"] == 0.90
+        assert rec["score_policy"] == "max_tree_gnn"
+        assert rec["tree_score"] == 0.30 and rec["gnn_score"] == 0.90
+
+    def test_log_record_ood_out_null_score(self):
+        """契约：ood.level=="out" 时 score 必须为 null（⛔ 优先于打分）。"""
+        pred = dict(self._pred("A", "B"))
+        pred["ood"] = {"level": "out", "reasons": ["双未见"]}
+        rec = gradio_app._build_log_record("A", "B", pred, "single")
+        assert rec["score"] is None and rec["ood_level"] == "out"
+
+    def test_single_source_gnn_only(self, pred_stub, monkeypatch):
+        """仅 GNN 出分：主分数用 GNN 并标注来源。"""
+        pred = self._pred("A", "B")
+        del pred["tree_probability"]
+        self._custom_stub(monkeypatch, pred)
+        prob_text = gradio_app.predict("Aald", "Bami")[0]
+        headline = prob_text.split("### 成膜打分")[0]
+        assert "0.900" in headline and "仅 GNN 出分" in headline
+        assert "0.300" not in headline
+        state, _, _ = gradio_app.batch_predict([], [], "Aald,Bami", None)
+        assert state["rows"][0]["score"] == 0.90
+
+    def test_single_source_tree_only(self, pred_stub, monkeypatch):
+        """仅树模型出分：主分数用树并标注来源。"""
+        pred = self._pred("A", "B")
+        del pred["gnn_probability"]
+        self._custom_stub(monkeypatch, pred)
+        prob_text = gradio_app.predict("Aald", "Bami")[0]
+        headline = prob_text.split("### 成膜打分")[0]
+        assert "0.300" in headline and "仅树模型出分" in headline
+        assert "0.900" not in headline
+
+    def test_both_missing_no_score(self, pred_stub, monkeypatch):
+        """两模型都未出分：主分数区给未出分提示，不显示任何替代分。"""
+        pred = self._pred("A", "B")
+        del pred["tree_probability"]
+        del pred["gnn_probability"]
+        self._custom_stub(monkeypatch, pred)
+        prob_text = gradio_app.predict("Aald", "Bami")[0]
+        headline = prob_text.split("### 成膜打分")[0]
+        assert "均未出分" in headline
         assert "score-big" not in headline  # 大字号区不显示任何替代分
         state, _, _ = gradio_app.batch_predict([], [], "Aald,Bami", None)
         assert state["rows"][0]["score"] is None
-        assert "树模型未出分" in state["rows"][0]["reason"]
+        assert "两模型均未出分" in state["rows"][0]["reason"]
+
+    def test_ood_out_no_score(self, pred_stub, monkeypatch):
+        """OOD=out：⛔ 优先于打分——任何模型分都不出，主分数区为空。"""
+        pred = dict(self._pred("A", "B"))
+        pred["ood"] = {"level": "out", "reasons": ["双未见"]}
+        self._custom_stub(monkeypatch, pred)
+        prob_text = gradio_app.predict("Aald", "Bami")[0]
+        assert "模型不适用" in prob_text
+        assert "score-big" not in prob_text
+        assert "0.900" not in prob_text and "0.300" not in prob_text
+        state, _, _ = gradio_app.batch_predict([], [], "Aald,Bami", None)
+        assert state["rows"][0]["score"] is None
+        assert state["rows"][0]["reason"] == "OOD 不适用，不出分"
 
 
 # ---------------------------------------------------------------------------

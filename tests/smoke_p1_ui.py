@@ -57,17 +57,22 @@ print(msg)
 fid = msg.split("（")[1].split("）")[0] if "（fav_" in msg else None
 assert fid, "应返回收藏 id"
 
-print("== 8b. 主分数口径（主分=路由树模型分，不取 max） ==")
+print("== 8b. 主分数口径（主分=两模型较高值 max(树,GNN)） ==")
 import re as _re
 headline = prob.split("### 成膜打分")[0]
 m_main = _re.search(r'score-big[^>]*>([\d.]+)', headline)
+assert m_main, "主分数应存在"
+assert "两模型较高值" in headline, "主分数旁须标注「两模型较高值」"
 m_tree = _re.search(r'\*\*树模型 \([^)]+\)\*\*: ([\d.]+)', prob)
-assert m_main and m_tree, "主分数与树模型行都应存在"
-assert m_main.group(1) == m_tree.group(1), "主分数必须 == 路由树模型分"
 m_gnn = _re.search(r'\*\*GNN v5\.3\*\*: ([\d.]+)', prob)
-if m_gnn:
-    print("主分数", m_main.group(1), "== 树模型分", m_tree.group(1),
-          "（GNN 对照", m_gnn.group(1), "，未取 max）")
+_vals = [float(m.group(1)) for m in (m_tree, m_gnn) if m]
+assert _vals, "树/GNN 至少一方出分"
+_expected = f"{max(_vals):.3f}"
+assert m_main.group(1) == _expected, f"主分数必须 == max(树,GNN) = {_expected}"
+print("主分数", m_main.group(1), "== max(树",
+      m_tree.group(1) if m_tree else "未出分",
+      ", GNN", m_gnn.group(1) if m_gnn else "未出分", ")")
+assert "主分数取两模型较高者，属乐观召回口径" in prob, "来源说明须存在"
 assert "综合打分（树与 GNN 平均，仅对照参考）" in prob, "综合分须明确标注"
 
 print("== 8c. 收藏去重提示（同 SMILES 对不新建） ==")
