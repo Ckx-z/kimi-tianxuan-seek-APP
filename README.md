@@ -1,20 +1,35 @@
 # COF 成膜单体组合推荐系统
 
-> 预测能形成膜的共价有机框架（COF）单体组合，输出成膜概率、推荐实验条件、生成 Word 实验报告。
+> 预测能形成膜的共价有机框架（COF）单体组合，输出成膜概率、打分理由、化学结构图，推荐实验条件，生成 Word 实验报告。
 
 ---
 
 ## 项目状态
 
-**App MVP 已完成**（2026-07-08）。
+**阶段 12 已完成**（2026-07-20）：双模型路由上线，App 功能完整。
 
-- ✅ 输入醛 + 胺 SMILES → 输出成膜概率
+- ✅ 输入醛 + 胺 SMILES → 输出成膜概率（GNN + 树模型 + 综合）
+- ✅ **双模型路由**（D23）：双未见单体 → `tree_v4_noTE`（外推臂）；其余 → `tree_v4`（池内臂），前端显示路由原因
+- ✅ **SHAP 打分理由**：全中文解释哪个官能团/特征推高或拉低成膜分（热态 ~0.04s）
+- ✅ **化学结构图**：醛/胺单体 2D 结构 + 亚胺缩合产物骨架（RDKit 渲染，非法 SMILES 优雅降级）
 - ✅ 推荐实验条件 / 溶液配比（基于规则 + 历史案例）
-- ✅ 生成 Word 实验报告（内嵌单体 2D 结构图）
-- ✅ 展示化学结构图：醛/胺单体 2D 结构 + 亚胺缩合产物骨架（RDKit 渲染，非法 SMILES 优雅降级）
-- ✅ Gradio 前端可启动
-- ✅ GNN v5.3 已通过 subprocess 接入
-- ✅ 树模型基线（PR-AUC 0.727）
+- ✅ 生成 Word 实验报告（内嵌单体结构图）
+- ✅ 双击 `start_app.vbs` 无窗口静默启动，自动打开浏览器
+- ✅ GNN v5.3 通过 subprocess 接入（PR-AUC 0.784）
+- ✅ 测试 57 项全部通过
+
+### 当前模型一览
+
+| 模型 | 角色 | LOGO PR-AUC | 双留出 PR-AUC（3 种子均值） |
+|---|---|---|---|
+| `tree_v4` | 池内臂（App 路由默认） | **0.878** | 0.642 |
+| `tree_v4_noTE` | 外推臂（双未见单体） | 0.790 | **0.682** |
+| `tree_v3` | 存档（前默认模型） | 0.761 | 0.653 |
+| `tree_v5`（指纹） | 存档（已证伪，见 exp_006） | 0.871 | 0.637 |
+| GNN v5.3 | 并行概率输出 | — | — |
+
+> 评估协议：LOGO = 留醛分组 CV；双留出 = 醛胺均不见于训练折（更严格的外推考核，须报多种子）。
+> 频率基线（胺历史成膜率单特征）LOGO 0.864，双留出坍缩至 0.523（证实统计泄漏）。
 
 ---
 
@@ -22,25 +37,29 @@
 
 ```
 全新机器学习实验/
-├── app/gradio_app.py              # Gradio App 入口
-├── start_app.bat                  # 一键启动脚本（Windows 双击）
-├── start_app.ps1                  # PowerShell 启动脚本
+├── app/gradio_app.py              # Gradio App 入口（概率 + 打分理由 + 结构图）
+├── start_app.vbs                  # 双击无窗口启动（推荐）
+├── start_app.bat                  # 调试启动（终端可见日志）
+├── silent_launch.py               # 静默启动器（vbs 调用）
 ├── src/
-│   ├── predictor/                 # 预测层（树模型 + GNN）
+│   ├── predictor/                 # 预测层（树模型路由 + GNN subprocess）
 │   ├── condition_recommender/     # 条件推荐层（规则 + 案例）
 │   ├── report_generator/          # Word 报告生成
-│   ├── features/                    # 描述符工程
-│   └── data/                        # 数据导入 + 审计
-├── data/raw/                      # 从旧项目复制的训练数据
-├── data/experimental_refs/        # 从 实验 目录复制的参考文档
-├── models/tree_baseline.pkl       # 已训练树模型
-├── reports/                        # 生成的报告
+│   ├── models/                    # 训练管线 + SHAP 归因
+│   ├── features/                  # 描述符 / target encoding / 指纹
+│   ├── utils/                     # molecule_viz 分子渲染等
+│   └── data/                      # 数据导入 + 审计
+├── scripts/                       # 评估/消融/校准/补全脚本（stage11/12 系列）
+├── data/raw/                      # 训练数据（复制自旧项目）
+├── data/interim/                  # 中间产物（条件补全 CSV、特征缓存）
+├── models/                        # 模型权重（.pkl 不入库）+ monomer_pool.json
+├── reports/                       # 实验指标 JSON + 归因报告 + 生成的 docx
 ├── PROJECT_STATE.md               # 项目当前状态（必读）
 ├── SESSION_START.md               # 会话启动清单
-├── DECISIONS.md                   # 关键决策记录
+├── DECISIONS.md                   # 关键决策记录（D1-D23）
 ├── DATA_DICT.md                   # 数据字典
-├── DAILY_LOG/                     # 日报
-└── EXPERIMENTS/                   # 实验记录
+├── DAILY_LOG/                     # 日报（AI 版 + 人版双轨）
+└── EXPERIMENTS/                   # 实验记录（exp_001-exp_008）
 ```
 
 ---
@@ -51,22 +70,22 @@
 
 | 组件 | 环境 | 说明 |
 |---|---|---|
-| App 前端（Gradio） | base Python 3.13 | 已安装 gradio 6.20、python-docx、xgboost |
+| App 前端（Gradio） | base Python 3.13 | gradio 6.20、python-docx、xgboost、shap |
 | GNN 预测 | dphuanjing Python 3.8 | torch 2.3.1 + PyG 2.6.1，通过 subprocess 调用 |
-| 树模型 | base Python 3.13 | 直接在 base 运行 |
+| 树模型训练 | `.venv` Python 3.12 | xgboost、rdkit、shap、scikit-learn |
 
 **为什么用两个环境？** dphuanjing 是旧项目环境，有 GNN 所需的 torch/PyG，但 Python 3.8 装不了新版 Gradio。新 App 用 base 环境，GNN 通过 subprocess 调用 dphuanjing，互不冲突。
 
 ### 环境要求
 
 - 已安装 Anaconda
-- base 环境：Python 3.13，已安装 `gradio`, `python-docx`, `xgboost`, `rdkit`, `pandas`, `joblib`
+- base 环境：Python 3.13，已安装 `gradio`, `python-docx`, `xgboost`, `rdkit`, `shap`, `pandas`, `joblib`
 - dphuanjing 环境：Python 3.8，含 `torch 2.3.1`, `torch_geometric 2.6.1`, `rdkit`
 
 如果缺少依赖：
 
 ```bash
-pip install gradio python-docx xgboost rdkit joblib pandas scikit-learn
+pip install gradio python-docx xgboost rdkit shap joblib pandas scikit-learn
 ```
 
 ---
@@ -84,7 +103,7 @@ pip install gradio python-docx xgboost rdkit joblib pandas scikit-learn
 
 ### 方式 2：双击 `start_app.bat`（调试用）
 
-会打开独立终端窗口运行，可在终端里查看实时日志；关掉窗口即关闭 App。
+会打开独立终端窗口运行，可在终端里查看实时日志（含 RDKit 调试信息）；关掉窗口即关闭 App。
 
 ### 方式 3：命令行
 
@@ -115,17 +134,20 @@ Running on local URL:  http://127.0.0.1:7860
 ```
 用户输入：醛 SMILES + 胺 SMILES
     │
-    ├──► [预测层] 树模型 + GNN v5.3 → 成膜概率
+    ├──► [预测层] 树模型双路路由（池内 tree_v4 / 外推 tree_v4_noTE）
+    │       + GNN v5.3 并行 → 成膜概率 + 路由原因
+    │       + SHAP 打分理由（中文，跟随路由模型）
+    │       + 化学结构图（醛/胺/缩合产物骨架）
     │
     └──► [条件推荐层] 规则引擎 + 案例匹配 → 实验条件
               │
               ▼
-        [报告生成层] Word 实验报告
+        [报告生成层] Word 实验报告（内嵌结构图）
 ```
 
-- **预测层 ML**：树模型 + GNN 并行，输出综合概率
+- **双模型路由**：训练单体池（醛 896 / 胺 1366，`models/monomer_pool.json`）为路由键——醛胺均未见 → 外推臂（无统计先验，双留出最强）；其余 → 池内臂（含单体历史成膜率先验）
+- **打分理由**：TreeExplainer 按模型缓存，特征名→中文映射，分组贡献（醛/胺/交互/规则/3D/先验）
 - **条件推荐**：基于单体类型（F/CF3/酰肼/常规）和拓扑，用规则 + 历史案例推荐
-- **报告生成**：python-docx 填充报告
 
 ---
 
@@ -133,15 +155,10 @@ Running on local URL:  http://127.0.0.1:7860
 
 ```bash
 cd "C:\Users\ckx\Desktop\全新机器学习实验"
-pytest tests/ -v
+E:\ANACONDA\python.exe -m pytest tests/ -v
 ```
 
-当前测试覆盖：
-- 描述符计算
-- 条件推荐
-- 树模型训练/预测
-- Word 报告生成
-- 数据导入
+当前 **57 项测试全部通过**，覆盖：描述符计算、条件推荐、树模型训练/预测、Word 报告生成、数据导入、SHAP 归因（含 TE 模型）、双模型路由、分子渲染、RDKit 日志行为。
 
 ---
 
@@ -163,19 +180,18 @@ pytest tests/ -v
 
 每次会话结束必须：
 1. 更新 `PROJECT_STATE.md`
-2. 写/更新 `DAILY_LOG/YYYY-MM-DD.md`
+2. 写/更新 `DAILY_LOG/YYYY-MM-DD.md`（AI 版 + 人版双轨）
 3. 新决策记入 `DECISIONS.md`
 4. 实验记入 `EXPERIMENTS/`
 
 ---
 
-## 后续优化方向
+## 当前主要问题（详见 PROJECT_STATE.md 遗留事项）
 
-1. **树模型准确率提升**：PR-AUC 0.727 < GNN 0.784，需改进特征工程（3D 描述符、LightGBM）
-2. **GNN 全接入**：目前通过 subprocess 调用，未来可直接导入（需解决 src 包名冲突）
+1. **双未见单体泛化 0.63-0.68（核心瓶颈）**：手工描述符与 Morgan 指纹均无法突破（指纹已证伪为"按单体记忆"），下一步方向是 **GNN embedding 迁移/蒸馏** 等学习型表征
+2. **fold3 型区域漂移**：大芳香醛等落在训练分布包络外的单体是难折来源，需专项切片跟踪
 3. **案例库丰富**：从 `data/experimental_refs/main_template.docx` 自动提取历史案例
-4. **报告模板优化**：复用现有 Word 模板格式
-5. ~~**单体结构图可视化**~~：已完成（2026-07-20，App + Word 报告均内嵌 RDKit 渲染结构图）
+4. **GNN 全接入**：目前通过 subprocess 调用，未来可直接导入（需解决 src 包名冲突）
 
 ---
 
@@ -184,11 +200,16 @@ pytest tests/ -v
 | 文件 | 说明 |
 |---|---|
 | `app/gradio_app.py` | Gradio 前端 |
-| `src/predictor/tree_model.py` | XGBoost 树模型 |
+| `src/predictor/__init__.py` | FilmPredictor（双模型路由入口） |
+| `src/predictor/routing.py` | 路由规则（routed_strict，D23） |
+| `src/predictor/tree_model.py` | XGBoost 树模型（自描述 pkl 加载） |
 | `src/predictor/gnn_model.py` | GNN v5.3 subprocess 封装 |
+| `src/models/attribution.py` | SHAP 归因 + 中文打分理由 |
+| `src/utils/molecule_viz.py` | 分子结构渲染（SMILES→PNG，App/报告复用） |
 | `src/condition_recommender/` | 条件推荐规则 + 案例 |
 | `src/report_generator/exporter.py` | Word 报告生成 |
-| `src/utils/molecule_viz.py` | 分子结构渲染（SMILES→PNG，App/报告复用） |
 | `src/features/descriptors.py` | 统一描述符接口（含归一化） |
+| `src/features/target_encoding.py` | 单体历史成膜率先验（CV 安全） |
+| `scripts/stage11_dual_holdout.py` | 双留出/LOGO 评估基础设施（逐折报告标配） |
 | `PROJECT_STATE.md` | 项目状态 |
 | `SESSION_START.md` | 会话启动清单 |
