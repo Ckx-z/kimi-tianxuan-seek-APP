@@ -572,3 +572,18 @@
 **原因**：用户决策。场景是筛选/排雷，假阴性（漏掉能成膜的组合）代价高于假阳性；exp_011 证明两模型信号互补。
 **护栏（随决策一起落地）**：① 主分数旁标注「两模型较高值」+ 来源说明（"高分请结合 OOD 与不确定度判断"）；② 树/GNN/综合三行并列展示可溯源；③ 快照与预测日志存 headline + score_policy=max_tree_gnn + 分量字段；④ OOD=out 优先于打分，不出分；⑤ 顺带修复预测日志 ood=out 时 score 未置 null 的契约违规。
 **何时复盘**：App 查询日志积累后，对比 max 口径 vs 树模型口径在真实实验上的命中/虚高率（尤其高分段），若虚高问题重现则回到树模型优先或改加权。
+
+---
+
+## D30：实验记录契约收紧 + LLM 基座配置链 + 用户数据不入库 + 页⑤暂缓
+
+**日期**：2026-07-22
+**决策**：
+1. **实验记录契约**：`experiment_no`（实验编号）独立必填字段；`conditions` 标准化九键——`solvent_1` / `solvent_2` / `eluent`（洗脱剂）/ `modulator` / `catalyst` / `temperature_c` / `time_days` / `vessel` / `addition_order`；旧 `solvent` 键读取时自动映射 `solvent_1`（向后兼容）；记录按收藏组过滤展示，切换收藏时表单强制刷新
+2. **LLM 基座三级配置链**：`data/llm_config.local.json`（用户本地，gitignore）→ `COF_LLM_*` 环境变量 → minimax `config/secrets.local.json` 种子（longcat 备用端点）；前端设置页可填自己的 base_url/api_key/model，他人克隆后接自己的 API
+3. **longcat（LongCat-2.0）推理模型适配**：响应解析容错（message.content 缺失时取顶层 content、列表分片拼接、空串报错）；调用方 max_tokens 上调（性质卡 3000 / 模板提取 4000 / 默认 2000）；HTTP 超时 30s→120s
+4. **用户数据不入库**：`data/favorites/`、`data/experiment_records/`、`data/llm_config.local.json` 等加入 .gitignore（内置模板 `builtin_hou_v3_9.json` 与 records/example.json 除外，仍入库）
+5. **页⑤（自然语言 RAG 方案迭代）暂缓开放**（用户决策）：等 minimax GraphRAG 深检索闭环成熟后回头集中处理
+
+**原因**：用户实测反馈——实验编号原本写在备注里不利于追溯；双溶剂+洗脱剂是真实实验记录需求；longcat 是推理模型，小 token 预算全被 reasoning_content 消耗导致 content 缺失/空串、长输出超 30s 超时；用户测试数据不应随仓库分发。
+**何时复盘**：minimax GraphRAG 可用时重启页⑤；若换非推理模型可回调 max_tokens 与超时。

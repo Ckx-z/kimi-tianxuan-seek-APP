@@ -160,21 +160,39 @@ def generate_plan_card(
     amine_smiles: str,
     ald_name: str = "",
     amine_name: str = "",
+    template: dict | None = None,
 ) -> dict:
     """生成侯老师法实验方案卡。
 
     返回 {template, aldehyde, amine, conditions, defaults_note, steps,
     checklist, monomer_hints, generated_at}；输入无法解析时仍可返回
     模板卡（monomer_hints 为空），不抛异常。
+
+    template 为 None 时使用内置侯老师法 v3.9 模板（原逻辑，向后兼容）；
+    给定模板 dict（schema 见 plan_templates.validate_template）时按给定
+    模板的 name/conditions/steps/checklist 渲染，monomer_hints 仍由
+    结构检测生成，不随模板变化。
     """
+    if template:
+        tpl_name = str(template.get("name") or TEMPLATE_NAME)
+        conditions = dict(template.get("conditions") or _CONDITIONS)
+        steps = list(template.get("steps") or _STEPS)
+        checklist = [dict(c) for c in (template.get("checklist") or _CHECKLIST)]
+        defaults_note = str(template.get("source") or "自定义模板")
+    else:
+        tpl_name = TEMPLATE_NAME
+        conditions = dict(_CONDITIONS)
+        steps = list(_STEPS)
+        checklist = [dict(c) for c in _CHECKLIST]
+        defaults_note = DEFAULTS_NOTE
     return {
-        "template": TEMPLATE_NAME,
+        "template": tpl_name,
         "aldehyde": _monomer_obj(aldehyde_smiles, ald_name),
         "amine": _monomer_obj(amine_smiles, amine_name),
-        "conditions": dict(_CONDITIONS),
-        "defaults_note": DEFAULTS_NOTE,
-        "steps": list(_STEPS),
-        "checklist": [dict(c) for c in _CHECKLIST],
+        "conditions": conditions,
+        "defaults_note": defaults_note,
+        "steps": steps,
+        "checklist": checklist,
         "monomer_hints": _monomer_hints(aldehyde_smiles, amine_smiles),
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
     }

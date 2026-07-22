@@ -251,6 +251,7 @@ class TestCreateRecord:
             strength="连续膜，可剥离",
             notes="顺利",
             operator="ckx",
+            experiment_no="A5",
         )
         # 契约必填字段
         assert rec["schema_version"] == "1.0"
@@ -263,9 +264,11 @@ class TestCreateRecord:
         assert rec["attachments"] == []
         assert rec["date"]  # YYYY-MM-DD
         assert rec["minimax_plan_no"] is None
-        # conditions 七个标准键齐全，未提供的留空
+        # conditions 九个标准键齐全，未提供的留空（P4a：solvent→solvent_1/2+eluent）
         for k in (
-            "solvent",
+            "solvent_1",
+            "solvent_2",
+            "eluent",
             "modulator",
             "catalyst",
             "temperature_c",
@@ -274,7 +277,8 @@ class TestCreateRecord:
             "addition_order",
         ):
             assert k in rec["conditions"]
-        assert rec["conditions"]["solvent"] == "甲苯"
+        assert rec["conditions"]["solvent_1"] == "甲苯"  # 旧 solvent 键兼容映射
+        assert rec["conditions"]["solvent"] == "甲苯"    # 旧键原样保留
         assert rec["conditions"]["catalyst"] == ""
         # 预测快照冗余
         assert rec["prediction_snapshot"] == {"score": 0.65, "std": 0.05, "ood": "none"}
@@ -287,16 +291,16 @@ class TestCreateRecord:
     def test_record_id_backlinked_to_favorite(self, rec_dirs):
         fav_d, _ = rec_dirs
         fav = fav_store.add_favorite(TP, PA)
-        r1 = rec_store.create_record(fav["id"], {}, "film")
-        r2 = rec_store.create_record(fav["id"], {}, "failed")
+        r1 = rec_store.create_record(fav["id"], {}, "film", experiment_no="T1")
+        r2 = rec_store.create_record(fav["id"], {}, "failed", experiment_no="T1")
         ids = fav_store.get_favorite(fav["id"])["experiment_record_ids"]
         assert ids == [r1["record_id"], r2["record_id"]]
 
     def test_record_ids_independent_and_unique(self, rec_dirs):
         fav_d, _ = rec_dirs
         fav = fav_store.add_favorite(TP, PA)
-        r1 = rec_store.create_record(fav["id"], {}, "film")
-        r2 = rec_store.create_record(fav["id"], {}, "film")
+        r1 = rec_store.create_record(fav["id"], {}, "film", experiment_no="T1")
+        r2 = rec_store.create_record(fav["id"], {}, "film", experiment_no="T1")
         assert r1["record_id"] != r2["record_id"]
         assert not r1["record_id"].startswith(fav["id"])
 
@@ -305,16 +309,16 @@ class TestCreateRecord:
         fav = fav_store.add_favorite(TP, PA)
         for bad in ("success", "", "FILM", None):
             with pytest.raises(ValueError):
-                rec_store.create_record(fav["id"], {}, bad)
+                rec_store.create_record(fav["id"], {}, bad, experiment_no="T1")
 
     def test_missing_favorite_raises(self, rec_dirs):
         with pytest.raises(KeyError):
-            rec_store.create_record("fav_20990101_999", {}, "film")
+            rec_store.create_record("fav_20990101_999", {}, "film", experiment_no="T1")
 
     def test_no_snapshot_when_never_predicted(self, rec_dirs):
         fav_d, _ = rec_dirs
         fav = fav_store.add_favorite(TP, PA)
-        rec = rec_store.create_record(fav["id"], {}, "partial")
+        rec = rec_store.create_record(fav["id"], {}, "partial", experiment_no="T1")
         assert rec["prediction_snapshot"] is None
         assert rec["prediction_id"] is None
 
@@ -324,9 +328,9 @@ class TestListRecords:
         fav_d, _ = rec_dirs
         f1 = fav_store.add_favorite(TP, PA)
         f2 = fav_store.add_favorite(A2_SMILES, TAPT_SMILES)
-        r1 = rec_store.create_record(f1["id"], {}, "film")
-        rec_store.create_record(f1["id"], {}, "partial")
-        rec_store.create_record(f2["id"], {}, "failed")
+        r1 = rec_store.create_record(f1["id"], {}, "film", experiment_no="T1")
+        rec_store.create_record(f1["id"], {}, "partial", experiment_no="T1")
+        rec_store.create_record(f2["id"], {}, "failed", experiment_no="T1")
         assert len(rec_store.list_records()) == 3
         f1_recs = rec_store.list_records(favorite_id=f1["id"])
         assert len(f1_recs) == 2
@@ -349,7 +353,7 @@ class TestListRecords:
     def test_get_record(self, rec_dirs):
         fav_d, _ = rec_dirs
         fav = fav_store.add_favorite(TP, PA)
-        rec = rec_store.create_record(fav["id"], {}, "film")
+        rec = rec_store.create_record(fav["id"], {}, "film", experiment_no="T1")
         got = rec_store.get_record(rec["record_id"])
         assert got["record_id"] == rec["record_id"]
         assert rec_store.get_record("rec_20990101_999") is None

@@ -11,6 +11,12 @@
   （当初预测快照 vs 实际结果对比）。
 - ⑤ 方案迭代（RAG 对接）：实验记录时间线摘要 + RAG 建议卡片回显
   （src.rag.suggestions，未就位时优雅降级为占位提示）。
+- ⑥ 设置（P4b）：LLM 配置（base_url / api_key / 模型名，OpenAI 兼容端点）
+  + 连通性测试；密钥仅存本地 gitignored 配置，界面掩码显示。
+
+P4a/P4b 增强：页④ 实验编号独立必填、溶剂一/二+洗脱剂、收藏联动过滤时间线、
+切换收藏/提交成功重置表单；页① 单体性质卡（RDKit facts + LLM 解读）与
+方案卡模板选择/上传（docx → LLM 提取 → 预览确认）。
 
 打分口径（两模型较高值）：主展示分数 = max(路由树模型分, GNN 分)（±std）；
 仅一方出分时用出分者并标注来源；都未出分显示未出分提示；属乐观召回口径，
@@ -871,21 +877,34 @@ def _fav_auto_refs(ald, amine, max_refs=8):
         return None, f"⚠️ 文献自动匹配失败：{_brief_error(e)}"
 
 
-def _rec_create_linked(favorite_id, conditions, outcome, strength, notes, operator):
-    """关联收藏的实验记录（单体对象与预测快照由后端从收藏冗余）。"""
+def _rec_create_linked(favorite_id, conditions, outcome, strength, notes,
+                       operator, experiment_no=""):
+    """关联收藏的实验记录（单体对象与预测快照由后端从收藏冗余）。
+
+    P4a：experiment_no 为钉死的新参数。后端未就位（TypeError）时降级为
+    旧签名调用并把实验编号并入 notes 前缀，保证功能可用。"""
     store, err = _load_records_store()
     if err:
         return None, err
     try:
         return store.create_record(
             favorite_id=favorite_id, conditions=conditions, outcome=outcome,
-            strength=strength, notes=notes, operator=operator), None
+            strength=strength, notes=notes, operator=operator,
+            experiment_no=experiment_no), None
+    except TypeError:
+        try:
+            merged = f"[{experiment_no}] {notes}".strip() if experiment_no else notes
+            return store.create_record(
+                favorite_id=favorite_id, conditions=conditions, outcome=outcome,
+                strength=strength, notes=merged, operator=operator), None
+        except Exception as e:
+            return None, f"⚠️ 实验记录保存失败：{_brief_error(e)}"
     except Exception as e:
         return None, f"⚠️ 实验记录保存失败：{_brief_error(e)}"
 
 
 def _rec_create_free(aldehyde_smiles, amine_smiles, conditions, outcome,
-                     strength, notes, operator):
+                     strength, notes, operator, experiment_no=""):
     """游离实验记录（不关联收藏，醛/胺 SMILES 直接录入；签名与任务B钉死）。"""
     store, err = _load_records_store()
     if err:
@@ -894,9 +913,19 @@ def _rec_create_free(aldehyde_smiles, amine_smiles, conditions, outcome,
         return store.create_record(
             favorite_id=None, aldehyde_smiles=aldehyde_smiles,
             amine_smiles=amine_smiles, conditions=conditions, outcome=outcome,
-            strength=strength, notes=notes, operator=operator), None
+            strength=strength, notes=notes, operator=operator,
+            experiment_no=experiment_no), None
     except TypeError:
-        return None, "⏳ 游离记录需后端扩展签名支持（任务B开发中），请改用关联收藏录入。"
+        try:
+            merged = f"[{experiment_no}] {notes}".strip() if experiment_no else notes
+            return store.create_record(
+                favorite_id=None, aldehyde_smiles=aldehyde_smiles,
+                amine_smiles=amine_smiles, conditions=conditions, outcome=outcome,
+                strength=strength, notes=merged, operator=operator), None
+        except TypeError:
+            return None, "⏳ 游离记录需后端扩展签名支持（任务B开发中），请改用关联收藏录入。"
+        except Exception as e:
+            return None, f"⚠️ 实验记录保存失败：{_brief_error(e)}"
     except Exception as e:
         return None, f"⚠️ 实验记录保存失败：{_brief_error(e)}"
 
@@ -911,15 +940,264 @@ def _rec_list(favorite_id=None):
         return None, f"⚠️ 实验记录读取失败：{_brief_error(e)}"
 
 
-def _plan_generate(ald, amine, ald_name, amine_name):
+def _plan_generate(ald, amine, ald_name, amine_name, template=None):
+    """生成方案卡。P4b：template 为钉死的新参数（模板名）；后端未就位
+    （TypeError）时降级为旧签名，模板选择暂不生效但不报错。"""
     try:
         from recommend.plan_card import generate_plan_card
     except ImportError:
         return None, "⏳ 方案卡模块尚未上线（后端开发中）。"
     try:
+        if template:
+            try:
+                return generate_plan_card(ald, amine, ald_name, amine_name,
+                                          template=template), None
+            except TypeError:
+                pass  # 后端尚未支持 template 参数，回退旧签名
         return generate_plan_card(ald, amine, ald_name, amine_name), None
     except Exception as e:
         return None, f"⚠️ 方案卡生成失败：{_brief_error(e)}"
+
+
+# ---------------------------------------------------------------------------
+# P4b 后端模块的安全封装（LLM 客户端 / 单体性质卡 / 方案卡模板；未就位时优雅降级）
+# ---------------------------------------------------------------------------
+
+def _load_llm_client():
+    try:
+        from llm import client as llm_client
+        return llm_client, None
+    except ImportError:
+        return None, "⏳ LLM 客户端模块尚未上线（后端开发中）。"
+
+
+def _llm_get_settings():
+    """读取 LLM 配置；未配置/未就位返回 None（由 UI 显示「未配置 LLM」）。
+
+    get_settings() 返回 {configured, base_url, model, api_key_masked, source}，
+    api_key 已由后端掩码，绝不回显原文。"""
+    client, err = _load_llm_client()
+    if err:
+        return None
+    try:
+        settings = client.get_settings()
+        return settings if settings and settings.get("configured") else None
+    except Exception:
+        return None
+
+
+def _llm_configured() -> bool:
+    return _llm_get_settings() is not None
+
+
+def settings_load():
+    """设置页进入：回填表单（key 掩码显示）→ (base_url, api_key掩码, model, 状态)。"""
+    client, err = _load_llm_client()
+    if err:
+        return "", "", "", err
+    try:
+        s = client.get_settings() or {}
+    except Exception as e:
+        return "", "", "", f"⚠️ 配置读取失败：{_brief_error(e)}"
+    if not s.get("configured"):
+        return "", "", "", "*未配置——填写下方表单并保存。*"
+    src = f"（来源：{s['source']}）" if s.get("source") else ""
+    return (s.get("base_url") or "", s.get("api_key_masked") or "",
+            s.get("model") or "", f"✓ 已加载当前配置{src}（API Key 以掩码显示）。")
+
+
+def settings_save(base_url: str, api_key: str, model: str):
+    """保存 LLM 配置（save_settings(base_url, api_key, model)，签名钉死）。
+
+    密钥不回显，因此掩码值/空值不允许直接保存——须重新输入完整 key。"""
+    client, err = _load_llm_client()
+    if err:
+        return err
+    if not (base_url or "").strip():
+        return "⚠️ 请填写 Base URL（OpenAI 兼容端点）。"
+    key = (api_key or "").strip()
+    if not key or "***" in key or "…" in key:
+        return ("⚠️ 请重新输入完整 API Key 再保存——密钥不回显，"
+                "掩码值不能直接保存（未做任何改动）。")
+    try:
+        client.save_settings((base_url or "").strip(), key, (model or "").strip())
+    except Exception as e:
+        return f"⚠️ 保存失败：{_brief_error(e)}"
+    return "✓ 配置已保存（API Key 已写入本地配置，不入库）。"
+
+
+def settings_test_connection():
+    """连通性测试 → 结果文案。"""
+    client, err = _load_llm_client()
+    if err:
+        return err
+    try:
+        ok, msg = client.test_connection()
+    except Exception as e:
+        return f"⚠️ 测试失败：{_brief_error(e)}"
+    return ("✓ 连接成功：" if ok else "⚠️ 连接失败：") + str(msg)
+
+
+def _monomer_properties(smiles: str, name: str = ""):
+    """单体性质卡数据。返回 (props, 提示)；模块未就位时 props 为 None。
+
+    props schema（钉死）：{"facts": {mw/xlogp/tpsa/hbd/hba/aromatic_rings/
+    f_count/rotatable_bonds}, "narrative": str | None, "narrative_source"}。"""
+    smiles = (smiles or "").strip()
+    if not smiles:
+        return None, "请输入 SMILES。"
+    try:
+        from recommend.monomer_props import get_monomer_properties
+    except ImportError:
+        return None, "⏳ 单体性质卡模块尚未上线（后端开发中）。"
+    try:
+        return get_monomer_properties(smiles, name), None
+    except Exception as e:
+        return None, f"⚠️ 性质卡生成失败（{_brief_error(e)}）"
+
+
+_PROP_FACT_LABELS = {
+    "mw": "分子量", "molecular_weight": "分子量",
+    "xlogp": "XlogP", "tpsa": "TPSA",
+    "hbd": "HBD（氢键供体）", "hba": "HBA（氢键受体）",
+    "aromatic_rings": "芳环数", "f_count": "F 原子数",
+    "rotatable_bonds": "可旋转键",
+}
+
+
+def _render_prop_card_html(props: dict | None, name: str, msg: str | None) -> str:
+    """单体性质卡 HTML：RDKit facts 表 + LLM 解读（标注「LLM 生成，供参考」）。"""
+    title = f"🧬 单体性质卡：{_esc(name)}" if name else "🧬 单体性质卡"
+    if not props:
+        return (f'<div class="prop-card"><h4>{title}</h4>'
+                f'<div class="prop-note">{_esc(msg or "暂无数据。")}</div></div>')
+    facts = props.get("facts") or {}
+    rows = "".join(
+        f"<tr><td>{_esc(_PROP_FACT_LABELS.get(k, k))}</td><td>{_esc(v)}</td></tr>"
+        for k, v in facts.items() if v not in (None, ""))
+    parts = [f'<div class="prop-card"><h4>{title}</h4>']
+    if rows:
+        parts.append(f'<table class="plan-table">{rows}</table>')
+    llm_txt = props.get("narrative") or props.get("llm_interpretation")
+    if llm_txt:
+        parts.append(f'<div class="prop-llm">{_esc(llm_txt)}'
+                     '<div class="prop-llm-tag">LLM 生成，供参考</div></div>')
+    else:
+        parts.append('<div class="prop-note">⚠️ LLM 解读不可用'
+                     '（未配置 LLM 或调用失败），以上为 RDKit 确定性事实。</div>')
+    parts.append("</div>")
+    return "".join(parts)
+
+
+def monomer_prop_card(smiles: str, name: str = ""):
+    """页① 性质卡回调：SMILES 确定后渲染单张性质卡。"""
+    smiles = (smiles or "").strip()
+    if not smiles:
+        return ""
+    props, msg = _monomer_properties(smiles, name)
+    return _render_prop_card_html(props, name, msg)
+
+
+def monomer_prop_cards_for_pair(ald_smiles: str, amine_smiles: str):
+    """打分成功后一次刷新醛/胺两张性质卡。"""
+    name_map = load_builtin_monomers()["name_by_smiles"]
+    ald, amine = (ald_smiles or "").strip(), (amine_smiles or "").strip()
+    return (monomer_prop_card(ald, _display_name(ald, name_map) if ald else ""),
+            monomer_prop_card(amine, _display_name(amine, name_map) if amine else ""))
+
+
+def _load_plan_templates():
+    try:
+        from recommend import plan_templates
+        return plan_templates, None
+    except ImportError:
+        return None, "⏳ 方案卡模板模块尚未上线（后端开发中）。"
+
+
+_DEFAULT_TEMPLATE_LABEL = "内置默认（侯老师界面法 v3.9）"
+
+
+def template_choices_update():
+    """模板下拉选项 → gr.update：内置默认为空值，用户模板为 (名称, id)。"""
+    mod, err = _load_plan_templates()
+    choices = [(_DEFAULT_TEMPLATE_LABEL, "")]
+    if not err:
+        try:
+            for t in mod.list_templates() or []:
+                if not isinstance(t, dict) or t.get("builtin"):
+                    continue
+                name, tid = t.get("name") or t.get("id"), t.get("id")
+                if name and tid:
+                    choices.append((name, tid))
+        except Exception:
+            pass
+    return gr.update(choices=choices, value="")
+
+
+def resolve_template_choice(template_value: str):
+    """模板下拉值（模板 id）→ 模板 dict；内置默认/解析失败返回 None。
+
+    generate_plan_card 的 template 参数钉死为 dict | None。"""
+    tid = (template_value or "").strip()
+    if not tid:
+        return None
+    mod, err = _load_plan_templates()
+    if err:
+        return None
+    try:
+        return mod.get_template(tid)
+    except Exception:
+        return None
+
+
+def template_upload_preview(docx_file):
+    """上传 docx → LLM 提取模板 → 预览关键字段 → (state, 预览, 状态)。"""
+    if not docx_file:
+        return None, "", "⚠️ 请先选择 docx 文件。"
+    mod, err = _load_plan_templates()
+    if err:
+        return None, "", err
+    if not _llm_configured():
+        return None, "", "⚠️ 未配置 LLM，请到设置页配置后再上传模板提取。"
+    path = docx_file.name if hasattr(docx_file, "name") else str(docx_file)
+    try:
+        tpl = mod.extract_template_from_docx(path)
+    except Exception as e:
+        msg = _brief_error(e)
+        if "LLM" in msg or "配置" in msg:
+            return None, "", f"⚠️ 模板提取失败：{msg}（如未配置 LLM 请到设置页配置）"
+        return None, "", f"⚠️ 模板提取失败：{msg}"
+    if not tpl:
+        return None, "", "⚠️ 未能从该文档提取模板。"
+    preview = {
+        "name": tpl.get("name"),
+        "source": tpl.get("source"),
+        "conditions": tpl.get("conditions"),
+        "steps": tpl.get("steps"),
+        "checklist": tpl.get("checklist"),
+        "hints_rules": tpl.get("hints_rules"),
+    }
+    md = ("**提取预览（关键字段，确认后保存）：**\n\n```json\n"
+          + json.dumps(preview, ensure_ascii=False, indent=1)[:1500] + "\n```")
+    return tpl, md, "✓ 提取完成——请核对预览后点击「确认保存模板」。"
+
+
+def template_confirm_save(pending_tpl, template_name: str):
+    """确认保存自定义模板 → (状态, 模板下拉更新)。"""
+    if not pending_tpl:
+        return "⚠️ 没有待保存的模板——请先上传并提取。", gr.update()
+    mod, err = _load_plan_templates()
+    if err:
+        return err, gr.update()
+    tpl = dict(pending_tpl)
+    if (template_name or "").strip():
+        tpl["name"] = template_name.strip()
+    try:
+        mod.save_template(tpl)
+    except Exception as e:
+        return f"⚠️ 模板保存失败：{_brief_error(e)}", gr.update()
+    return (f"✓ 模板「{tpl.get('name', '?')}」已保存，可在方案卡模板下拉中选择。",
+            template_choices_update())
 
 
 # ---------------------------------------------------------------------------
@@ -1154,8 +1432,11 @@ _OUTCOME_ZH = {
     "failed": ("⛔ 失败", "#b91c1c"),
 }
 _COND_LABELS = {
-    "solvent": "溶剂", "modulator": "调制剂", "catalyst": "催化剂",
+    "solvent": "溶剂", "solvent_1": "溶剂一", "solvent_2": "溶剂二",
+    "eluent": "洗脱剂",
+    "modulator": "调制剂", "catalyst": "催化剂",
     "temperature_c": "温度(°C)", "time_days": "时间(天)",
+    "temperature": "温度(°C)", "time": "时间(天)",
     "vessel": "容器", "addition_order": "加料顺序",
 }
 
@@ -1212,6 +1493,8 @@ def _render_records_timeline(records: list) -> str:
 
         rid = rec.get("record_id") or rec.get("id") or "?"
         meta_parts = []
+        if rec.get("experiment_no"):
+            meta_parts.append(f"实验编号：{_esc(rec['experiment_no'])}")
         if rec.get("strength"):
             meta_parts.append(f"机械强度：{_esc(rec['strength'])}")
         if rec.get("operator"):
@@ -1297,15 +1580,16 @@ def favorite_current(ald_smiles: str, amine_smiles: str, notes: str) -> str:
     return msg
 
 
-def plan_card_for_input(ald_smiles: str, amine_smiles: str):
-    """页①「生成实验方案卡」：直接按当前 SMILES 对生成。"""
+def plan_card_for_input(ald_smiles: str, amine_smiles: str, template_value: str = ""):
+    """页①「生成实验方案卡」：直接按当前 SMILES 对生成（可选模板）。"""
     if not ald_smiles.strip() or not amine_smiles.strip():
         return "", "⚠️ 请先填写醛和胺的 SMILES。"
     name_map = load_builtin_monomers()["name_by_smiles"]
     ald_name = _display_name(ald_smiles.strip(), name_map)
     amine_name = _display_name(amine_smiles.strip(), name_map)
     card, err = _plan_generate(ald_smiles.strip(), amine_smiles.strip(),
-                               ald_name, amine_name)
+                               ald_name, amine_name,
+                               template=resolve_template_choice(template_value))
     if err:
         return "", err
     return (_render_plan_card_html(card, ald_name, amine_name),
@@ -1428,7 +1712,7 @@ def rescore_favorite(fid: str):
     return "✓ 已重新打分并更新快照。", _pred_snapshot_markdown(pred)
 
 
-def plan_card_for_favorite(fid: str):
+def plan_card_for_favorite(fid: str, template_value: str = ""):
     """页③「生成方案卡」→ (方案卡HTML, 状态)。"""
     if not fid:
         return "", "⚠️ 请先选择收藏条目。"
@@ -1436,7 +1720,8 @@ def plan_card_for_favorite(fid: str):
     if err:
         return "", err
     ald_s, amine_s, ald_n, amine_n = _fav_pair(fav)
-    card, perr = _plan_generate(ald_s, amine_s, ald_n, amine_n)
+    card, perr = _plan_generate(ald_s, amine_s, ald_n, amine_n,
+                                template=resolve_template_choice(template_value))
     if perr:
         return "", perr
     return _render_plan_card_html(card, ald_n, amine_n), "✓ 方案卡已生成。"
@@ -1467,25 +1752,68 @@ def _record_fav_choices():
     return gr.update(choices=choices)
 
 
-def refresh_records_tab():
-    """页④ 进入/刷新：更新收藏下拉 + 记录时间线。"""
-    recs, err = _rec_list()
+def refresh_records_tab(fav_id: str = "", show_all: bool = True):
+    """页④ 进入/刷新：更新收藏下拉 + 记录时间线。
+
+    P4a：选中收藏且未开「显示全部」时，时间线只显示该 fav 的记录。
+    """
+    fid = (fav_id or "") or None
+    recs, err = _rec_list(favorite_id=None if (show_all or not fid) else fid)
     recs_html = (f'<div class="placeholder-page">{_esc(err)}</div>'
                  if err else _render_records_timeline(recs or []))
     return _record_fav_choices(), recs_html
 
 
-def submit_record(fav_id, solvent, modulator, catalyst, temperature, time_days,
-                  addition_order, outcome_zh, strength, operator, notes,
-                  free_record=False, free_ald="", free_amine=""):
-    """录入实验记录 → (状态, 记录时间线, 收藏下拉更新)。
+def reset_record_form():
+    """重置页④ 全部表单字段（切换收藏 / 提交成功后调用，P4a 修复 c）。
 
-    两种模式：
-    - 关联收藏（默认）：记录挂在收藏条目上，单体与预测快照由后端冗余带入；
-    - 游离记录（勾选「不关联收藏」）：favorite_id=None，直接录入醛/胺 SMILES。
+    返回顺序与页④ _REC_FORM_OUTPUTS 一致：
+    实验编号, 溶剂一, 溶剂二, 洗脱剂, 调制剂, 催化剂, 温度, 时间, 加料顺序,
+    结果, 强度, 操作人, 备注, 游离勾选, 游离醛, 游离胺, 游离行可见性。
     """
+    empty = gr.update(value="")
+    return (empty, empty, empty, empty, empty, empty, empty, empty, empty,
+            gr.update(value="成膜"), empty, empty, empty,
+            gr.update(value=False), empty, empty, gr.update(visible=False))
+
+
+def on_record_fav_change(fav_id: str, show_all: bool):
+    """收藏下拉变化（P4a 修复 a+c）：重置全部表单字段 + 按收藏过滤时间线。
+
+    返回 (时间线HTML, *表单重置)。"""
+    fid = (fav_id or "") or None
+    recs, err = _rec_list(favorite_id=None if (show_all or not fid) else fid)
+    recs_html = (f'<div class="placeholder-page">{_esc(err)}</div>'
+                 if err else _render_records_timeline(recs or []))
+    return (recs_html,) + reset_record_form()
+
+
+def on_show_all_toggle(fav_id: str, show_all: bool):
+    """「显示全部」开关变化：仅刷新时间线。"""
+    fid = (fav_id or "") or None
+    recs, err = _rec_list(favorite_id=None if (show_all or not fid) else fid)
+    return (f'<div class="placeholder-page">{_esc(err)}</div>'
+            if err else _render_records_timeline(recs or []))
+
+
+def submit_record(fav_id, experiment_no, solvent_1, solvent_2, eluent,
+                  modulator, catalyst, temperature, time_days, addition_order,
+                  outcome_zh, strength, operator, notes,
+                  free_record=False, free_ald="", free_amine=""):
+    """录入实验记录 → (状态, 记录时间线, 收藏下拉更新, *表单重置)。
+
+    P4a：实验编号为独立必填字段（空则前端拦截）；conditions 键钉死为
+    solvent_1/solvent_2/eluent/modulator/catalyst/temperature_c/time_days/
+    addition_order。提交成功后重置全部表单字段。
+    """
+    experiment_no = (experiment_no or "").strip()
+    if not experiment_no:
+        return ("⚠️ 请填写「实验编号」（如 A5、G2-3）——这是必填字段。",
+                "", gr.update()) + (gr.update(),) * 17
     conditions = {
-        "solvent": (solvent or "").strip(),
+        "solvent_1": (solvent_1 or "").strip(),
+        "solvent_2": (solvent_2 or "").strip(),
+        "eluent": (eluent or "").strip(),
         "modulator": (modulator or "").strip(),
         "catalyst": (catalyst or "").strip(),
         "temperature_c": (temperature or "").strip(),
@@ -1493,7 +1821,8 @@ def submit_record(fav_id, solvent, modulator, catalyst, temperature, time_days,
         "addition_order": (addition_order or "").strip(),
     }
     if not any(conditions.values()) and not (notes or "").strip():
-        return ("⚠️ 请至少填写一项实际条件或备注再保存。", "", gr.update())
+        return ("⚠️ 请至少填写一项实际条件或备注再保存。",
+                "", gr.update()) + (gr.update(),) * 17
     outcome = _OUTCOME_MAP.get(outcome_zh, "failed")
     strength, notes, operator = ((strength or "").strip(), (notes or "").strip(),
                                  (operator or "").strip())
@@ -1501,21 +1830,22 @@ def submit_record(fav_id, solvent, modulator, catalyst, temperature, time_days,
         ald_s, amine_s = (free_ald or "").strip(), (free_amine or "").strip()
         if not ald_s or not amine_s:
             return ("⚠️ 游离记录需填写醛和胺的 SMILES（或取消勾选并选择收藏条目）。",
-                    "", gr.update())
+                    "", gr.update()) + (gr.update(),) * 17
         rec, err = _rec_create_free(ald_s, amine_s, conditions, outcome,
-                                    strength, notes, operator)
+                                    strength, notes, operator, experiment_no)
     else:
         if not fav_id:
             return ("⚠️ 请先选择关联的收藏条目——或勾选「不关联收藏（游离记录）」"
-                    "后直接填写醛/胺 SMILES。", "", gr.update())
+                    "后直接填写醛/胺 SMILES。", "", gr.update()) + (gr.update(),) * 17
         rec, err = _rec_create_linked(fav_id, conditions, outcome,
-                                      strength, notes, operator)
+                                      strength, notes, operator, experiment_no)
     if err:
-        return err, "", gr.update()
+        return (err, "", gr.update()) + (gr.update(),) * 17
     recs, _ = _rec_list()
     rid = rec.get("record_id") or rec.get("id") or "?"
-    return (f"✓ 实验记录已保存（{rid}）。",
-            _render_records_timeline(recs or []), _record_fav_choices())
+    return (f"✓ 实验记录已保存（{rid}，实验编号 {experiment_no}）。",
+            _render_records_timeline(recs or []), _record_fav_choices(),
+            *reset_record_form())
 
 
 # ---------------------------------------------------------------------------
@@ -1721,6 +2051,12 @@ CUSTOM_CSS = """
 .sug-ev { font-size: 0.85rem; color: #334155; margin-top: 6px; }
 .sug-meta { color: #64748b; font-size: 0.78rem; margin-top: 6px; }
 .ref-pid { color: #94a3b8; font-size: 0.75rem; }
+/* P4b：单体性质卡 */
+.prop-card { border: 1px solid #e2e8f0; border-left: 4px solid #0891b2; border-radius: 10px; padding: 8px 14px; background: #fff; margin: 8px 0; }
+.prop-card h4 { margin: 4px 0 8px; }
+.prop-llm { margin-top: 8px; color: #334155; font-size: 0.9rem; line-height: 1.55; }
+.prop-llm-tag { display: inline-block; margin-top: 4px; font-size: 0.72rem; background: #fef3c7; color: #92400e; border-radius: 999px; padding: 1px 8px; }
+.prop-note { color: #64748b; font-size: 0.85rem; }
 /* 中文字体栈放在 CSS 里：theme 的 font= 字符串参数会触发 gradio 6.20
    launch() 主题比较 bug（fonts.py __eq__: 'str' object has no attribute 'name'） */
 body, .gradio-container {
@@ -1759,7 +2095,7 @@ def create_app() -> gr.Blocks:
 
         with gr.Tabs():
             # ===================== 页① 查询打分 =====================
-            with gr.Tab("① 查询打分"):
+            with gr.Tab("① 查询打分") as query_tab:
                 with gr.Row():
                     # ---- 输入卡片 ----
                     with gr.Column(scale=5):
@@ -1807,7 +2143,24 @@ def create_app() -> gr.Blocks:
                             with gr.Row():
                                 favorite_btn = gr.Button("☆ 收藏这组单体", size="sm")
                                 plan_btn1 = gr.Button("生成实验方案卡", size="sm")
+                            plan_template1 = gr.Dropdown(
+                                label="方案卡模板",
+                                choices=[(_DEFAULT_TEMPLATE_LABEL, "")],
+                                value="",
+                                interactive=True, allow_custom_value=True)
                             fav_status1 = gr.Markdown()
+                        with gr.Group():
+                            gr.Markdown("#### 上传自定义方案卡模板（docx）")
+                            tpl_upload = gr.File(
+                                label="文献实验方案 docx", file_types=[".docx"])
+                            tpl_preview_state = gr.State(None)
+                            tpl_preview_md = gr.Markdown()
+                            with gr.Row():
+                                tpl_name_input = gr.Textbox(
+                                    label="模板名（可选，留空用提取名）", scale=2)
+                                tpl_save_btn = gr.Button("确认保存模板", size="sm",
+                                                         scale=1)
+                            tpl_status = gr.Markdown()
 
                     # ---- 输出卡片 ----
                     with gr.Column(scale=7):
@@ -1819,6 +2172,9 @@ def create_app() -> gr.Blocks:
                         with gr.Group():
                             similar_output = gr.Markdown(
                                 value="*相似成膜案例将在打分后显示。*")
+                        with gr.Row():
+                            ald_prop_html = gr.HTML()
+                            amine_prop_html = gr.HTML()
                         with gr.Group():
                             cond_output = gr.Markdown(
                                 value="*推荐实验条件将在打分后显示。*")
@@ -1855,8 +2211,32 @@ def create_app() -> gr.Blocks:
                                    inputs=[ald_input, amine_input, fav_notes_input1],
                                    outputs=[fav_status1])
                 plan_btn1.click(fn=plan_card_for_input,
-                                inputs=[ald_input, amine_input],
+                                inputs=[ald_input, amine_input, plan_template1],
                                 outputs=[plan_html1, fav_status1])
+                # 单体性质卡：打分成功后刷新两张；单侧 SMILES 变化时刷新该侧
+                predict_btn.click(fn=monomer_prop_cards_for_pair,
+                                  inputs=[ald_input, amine_input],
+                                  outputs=[ald_prop_html, amine_prop_html])
+                ald_input.change(
+                    fn=lambda s: monomer_prop_card(
+                        s, _display_name(s, load_builtin_monomers()["name_by_smiles"])
+                        if (s or "").strip() else ""),
+                    inputs=[ald_input], outputs=[ald_prop_html])
+                amine_input.change(
+                    fn=lambda s: monomer_prop_card(
+                        s, _display_name(s, load_builtin_monomers()["name_by_smiles"])
+                        if (s or "").strip() else ""),
+                    inputs=[amine_input], outputs=[amine_prop_html])
+                # 模板：进入页① 刷新下拉；上传提取 → 预览 → 确认保存
+                query_tab.select(fn=template_choices_update,
+                                 outputs=[plan_template1])
+                tpl_upload.change(fn=template_upload_preview,
+                                  inputs=[tpl_upload],
+                                  outputs=[tpl_preview_state, tpl_preview_md,
+                                           tpl_status])
+                tpl_save_btn.click(fn=template_confirm_save,
+                                   inputs=[tpl_preview_state, tpl_name_input],
+                                   outputs=[tpl_status, plan_template1])
 
             # ===================== 页② 批量排序 =====================
             with gr.Tab("② 批量排序"):
@@ -1932,6 +2312,11 @@ def create_app() -> gr.Blocks:
                         fav_rescore_btn = gr.Button("重新打分", size="sm")
                         fav_plan_btn = gr.Button("生成方案卡", size="sm")
                         fav_delete_btn = gr.Button("删除收藏", size="sm", variant="stop")
+                    plan_template3 = gr.Dropdown(
+                        label="方案卡模板",
+                        choices=[(_DEFAULT_TEMPLATE_LABEL, "")],
+                        value="",
+                        interactive=True, allow_custom_value=True)
                     fav_action_status = gr.Markdown()
                     fav_plan_html = gr.HTML()
                 with gr.Group():
@@ -1978,8 +2363,11 @@ def create_app() -> gr.Blocks:
                 fav_rescore_btn.click(fn=rescore_favorite, inputs=[fav_select],
                                       outputs=[fav_action_status,
                                                fav_detail_snapshot])
-                fav_plan_btn.click(fn=plan_card_for_favorite, inputs=[fav_select],
+                fav_plan_btn.click(fn=plan_card_for_favorite,
+                                   inputs=[fav_select, plan_template3],
                                    outputs=[fav_plan_html, fav_action_status])
+                fav_tab.select(fn=template_choices_update,
+                               outputs=[plan_template3])
                 fav_delete_btn.click(fn=delete_favorite, inputs=[fav_select],
                                      outputs=[fav_action_status, fav_cards,
                                               fav_select] + _detail_outputs)
@@ -2001,9 +2389,16 @@ def create_app() -> gr.Blocks:
                             label="醛单体 SMILES", placeholder="游离记录必填")
                         rec_free_amine = gr.Textbox(
                             label="胺单体 SMILES", placeholder="游离记录必填")
+                    rec_exp_no = gr.Textbox(
+                        label="实验编号（必填）", placeholder="例如：A5、G2-3")
                     with gr.Row():
-                        rec_solvent = gr.Textbox(label="溶剂",
-                                                 placeholder="甲苯 / BTF/二氧六环")
+                        rec_solvent1 = gr.Textbox(label="溶剂一",
+                                                  placeholder="甲苯 / BTF")
+                        rec_solvent2 = gr.Textbox(label="溶剂二",
+                                                  placeholder="二氧六环（可空）")
+                        rec_eluent = gr.Textbox(
+                            label="洗脱剂", placeholder="后处理洗涤用（可空）")
+                    with gr.Row():
                         rec_modulator = gr.Textbox(label="调制剂",
                                                    placeholder="苯胺 13.7 μL")
                         rec_catalyst = gr.Textbox(label="催化剂",
@@ -2027,22 +2422,45 @@ def create_app() -> gr.Blocks:
                     rec_status = gr.Markdown()
                 with gr.Group():
                     gr.Markdown("#### 记录列表（当初预测 vs 实际结果）")
-                    rec_refresh_btn = gr.Button("刷新记录", size="sm")
+                    with gr.Row():
+                        rec_refresh_btn = gr.Button("刷新记录", size="sm", scale=1)
+                        rec_show_all = gr.Checkbox(
+                            label="显示全部记录（关闭则只看上方选中收藏的记录）",
+                            value=True, scale=3)
                     rec_list_html = gr.HTML()
 
+                # 表单字段输出顺序（reset_record_form / submit_record 共用）
+                _REC_FORM_OUTPUTS = [rec_exp_no, rec_solvent1, rec_solvent2,
+                                     rec_eluent, rec_modulator, rec_catalyst,
+                                     rec_temp, rec_time, rec_order,
+                                     rec_outcome, rec_strength, rec_operator,
+                                     rec_notes, rec_free, rec_free_ald,
+                                     rec_free_amine, rec_free_row]
+
                 rec_tab.select(fn=refresh_records_tab,
+                               inputs=[rec_fav_select, rec_show_all],
                                outputs=[rec_fav_select, rec_list_html])
                 rec_refresh_btn.click(fn=refresh_records_tab,
+                                      inputs=[rec_fav_select, rec_show_all],
                                       outputs=[rec_fav_select, rec_list_html])
                 rec_free.change(fn=lambda v: gr.update(visible=bool(v)),
                                 inputs=[rec_free], outputs=[rec_free_row])
+                # P4a 修复 a+c：切换收藏 → 重置全部表单 + 时间线只看该收藏
+                rec_fav_select.change(fn=on_record_fav_change,
+                                      inputs=[rec_fav_select, rec_show_all],
+                                      outputs=[rec_list_html] + _REC_FORM_OUTPUTS)
+                rec_show_all.change(fn=on_show_all_toggle,
+                                    inputs=[rec_fav_select, rec_show_all],
+                                    outputs=[rec_list_html])
                 rec_submit_btn.click(
                     fn=submit_record,
-                    inputs=[rec_fav_select, rec_solvent, rec_modulator,
+                    inputs=[rec_fav_select, rec_exp_no, rec_solvent1,
+                            rec_solvent2, rec_eluent, rec_modulator,
                             rec_catalyst, rec_temp, rec_time, rec_order,
                             rec_outcome, rec_strength, rec_operator, rec_notes,
                             rec_free, rec_free_ald, rec_free_amine],
-                    outputs=[rec_status, rec_list_html, rec_fav_select])
+                    outputs=[rec_status, rec_list_html, rec_fav_select]
+                            + _REC_FORM_OUTPUTS)
 
             # ===================== 页⑤ 方案迭代（RAG 对接） =====================
             with gr.Tab("⑤ 方案迭代") as iter_tab:
@@ -2074,6 +2492,43 @@ def create_app() -> gr.Blocks:
                 iter_fav_filter.change(fn=refresh_suggestions,
                                        inputs=[iter_fav_filter],
                                        outputs=[iter_sug_html, iter_status])
+
+            # ===================== 页⑥ 设置 =====================
+            with gr.Tab("⑥ 设置") as settings_tab:
+                gr.Markdown(
+                    "#### LLM 配置（OpenAI 兼容端点）\n\n"
+                    "性质卡 LLM 解读与方案卡模板提取需要 LLM。clone 本项目后"
+                    "在此填入你自己的 OpenAI 兼容端点即可（longcat / MiniMax / "
+                    "OpenAI / 本地 vLLM 均可）：\n"
+                    "- **Base URL**：如 `https://api.openai.com/v1`\n"
+                    "- **API Key**：只保存在本地 `config/llm_settings.local.json`"
+                    "（不入库），界面以掩码显示\n"
+                    "- **模型名**：如 `gpt-4o-mini`\n\n"
+                    "未配置时相关按钮会提示「未配置 LLM，请到设置页配置」，"
+                    "其余功能不受影响。")
+                with gr.Group():
+                    set_base_url = gr.Textbox(
+                        label="Base URL", placeholder="https://api.openai.com/v1")
+                    set_api_key = gr.Textbox(
+                        label="API Key", type="password",
+                        placeholder="sk-…（已保存时显示掩码，留空则不修改）")
+                    set_model = gr.Textbox(
+                        label="模型名", placeholder="gpt-4o-mini")
+                    with gr.Row():
+                        set_save_btn = gr.Button("保存配置", variant="primary",
+                                                 size="sm")
+                        set_test_btn = gr.Button("测试连通性", size="sm")
+                    set_status = gr.Markdown()
+                    set_test_result = gr.Markdown()
+
+                settings_tab.select(fn=settings_load,
+                                    outputs=[set_base_url, set_api_key,
+                                             set_model, set_status])
+                set_save_btn.click(fn=settings_save,
+                                   inputs=[set_base_url, set_api_key, set_model],
+                                   outputs=[set_status])
+                set_test_btn.click(fn=settings_test_connection,
+                                   outputs=[set_test_result])
 
     # Gradio 6 把 theme/css 从 Blocks 构造器移到 launch()；构造器 kwargs 仅存入
     # _deprecated_theme/_deprecated_css 并告警。这里直接设置这两个内部字段，

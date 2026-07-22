@@ -90,14 +90,16 @@ assert "最新预测快照" in snap
 print("文献自动匹配条数:", refs.count("相关文献·自动匹配"))
 plan_html, st = g.plan_card_for_favorite(fid)
 print("方案卡:", st, "| 防错清单:", "防错清单" in plan_html)
-st, timeline, _ = g.submit_record(fid, "甲苯", "", "6M 乙酸", "120", "3",
-                                  "先醛后胺", "部分成膜", "", "冒烟", "测试")
+st, timeline, _, *resets = g.submit_record(
+    fid, "P4冒烟-1", "甲苯", "", "", "", "6M 乙酸", "120", "3",
+    "先醛后胺", "部分成膜", "", "冒烟", "测试")
 print(st, "| 时间线含对比:", "实际" in timeline)
+assert "P4冒烟-1" in st and len(resets) == 17, "提交成功应重置 17 个表单字段"
 
 print("== 9. 游离实验记录（不关联收藏） ==")
-st2, timeline2, _ = g.submit_record("", "甲苯", "", "6M 乙酸", "120", "3",
-                                    "", "成膜", "", "冒烟", "游离测试",
-                                    True, ald, amine)
+st2, timeline2, _, *r2 = g.submit_record(
+    "", "P4冒烟-2", "甲苯", "", "", "", "6M 乙酸", "120", "3",
+    "", "成膜", "", "冒烟", "游离测试", True, ald, amine)
 print(st2)
 assert "✓" in st2, "游离记录应保存成功（后端签名已就位）"
 assert "游离" not in timeline2 or "×" in timeline2
@@ -109,6 +111,73 @@ print("建议区:", (status5 or sug_html5[:80]))
 assert summary5 and sug_html5
 html_sug2, status_sug2 = g.refresh_suggestions(fid)
 print("按收藏过滤:", status_sug2 or html_sug2[:60])
+
+print("== 11. P4a 页④ 四项修复（真实后端） ==")
+# a. 收藏联动过滤
+_, html_f = g.refresh_records_tab(fid, False)
+assert "P4冒烟" in html_f, "过滤后应显示该收藏的记录"
+_, html_all = g.refresh_records_tab(fid, True)
+assert "游离测试" in html_all or "P4冒烟-2" in html_all, "显示全部应含游离记录"
+print("a. 收藏过滤 + 显示全部 OK")
+# b. 实验编号必填拦截
+st_b, _, _, *_ = g.submit_record(fid, "  ", "甲苯", "", "", "", "", "", "", "",
+                                 "成膜", "", "", "")
+assert "实验编号" in st_b and "⚠️" in st_b
+print("b. 实验编号必填拦截 OK")
+# c. 收藏切换重置表单
+out_c = g.on_record_fav_change(fid, False)
+assert len(out_c) == 18 and out_c[1]["value"] == ""
+print("c. 切换收藏重置表单 OK")
+# d. 溶剂一/二 + 洗脱剂落盘
+st_d, _, _, *_ = g.submit_record(fid, "P4冒烟-3", "甲苯", "二氧六环", "氯仿",
+                                 "", "", "", "", "", "成膜", "", "冒烟", "")
+assert "✓" in st_d
+import json as _j
+rec_dir = ROOT / "data" / "rag_export" / "records"
+_rid = st_d.split("（")[1].split("，")[0]
+_rec = _j.loads((rec_dir / f"{_rid}.json").read_text(encoding="utf-8"))
+assert _rec["conditions"]["solvent_1"] == "甲苯"
+assert _rec["conditions"]["solvent_2"] == "二氧六环"
+assert _rec["conditions"]["eluent"] == "氯仿"
+assert _rec["experiment_no"] == "P4冒烟-3"
+print("d. solvent_1/solvent_2/eluent + experiment_no 落盘 OK")
+
+print("== 12. P4b 设置页（mock 客户端） ==")
+class _MockLLM:
+    @staticmethod
+    def get_settings():
+        return {"configured": True, "base_url": "https://mock.local/v1",
+                "model": "m", "api_key_masked": "mk***1234", "source": "local"}
+    @staticmethod
+    def save_settings(base_url, api_key, model):
+        _MockLLM.saved = (base_url, api_key, model)
+    @staticmethod
+    def test_connection():
+        return True, "ok"
+_orig_loader = g._load_llm_client
+g._load_llm_client = lambda: (_MockLLM, None)
+try:
+    b, k, m, s = g.settings_load()
+    assert k == "mk***1234" and b == "https://mock.local/v1"
+    assert "✓" in g.settings_save("https://mock.local/v1", "mk-newsecret", "m")
+    assert _MockLLM.saved[1] == "mk-newsecret"
+    assert "✓ 连接成功" in g.settings_test_connection()
+    print("设置页保存/加载/连通性（mock）OK")
+finally:
+    g._load_llm_client = _orig_loader
+
+print("== 13. P4b 单体性质卡（真实 RDKit facts） ==")
+prop_html = g.monomer_prop_card(ald, "冒烟醛")
+assert "单体性质卡" in prop_html and "分子量" in prop_html
+assert "LLM 生成，供参考" in prop_html or "LLM 解读不可用" in prop_html
+print("性质卡 OK（LLM 段：", "有" if "供参考" in prop_html else "降级提示", "）")
+
+print("== 14. P4b 方案卡模板选择 ==")
+upd = g.template_choices_update()
+print("模板下拉:", [c[0] for c in upd["choices"]])
+plan_html_t, st_t = g.plan_card_for_input(ald, amine, "")
+assert "防错清单" in plan_html_t and "✓" in st_t
+print("内置模板生成方案卡 OK")
 
 # 清理冒烟数据
 import json as _json

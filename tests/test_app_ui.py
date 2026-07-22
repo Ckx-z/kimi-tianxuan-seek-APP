@@ -345,7 +345,7 @@ class TestFavoriteFlow:
 class TestPlanCard:
     def test_real_schema_render(self, monkeypatch):
         monkeypatch.setattr(gradio_app, "_plan_generate",
-                            lambda a, b, an, bn: (dict(_FAKE_CARD), None))
+                            lambda a, b, an, bn, template=None: (dict(_FAKE_CARD), None))
         html_out, status = gradio_app.plan_card_for_input("O=Cc1ccccc1", "Nc1ccc(N)cc1")
         assert "✓" in status
         assert "侯老师法" in html_out and "防错清单" in html_out
@@ -353,9 +353,21 @@ class TestPlanCard:
         assert "溶剂" in html_out and "催化剂" in html_out  # 英文键→中文标签
         assert "含氟单体注意溶解性" in html_out
 
+    def test_template_param_passed(self, monkeypatch):
+        """P4b：模板下拉值（模板 id）经 resolve 后以 dict 传给 generate_plan_card。"""
+        seen = {}
+        monkeypatch.setattr(
+            gradio_app, "_plan_generate",
+            lambda a, b, an, bn, template=None: seen.update(template=template)
+            or (dict(_FAKE_CARD), None))
+        tpl = {"id": "tpl_x", "name": "自定义模板"}
+        monkeypatch.setattr(gradio_app, "resolve_template_choice", lambda v: tpl)
+        gradio_app.plan_card_for_input("O=Cc1ccccc1", "Nc1ccc(N)cc1", "tpl_x")
+        assert seen["template"] == tpl
+
     def test_backend_missing(self, monkeypatch):
         monkeypatch.setattr(gradio_app, "_plan_generate",
-                            lambda a, b, an, bn: (None, "⏳ 方案卡模块尚未上线（后端开发中）。"))
+                            lambda a, b, an, bn, template=None: (None, "⏳ 方案卡模块尚未上线（后端开发中）。"))
         html_out, status = gradio_app.plan_card_for_input("ALD", "AMN")
         assert html_out == "" and "尚未上线" in status
 
@@ -455,27 +467,42 @@ class TestRecordsPage:
         created = {}
         monkeypatch.setattr(
             gradio_app, "_rec_create_linked",
-            lambda fid, cond, out, s, n, op: created.update(
-                fid=fid, outcome=out) or (dict(_FAKE_REC), None))
+            lambda fid, cond, out, s, n, op, exp="": created.update(
+                fid=fid, outcome=out, cond=cond, exp=exp)
+            or (dict(_FAKE_REC), None))
         monkeypatch.setattr(gradio_app, "_rec_list",
                             lambda favorite_id=None: ([dict(_FAKE_REC)], None))
-        st, timeline, _ = gradio_app.submit_record(
-            "fav_20260722_001", "甲苯", "", "6M 乙酸", "120", "3",
-            "先醛后胺", "失败", "膜脆", "测试员", "乙酸用错")
-        assert "✓" in st and "rec_20260722_001" in st
+        st, timeline, _, *resets = gradio_app.submit_record(
+            "fav_20260722_001", "A5", "甲苯", "二氧六环", "氯仿", "",
+            "6M 乙酸", "120", "3", "先醛后胺", "失败", "膜脆", "测试员", "乙酸用错")
+        assert "✓" in st and "rec_20260722_001" in st and "A5" in st
         assert created["outcome"] == "failed"  # 中文→契约枚举
+        assert created["exp"] == "A5"          # 实验编号透传后端
+        # P4a 修复 d：conditions 新键
+        assert created["cond"]["solvent_1"] == "甲苯"
+        assert created["cond"]["solvent_2"] == "二氧六环"
+        assert created["cond"]["eluent"] == "氯仿"
+        assert "solvent" not in created["cond"]
         assert "预测 0.650 ± 0.040" in timeline
         assert "实际" in timeline and "⛔ 失败" in timeline
-        assert "溶剂：甲苯" in timeline
+        # P4a 修复 c：提交成功后表单重置（17 个字段更新）
+        assert len(resets) == 17
+
+    def test_submit_requires_experiment_no(self):
+        """P4a 修复 b：实验编号为独立必填字段，空则前端拦截。"""
+        st, timeline, _, *resets = gradio_app.submit_record(
+            "fav_x", "  ", "甲苯", "", "", "", "", "", "", "", "成膜", "", "", "")
+        assert "实验编号" in st and "必填" in st and "⚠️" in st
+        assert timeline == ""
 
     def test_submit_requires_favorite(self):
-        st, _, _ = gradio_app.submit_record(
-            "", "甲苯", "", "", "", "", "", "成膜", "", "", "")
+        st, _, _, *_ = gradio_app.submit_record(
+            "", "A5", "甲苯", "", "", "", "", "", "", "", "成膜", "", "", "")
         assert "收藏" in st and "⚠️" in st
 
     def test_submit_requires_content(self):
-        st, _, _ = gradio_app.submit_record(
-            "fav_x", "", "", "", "", "", "", "成膜", "", "", "")
+        st, _, _, *_ = gradio_app.submit_record(
+            "fav_x", "A5", "", "", "", "", "", "", "", "", "成膜", "", "", "")
         assert "至少填写一项" in st
 
     def test_timeline_without_snapshot(self):
@@ -771,20 +798,24 @@ class TestFreeRecord:
         created = {}
         monkeypatch.setattr(
             gradio_app, "_rec_create_free",
-            lambda a, b, cond, out, s, n, op: created.update(
-                ald=a, amine=b, fid_checked=True) or (dict(_FAKE_REC), None))
+            lambda a, b, cond, out, s, n, op, exp="": created.update(
+                ald=a, amine=b, fid_checked=True, exp=exp)
+            or (dict(_FAKE_REC), None))
         monkeypatch.setattr(gradio_app, "_rec_list",
                             lambda favorite_id=None: ([dict(_FAKE_REC)], None))
-        st, timeline, _ = gradio_app.submit_record(
-            "", "甲苯", "", "6M 乙酸", "120", "3", "", "成膜", "", "测试员", "",
+        st, timeline, _, *resets = gradio_app.submit_record(
+            "", "G2-3", "甲苯", "", "", "", "6M 乙酸", "120", "3", "",
+            "成膜", "", "测试员", "",
             True, "O=Cc1ccccc1", "Nc1ccc(N)cc1")
         assert "✓" in st
         assert created["ald"] == "O=Cc1ccccc1"
         assert created["amine"] == "Nc1ccc(N)cc1"
+        assert created["exp"] == "G2-3"
+        assert len(resets) == 17
 
     def test_free_record_requires_smiles(self):
-        st, _, _ = gradio_app.submit_record(
-            "", "甲苯", "", "", "", "", "", "成膜", "", "", "",
+        st, _, _, *_ = gradio_app.submit_record(
+            "", "A5", "甲苯", "", "", "", "", "", "", "", "成膜", "", "", "",
             True, "", "Nc1ccc(N)cc1")
         assert "⚠️" in st and "SMILES" in st
 
@@ -792,17 +823,17 @@ class TestFreeRecord:
         created = {}
         monkeypatch.setattr(
             gradio_app, "_rec_create_linked",
-            lambda fid, cond, out, s, n, op: created.update(fid=fid)
+            lambda fid, cond, out, s, n, op, exp="": created.update(fid=fid)
             or (dict(_FAKE_REC), None))
         monkeypatch.setattr(gradio_app, "_rec_list",
                             lambda favorite_id=None: ([], None))
-        st, _, _ = gradio_app.submit_record(
-            "fav_20260722_001", "甲苯", "", "", "", "", "", "成膜", "", "", "",
-            False, "", "")
+        st, _, _, *_ = gradio_app.submit_record(
+            "fav_20260722_001", "A5", "甲苯", "", "", "", "", "", "", "",
+            "成膜", "", "", "", False, "", "")
         assert "✓" in st and created["fid"] == "fav_20260722_001"
 
     def test_free_wrapper_calls_pinned_signature(self, monkeypatch):
-        """游离记录封装按钉死签名调 create_record（关键字传参）。"""
+        """游离记录封装按钉死签名调 create_record（关键字传参，含 experiment_no）。"""
         calls = {}
 
         class _Store:
@@ -814,14 +845,34 @@ class TestFreeRecord:
         monkeypatch.setattr(gradio_app, "_load_records_store",
                             lambda: (_Store, None))
         rec, err = gradio_app._rec_create_free(
-            "ALD", "AMN", {"solvent": "甲苯"}, "film", "", "备注", "操作人")
+            "ALD", "AMN", {"solvent_1": "甲苯"}, "film", "", "备注", "操作人", "A5")
         assert err is None and rec["record_id"] == "rec_x"
         assert calls["favorite_id"] is None
         assert calls["aldehyde_smiles"] == "ALD"
         assert calls["amine_smiles"] == "AMN"
-        assert calls["conditions"] == {"solvent": "甲苯"}
+        assert calls["conditions"] == {"solvent_1": "甲苯"}
         assert calls["outcome"] == "film"
         assert calls["notes"] == "备注" and calls["operator"] == "操作人"
+        assert calls["experiment_no"] == "A5"
+
+    def test_wrapper_typeerror_fallback_merges_exp_no(self, monkeypatch):
+        """后端未支持 experiment_no（TypeError）时降级：编号并入 notes 前缀。"""
+        calls = {}
+
+        class _OldStore:
+            @staticmethod
+            def create_record(**kw):
+                if "experiment_no" in kw:
+                    raise TypeError("unexpected keyword")
+                calls.update(kw)
+                return {"record_id": "rec_y"}
+
+        monkeypatch.setattr(gradio_app, "_load_records_store",
+                            lambda: (_OldStore, None))
+        rec, err = gradio_app._rec_create_linked(
+            "fav_x", {"solvent_1": "甲苯"}, "film", "", "备注", "操作人", "A5")
+        assert err is None and rec["record_id"] == "rec_y"
+        assert calls["notes"] == "[A5] 备注"
 
 
 # ---------------------------------------------------------------------------
@@ -933,6 +984,288 @@ class TestIterationTab:
         summary = gradio_app._records_summary(recs)
         assert "共 **2** 条" in summary and "✓ 成膜 1" in summary
         assert "⛔ 失败 1" in summary and "2026-07-22" in summary
+
+
+# ---------------------------------------------------------------------------
+# P4a：页④ 收藏联动过滤 / 表单重置
+# ---------------------------------------------------------------------------
+
+class TestRecordsTabP4a:
+    def test_timeline_filtered_by_favorite(self, monkeypatch):
+        """修复 a：选中收藏且未开「显示全部」→ list_records(favorite_id=...)。"""
+        seen = {}
+
+        def _rec_list(favorite_id=None):
+            seen["fid"] = favorite_id
+            return [dict(_FAKE_REC)], None
+
+        monkeypatch.setattr(gradio_app, "_rec_list", _rec_list)
+        monkeypatch.setattr(gradio_app, "_fav_list", lambda: ([], None))
+        _, html_out = gradio_app.refresh_records_tab("fav_20260722_001", False)
+        assert seen["fid"] == "fav_20260722_001"
+        assert "rec_20260722_001" in html_out
+
+    def test_show_all_bypasses_filter(self, monkeypatch):
+        seen = {}
+
+        def _rec_list(favorite_id=None):
+            seen["fid"] = favorite_id
+            return [], None
+
+        monkeypatch.setattr(gradio_app, "_rec_list", _rec_list)
+        monkeypatch.setattr(gradio_app, "_fav_list", lambda: ([], None))
+        gradio_app.refresh_records_tab("fav_20260722_001", True)
+        assert seen["fid"] is None           # 显示全部 → 不过滤
+        gradio_app.refresh_records_tab("", False)
+        assert seen["fid"] is None           # 未选收藏 → 不过滤
+
+    def test_fav_change_resets_form_and_filters(self, monkeypatch):
+        """修复 a+c：收藏下拉 change → 重置全部表单字段 + 时间线过滤。"""
+        seen = {}
+        monkeypatch.setattr(
+            gradio_app, "_rec_list",
+            lambda favorite_id=None: seen.update(fid=favorite_id)
+            or ([dict(_FAKE_REC)], None))
+        out = gradio_app.on_record_fav_change("fav_20260722_001", False)
+        timeline, resets = out[0], out[1:]
+        assert seen["fid"] == "fav_20260722_001"
+        assert "rec_20260722_001" in timeline
+        assert len(resets) == 17
+        # 文本字段重置为空值更新；结果 radio 回到「成膜」；游离勾选关闭
+        assert resets[0]["value"] == ""      # 实验编号清空
+        assert resets[9]["value"] == "成膜"
+        assert resets[13]["value"] is False  # 游离勾选
+
+    def test_show_all_toggle_refreshes_only_timeline(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_rec_list",
+                            lambda favorite_id=None: ([dict(_FAKE_REC)], None))
+        html_out = gradio_app.on_show_all_toggle("fav_x", True)
+        assert "rec_20260722_001" in html_out
+
+    def test_timeline_shows_experiment_no(self):
+        rec = dict(_FAKE_REC, experiment_no="A5")
+        timeline = gradio_app._render_records_timeline([rec])
+        assert "实验编号：A5" in timeline
+
+    def test_new_condition_labels(self):
+        rec = dict(_FAKE_REC, conditions={"solvent_1": "甲苯",
+                                          "solvent_2": "二氧六环",
+                                          "eluent": "氯仿"})
+        timeline = gradio_app._render_records_timeline([rec])
+        assert "溶剂一：甲苯" in timeline and "溶剂二：二氧六环" in timeline
+        assert "洗脱剂：氯仿" in timeline
+
+
+# ---------------------------------------------------------------------------
+# P4b：设置页 / 单体性质卡 / 方案卡模板
+# ---------------------------------------------------------------------------
+
+class _FakeLLMClient:
+    """src.llm.client 桩：get_settings/save_settings/test_connection 签名钉死。"""
+
+    saved = None
+
+    @staticmethod
+    def get_settings():
+        return {"configured": True, "base_url": "https://api.example.com/v1",
+                "model": "test-model", "api_key_masked": "sk-***wxyz",
+                "source": "local"}
+
+    @staticmethod
+    def save_settings(base_url, api_key, model):
+        _FakeLLMClient.saved = (base_url, api_key, model)
+
+    @staticmethod
+    def test_connection():
+        return True, "模型 test-model 可用"
+
+
+class _FakeLLMClientUnconfigured:
+    @staticmethod
+    def get_settings():
+        return {"configured": False, "base_url": "", "model": "",
+                "api_key_masked": "", "source": ""}
+
+    @staticmethod
+    def save_settings(base_url, api_key, model):
+        pass
+
+    @staticmethod
+    def test_connection():
+        return False, "未配置"
+
+
+class TestSettingsTab:
+    def test_load_masks_key(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_llm_client",
+                            lambda: (_FakeLLMClient, None))
+        base_url, key, model, status = gradio_app.settings_load()
+        assert base_url == "https://api.example.com/v1"
+        assert key == "sk-***wxyz"           # 掩码显示，绝不回显原文
+        assert model == "test-model" and "✓" in status
+
+    def test_load_unconfigured(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_llm_client",
+                            lambda: (_FakeLLMClientUnconfigured, None))
+        _, _, _, status = gradio_app.settings_load()
+        assert "未配置" in status
+
+    def test_save_calls_pinned_signature(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_llm_client",
+                            lambda: (_FakeLLMClient, None))
+        _FakeLLMClient.saved = None
+        st = gradio_app.settings_save("https://api.example.com/v1",
+                                      "sk-newkey123456", "m1")
+        assert "✓" in st
+        assert _FakeLLMClient.saved == ("https://api.example.com/v1",
+                                        "sk-newkey123456", "m1")
+        assert "sk-newkey123456" not in st   # 状态文案不回显 key
+
+    def test_save_rejects_masked_key(self, monkeypatch):
+        """掩码值不能直接保存——防止把掩码当真 key 写盘。"""
+        monkeypatch.setattr(gradio_app, "_load_llm_client",
+                            lambda: (_FakeLLMClient, None))
+        _FakeLLMClient.saved = None
+        st = gradio_app.settings_save("https://api.example.com/v1",
+                                      "sk-***wxyz", "m1")
+        assert "⚠️" in st and "重新输入" in st
+        assert _FakeLLMClient.saved is None
+
+    def test_test_connection(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_llm_client",
+                            lambda: (_FakeLLMClient, None))
+        assert "✓ 连接成功" in gradio_app.settings_test_connection()
+
+    def test_module_missing_friendly(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_llm_client",
+                            lambda: (None, "⏳ LLM 客户端模块尚未上线（后端开发中）。"))
+        assert "尚未上线" in gradio_app.settings_load()[3]
+        assert "尚未上线" in gradio_app.settings_save("u", "k", "m")
+        assert "尚未上线" in gradio_app.settings_test_connection()
+
+
+_FAKE_PROPS = {
+    "facts": {"mw": 106.12, "xlogp": 1.5, "tpsa": 17.07, "hbd": 0, "hba": 1,
+              "aromatic_rings": 1, "f_count": 0, "rotatable_bonds": 1},
+    "narrative": "苯甲醛类单体，预计芳香溶剂中溶解性较好。",
+    "narrative_source": "llm",
+}
+
+
+class TestMonomerPropCards:
+    def test_render_facts_and_llm(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_monomer_properties",
+                            lambda s, n="": (dict(_FAKE_PROPS), None))
+        html_out = gradio_app.monomer_prop_card("O=Cc1ccccc1", "苯甲醛")
+        assert "单体性质卡" in html_out and "苯甲醛" in html_out
+        assert "106.12" in html_out and "XlogP" in html_out
+        assert "芳环数" in html_out and "可旋转键" in html_out
+        assert "LLM 生成，供参考" in html_out
+        assert "溶解性较好" in html_out
+
+    def test_llm_none_degrades(self, monkeypatch):
+        props = dict(_FAKE_PROPS, narrative=None, narrative_source="none")
+        monkeypatch.setattr(gradio_app, "_monomer_properties",
+                            lambda s, n="": (props, None))
+        html_out = gradio_app.monomer_prop_card("O=Cc1ccccc1", "苯甲醛")
+        assert "LLM 解读不可用" in html_out and "RDKit" in html_out
+
+    def test_module_missing(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_monomer_properties",
+                            lambda s, n="": (None, "⏳ 单体性质卡模块尚未上线（后端开发中）。"))
+        html_out = gradio_app.monomer_prop_card("O=Cc1ccccc1", "苯甲醛")
+        assert "尚未上线" in html_out
+
+    def test_empty_smiles_returns_empty(self):
+        assert gradio_app.monomer_prop_card("  ", "x") == ""
+
+    def test_pair_refresh(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_monomer_properties",
+                            lambda s, n="": (dict(_FAKE_PROPS), None))
+        ald_html, amine_html = gradio_app.monomer_prop_cards_for_pair(
+            "O=Cc1ccccc1", "Nc1ccc(N)cc1")
+        assert "单体性质卡" in ald_html and "单体性质卡" in amine_html
+
+
+class _FakePlanTemplates:
+    saved = None
+
+    @staticmethod
+    def list_templates():
+        return [{"id": "builtin_hou_v3_9", "name": "侯老师界面法 v3.9",
+                 "builtin": True},
+                {"id": "tpl_custom1", "name": "自定义·文献A法", "builtin": False}]
+
+    @staticmethod
+    def get_template(tid):
+        if tid == "tpl_custom1":
+            return {"id": "tpl_custom1", "name": "自定义·文献A法"}
+        raise KeyError(tid)
+
+    @staticmethod
+    def extract_template_from_docx(path):
+        return {"id": "tpl_new", "name": "提取模板",
+                "source": "user-docx", "conditions": {"solvent": "甲苯"},
+                "steps": ["第一步"], "checklist": [{"item": "核对"}],
+                "hints_rules": [{"hint": "提示"}]}
+
+    @staticmethod
+    def save_template(tpl):
+        _FakePlanTemplates.saved = tpl
+        return tpl
+
+
+class TestPlanTemplates:
+    def test_choices_include_user_templates(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_plan_templates",
+                            lambda: (_FakePlanTemplates, None))
+        upd = gradio_app.template_choices_update()
+        choices = [tuple(c) for c in upd["choices"]]
+        assert (gradio_app._DEFAULT_TEMPLATE_LABEL, "") in choices
+        assert ("自定义·文献A法", "tpl_custom1") in choices
+        assert upd["value"] == ""
+
+    def test_module_missing_default_only(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_plan_templates",
+                            lambda: (None, "⏳ 方案卡模板模块尚未上线（后端开发中）。"))
+        upd = gradio_app.template_choices_update()
+        assert upd["choices"] == [(gradio_app._DEFAULT_TEMPLATE_LABEL, "")]
+
+    def test_resolve_template_choice(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_plan_templates",
+                            lambda: (_FakePlanTemplates, None))
+        assert gradio_app.resolve_template_choice("") is None
+        tpl = gradio_app.resolve_template_choice("tpl_custom1")
+        assert tpl["name"] == "自定义·文献A法"
+        assert gradio_app.resolve_template_choice("不存在") is None
+
+    def test_upload_preview(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_plan_templates",
+                            lambda: (_FakePlanTemplates, None))
+        monkeypatch.setattr(gradio_app, "_llm_configured", lambda: True)
+        tpl, md, st = gradio_app.template_upload_preview("fake.docx")
+        assert tpl["id"] == "tpl_new" and "提取模板" in md
+        assert "甲苯" in md and "✓" in st
+
+    def test_upload_requires_llm(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_plan_templates",
+                            lambda: (_FakePlanTemplates, None))
+        monkeypatch.setattr(gradio_app, "_llm_configured", lambda: False)
+        tpl, md, st = gradio_app.template_upload_preview("fake.docx")
+        assert tpl is None and "未配置 LLM" in st and "设置页" in st
+
+    def test_confirm_save(self, monkeypatch):
+        monkeypatch.setattr(gradio_app, "_load_plan_templates",
+                            lambda: (_FakePlanTemplates, None))
+        _FakePlanTemplates.saved = None
+        pending = {"id": "tpl_new", "name": "提取模板", "source": "user-docx",
+                   "conditions": {}, "steps": [], "checklist": [],
+                   "hints_rules": []}
+        st, upd = gradio_app.template_confirm_save(pending, "改名模板")
+        assert "✓" in st and "改名模板" in st
+        assert _FakePlanTemplates.saved["name"] == "改名模板"
+        st, _ = gradio_app.template_confirm_save(None, "")
+        assert "⚠️" in st
 
 
 if __name__ == "__main__":

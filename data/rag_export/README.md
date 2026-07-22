@@ -61,6 +61,7 @@ data/rag_export/
 |---|---|---|---|
 | schema_version / record_type | string | ✓ | `"1.0"` / `"experiment_record"` |
 | record_id | string | ✓ | `rec_YYYYMMDD_NNN`，主键，独立编号体系 |
+| experiment_no | string | ✓ | 实验编号（如 `A5`、`G2-3`），用户独立必填字段（P4a）；同时并入 notes 前缀 |
 | favorite_id | string\|null | ✓ | 关联收藏条目；游离记录为 null |
 | aldehyde / amine | object | ✓ | 单体对象 |
 | prediction_id | string\|null | – | 当初依据的预测快照 id |
@@ -79,13 +80,17 @@ data/rag_export/
 
 | 字段 | 说明 | 示例 |
 |---|---|---|
-| solvent | 溶剂 | `甲苯` / `BTF/二氧六环` |
+| solvent_1 | 溶剂一（P4a 起替代旧 `solvent`） | `甲苯` / `BTF` |
+| solvent_2 | 溶剂二（混合溶剂时填） | `二氧六环` |
+| eluent | 洗脱剂（反应后处理洗涤/洗脱用） | `氯仿` |
 | modulator | 调制剂及用量 | `苯胺 13.7 μL` |
 | catalyst | 催化剂及用量 | `6M 乙酸 0.2 mL` |
 | temperature_c | 温度 °C | `120` |
 | time_days | 反应天数 | `3` |
 | vessel | 容器 | `35 mL Pyrex 管` |
 | addition_order | 加料顺序 | `先醛+苯胺，后胺，最后乙酸` |
+
+向后兼容（P4a，schema_version 不变）：旧文件/旧调用中的 `solvent` 单键自动映射到 `solvent_1`，旧键本身按"额外字段原样保留"规则一并留存；新增 `solvent_1`/`solvent_2`/`eluent` 与必填 `experiment_no` 均视为契约内演进（旧消费方遇未知字段应忽略）。
 
 示例：`records/example.json`
 

@@ -35,8 +35,12 @@ VALID_OUTCOMES = ("film", "partial", "failed")  # 成膜 / 部分 / 失败
 _ID_RE = re.compile(r"^rec_(\d{8})_(\d{3})$")
 
 # 契约 conditions 标准字段（未知留空字符串；额外字段原样保留）
+# P4a：solvent 拆为 solvent_1 / solvent_2，新增 eluent（洗脱剂）；
+# temperature_c / time_days / vessel 沿用 1.0 契约原名不变。
 _CONDITION_KEYS = (
-    "solvent",
+    "solvent_1",
+    "solvent_2",
+    "eluent",
     "modulator",
     "catalyst",
     "temperature_c",
@@ -44,6 +48,9 @@ _CONDITION_KEYS = (
     "vessel",
     "addition_order",
 )
+
+# 旧键 → 新键兼容映射（仅当新键未提供时生效；旧键本身按"额外字段"原样保留）
+_LEGACY_CONDITION_KEYS = {"solvent": "solvent_1"}
 
 # 契约示例文件不作为真实记录列出
 _EXAMPLE_FILE = "example.json"
@@ -83,9 +90,12 @@ def create_record(
     strength: str = "",
     notes: str = "",
     operator: str = "",
+    experiment_no: str = "",
 ) -> dict:
     """创建实验记录并按 RAG 契约落盘，返回完整记录 dict。
 
+    - experiment_no 必填（关联/游离记录都要），空串 ValueError；落盘为
+      独立字段并并入 notes 前缀（P4a 用户决策：独立必填字段）；
     - outcome 必须是 film|partial|failed，否则 ValueError；
     - 关联收藏（favorite_id 非 None）：favorite_id 必须指向已存在的收藏
       条目，否则 KeyError（单体对象与 prediction_snapshot 从收藏冗余），
@@ -96,7 +106,8 @@ def create_record(
 
     向后兼容：旧签名 create_record(favorite_id, conditions, outcome,
     strength, notes, operator) 的位置调用（第二个位置参数是 dict）仍然
-    可用，参数自动按旧语义重排。
+    可用，参数自动按旧语义重排；conditions 里的旧键 "solvent" 自动映射
+    到新标准键 "solvent_1"（新键已提供时不动）。
     """
     # 旧位置调用检测：create_record(fid, conditions_dict, outcome, ...)
     if isinstance(aldehyde_smiles, dict):
@@ -108,7 +119,14 @@ def create_record(
         aldehyde_smiles, amine_smiles = "", ""
         conditions = legacy_cond
         outcome = legacy_outcome
-        strength, notes, operator = legacy_strength, legacy_notes, legacy_operator
+        # 旧位置槽位为空时保留显式传入的关键字值（混合调用友好）
+        strength = legacy_strength or strength
+        notes = legacy_notes or notes
+        operator = legacy_operator or operator
+
+    experiment_no = (experiment_no or "").strip()
+    if not experiment_no:
+        raise ValueError("experiment_no 为必填字段（如 A5、G2-3），不能为空")
 
     outcome = (outcome or "").strip()
     if outcome not in VALID_OUTCOMES:
@@ -144,12 +162,23 @@ def create_record(
         prediction_snapshot = None
 
     cond = {k: "" for k in _CONDITION_KEYS}
-    cond.update(conditions or {})
+    extra = dict(conditions or {})
+    for old, new in _LEGACY_CONDITION_KEYS.items():
+        if old in extra and not extra.get(new):
+            extra[new] = extra[old]
+    cond.update(extra)
+
+    notes = (notes or "").strip()
+    notes = (
+        f"实验编号：{experiment_no}" if not notes
+        else f"实验编号：{experiment_no}；{notes}"
+    )
 
     rec = {
         "schema_version": SCHEMA_VERSION,
         "record_type": RECORD_TYPE,
         "record_id": _next_id(),
+        "experiment_no": experiment_no,
         "favorite_id": favorite_id,
         "aldehyde": aldehyde,
         "amine": amine,
@@ -159,7 +188,7 @@ def create_record(
         "outcome": outcome,
         "failure_class": None,
         "strength": strength or "",
-        "notes": notes or "",
+        "notes": notes,
         "attachments": [],
         "operator": operator or "",
         "date": _today(),

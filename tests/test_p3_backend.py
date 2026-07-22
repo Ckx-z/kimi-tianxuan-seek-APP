@@ -183,6 +183,7 @@ class TestOrphanRecord:
             amine_smiles=PA,
             conditions={"solvent": "甲苯", "temperature_c": 120},
             outcome="film",
+            experiment_no="B2",
             strength="连续膜",
             notes="未关联收藏",
             operator="ckx",
@@ -209,6 +210,7 @@ class TestOrphanRecord:
             aldehyde_smiles=A2_SMILES,
             amine_smiles=TAPT_SMILES,
             outcome="partial",
+            experiment_no="B3",
         )
         assert rec["aldehyde"]["cas"] == "3217-47-8"
         assert rec["aldehyde"]["name"] == "A2"
@@ -220,14 +222,14 @@ class TestOrphanRecord:
             with pytest.raises(ValueError):
                 rec_store.create_record(
                     favorite_id=None, aldehyde_smiles=ald, amine_smiles=amine,
-                    outcome="film",
+                    outcome="film", experiment_no="T1",
                 )
 
     def test_orphan_invalid_outcome_raises(self, rec_dirs):
         with pytest.raises(ValueError):
             rec_store.create_record(
                 favorite_id=None, aldehyde_smiles=TP, amine_smiles=PA,
-                outcome="success",
+                outcome="success", experiment_no="T1",
             )
 
     def test_orphan_not_backlinked(self, rec_dirs):
@@ -235,15 +237,17 @@ class TestOrphanRecord:
         fav = fav_store.add_favorite(TP, PA)
         rec_store.create_record(
             favorite_id=None, aldehyde_smiles=TP, amine_smiles=PA, outcome="film",
+            experiment_no="T1",
         )
         assert fav_store.get_favorite(fav["id"])["experiment_record_ids"] == []
 
     def test_orphan_listed_and_filterable(self, rec_dirs):
         fav_d, _ = rec_dirs
         fav = fav_store.add_favorite(TP, PA)
-        rec_store.create_record(fav["id"], {}, "film")  # 旧位置调用
+        rec_store.create_record(fav["id"], {}, "film", experiment_no="T1")  # 旧位置调用
         rec_store.create_record(
             favorite_id=None, aldehyde_smiles=TP, amine_smiles=PA, outcome="failed",
+            experiment_no="T1",
         )
         assert len(rec_store.list_records()) == 2
         linked = rec_store.list_records(favorite_id=fav["id"])
@@ -258,37 +262,40 @@ class TestLegacyPositionalCompat:
         fav = fav_store.add_favorite(TP, PA)
         rec = rec_store.create_record(
             fav["id"], {"solvent": "甲苯"}, "film", "强度好", "备注", "ckx",
+            experiment_no="G2-3",
         )
         assert rec["favorite_id"] == fav["id"]
         assert rec["outcome"] == "film"
         assert rec["conditions"]["solvent"] == "甲苯"
         assert rec["strength"] == "强度好"
-        assert rec["notes"] == "备注"
+        assert rec["notes"] == "实验编号：G2-3；备注"  # P4a：experiment_no 并入 notes 前缀
         assert rec["operator"] == "ckx"
 
     def test_legacy_positional_partial(self, rec_dirs):
         fav_d, _ = rec_dirs
         fav = fav_store.add_favorite(TP, PA)
-        rec = rec_store.create_record(fav["id"], {}, "partial")
+        rec = rec_store.create_record(fav["id"], {}, "partial", experiment_no="T1")
         assert rec["outcome"] == "partial"
-        assert rec["strength"] == "" and rec["notes"] == "" and rec["operator"] == ""
+        assert rec["strength"] == "" and rec["operator"] == ""
+        assert rec["notes"] == "实验编号：T1"  # P4a：experiment_no 并入 notes 前缀
 
     def test_legacy_invalid_outcome_raises(self, rec_dirs):
         fav_d, _ = rec_dirs
         fav = fav_store.add_favorite(TP, PA)
         for bad in ("success", "", None):
             with pytest.raises(ValueError):
-                rec_store.create_record(fav["id"], {}, bad)
+                rec_store.create_record(fav["id"], {}, bad, experiment_no="T1")
 
     def test_legacy_missing_favorite_raises(self, rec_dirs):
         with pytest.raises(KeyError):
-            rec_store.create_record("fav_20990101_999", {}, "film")
+            rec_store.create_record("fav_20990101_999", {}, "film", experiment_no="T1")
 
     def test_new_keyword_style_for_linked(self, rec_dirs):
         fav_d, _ = rec_dirs
         fav = fav_store.add_favorite(TP, PA)
         rec = rec_store.create_record(
             favorite_id=fav["id"], conditions={"solvent": "BTF"}, outcome="film",
+            experiment_no="T1",
         )
         assert rec["favorite_id"] == fav["id"]
         assert rec["aldehyde"]["smiles"] == fav["aldehyde"]["smiles"]

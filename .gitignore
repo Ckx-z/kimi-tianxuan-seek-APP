@@ -91,3 +91,15 @@ minimax/run_indexer.vbs
 minimax/run_indexer_v2.vbs
 minimax/_tmp/
 logs/*.pid
+
+# 用户私有数据（每个用户独立实例，不入库）
+config/llm_settings.local.json
+data/llm_cache/
+data/favorites/*.json
+!data/favorites/.gitkeep
+data/rag_export/records/*
+!data/rag_export/records/example.json
+data/rag_export/suggestions/*
+!data/rag_export/suggestions/example.json
+data/plan_templates/*
+!data/plan_templates/builtin_hou_v3_9.json
