@@ -231,3 +231,186 @@ def test_llm_settings_mask():
     d = r.json()
     assert "api_key" not in d               # 绝不回显原文
     assert "api_key_masked" in d
+
+
+# ---------------------------------------------------------------------------
+# 页⑤ 迭代路由 + 性质卡批量
+# ---------------------------------------------------------------------------
+
+def _write_suggestion(directory, **kw):
+    """造一条建议 JSON 到隔离目录，返回 dict。"""
+    import json as _json
+    sug = {
+        "schema_version": "1.0", "record_type": "suggestion",
+        "suggestion_id": kw.get("suggestion_id", "sug_20260722_001"),
+        "favorite_id": kw.get("favorite_id"),
+        "type": "condition_adjust",
+        "payload": {"title": "调溶剂", "adjustments": [{"note": "甲苯加量"}]},
+        "evidence_refs": [],
+        "created_at": kw.get("created_at", "2026-07-22T14:00:00+08:00"),
+        "status": kw.get("status", "pending"),
+    }
+    if "batch" in kw:
+        sug["batch"] = kw["batch"]
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f"{sug['suggestion_id']}.json").write_text(
+        _json.dumps(sug, ensure_ascii=False), encoding="utf-8")
+    return sug
+
+
+@pytest.fixture
+def isolated_iterate(tmp_path, monkeypatch):
+    """页⑤数据隔离：建议/方案/收藏全部打到临时目录。"""
+    import api.routers.iterate as it
+    from src.recommend import generated_plans as gp
+    sugs, plans, favs = tmp_path / "sugs", tmp_path / "plans", tmp_path / "favs"
+    for m in (it, gp):
+        monkeypatch.setattr(m, "SUGGESTIONS_DIR", sugs)
+        monkeypatch.setattr(m, "PLANS_DIR", plans)
+    # 收藏目录只在 generated_plans 侧（iterate 路由不直接读收藏）
+    monkeypatch.setattr(gp, "FAVORITES_DIR", favs)
+    return sugs, plans, favs
+
+
+def test_iterate_suggestions_list_and_filter(isolated_iterate):
+    sugs, _, _ = isolated_iterate
+    _write_suggestion(sugs, suggestion_id="sug_20260722_001",
+                      favorite_id="fav_a", status="pending",
+                      batch="batch_20260722_100000",
+                      created_at="2026-07-22T10:00:00+08:00")
+    _write_suggestion(sugs, suggestion_id="sug_20260722_002",
+                      favorite_id="fav_b", status="adopted",
+                      created_at="2026-07-22T15:00:00+08:00")
+    # 全量：created_at 倒序
+    r = client.get("/api/iterate/suggestions")
+    assert r.status_code == 200
+    ids = [s["suggestion_id"] for s in r.json()["suggestions"]]
+    assert ids == ["sug_20260722_002", "sug_20260722_001"]
+    # 过滤
+    r = client.get("/api/iterate/suggestions",
+                   params={"favorite_id": "fav_a"})
+    assert [s["suggestion_id"] for s in r.json()["suggestions"]] == [
+        "sug_20260722_001"]
+    r = client.get("/api/iterate/suggestions", params={"status": "adopted"})
+    assert [s["suggestion_id"] for s in r.json()["suggestions"]] == [
+        "sug_20260722_002"]
+    r = client.get("/api/iterate/suggestions",
+                   params={"batch": "batch_20260722_100000"})
+    assert r.json()["count"] == 1
+
+
+def test_iterate_suggestions_corrupt_file_skipped(isolated_iterate):
+    sugs, _, _ = isolated_iterate
+    _write_suggestion(sugs, suggestion_id="sug_20260722_001")
+    sugs.mkdir(parents=True, exist_ok=True)
+    (sugs / "sug_20260722_999.json").write_text("{损坏", encoding="utf-8")
+    r = client.get("/api/iterate/suggestions")
+    assert r.status_code == 200
+    assert r.json()["count"] == 1   # 损坏文件跳过，不影响整体
+
+
+def test_iterate_suggest_success(monkeypatch):
+    """suggest 成功：subprocess 返回契约末行 JSON → 透传 written/count/batch。"""
+    import subprocess as sp
+    import api.routers.iterate as it
+
+    class _Proc:
+        returncode = 0
+        stdout = ('日志若干行\n{"written": ["sug_20260722_001"],'
+                  ' "count": 1, "batch": "batch_20260722_120000"}')
+        stderr = ""
+
+    monkeypatch.setattr(it.subprocess, "run",
+                        lambda *a, **k: _Proc())
+    r = client.post("/api/iterate/suggest",
+                    json={"question": "上次失败了怎么调", "favorite_id": "fav_a"})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["written"] == ["sug_20260722_001"]
+    assert d["count"] == 1
+    assert d["batch"] == "batch_20260722_120000"
+    assert sp is it.subprocess  # 确实走 subprocess 通道
+
+
+def test_iterate_suggest_interpreter_missing_503(monkeypatch):
+    """解释器不存在 → 明确 503，且不真正起 subprocess。"""
+    import api.routers.iterate as it
+    monkeypatch.setattr(it, "ITERATE_PYTHON", r"E:\不存在的路径\python.exe")
+
+    def _boom(*a, **k):
+        raise AssertionError("解释器缺失时不应调用 subprocess.run")
+
+    monkeypatch.setattr(it.subprocess, "run", _boom)
+    r = client.post("/api/iterate/suggest", json={"question": "怎么调"})
+    assert r.status_code == 503
+    assert "迭代建议生成暂不可用" in r.json()["detail"]
+
+
+def test_iterate_adopt_success(isolated_iterate):
+    sugs, plans, favs = isolated_iterate
+    _write_suggestion(sugs, suggestion_id="sug_20260722_001",
+                      favorite_id="fav_a")
+    favs.mkdir(parents=True, exist_ok=True)
+    import json as _json
+    (favs / "fav_a.json").write_text(_json.dumps({
+        "id": "fav_a",
+        "aldehyde": {"smiles": "O=Cc1ccccc1", "name": "苯甲醛"},
+        "amine": {"smiles": "Nc1ccccc1", "name": "苯胺"},
+    }, ensure_ascii=False), encoding="utf-8")
+    r = client.post("/api/iterate/adopt",
+                    json={"suggestion_id": "sug_20260722_001"})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["plan_id"].startswith("plan_")
+    assert d["seq"] == 1
+    assert d["template_name"]
+    assert d["favorite_id"] == "fav_a"
+    # 落盘 + 回写建议状态
+    assert (plans / f"{d['plan_id']}.json").exists()
+    r2 = client.get("/api/iterate/suggestions", params={"status": "adopted"})
+    assert r2.json()["count"] == 1
+
+
+def test_iterate_adopt_error_400(isolated_iterate):
+    """AdoptError（建议不存在）→ 400 中文文案。"""
+    r = client.post("/api/iterate/adopt",
+                    json={"suggestion_id": "sug_20990101_999"})
+    assert r.status_code == 400
+    assert "不存在" in r.json()["detail"]
+
+
+def test_iterate_plans_list(isolated_iterate, tmp_path, monkeypatch):
+    import json as _json
+    import api.routers.iterate as it
+    plans_dir = tmp_path / "plans2"
+    plans_dir.mkdir()
+    monkeypatch.setattr(it, "PLANS_DIR", plans_dir)
+    for pid, fid, ts in (("plan_20260722_001", "fav_a",
+                          "2026-07-22T10:00:00+08:00"),
+                         ("plan_20260722_002", None,
+                          "2026-07-22T15:00:00+08:00")):
+        (plans_dir / f"{pid}.json").write_text(_json.dumps({
+            "plan_id": pid, "favorite_id": fid, "created_at": ts}),
+            encoding="utf-8")
+    (plans_dir / "plan_20260722_003.json").write_text("{坏", encoding="utf-8")
+    r = client.get("/api/iterate/plans")
+    assert r.status_code == 200
+    ids = [p["plan_id"] for p in r.json()["plans"]]
+    assert ids == ["plan_20260722_002", "plan_20260722_001"]  # 倒序+坏文件跳过
+    r = client.get("/api/iterate/plans", params={"favorite_id": "fav_a"})
+    assert [p["plan_id"] for p in r.json()["plans"]] == ["plan_20260722_001"]
+
+
+def test_monomer_props_batch_partial_invalid():
+    """批量性质卡：单项非法 SMILES 返回 error，不影响合法项。"""
+    r = client.post("/api/monomers/props/batch", json={"items": [
+        {"smiles": "Nc1ccccc1", "name": "苯胺"},
+        {"smiles": "not_a_smiles!!", "name": "坏的"},
+    ]})
+    assert r.status_code == 200
+    results = r.json()["results"]
+    assert len(results) == 2
+    ok, bad = results
+    assert "error" not in ok
+    assert ok["facts"]["mw"] > 90
+    assert "非法 SMILES" in bad["error"]

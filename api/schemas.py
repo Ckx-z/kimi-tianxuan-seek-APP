@@ -52,3 +52,25 @@ class LLMSettings(BaseModel):
     base_url: str = ""
     api_key: str = ""
     model: str = ""
+
+
+class SuggestRequest(BaseModel):
+    question: str = Field(..., description="迭代问题原文（自然语言）")
+    favorite_id: str | None = Field(
+        None, description="收藏条目 id；空则基于全部实验记录")
+
+
+class AdoptRequest(BaseModel):
+    suggestion_id: str = Field(..., description="建议主键（sug_YYYYMMDD_NNN）")
+    template_id: str | None = Field(
+        None, description="方案模板 id；空则内置侯老师 v3.9")
+
+
+class PropsItem(BaseModel):
+    smiles: str = Field(..., description="单体 SMILES")
+    name: str = ""
+
+
+class PropsBatchRequest(BaseModel):
+    items: list[PropsItem] = Field(
+        ..., description="批量性质卡请求列表（单项非法 SMILES 不影响其他项）")

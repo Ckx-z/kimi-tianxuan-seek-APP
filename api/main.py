@@ -13,7 +13,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import favorites, llm, monomers, plan, predict, records
+from .routers import favorites, iterate, llm, monomers, plan, predict, records
 
 app = FastAPI(
     title="COF 成膜推荐系统 API",
@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 for r in (predict.router, favorites.router, records.router,
-          monomers.router, plan.router, llm.router):
+          monomers.router, plan.router, llm.router, iterate.router):
     app.include_router(r)
 
 

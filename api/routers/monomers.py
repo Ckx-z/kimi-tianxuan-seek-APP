@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from ..deps import load_builtin_monomers
+from ..schemas import PropsBatchRequest
 
 router = APIRouter(prefix="/api/monomers", tags=["monomers"])
 
@@ -13,6 +14,45 @@ router = APIRouter(prefix="/api/monomers", tags=["monomers"])
 def list_monomers():
     lib = load_builtin_monomers()
     return {"aldehydes": lib["aldehydes"], "amines": lib["amines"]}
+
+
+@router.post("/props/batch")
+def monomer_props_batch(req: PropsBatchRequest):
+    """批量性质卡：逐项调 get_monomer_properties。
+
+    单项非法 SMILES → 该项返回 {"smiles", "name", "error"}，不影响其他项；
+    与单体接口同口径：RDKit 预校验拦截非法 SMILES，绝不烧 LLM。
+    """
+    try:
+        from rdkit import Chem
+        def _valid(s: str) -> bool:
+            return Chem.MolFromSmiles(s) is not None
+    except ImportError:
+        def _valid(s: str) -> bool:  # RDKit 不可用时降级为后端自行兜底
+            return True
+
+    from recommend.monomer_props import canonical_smiles, get_monomer_properties
+
+    results: list[dict] = []
+    for item in req.items:
+        smiles = (item.smiles or "").strip()
+        name = (item.name or "").strip()
+        if not smiles:
+            results.append({"smiles": smiles, "name": name,
+                            "error": "smiles 不能为空"})
+            continue
+        if not _valid(smiles):
+            results.append({"smiles": smiles, "name": name,
+                            "error": f"非法 SMILES，RDKit 解析失败: {smiles!r}"})
+            continue
+        try:
+            card = get_monomer_properties(canonical_smiles(smiles), name=name)
+            card["name"] = card.get("name") or name
+            results.append(card)
+        except Exception as exc:
+            results.append({"smiles": smiles, "name": name,
+                            "error": f"{type(exc).__name__}: {exc}"})
+    return {"results": results, "count": len(results)}
 
 
 @router.get("/props")
