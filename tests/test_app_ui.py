@@ -456,11 +456,26 @@ class TestFavoritePages:
         assert "✓" in st and snapped["fid"] == _FAKE_FAV["id"]
         assert "最新预测快照" in snap_md
 
-    def test_delete(self, monkeypatch):
-        monkeypatch.setattr(gradio_app, "_fav_delete", lambda fid: (True, None))
+    def test_delete_two_stage_confirm(self, monkeypatch):
+        """删除收藏两段确认：第一次点击仅进入待确认态，第二次才真正删除。"""
+        deleted = {}
+        monkeypatch.setattr(gradio_app, "_fav_delete",
+                            lambda fid: deleted.update(fid=fid) or (True, None))
         monkeypatch.setattr(gradio_app, "_fav_list", lambda: ([], None))
-        out = gradio_app.delete_favorite(_FAKE_FAV["id"])
-        assert "已删除" in out[0]
+        # 第一次点击：不删除，进入 armed 态，按钮变「再点一次确认」
+        out1 = gradio_app.delete_favorite(_FAKE_FAV["id"], False)
+        assert "再点一次" in out1[0] and not deleted
+        assert out1[2] is True and "再点一次确认" in out1[1]["value"]
+        # 第二次点击：执行删除并复位状态机
+        out2 = gradio_app.delete_favorite(_FAKE_FAV["id"], True)
+        assert "已删除" in out2[0] and deleted["fid"] == _FAKE_FAV["id"]
+        assert out2[2] is False and out2[1]["value"] == "删除收藏"
+
+    def test_delete_disarm_on_empty_selection(self, monkeypatch):
+        """未选收藏时点击：提示选择并复位确认态。"""
+        out = gradio_app.delete_favorite("", True)
+        assert "请先选择收藏条目" in out[0]
+        assert out[2] is False and out[1]["value"] == "删除收藏"
 
 
 class TestRecordsPage:
@@ -488,6 +503,20 @@ class TestRecordsPage:
         assert "实际" in timeline and "⛔ 失败" in timeline
         # P4a 修复 c：提交成功后表单重置（17 个字段更新）
         assert len(resets) == 17
+
+    def test_submit_duplicate_experiment_no_warns(self, monkeypatch):
+        """后端回传 duplicate_experiment_no=true（不落盘）→ 保存文案后追加警告。"""
+        dup_rec = dict(_FAKE_REC, duplicate_experiment_no=True)
+        monkeypatch.setattr(
+            gradio_app, "_rec_create_linked",
+            lambda fid, cond, out, s, n, op, exp="": (dict(dup_rec), None))
+        monkeypatch.setattr(gradio_app, "_rec_list",
+                            lambda favorite_id=None: ([], None))
+        st, _, _, _pick, *_ = gradio_app.submit_record(
+            "fav_20260722_001", "A5", "甲苯", "", "", "", "", "", "", "",
+            "失败", "", "", "")
+        assert "✓ 实验记录已保存" in st
+        assert "⚠️ 该收藏下已存在相同实验编号 A5" in st
 
     def test_submit_requires_experiment_no(self):
         """P4a 修复 b：实验编号为独立必填字段，空则前端拦截。"""
@@ -1027,7 +1056,7 @@ class TestIterateSuggest:
         # 契约：命令含脚本与 --favorite-id / --question
         assert called["cmd"][1] == str(gradio_app.ITERATE_SCRIPT)
         assert "--favorite-id" in called["cmd"] and "--question" in called["cmd"]
-        assert called["kwargs"]["timeout"] == 180
+        assert called["kwargs"]["timeout"] == 300
         assert called["kwargs"]["capture_output"] is True
         assert called["kwargs"]["errors"] == "replace"
 
@@ -1046,11 +1075,16 @@ class TestIterateSuggest:
     def test_timeout_message(self, monkeypatch):
         """subprocess.TimeoutExpired → 明确超时提示，不抛异常。"""
         def _fake_run(cmd, **kwargs):
-            raise subprocess.TimeoutExpired(cmd=cmd, timeout=180)
+            raise subprocess.TimeoutExpired(cmd=cmd, timeout=300)
 
         monkeypatch.setattr(gradio_app.subprocess, "run", _fake_run)
         html_out, status, _ = gradio_app.run_iterate_suggest("怎么调", "")
-        assert "超时" in status and "180" in status
+        assert "超时" in status and "300" in status
+
+    def test_timeout_constant_300(self):
+        """ITERATE_TIMEOUT_S 钉死 300s：编排器 LLM 主备串行最坏约 240s，
+        留 60s 余量防止「超时却写成功」不一致。"""
+        assert gradio_app.ITERATE_TIMEOUT_S == 300
 
     def test_empty_question_no_subprocess(self, monkeypatch):
         """空问题直接拦截，不启动子进程。"""

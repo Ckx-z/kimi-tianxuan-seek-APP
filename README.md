@@ -6,18 +6,19 @@
 
 ## 项目状态
 
-**阶段 20 已收官**（2026-07-21）：App 五页重设计全部落地，打分口径定版（D29）；真实回测证实新模型比旧 GNN 显著更诚实（exp_011，Brier 0.112 vs 0.489）。
+**阶段 22 已收官**（2026-07-22）：页⑤ GraphRAG 迭代引擎全量对接（自然语言提问 → GraphRAG 取证 → LLM 建议写回 → 采纳生成编号方案卡闭环）；阶段 22b 落地 FastAPI 地基（`api/` 六路由，未来独立前端对接层）。基线测试 **332 项全部通过**。
 
-- ✅ **五标签页 App**：① 查询打分（SMILES / CAS 号 / 内置单体库三种输入 + 相似成膜案例）② 批量排序（多组打分排序表 + 导出 CSV）③ 收藏夹（文献自动匹配 + 真实论文标题）④ 实验记录（预测 vs 实际时间线）⑤ 方案迭代（RAG 建议展示）
+- ✅ **五标签页 App**：① 查询打分（SMILES / CAS 号 / 内置单体库三种输入 + 相似成膜案例 + LLM 单体性质卡）② 批量排序（多组打分排序表 + 导出 CSV）③ 收藏夹（文献自动匹配 + 真实论文标题）④ 实验记录（预测 vs 实际时间线 + 记录管理：删除/放大查看）⑤ 方案迭代（GraphRAG 迭代引擎：建议展示 + 采纳生成编号方案卡）
+- ✅ **FastAPI 后端**（`api/`）：打分 / 收藏 / 实验记录 / 单体 / 方案卡 / LLM 六路由，`uvicorn api.main:app --port 8000` 启动，与 Gradio App 共用 `src/` 后端互不影响
 - ✅ **打分三件套**：主分数 max(树, GNN) 乐观召回口径（D29，带标注与分量溯源）± bagging 不确定度 + OOD 三级标记（⛔ 非标准官能团不出分 / ⚠️ 外推警告）
 - ✅ **双模型路由**（D23）：双未见单体 → `tree_v4_noTE`（外推臂）；其余 → `tree_v4`（池内臂）
 - ✅ **SHAP 打分理由**：全中文解释哪个官能团/特征推高或拉低成膜分（热态 ~0.04s）
 - ✅ **化学结构图**：醛/胺单体 2D 结构 + 亚胺缩合产物骨架（RDKit 渲染，非法 SMILES 优雅降级）
-- ✅ **实验方案卡**：侯老师法模板（条件 + 加料顺序）+ 防错清单（来自真实失败教训）
+- ✅ **实验方案卡**：模板系统（内置侯老师法默认模板 + 上传 docx 由 LLM 提取自定义模板）+ 防错清单（来自真实失败教训）；页⑤建议采纳后自动生成带编号的方案卡
 - ✅ 生成 Word 实验报告（内嵌单体结构图）
 - ✅ 桌面快捷方式 `COF成膜推荐.lnk`（定制图标）/ `启动COF推荐.vbs` 静默启动，双击=重启到最新代码
 - ✅ GNN v5.3 通过 subprocess 接入（PR-AUC 0.784）
-- ✅ 测试 231 项全部通过
+- ✅ 测试 332 项全部通过
 - ✅ **minimax RAG 模块已合并**（`minimax/`，subtree 保留全部提交历史），经 `data/rag_export/` 契约对接；LLM 双端点（MiniMax 主 + longcat 备，密钥仅本地）
 
 ### 当前模型一览
@@ -41,7 +42,7 @@
 
 | 模块 | 定位 | 说明 |
 |---|---|---|
-| 主模块（仓库根） | **打分与交付** | Gradio App + XGBoost 双模型路由 + GNN v5.3 对照，输出成膜概率、打分理由、结构图、Word 报告 |
+| 主模块（仓库根） | **打分与交付** | Gradio App + FastAPI（`api/`）+ XGBoost 双模型路由 + GNN v5.3 对照，输出成膜概率、打分理由、结构图、Word 报告 |
 | `minimax/` | **RAG 迭代** | 实验迭代 RAG 项目（原 `shiyandiedai` 仓库，subtree 合并保留全部历史），含 `predict/`（预测）、`experiment/`（实验）、`bridge/`（GraphRAG v2 检索与方案生成）、`adapters/`（契约摄入适配器） |
 
 两模块经 **`data/rag_export/` 数据契约**对接：App 侧按契约导出预测/反馈数据，minimax 侧 `adapters/cof_app_ingest.py` 摄入，用于 RAG 检索与实验方案迭代。契约文档见 `minimax/docs/COF_APP_CONTRACT.md`。
@@ -53,6 +54,7 @@
 ```
 全新机器学习实验/
 ├── app/gradio_app.py              # Gradio App 入口（概率 + 打分理由 + 结构图）
+├── api/                           # FastAPI 后端（六路由，uvicorn 启动，未来独立前端对接层）
 ├── 启动COF推荐.vbs                # 双击无窗口启动（推荐）
 ├── 调试启动.bat                   # 调试启动（终端可见日志）
 ├── silent_launch.py               # 静默启动器（vbs 调用）
@@ -89,26 +91,31 @@
 
 ## 运行环境
 
-### 双环境设计
+### 三解释器分工
 
-| 组件 | 环境 | 说明 |
+| 组件 | 解释器 | 说明 |
 |---|---|---|
-| App 前端（Gradio） | base Python 3.13 | gradio 6.20、python-docx、xgboost、shap |
-| GNN 预测 | dphuanjing Python 3.8 | torch 2.3.1 + PyG 2.6.1，通过 subprocess 调用 |
-| 树模型训练 | `.venv` Python 3.12 | xgboost、rdkit、shap、scikit-learn |
+| App 前端 / 测试 / 主后端（FastAPI） | `E:\ANACONDA\python.exe`（base，Python 3.13） | gradio 6.20、fastapi、uvicorn、python-docx、xgboost、shap；基线测试与 `api/` 均用它 |
+| minimax GraphRAG 运行时 | `E:\python3.12\python.exe`（Python 3.12） | 页⑤ GraphRAG 迭代引擎（networkx 图谱检索 + LLM 调用），依赖见 `minimax/requirements-minimax.txt` |
+| GNN 推理 | `E:\ANACONDA\envs\dphuanjing\python.exe`（Python 3.8） | torch 2.3.1 + PyG 2.6.1，主后端通过 subprocess 调用 |
 
-**为什么用两个环境？** dphuanjing 是旧项目环境，有 GNN 所需的 torch/PyG，但 Python 3.8 装不了新版 Gradio。新 App 用 base 环境，GNN 通过 subprocess 调用 dphuanjing，互不冲突。
+**为什么用多个解释器？** dphuanjing 是旧项目环境，有 GNN 所需的 torch/PyG，但 Python 3.8 装不了新版 Gradio；minimax GraphRAG 运行时固定在独立的 Python 3.12（networkx 图谱运行时），与主后端隔离。新 App / API 用 base 环境，GNN 与 GraphRAG 均通过 subprocess 调用，互不冲突。
 
 ### 环境要求
 
 - 已安装 Anaconda
-- base 环境：Python 3.13，已安装 `gradio`, `python-docx`, `xgboost`, `rdkit`, `shap`, `pandas`, `joblib`
-- dphuanjing 环境：Python 3.8，含 `torch 2.3.1`, `torch_geometric 2.6.1`, `rdkit`
+- base 环境（`E:\ANACONDA\python.exe`）：Python 3.13，依赖见 `requirements.txt`（gradio、fastapi、uvicorn、python-docx、xgboost、rdkit、shap、pandas、joblib 等）
+- GraphRAG 环境（`E:\python3.12\python.exe`）：Python 3.12，依赖见 `minimax/requirements-minimax.txt`（networkx、requests、python-docx 等）
+- dphuanjing 环境（`E:\ANACONDA\envs\dphuanjing`）：Python 3.8，含 `torch 2.3.1`, `torch_geometric 2.6.1`, `rdkit`
 
 如果缺少依赖：
 
 ```bash
-pip install gradio python-docx xgboost rdkit shap joblib pandas scikit-learn
+# 主后端 / App / 测试（base）
+E:\ANACONDA\python.exe -m pip install -r requirements.txt
+
+# minimax GraphRAG 运行时（python3.12）
+E:\python3.12\python.exe -m pip install -r minimax/requirements-minimax.txt
 ```
 
 ---
@@ -142,6 +149,17 @@ Running on local URL:  http://127.0.0.1:7860
 ```
 
 浏览器打开：`http://127.0.0.1:7860`
+
+### 启动 API 服务（FastAPI）
+
+```bash
+cd "C:\Users\ckx\Desktop\全新机器学习实验"
+E:\ANACONDA\python.exe -m uvicorn api.main:app --port 8000
+```
+
+- 交互文档：`http://127.0.0.1:8000/docs`
+- 与 Gradio App 并存，共用 `src/` 后端与 `data/` 数据，互不影响；是未来 React/Tauri 独立前端的对接层
+- 路由：`/api/predict` 打分、`/api/favorites` 收藏、`/api/records` 实验记录、`/api/monomers` 单体、`/api/plan` 方案卡、`/api/llm` LLM
 
 ### 打不开怎么办？
 
@@ -181,7 +199,15 @@ cd "C:\Users\ckx\Desktop\全新机器学习实验"
 E:\ANACONDA\python.exe -m pytest tests/ -v
 ```
 
-当前 **231 项测试全部通过**，覆盖：描述符计算、条件推荐、树模型训练/预测、Word 报告生成、数据导入、SHAP 归因（含 TE 模型）、双模型路由、分子渲染、RDKit 日志行为、CAS 查询、批量排序、收藏夹/实验记录存储、方案卡、主分数口径（D29）、suggestions/文献标题/游离记录、rag_export 契约。minimax 模块自带集成测试见 `minimax/bridge/test_integration.py`（独立运行，12/12）。
+当前 **332 项测试全部通过**，覆盖：描述符计算、条件推荐、树模型训练/预测、Word 报告生成、数据导入、SHAP 归因（含 TE 模型）、双模型路由、分子渲染、RDKit 日志行为、CAS 查询、批量排序、收藏夹/实验记录存储、方案卡、主分数口径（D29）、suggestions/文献标题/游离记录、rag_export 契约、LLM 性质卡/方案卡模板、FastAPI 六路由、页⑤ GraphRAG 迭代闭环。minimax 模块自带集成测试见 `minimax/bridge/test_integration.py`（独立运行，12/12）。
+
+---
+
+## 数据与随仓库分发说明
+
+- **用户数据本地独立、不入 git**（D30）：`config/llm_settings.local.json`（LLM 密钥，仅本地）、`data/favorites/`、`data/rag_export/records|suggestions/`、`data/plan_templates/`、`data/generated_plans/`、`data/llm_cache/` 等均为各用户独立实例，已被 `.gitignore` 覆盖；`*.local.json` 为兜底规则。
+- **GraphRAG 检索底座随仓库分发**：`minimax/bridge/graphrag/`（图谱 `graph.pkl` / `graph_v2.pkl`、节点/边 jsonl、文献 embedding 等）与 `minimax/bridge/graphrag_v2/` 代码，连同 `minimax/` 其余已追踪文件共约 **75MB**，是页⑤ GraphRAG 迭代引擎的运行底座，**刻意保留在 git 追踪中**（决策：克隆即用，避免每位用户重建图谱）。它们虽命中根 `.gitignore` 的 `*.pkl` 规则，但已被强制追踪（`git add -f`），请勿新增针对它们的忽略规则。
+- **不入库的大文件**：`minimax/知识库/`（本地文献 PDF，~850MB）、tianxuan 二进制向量索引（`tianxuan_vectors.bin` 1.7GB 等）、模型权重 `models/*.pkl`——见根 `.gitignore`。
 
 ---
 
@@ -223,6 +249,7 @@ E:\ANACONDA\python.exe -m pytest tests/ -v
 | 文件 | 说明 |
 |---|---|
 | `app/gradio_app.py` | Gradio 前端 |
+| `api/main.py` | FastAPI 入口（六路由，uvicorn 启动） |
 | `src/predictor/__init__.py` | FilmPredictor（双模型路由入口） |
 | `src/predictor/routing.py` | 路由规则（routed_strict，D23） |
 | `src/predictor/tree_model.py` | XGBoost 树模型（自描述 pkl 加载） |

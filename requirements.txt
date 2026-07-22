@@ -30,6 +30,13 @@ python-docx>=0.8  # Word 报告生成
 # --- App 前端 ---
 gradio>=4.0
 
+# --- FastAPI 后端（api/） ---
+fastapi>=0.110
+uvicorn>=0.29
+
+# --- GraphRAG 图谱检索（minimax 迭代引擎） ---
+networkx>=3.0
+
 # --- GNN 对比基线（可选） ---
 # torch>=2.0
 # torch_geometric>=2.3

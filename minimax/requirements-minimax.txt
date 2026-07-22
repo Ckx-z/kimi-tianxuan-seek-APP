@@ -1,0 +1,18 @@
+# minimax GraphRAG 迭代引擎 — 依赖
+# 专用解释器：E:\python3.12\python.exe（Python 3.12）
+# 安装：E:\python3.12\python.exe -m pip install -r minimax/requirements-minimax.txt
+# 说明：minimax/predict/ 的 GNN 推理走 dphuanjing 环境（torch/PyG/rdkit），不在此文件
+
+# --- GraphRAG 图谱运行时 ---
+networkx>=3.0        # 图谱构建与多跳 BFS 检索（graph_v2.pkl 底座）
+
+# --- LLM 调用 ---
+requests>=2.31       # LLM 双端点 HTTP 调用（MiniMax 主 + longcat 备）
+pyyaml>=6.0          # llm_config.yaml 路由配置
+
+# --- 方案卡 / 文档 ---
+python-docx>=0.8     # docx 方案生成与模板提取
+
+# --- 数据处理 ---
+numpy>=1.24          # 向量/索引计算
+scikit-learn>=1.3    # 检索打分辅助

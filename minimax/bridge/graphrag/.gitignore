@@ -1,1 +1,2 @@
-graph_v2.pkl
+# 决策：graph_v2.pkl 等 GraphRAG 底座文件随仓库分发（保留 git 追踪，克隆即用），
+# 请勿在此添加针对 graph*.pkl / *.jsonl 的忽略规则。详见根 README「数据与随仓库分发说明」。

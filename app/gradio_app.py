@@ -1854,16 +1854,26 @@ def plan_card_for_favorite(fid: str, template_value: str = ""):
     return _render_plan_card_html(card, ald_n, amine_n), "✓ 方案卡已生成。"
 
 
-def delete_favorite(fid: str):
-    """删除收藏 → (状态, 卡片墙, 下拉, 详情清空×5)。"""
+def delete_favorite(fid: str, armed: bool):
+    """「删除收藏」回调（两段确认）：第一次点击进入待确认态，第二次执行删除。
+
+    复用页④ rec_del_btn 的 armed 状态机模式。
+    返回 (状态, 删除按钮, armed状态, 卡片墙, 下拉, 详情清空×5)。
+    """
     empty_detail = ("", "", "", "", "")
+    disarm = (gr.update(value="删除收藏", variant="stop"), False)
     if not fid:
-        return ("⚠️ 请先选择收藏条目。", "", gr.update()) + empty_detail
+        return ("⚠️ 请先选择收藏条目。", *disarm, "", gr.update()) + empty_detail
+    if not armed:
+        return (f"⚠️ 确认删除收藏 {fid}？关联实验记录不受影响，但此操作不可恢复"
+                "——再点一次红色按钮执行。",
+                gr.update(value="⚠️ 再点一次确认删除", variant="primary"), True,
+                gr.update(), gr.update()) + empty_detail
     _, err = _fav_delete(fid)
     if err:
-        return (err, "", gr.update()) + empty_detail
+        return (err, *disarm, "", gr.update()) + empty_detail
     cards, sel, _ = refresh_favorites()
-    return (f"✓ 已删除收藏 {fid}。", cards, sel) + empty_detail
+    return (f"✓ 已删除收藏 {fid}。", *disarm, cards, sel) + empty_detail
 
 
 # ---------------------------------------------------------------------------
@@ -1971,7 +1981,11 @@ def submit_record(fav_id, experiment_no, solvent_1, solvent_2, eluent,
         return (err, "", gr.update(), gr.update()) + (gr.update(),) * 17
     recs, _ = _rec_list()
     rid = rec.get("record_id") or rec.get("id") or "?"
-    return (f"✓ 实验记录已保存（{rid}，实验编号 {experiment_no}）。",
+    status = f"✓ 实验记录已保存（{rid}，实验编号 {experiment_no}）。"
+    # 后端在同收藏下编号重复时不落盘并回传 duplicate_experiment_no，前端透传警告
+    if rec.get("duplicate_experiment_no"):
+        status += f"⚠️ 该收藏下已存在相同实验编号 {experiment_no}"
+    return (status,
             _render_records_timeline(recs or []), _record_fav_choices(),
             _record_pick_choices(recs or []), *reset_record_form())
 
@@ -2213,7 +2227,7 @@ def refresh_suggestions(fav_filter=""):
 # 钉死的协作契约：orchestrator CLI 入口与解释器路径（任务B提供脚本本体）
 ITERATE_PYTHON = r"E:\python3.12\python.exe"
 ITERATE_SCRIPT = PROJECT_ROOT / "minimax" / "adapters" / "iterate_suggest.py"
-ITERATE_TIMEOUT_S = 180
+ITERATE_TIMEOUT_S = 300  # 编排器 LLM 主备串行最坏约 240s，留 60s 余量防「超时却写成功」
 
 
 def _iterate_fav_choices():
@@ -2706,6 +2720,7 @@ def create_app() -> gr.Blocks:
                         fav_rescore_btn = gr.Button("重新打分", size="sm")
                         fav_plan_btn = gr.Button("生成方案卡", size="sm")
                         fav_delete_btn = gr.Button("删除收藏", size="sm", variant="stop")
+                    fav_del_armed = gr.State(False)  # 删除收藏两段确认状态机
                     plan_template3 = gr.Dropdown(
                         label="方案卡模板",
                         choices=[(_DEFAULT_TEMPLATE_LABEL, "")],
@@ -2762,9 +2777,15 @@ def create_app() -> gr.Blocks:
                                    outputs=[fav_plan_html, fav_action_status])
                 fav_tab.select(fn=template_choices_update,
                                outputs=[plan_template3])
-                fav_delete_btn.click(fn=delete_favorite, inputs=[fav_select],
-                                     outputs=[fav_action_status, fav_cards,
+                fav_delete_btn.click(fn=delete_favorite,
+                                     inputs=[fav_select, fav_del_armed],
+                                     outputs=[fav_action_status, fav_delete_btn,
+                                              fav_del_armed, fav_cards,
                                               fav_select] + _detail_outputs)
+                # 切换收藏条目时复位删除确认态，避免「带着确认态删错条目」
+                fav_select.change(fn=lambda: (gr.update(
+                    value="删除收藏", variant="stop"), False),
+                    outputs=[fav_delete_btn, fav_del_armed])
 
             # ===================== 页④ 实验记录 =====================
             with gr.Tab("④ 实验记录") as rec_tab:

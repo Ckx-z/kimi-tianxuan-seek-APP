@@ -4,6 +4,13 @@
 > 依据：`docs/APP_REDESIGN_PROPOSAL.md` 第 6 节细化
 > 消费方：`C:\Users\ckx\Desktop\minimax`（shiyandiedai RAG 项目），对接文档见其 `docs/COF_APP_CONTRACT.md`
 
+## 变更日志
+
+- 2026-07-22：Schema 3 扩展——新增可选 `batch` 批次号、`payload.confidence` 置信度自评、
+  `payload.unverified_refs` 白名单剔除引用记录；`type` 增加 `literature`（LLM 失败时的降级建议）。
+  均为契约内演进（新增可选字段/枚举值），schema_version 不变。
+- 2026-07-21：首版（Schema 1/2/3 + 映射要点 + 演进规则）。
+
 ## 定位
 
 本目录是 App 向 RAG 迭代系统的**标准化数据出口**（阶段 1：文件对接，零耦合）。
@@ -103,9 +110,12 @@ RAG 产出的迭代建议，App 页⑤展示并与收藏条目关联。**由 min
 | schema_version / record_type | string | ✓ | `"1.0"` / `"suggestion"` |
 | suggestion_id | string | ✓ | `sug_YYYYMMDD_NNN`，主键 |
 | favorite_id | string\|null | ✓ | 针对的收藏条目；通用建议为 null |
-| type | string | ✓ | `condition_adjust`（条件调整）/ `new_candidate`（新候选单体对） |
-| payload | object | ✓ | type=condition_adjust：`{"adjustments":[{"field","from","to","rationale"}]}`；type=new_candidate：`{"aldehyde":{...},"amine":{...},"rationale"}` |
-| evidence_refs | array | ✓ | 依据：`[{"kind":"experiment_record"\|"literature"\|"prediction","ref":"rec_...或DOI或pred_id","note":""}]` |
+| batch | string | – | 本次运行批次号 `batch_YYYYMMDD_HHMMSS`，同次运行的所有建议共用一个批次号（2026-07-22 新增可选字段） |
+| type | string | ✓ | `condition_adjust`（条件调整）/ `new_candidate`（新候选单体对）/ `literature`（降级建议：LLM 失败或建议全被去重时，只含检索证据原文） |
+| payload | object | ✓ | type=condition_adjust：`{"title","adjustments":[{"field","from","to","rationale"}]}`；type=new_candidate：`{"title","aldehyde":{...},"amine":{...},"rationale"}`；type=literature：`{"title","detail"}`（detail 含降级原因与证据摘录） |
+| payload.confidence | object | – | 置信度自评 `{"level":"high"\|"medium"\|"low", "reason":str}`；**0 条白名单内有效证据时强制 `low`** 并在 reason 标注（2026-07-22 新增可选字段） |
+| payload.unverified_refs | array | – | 白名单校验剔除的引用原文 `[{"kind","ref","note"}]`，仅在有剔除时出现，供人工复核（2026-07-22 新增可选字段） |
+| evidence_refs | array | ✓ | 依据：`[{"kind":"experiment_record"\|"literature"\|"prediction","ref":"rec_...或DOI或pred_id","note":""}]`；写入前经白名单校验（ref 必须来自真实 record_id / 实际检索命中的文献名或图节点 ID），匹配不上者剔除并记入 `payload.unverified_refs` |
 | created_at | string | ✓ | 生成时间 |
 | status | string | ✓ | `new` / `adopted`（已采纳）/ `rejected`（已否决）/ `done`（已实验验证），由 App 侧回写状态 |
 

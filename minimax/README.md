@@ -43,7 +43,7 @@ minimax/
 │   ├── update_daily.py         # 每日 22:00 日报生成 + git commit
 │   ├── pre_commit_check.py     # 敏感信息扫描 (pre-commit hook 调用)
 │   ├── install_pre_commit_hook.py # 一键安装 pre-commit hook
-│   ├── llm_config.yaml         # LLM 路由 (主 MiniMax + 备 Kimi 2.7)
+│   ├── llm_config.yaml         # LLM 路由 (主 MiniMax + 备 longcat)
 │   ├── cas_image_map.json      # CAS → 结构式图片映射
 │   ├── knowledge_index.jsonl   # 核心知识库 embedding 索引 (1791 chunks, gitignored)
 │   ├── knowledge_index_tianxuan.jsonl # tianxuan 全库索引 (282057 chunks, 5.8GB, gitignored)
@@ -53,12 +53,24 @@ minimax/
 │   ├── _build_reagent_db.py    # 从 xlsx 重建 reagent_db.json
 │   └── _copy_predict.py        # 从 tianxuan-seek 复制最小集
 │
+├── adapters/                   # 与 COF App（全新机器学习实验）的文件对接层
+│   ├── cof_app_ingest.py       # 读 App 侧 rag_export → 校验 + 转换 feedback 行
+│   ├── iterate_suggest.py      # 页⑤ 自然语言方案迭代编排器（见下「页⑤ 对接」）
+│   └── test_iterate_suggest.py # 编排器测试
+│
 ├── 知识库/                    # 本地文献 PDF (只读, 来源包含于知识库/下)
 │
 ├── progress.md                 # 项目进度跟踪 (时间戳追加)
 ├── README.md                   # 本文件
 └── _tmp/set_api_env.ps1        # 环境变量设置脚本 (一次性)
 ```
+
+---
+
+## 运行环境与随仓库分发说明
+
+- **GraphRAG 运行时**：固定使用 `E:\python3.12\python.exe`（Python 3.12），依赖见 `requirements-minimax.txt`（networkx / requests / python-docx 等）。`predict/` 的 GNN 推理走 dphuanjing 环境（torch/PyG），不在该文件内。
+- **GraphRAG 检索底座随仓库分发**：`bridge/graphrag/`（图谱 `graph.pkl` / `graph_v2.pkl`、节点/边 jsonl、文献 embedding）连同本模块其余已追踪文件共约 75MB，**刻意保留在 git 追踪中**（决策：克隆即用，避免每位用户重建图谱；它们虽命中根 `.gitignore` 的 `*.pkl` 规则但已被强制追踪）。`bridge/graphrag/.gitignore` 中原有的 `graph_v2.pkl` 忽略规则与该决策矛盾，已删除。详见根 README「数据与随仓库分发说明」。
 
 ---
 
@@ -101,18 +113,34 @@ minimax/
 ## LLM 路由
 
 - **主 LLM**: MiniMax (方案拼装、结构化抽取)
-- **备用 LLM**: Kimi 2.7 (`kimi for coding`)
+- **备用 LLM**: longcat (`LongCat-2.0`，`LONGCAT_API_KEY`；主端点失败自动回落)
 - **Embedding**: MiniMax `embo-01` (type=db / type=query, 1536 维 asymmetric)
 - **本地检索**: 优先结构式 CAS 精确匹配, 其次 embedding 相似度
 
 **API key 安全**: 全部从环境变量读, 任何时候不写进文件
 
 ```powershell
-$env:KIMI_API_KEY = "你的 Kimi API key"
 $env:MINIMAX_API_KEY = "你的 MiniMax API key"
+$env:LONGCAT_API_KEY = "你的 longcat API key"
 ```
 
 设置脚本: `_tmp/set_api_env.ps1`
+
+---
+
+## 页⑤ 对接（COF App ↔ minimax）
+
+与主项目「全新机器学习实验」页⑤（自然语言方案迭代）对接：**读 App 侧
+`data/rag_export/records/` 实验记录 + 收藏单体 → 降级链检索取证 → LLM 生成 →
+按 Schema 3 落盘 `data/rag_export/suggestions/` 供 App 回显**（文件对接，零耦合；
+契约见 `docs/COF_APP_CONTRACT.md` 与 App 侧 `data/rag_export/README.md`）。
+
+```powershell
+# 指定收藏条目迭代
+python minimax/adapters/iterate_suggest.py --favorite-id fav_20260722_001 --question "上次失败了，下次怎么调条件"
+# 省略 --favorite-id 表示用全部实验记录
+python minimax/adapters/iterate_suggest.py --question "..."
+```
 
 ---
 
@@ -130,7 +158,7 @@ $env:MINIMAX_API_KEY = "你的 MiniMax API key"
 
 ## Git 仓库
 
-- **本地**: `C:\Users\ckx\Desktop\minimax` (master 分支)
+- **本地**: 本仓库 `minimax/` 目录（位于 `C:\Users\ckx\Desktop\全新机器学习实验\minimax`，master 分支；旧独立路径 `C:\Users\ckx\Desktop\minimax` 已失效）
 - **GitHub**: `https://github.com/Ckx-z/shiyandiedai`
 - **认证**: SSH (你已配)
 
@@ -152,7 +180,7 @@ $env:MINIMAX_API_KEY = "你的 MiniMax API key"
 
 ---
 
-## 当前状态 (2026-07-17)
+## 当前状态 (2026-07-22)
 
 ✅ 已完成:
 - 实验 ABCDEF 14 条入库 feedback_db.csv
@@ -167,6 +195,9 @@ $env:MINIMAX_API_KEY = "你的 MiniMax API key"
 - 每日日报 + git commit (cron job)
 - ABCDEF 巡查工具 (inspect_abcdef.py)
 - pre-commit hook (敏感信息扫描)
+- **页⑤ 对接**（adapters/iterate_suggest.py + cof_app_ingest.py，与主项目文件对接零耦合）
+- **波次 2**：failure 专家语料注入、evidence_refs 白名单校验（编造引用剔除进 unverified_refs）、
+  confidence 置信度自评（0 证据强制 low）、GraphRAG 多跳 BFS、nl2graph 中文支持、数据清洗重建
 
 ⏸ 等待用户:
 - 上传最新实验反馈 (in_progress.md 停在 7/11)

@@ -84,7 +84,6 @@ minimax/bridge/tianxuan_norms.bin
 minimax/bridge/indexer_*.log
 minimax/bridge/run_log.txt
 minimax/bridge/graphrag_v2/cached/
-minimax/graphrag/graph_v2.pkl
 # minimax 本地启动脚本与临时目录
 minimax/run_indexer.bat
 minimax/run_indexer.vbs
@@ -93,6 +92,7 @@ minimax/_tmp/
 logs/*.pid
 
 # 用户私有数据（每个用户独立实例，不入库）
+*.local.json
 config/llm_settings.local.json
 data/llm_cache/
 data/favorites/*.json
