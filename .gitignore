@@ -105,3 +105,6 @@ data/plan_templates/*
 !data/plan_templates/builtin_hou_v3_9.json
 data/generated_plans/*
 !data/generated_plans/.gitkeep
+
+# 本地安全备份（ dated ）
+*.bak_*

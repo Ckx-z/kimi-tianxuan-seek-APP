@@ -1,0 +1,430 @@
+﻿csv_line,smiles,best_name,action,issues
+4,Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline-15N",dropped,同位素/残留标注
+9,O=Cc1ccc(C(=O)C(F)(F)F)cc1,4-(trifluoroacetyl)benzaldehyde,fixed,is_aldehyde False→True
+13,CC1(C)OB(c2ccc(-c3ccc(Br)cc3)cc2)OC1c1ccc(-c2ccc(-c3ccc(Br)cc3)cc2)cc1,"1,3,5-tris(4-bromophenyl)boronic acid pinacol ester",review,type 存疑 other vs RDKit=none
+14,CC1(C)OB(c2ccc(C(F)(F)F)cc2)OC1c1ccc(C(F)(F)F)cc1,4-(trifluoromethyl)phenylboronic acid pinacol ester,review,type 存疑 other vs RDKit=none
+18,C=CC(=O)OCC(C(F)(F)F)(C(F)(F)F)C(F)(F)F,"1H,1H,7H-dodecafluoroheptyl acrylate",review,type 存疑 other vs RDKit=none
+20,Brc1ccc(C(c2ccc(Br)cc2)(c2ccc(Br)cc2)c2ccc(Br)cc2)cc1,tetrakis(4-bromophenyl)methane,review,type 存疑 other vs RDKit=none
+21,Nc1ccc2c(c1)C(=O)c1ccccc1C2=O,"2,6-diaminoanthraquinone",fixed,is_amine False→True
+22,O=Cc1ccc2c(c1-c1ccccc1-c1ccc3c(c1-c1ccccc1-c1ccc(O)cc1)C=C3)C=C2,"2,2′,7,7′-tetramethoxy-9,9′-spirobifluorene-3,3′,6,6′-tetracarbaldehyde",fixed,is_aldehyde False→True
+24,Cc1ccc(-c2ccc(N)cc2C)c(C)c1,"4,4′-diamino-2,2′,6,6′-tetramethylbiphenyl",fixed,is_amine False→True
+26,N#Cc1ccc(C#N)cc1,"1,4-benzenedicarbonitrile",review,type 存疑 other vs RDKit=none
+27,N#Cc1ccc(-c2ccc(C#N)nc2)nc1,"2,2-bipyridine-5,5-dicarbonitrile",review,type 存疑 other vs RDKit=none
+31,Cl.N=C(N)NNC(N)=[NH2+],triaminoguanidinium chloride,fixed,"计数修正 n_aldehyde 0→0, n_amine 3→2"
+33,O=Cc1ccc(F)cc1,4-fluorobenzaldehyde,fixed,is_aldehyde False→True
+34,O=Cc1ccc(=O)[nH]c(=O)c1,"1,3,5-triformylphloroglucinol",fixed,is_aldehyde False→True
+35,Nc1c(F)cc(-c2c(F)c(F)cc(F)c2F)c(F)c1F,"1,3,5-tris(2,3,5,6-tetrafluoroanilino)benzene",fixed,is_amine False→True
+37,CCCOc1ccc(C(=O)NN)c(-c2ccccc2C(=O)NN)c1-c1ccccc1,"5′-(4-(hydrazinecarbonyl)-3-propoxyphenyl)-3,3′′-di(propoxy)-[1,1′:3′,1′′-terphenyl]-4,4′′-dicarboxyhydrazide",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; type 存疑 other vs RDKit=none"
+38,Nc1c(F)c(F)cc(F)c1F,"1,3,5-tris(2,3,5,6-tetrafluoroanilino)benzene",fixed,is_amine False→True
+39,O=CC1=CC(=O)C(O)=C(O)C1=O,"1,3,5-triformylphloroglucinol",fixed,is_aldehyde False→True
+40,Oc1cc(O)cc(O)c1,phloroglucinol,review,type 存疑 other vs RDKit=none
+42,Cc1ccc(-c2cc(C)ccc2C)cc1,"1,3,5-tris(4-methylphenyl)benzene derivative",review,type 存疑 other vs RDKit=none
+43,NN,hydrazine hydrate,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+49,Nc1ccc(-c2nc(Nc3ccccc3)nc(-c3ccc(N)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→4"
+51,Nc1ccc(Nc2ccc(-c3ccc(Nc4ccc(-c5ccc(Nc6ccc(-c7ccc8c(ccc9c%10ccccc%10ccc89)c7)cc6)cc5)cc4)cc3)cc2)cc1,"4,4',4'',4'''(Pyrene-1,3,6,8-tetrayl)tetaniline",fixed,"计数修正 n_aldehyde 0→0, n_amine 1→7; is_amine False→True"
+53,N=C(N)NN,triaminoguanidinium chloride,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→1"
+55,Nc1ccc(-c2ccccc3ncnc2-3)cc1,"1,3,5-tris(4-aminophenyl)triazine",fixed,is_amine False→True
+59,O=CC1=C(F)C(C(F)=C(F)F)=C(F)C1=O,"2,3,5,6-tetrafluoroterephthalaldehyde",fixed,is_aldehyde False→True
+60,OB(O)c1ccc(B(O)O)cc1,"1,4-phenylenediboronic acid",review,type 存疑 other vs RDKit=none
+61,CC1(C)OB(c2ccc(C=O)cc2)OC1(C)C,"4-(4,4,5,5-tetramethyl-1,3,2-dioxaborolan-2-yl)benzaldehyde",fixed,is_aldehyde False→True
+62,CC1(C)OB(c2ccc(N)cc2)OC1(C)C,"4-(4,4,5,5-tetramethyl-1,3,2-dioxaborolan-2-yl)aniline",fixed,is_amine False→True
+63,c1ccc2nonc2c1,"2,1,3-benzothiadiazole",review,type 存疑 other vs RDKit=none
+66,COc1ccccc1N,o-dimethoxyaniline,fixed,is_amine False→True
+68,Oc1ccc(O)c(O)c1,"1,3,5-trihydroxybenzene",review,type 存疑 other vs RDKit=none
+72,OBc1ccc(C#CC#Cc2ccc(BO)cc2)cc1,"4,4'-diphenylbutadiynebis(boronic acid)",review,type 存疑 other vs RDKit=none
+83,NNC(=O)OCCOCCO,PEO-hydrazide monomer (x=3),fixed,"计数修正 n_aldehyde 0→0, n_amine 1→0; type 存疑 amine vs RDKit=none"
+84,OB1C=CC=C(B(O)O)C=C1,"1,4-benzenediboronic acid",review,type 存疑 other vs RDKit=none
+87,N#CC(=Cc1ccccc1)c1ccccc1,"2,3-diphenylacrylonitrile",review,type 存疑 other vs RDKit=none
+88,C(=Nc1ccccc1)c1ccccc1,"N,N'-p-phenylenedimethylene dibenzenamine",review,type 存疑 other vs RDKit=none
+93,COc1ccc(C=O)cc1OC,"2,5-dimethoxyterephthaldehyde",fixed,is_aldehyde False→True
+94,CCOc1ccc(C=O)cc1OCC,"2,5-diethoxyterephthaldehyde",fixed,is_aldehyde False→True
+96,Brc1cccc2c1C1=C2c2c(Br)ccc1c2Br,"1,3,6,8-tetrabromopyrene",review,type 存疑 aldehyde vs RDKit=none
+99,OB(O)c1ccccc1,"1,4-phenylenebis(boronic acid) (PBBA)",review,type 存疑 other vs RDKit=none
+102,Nc1ccc(C#Cc2c3ccccc3cc3ccccc23)cc1,"9,10-bis(4-aminophenylethynyl)anthracene",fixed,is_amine False→True
+103,N=C(N)NC(=N)N,biguanide,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→4"
+104,CN(C)NC(=N)NC(=N)N,metformin,fixed,"计数修正 n_aldehyde 0→0, n_amine 1→3; is_amine False→True"
+105,N=C1N=C(Nc2ccccn2)N=C1c1cccc(N)n1,"5,5',5''-(1,3,5-triazine-2,4,6-triyl)tri(pyridin-2-amine)",fixed,"计数修正 n_aldehyde 0→0, n_amine 1→3; is_amine False→True"
+109,Nc1ccc(B(O)O)cc1,4-aminophenylboronic acid,fixed,is_amine False→True; type 存疑 aldehyde-amine vs RDKit=amine
+110,C#Cc1ccc(B(O)O)cc1,(4-ethynylphenyl)boronic acid,review,type 存疑 other vs RDKit=none
+111,O=C(O)c1cc(C(=O)O)cc(C(=O)O)c1,"1,3,5-benzenetricarboxylic acid",review,type 存疑 other vs RDKit=none
+112,C1CNCCNC1,piperazine,fixed,"计数修正 n_aldehyde 0→0, n_amine 0→4; is_amine False→True"
+113,Nc1ccc(S(=O)O)cc1,4-aminobenzenesulfonic acid,fixed,is_amine False→True
+117,O=C(O)CCN(CCN(CC(=O)O)CC(=O)O)CC(=O)O,diethylenetriaminepentaacetic acid,review,type 存疑 other vs RDKit=none
+119,Oc1cccc(O)c1O,pyrogallol,review,type 存疑 other vs RDKit=none
+120,Oc1ccccc1O,catechol,review,type 存疑 other vs RDKit=none
+122,Oc1ccc2c(c1)cc(O)c1c3ccc(O)cc3ccc21,"2,3,6,7,10,11-hexahydroxytriphenylene",review,type 存疑 other vs RDKit=none
+123,OB(O)c1ccc(-c2ccccc2)cc1,biphenyl-4-boronic acid,review,type 存疑 other vs RDKit=none
+127,N#Cc1ccc(N)cc1,4-aminobenzyl cyanide,fixed,is_amine False→True
+129,COc1cc(C(=O)NN)cc(C(=O)NN)c1,"2,5-dimethoxyterephthalohydrazide",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; type 存疑 other vs RDKit=none"
+130,Nc1ccc(Nc2ccc(-c3ncnc(-c4ccc(Nc5ccc(N)cc5)cc4)c3-c3ccc(Nc4ccc(N)cc4)cc3)cc2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)tris(N-phenyl-[1,1'-biphenyl]-4-amine)",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→9"
+131,Cc1nc(C)nc(C)n1,"2,4,6-trimethyl-1,3,5-triazine",review,type 存疑 other vs RDKit=none
+132,COc1ccc(Cc2cccc[n+]2C)c(Cc2ccccn2)c1,"1,1'-[(2,5-dimethoxy-1,4-phenylene)bis(methylene)]bis[pyridinium]",review,type 存疑 other vs RDKit=none
+133,Bc1ccc(B(O)O)cc1,"1,4-phenylenediboronic acid",review,type 存疑 other vs RDKit=none
+136,Cc1ccc(N)cc1C,"2,5-dimethyl-1,4-phenylenediamine",fixed,is_amine False→True
+137,Oc1c(O)c(Cl)c(Cl)c(O)c1Cl,trichlorophloroglucinol,review,type 存疑 other vs RDKit=none
+139,Nc1ccc(S(=O)(=O)O)cc1,4-aminobenzenesulfonic acid,fixed,is_amine False→True
+140,Nc1ccc(Nc2ccc(-c3ccc(N)cc3)cc2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→4"
+142,Nc1ccc(F)nc1F,"2,6-difluoro-1,4-pyridinediamine",fixed,is_amine False→True
+145,Nc1ccc(N)c(S(=O)(=O)O)c1,"2,5-diaminobenzenesulfonic acid",fixed,is_amine False→True; type 存疑 other vs RDKit=amine
+148,NN.O,hydrazine hydrate,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+154,N#Cc1ccc(C2=NC3=NC(c4ccc(C#N)cc4)=C(c4ccc(C#N)cc4)C3=N2)cc1,"1,3,5-tris(4-cyanophenyl)triazine",review,type 存疑 other vs RDKit=none
+157,Nc1ccc(C(F)(F)F)cc1,4-(trifluoromethyl)aniline,fixed,is_amine False→True
+158,OB(O)c1ccccc1B(O)O,benzenediboronic acid,review,type 存疑 other vs RDKit=none
+163,NC(=O)c1ccc(C(N)=O)cc1,terephthalamide dihydrochloride,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+164,NC1=CC(=O)C(N)=C(N)C1=O,"1,2,4,5-tetraaminobenzoquinone",review,type 存疑 aldehyde-amine vs RDKit=amine
+165,O=C1C(=O)C(=O)C(=O)C(=O)C1=O,"cyclohexane-1,2,3,4,5,6-hexone",review,type 存疑 aldehyde vs RDKit=none
+168,COc1ccc(N)cc1OC,"2,5-dimethoxybenzene-1,4-diamine",fixed,is_amine False→True
+171,O=C(Cl)c1cc(C(=O)Cl)cc(C(=O)Cl)c1,"1,3,5-benzenetricarbonyl chloride",review,type 存疑 other vs RDKit=none
+176,N#Cc1ccc(-c2ccc(C#N)cc2)cc1,"4,4'-dicyanobiphenyl",review,type 存疑 other vs RDKit=none
+177,N#Cc1cccc(C#N)c1,"2,6-dicyanopyridine",review,type 存疑 other vs RDKit=none
+178,N#Cc1ccc(-c2cc(-c3ccc(C#N)cc3)cc(-c3ccc(C#N)cc3)c2)cc1,"1,3,5-tris(4-cyanophenyl)benzene",review,type 存疑 other vs RDKit=none
+179,O=C=Nc1cccc2ccccc12,(S)- or (R)-naphthyl isocyanate,review,type 存疑 other vs RDKit=none
+180,O=C(O)c1cccc2c(=O)oc(=O)c(=O)oc(=O)c12,pyromellitic dianhydride,review,type 存疑 other vs RDKit=none
+181,c1ccc(N(c2ccccc2)c2ccccc2)cc1,triphenylamine,review,type 存疑 amine vs RDKit=none
+182,Clc1ncnc(Cl)n1,"2,4,6-trichloro-1,3,5-triazine",review,type 存疑 other vs RDKit=none
+188,NCC(O)(CO)CO,tris(hydroxymethyl)aminomethane,fixed,is_amine False→True
+189,Nc1ccc(Nc2ccc(-c3ccc(N)cc3)c(-c3ccccc3)c2)cc1,"5'-(4-aminophenyl)-[1,1':3',1''-terphenyl]-4,4''-diamine",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→4"
+191,C#Cc1ccc(C#Cc2ccc(C(=O)c3ccc(C#Cc4ccc(C(=O)c5ccc(C#C)cc5)cc4)cc3)cc2)cc1,"1,3,5-tris(4-ethynylphenyl)benzene-1',3''-trione",review,type 存疑 other vs RDKit=none
+193,O=C1COC(=O)CO1,diglycolic anhydride,review,type 存疑 other vs RDKit=none
+194,COCC(=O)C(C)(CO)COC,"1,1,3-trimethoxypropane",review,type 存疑 aldehyde vs RDKit=none
+195,c1ccc(Nc2ccc(Nc3ccccc3)cc2)cc1,"N1,N1'-(1,4-phenylene)bis(N1-(4-aminophenyl)phenyl-1,4-diamine)",fixed,"计数修正 n_aldehyde 0→0, n_amine 0→4; is_amine False→True"
+196,C=Cc1ccc(C=O)cc1C=C,"2,5-divinylterephthalaldehyde",fixed,is_aldehyde False→True
+197,COc1cc(-c2cc(C(=O)NN)cc(-c3cccc(C(=O)NN)c3)c2)ccc1C(=O)NN,"1,3,5-tris(3'-methoxy-4'-hydrazinecarbonylphenyl)benzene",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→0; is_amine True→False; type 存疑 aldehyde-amine vs RDKit=none"
+198,Nc1cccc(Nc2ccc(-c3nc(-c4ccc(Nc5ccccc5)cc4)nc(-c4ccc(Nc5ccccc5)cc4)n3)cc2)c1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",fixed,"计数修正 n_aldehyde 0→0, n_amine 1→7; is_amine False→True"
+199,O=C1C=CC(=O)C2=C1Cc1ccccc12,ace-naphthenequinone,review,type 存疑 other vs RDKit=none
+200,Clc1nc(Cl)nc(Cl)n1,"2,4,6-trichloro-1,3,5-triazine",review,type 存疑 other vs RDKit=none
+201,Nc1ccc(C2=NC(Nc3ccccc3)=C3C=CC(=N3)C(c3ccc(N)cc3)=C2c2ccc(N)cc2)cc1,"5,10,15,20-tetrakis(4-aminophenyl)-21H,23H-porphine",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→5"
+203,CNCCCN,N-propylethylenediamine,fixed,"计数修正 n_aldehyde 0→0, n_amine 1→3; is_amine False→True"
+204,OB(O)c1ccc(C(c2ccc(B(O)O)cc2)(c2ccc(B(O)O)cc2)c2ccc(B(O)O)cc2)cc1,tetrakis(4-boronic acid phenyl)methane,review,type 存疑 other vs RDKit=none
+205,OB(O)c1ccc([Si](c2ccc(B(O)O)cc2)(c2ccc(B(O)O)cc2)c2ccc(B(O)O)cc2)cc1,tetrakis(4-boronic acid phenyl)silane,review,type 存疑 other vs RDKit=none
+207,CC(C)Nc1nc(N)nc(N)n1,"2,4-diamino-6-isopropyl-s-triazine",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→4"
+208,CC(C)Nc1nc(N)nc(F)n1,4-isopropyl-2-amino-6-fluoro-s-triazine,fixed,"计数修正 n_aldehyde 0→0, n_amine 1→3; is_amine False→True"
+209,NC1CCCC1[N]([Ni][c]1ccc(C=O)cc1O)c1ccc(C=O)cc1O,"(1R,2R)-N,N'-bis(3-formyl-4-hydroxybenzylidene)-1,2-diaminocyclohexane nickel(II)",fixed,is_amine False→True; type 存疑 aldehyde-amine vs RDKit=both
+210,CC(C)(C)OC(=O)Nc1ccc(O)c(C=O)c1,tert-butyl (3-formyl-4-hydroxyphenyl)carbamate,fixed,is_aldehyde False→True
+212,O=Cc1ccccc1,benzaldehyde,fixed,is_aldehyde False→True
+213,C1=CCC(C(c2ccccc2)N(c2ccccc2)c2ccccc2)=C1,triphenylamine,review,type 存疑 amine vs RDKit=none
+214,Nc1ccccc1,aniline,fixed,is_amine False→True
+215,NNC(=O)N(N)C=O,oxalic dihydrazide,fixed,"计数修正 n_aldehyde 0→1, n_amine 2→0; is_aldehyde False→True; type 存疑 other vs RDKit=aldehyde"
+216,Oc1ccc2c3ccc4c5ccc6c7c(O)c8c7c6c6c8c1c2c3c4c56,"2,3,10,11,18,19-hexahydroxy-hexabenzocoronene",review,type 存疑 other vs RDKit=none
+218,OB(O)c1ccc2sc(-c3ccc(O)cc3)nc2c1,"1,4-benzothiadiazole-2,5-diboronic acid",review,type 存疑 other vs RDKit=none
+219,O=C(c1ccccc1)c1ccccc1,benzophenone,review,type 存疑 other vs RDKit=none
+225,O=Cc1cc(F)ccc1F,"2,4-difluorobenzaldehyde",fixed,is_aldehyde False→True
+226,O=Cc1cc(F)c(F)c(F)c1F,"2,3,4,5-tetrafluorobenzaldehyde",fixed,is_aldehyde False→True
+227,OC1=C2C(=C(O)c3c(O)cccc32)c2cc(O)ccc21,"2,3,6,7,10,11-hexahydroxytriphenylene",review,type 存疑 other vs RDKit=none
+228,CC1(C)CB(OB2CC(C)(C)O2)O1,bis(pinacolato)diboron,review,type 存疑 other vs RDKit=none
+229,N#Cc1ccc(C#N)c(C#N)c1,"1,2,4,5-tetracyanobenzene",review,type 存疑 other vs RDKit=none
+231,O=C(O)c1ccc(-c2nc(-c3ccc(C(=O)O)cc3)nc(-c3ccc(C(=O)O)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)tribenzoic acid",review,type 存疑 other vs RDKit=none
+233,O=C1OC(=O)c2ccc(cc2)C(=O)O1,pyromellitic dianhydride,review,type 存疑 other vs RDKit=none
+236,O=Cc1ccccc1[N+](=O)[O-],2-nitrobenzaldehyde,fixed,is_aldehyde False→True
+237,Nc1ccccc1C=O,2-aminobenzaldehyde,fixed,is_aldehyde False→True; is_amine False→True; type 存疑 aldehyde-amine vs RDKit=both
+238,O=Cc1ccccc1C(=O)O,2-formylbenzoic acid,fixed,is_aldehyde False→True
+239,O=Cc1ccc(C(=O)O)cc1,4-carboxybenzaldehyde,fixed,is_aldehyde False→True
+240,O=Cc1ccc([N+](=O)[O-])cc1,4-nitrobenzaldehyde,fixed,is_aldehyde False→True
+242,Nc1ccccc1S,2-aminobenzenethiol,fixed,is_amine False→True
+248,CC[N+]1=C(c2c3cccc2[N+](CC)=C(c2ccccc2)c2ccccc2-3)CC(C(=N)N)=C1,Ethidium bromide,fixed,is_amine False→True; type 存疑 other vs RDKit=amine
+250,N#CCc1ccc(C#N)cc1,"2,2'-(1,4-phenylene)diacetonitrile",review,type 存疑 other vs RDKit=none
+251,N#CCc1ccc(-c2ccc(C#N)cc2)cc1,"2,2'-(biphenyl-4,4'-diyl)diacetonitrile",review,type 存疑 other vs RDKit=none
+252,COc1cc(N)c(N)cc1OC,"2,5-dimethoxy-1,4-phenylenediamine",fixed,is_amine False→True; type 存疑 other vs RDKit=amine
+256,Cl.N=C(N)NN,aminoguanidine hydrochloride,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→1"
+258,OCc1c(F)c(F)c(CO)c(F)c1F,"2,3,5,6-tetrafluoro-1,4-benzenedimethanol",review,type 存疑 other vs RDKit=none
+262,Nc1ccc(-c2ncnc(-c3ccc(N)cc3)n2)cc1,"4,4′,4″-(1,3,5-triazine-2,4,6-triyl)trianiline",fixed,is_amine False→True; type 存疑 other vs RDKit=amine
+264,Nc1ccc(S(=O)(=O)O)nc1,"2,5-diaminobenzene-1,4-disulfonic acid",fixed,is_amine False→True
+265,O=Cc1ccc2c(c1)C=CC(=O)C2=O,"2,5-divinylterephthalaldehyde",fixed,is_aldehyde False→True
+267,N#CC1=C2C(c3ccccc3)=NSC(c3ccccc3)=C2SN=C1c1ccccc1,"2,6-dicyano-1,3,5,7-tetraphenylbenzo[1,2-d:4,5-d']bis(thiazole)",review,type 存疑 other vs RDKit=none
+268,O=Cc1cc(F)c(F)c(=O)c(F)c1F,"2,3,5,6-tetrafluoro-1,4-benzenedicarboxaldehyde",fixed,is_aldehyde False→True
+271,O=c1oc(=O)c2ccccc2o1,pyromellitic anhydride,review,type 存疑 other vs RDKit=none
+272,Nc1ccc2nsnc2c1,"4,7-diamino-2,1,3-benzothiadiazole (BT-H)",fixed,is_amine False→True; type 存疑 aldehyde-amine vs RDKit=amine
+273,Nc1c(F)ccc2nsnc12,"4,7-diamino-5-fluoro-2,1,3-benzothiadiazole (BT-F)",fixed,is_amine False→True; type 存疑 aldehyde-amine vs RDKit=amine
+274,Nc1c(Cl)ccc2nsnc12,"4,7-diamino-5-chloro-2,1,3-benzothiadiazole (BT-Cl)",fixed,is_amine False→True; type 存疑 aldehyde-amine vs RDKit=amine
+275,Cc1ccc(OCC#Cc2c(O)cccc2C=O)cc1,3-(3-(p-tolyl)prop-2-ynoxy)-2-hydroxybenzaldehyde,fixed,is_aldehyde False→True
+276,O=Cc1c(O)cccc1OCC#Cc1ccccc1,3-(3-phenylprop-2-ynoxy)-2-hydroxybenzaldehyde,fixed,is_aldehyde False→True
+277,c1ccc(C2CO2)cc1,styrene oxide,review,type 存疑 other vs RDKit=none
+279,O=Cc1ccc2ccccc2c1,naphthalene-based monomer,fixed,is_aldehyde False→True
+280,Nc1ccc([N+](=O)[O-])cc1,PaNO₂,fixed,is_amine False→True
+281,O=[N+]([O-])c1ccc([N+](=O)[O-])cc1,BD(NO₂)₂,review,type 存疑 amine vs RDKit=none
+282,N#Cc1ccc(N=Nc2ccc(N)cc2)cc1,Azo,fixed,is_amine False→True; type 存疑 other vs RDKit=amine
+285,O=CC1=C(C(=O)C2C=CS2)S1,"5,5'-bithiene-2,2'-dicarbaldehyde",fixed,is_aldehyde False→True
+288,[N-]=[N+]=NCCOCCOCC=O,2-(2-azidoethoxy)ethoxyacetaldehyde,fixed,is_aldehyde False→True
+290,Nc1ccc(Nc2nc(Nc3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→7"
+291,CCOc1cc(NC(=O)C(=O)NN)ccc1OC(=O)C(=O)NN,"2,5-diethoxyterephthalohydrazide",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; type 存疑 other vs RDKit=none"
+292,Ic1ccc(-c2ccc(-c3ccc(I)cc3)c(-c3ccc(I)cc3)c2)cc1,"1,3,5-tris(4-iodophenyl)benzene",review,type 存疑 other vs RDKit=none
+295,Cc1nc(C)c(C)c(C)n1,"2,4,6-三甲基-1,3,5-三嗪 (TMT)",review,type 存疑 other vs RDKit=none
+296,C=O,formaldehyde (from paraformaldehyde),review,type 存疑 aldehyde vs RDKit=none
+297,Nc1ccnc(-c2c(-c3ccncc3)ccnc2-c2cccnc2)c1,"1,3,5-tris(4-aminopyridyl)pyridine",fixed,is_amine False→True
+299,O=Cc1cccc(-c2ccccc2)c1,"1,3,5-benzenetricarboxaldehyde",fixed,is_aldehyde False→True
+300,NC(=S)Nc1ccc(C(N)=S)cc1,"1,4-phenylenebis(thiourea)",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→4"
+301,c1ccc(Nc2nc(Nc3ccccn3)nc(Nc3ccccn3)n2)nc1,"2,4,6-tris(pyridin-2-amino)-1,3,5-triazine",fixed,"计数修正 n_aldehyde 0→0, n_amine 0→6; is_amine False→True"
+302,c1ccc(Nc2cc(Nc3ccccn3)cc(Nc3ccccn3)c2)nc1,"1,3,5-tris(pyridin-2-amino)benzene",fixed,"计数修正 n_aldehyde 0→0, n_amine 0→6; is_amine False→True"
+303,Nc1ccc(F)cc1,4-fluoroaniline,fixed,is_amine False→True
+304,Nc1ccc(O)cc1,4-aminophenol,fixed,is_amine False→True
+305,O=Cc1ccc(B(O)O)cc1,4-(dihydroxyboryl)benzaldehyde,fixed,is_aldehyde False→True
+307,O=Cc1ccc2ccc3cccc4ccc1c2c34,pyrene-1-carbaldehyde,fixed,is_aldehyde False→True
+309,O=C(O)c1ccc2nc(C(=O)O)sc2c1,"1,4-benzothiazole-2,5-dicarboxylic acid",review,type 存疑 other vs RDKit=none
+310,NNc1ncnc(NN)n1,"2,4,6-trihydrazinyl-1,3,5-triazine",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+315,O=Cc1ccc(O)c(O)c1,protocatechuic aldehyde,fixed,is_aldehyde False→True
+316,Oc1cccc(O)c1,"1,3-benzenediol",review,type 存疑 other vs RDKit=none
+318,Nc1ccc(C(=O)O)cc1,4-aminobenzoic acid,fixed,is_amine False→True
+319,NN=C(N)N,triaminoguanidine,fixed,"计数修正 n_aldehyde 0→0, n_amine 3→2"
+322,CC(C)(C)OC(=O)Nc1ccc(N)cc1,4-(tert-butoxycarbonylamino)-aniline,fixed,is_amine False→True
+325,Brc1ccc(Br)cc1,"1,4-dibromobenzene",review,type 存疑 other vs RDKit=none
+326,NNC(=O)c1ccc(C(=O)NN)cc1,terephthalohydrazide,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+327,N#Cc1cc(C#N)cc(C#N)c1,"1,3,5-tricyanobenzene",review,type 存疑 other vs RDKit=none
+328,Nc1c(F)c(F)c(F)c(F)c1F,pentafluoroaniline,fixed,is_amine False→True
+332,c1cncc(-c2cc3cc(-c4ccncc4)cc(-c4ccncc4)c3cc2-c2ccncc2)c1,"1,3,6,8-tetra(4-pyridyl)pyrene",review,type 存疑 other vs RDKit=none
+337,c1ccc(-c2ccc(-c3ccccc3)cc2)cc1,对三联苯,review,type 存疑 other vs RDKit=none
+338,O=C1CCC(=O)O1,琥珀酸酐,review,type 存疑 other vs RDKit=none
+339,CC(=O)CC(=O)C(F)(F)F,trifluoroacetylacetone,review,type 存疑 other vs RDKit=none
+340,N#CC(C#N)=C(C#N)C#N,tetracyanoethylene,review,type 存疑 other vs RDKit=none
+342,C#Cc1ccc(F)cc1,1-ethynyl-4-fluorobenzene,review,type 存疑 other vs RDKit=none
+343,C#Cc1cc(F)cc(F)c1,"1-ethynyl-3,5-difluorobenzene",review,type 存疑 other vs RDKit=none
+348,CC=O,acetaldehyde,fixed,is_aldehyde False→True
+349,N#CCc1ccc(CC#N)cc1,"2,2′-(1,4-phenylene)diacetonitrile",review,type 存疑 other vs RDKit=none
+352,O=Cc1ccccc1B(O)O,2-formylphenylboronic acid,fixed,is_aldehyde False→True
+353,O=C1C=CC(=O)C=C1,benzoquinone,review,type 存疑 other vs RDKit=none
+359,CCOc1cc(C(=O)NN)cc(OCC)c1C(=O)NN,"2,5-diethoxyterephthalohydrazide",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+360,CC1(C)C2CCC1(C(=O)O)C(C(=O)O)C2,camphoric acid,review,type 存疑 other vs RDKit=none
+361,O=C(O)[C@@H](O)[C@@H](O)C(=O)O,tartaric acid,review,type 存疑 other vs RDKit=none
+362,Oc1ccc2ccccc2c1-c1c(O)ccc2ccccc12,"1,1'-bi-2-naphthol",review,type 存疑 other vs RDKit=none
+363,O=Cc1ccccc1/N=C/C/N=C/c1ccccc1O,"N,N'-bis(salicylidene)ethylenediamine",fixed,is_aldehyde False→True; type 存疑 other vs RDKit=aldehyde
+365,O=[N+]([O-])c1ccc([N+](=O)[O-])c(-[n+]2ccc(-c3ccc(-c4cccc(-c5cc[n+](-c6cc([N+](=O)[O-])ccc6[N+](=O)[O-])cc5)c4)cc3)cc2)c1.[Cl-].[Cl-],"4,4'-(1,4-phenylene)bis(1-(2,4-dinitrophenyl)pyridinium) dichloride",review,type 存疑 other vs RDKit=none
+366,O=[N+]([O-])c1ccc(C(=C(c2ccc([N+](=O)[O-])cc2)c2ccc([N+](=O)[O-])cc2)c2ccc([N+](=O)[O-])cc2)cc1,"1,1,2,2-Tetrakis(4-nitrophenyl)ethene",review,type 存疑 other vs RDKit=none
+367,CC(=O)O[C@@H]1C(=O)OC(=O)[C@H]1OC(C)=O,(+)-diacetyl-L-tartaric anhydride,review,type 存疑 other vs RDKit=none
+370,ClP1(Cl)=NP(Cl)(Cl)=NP(Cl)(Cl)=N1,hexachlorocyclotriphosphazene,review,type 存疑 other vs RDKit=none
+371,N#Cc1ccc(C(=O)Cl)cc1,4-cyanobenzoyl chloride,review,type 存疑 other vs RDKit=none
+372,Cc1cc(C#N)c(O)nc1C,"3-cyano-4,6-dimethyl-2-hydroxypyridine",review,type 存疑 other vs RDKit=none
+373,OC1=C(O)c2cc3c(cc2=C1)C(O)=C(O)C=3O,"2,3,6,7,10,11-hexahydroxytriphenylene",review,type 存疑 other vs RDKit=none
+374,OBc1ccc(B(O)O)cc1,"1,4-phenylenebis(boronic acid)",review,type 存疑 other vs RDKit=none
+377,c1ccc(-c2ccccn2)nc1,"2,2'-bipyridine",review,type 存疑 other vs RDKit=none
+378,c1cnc(-c2ccncn2)nc1,"2,2'-bipyrimidine",review,type 存疑 other vs RDKit=none
+379,c1cnc(-c2cnccn2)nc1,"2,2'-bipyrazine",review,type 存疑 other vs RDKit=none
+381,O=C(Cl)c1ccc(C(=O)Cl)cc1,terephthaloyl chloride,review,type 存疑 other vs RDKit=none
+385,OB(O)C1=Cc2c(sc3c4c(sc23)=C(B(O)O)C=C4)=C1,"benzo[1,2-b:4,5-b']dithiophene-2,6-diyldiboronic acid",review,type 存疑 other vs RDKit=none
+386,OC1=C(O)c2cc3c(cc2=C1O)C(O)=C(O)C=3O,"2,3,6,7,10,11-hexahydroxytriphenylene",review,type 存疑 other vs RDKit=none
+389,N#Cc1cc(F)c(F)c(F)c1F,"2,3,5,6-tetrafluorobenzonitrile",review,type 存疑 other vs RDKit=none
+390,N#Cc1cc(F)c(I)c(F)c1F,"2,3,5,6-tetrafluoro-4-iodobenzonitrile",review,type 存疑 other vs RDKit=none
+391,C[C@@H]1CNCCN1,S-(+)-2-methylpiperazine,fixed,"计数修正 n_aldehyde 0→0, n_amine 0→4; is_amine False→True"
+395,NNC(=O)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(=O)NN,"perfluorohexane-1,6-dicarbohydrazide",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+396,O=Cc1cc2c(cc1C=O)Sc1ccccc1N2,"phenothiazine-3,7-dicarbaldehyde",fixed,"计数修正 n_aldehyde 2→2, n_amine 0→2; is_amine False→True; type 存疑 aldehyde vs RDKit=both"
+397,Brc1c2ccccc2c(Br)c2ccccc12,"9,10-dibromoanthracene",review,type 存疑 other vs RDKit=none
+399,N#Cc1ccc(O[PH]2=N[PH](Oc3ccc(C#N)cc3)=NP(Oc3ccc(C#N)cc3)(Oc3ccc(C#N)cc3)=N2)cc1,hexakis(4-cyanophenoxy)cyclotriphosphazene,review,type 存疑 other vs RDKit=none
+405,O=C(O)c1ccc(C(=O)O)cc1,terephthalic acid,review,type 存疑 other vs RDKit=none
+408,C1CNCCN1,piperazine,fixed,"计数修正 n_aldehyde 0→0, n_amine 0→4; is_amine False→True"
+410,NNC(=O)C(=O)NN,oxalyl dihydrazide,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+416,O=C(O)c1cccc(-c2cccc(C(=O)O)n2)n1,"2,2'-bipyridine-6,6'-dicarboxylic acid",review,type 存疑 other vs RDKit=none
+417,OB(O)c1ccc(-c2ccc(B(O)O)cc2)cc1,"4,4'-biphenyldiboronic acid",review,type 存疑 other vs RDKit=none
+421,Fc1ccc(F)cc1,difluorobenzene,review,type 存疑 other vs RDKit=none
+422,Fc1ccc2ccccc2c1F,difluoronaphthalene,review,type 存疑 other vs RDKit=none
+423,Fc1c2ccccc2c(F)c2ccccc12,difluoroanthracene,review,type 存疑 other vs RDKit=none
+425,O=c1oc(=O)c2ccc3c(=O)oc(=O)c3c2c1=O,"naphthalene-1,4,5,8-tetracarboxylic dianhydride",review,type 存疑 other vs RDKit=none
+426,c1ccc(N(c2ccccc2)c2ccc(N(c3ccccc3)c3ccccc3)cc2)cc1,W-NH2,review,type 存疑 amine vs RDKit=none
+427,C#Cc1ccccc1,phenylacetylene,review,type 存疑 other vs RDKit=none
+428,C#Cc1ccc(C(=O)OC)cc1,methyl 4-ethynylbenzoate,review,type 存疑 other vs RDKit=none
+431,O=C1c2cc(Br)ccc2-c2cc(Br)ccc21,"3,6-dibromophenanthrene-9,10-dione",review,type 存疑 other vs RDKit=none
+433,N#CCc1cc(CC#N)cc(CC#N)c1,"2,2',2''-(benzene-1,3,5-triyl)triacetonitrile",review,type 存疑 other vs RDKit=none
+435,CCOc1cc(C(=O)NN)c(OCC)cc1C(=O)NN,"2,5-diethoxyterephthalohydrazide",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+436,C#Cc1c(Cl)c(Cl)c(Cl)c(Cl)c1[C](c1cc(Cl)c(Cl)c(Cl)c1Cl)c1cc(Cl)c(Cl)c(Cl)c1Cl,PTMacetylenic,review,type 存疑 other vs RDKit=none
+437,N=C(N)N(N)N,triaminoguanidine,fixed,"计数修正 n_aldehyde 0→0, n_amine 3→1"
+439,Cc1nc(C)c(C#N)c(C)c1C#N,"2,4,6-trimethylpyridine-3,5-dicarbonitrile",review,type 存疑 other vs RDKit=none
+442,O=C1OC(=O)c2c1ccc1c(=O)oc(=O)oc(=O)c21,"1,4,5,8-Naphthalenetetracarboxylic dianhydride",review,type 存疑 other vs RDKit=none
+445,c1cc2ccc3cccc4ccc5ccc6ccc(c1)c1c2c3c4c5c61,decacyclene,review,type 存疑 other vs RDKit=none
+446,O=Nc1ccc(N=O)cc1,"1,4-dinitrosobenzene",review,type 存疑 other vs RDKit=none
+448,Nc1ccc(C2=NC3=NC=NC3=N2)cc1,"4,4',4''-(1,3,5-triazine-2,4,6-triyl)trianiline",fixed,is_amine False→True
+451,Nc1ccc(P(=O)(O)O)cc1,4-aminophenylphosphonic acid,fixed,is_amine False→True
+452,Oc1cc(O)c2ccc3cc(O)c(O)cc3c2c1,"2,3,6,7-tetrahydroxyanthracene",review,type 存疑 other vs RDKit=none
+456,OB(O)c1cc(B(O)O)cc(B(O)O)c1,"1,3,5-benzenetriboronic acid",review,type 存疑 other vs RDKit=none
+461,BrCc1cc(CBr)cc(CBr)c1,"1,3,5-tris(bromomethyl)benzene",review,type 存疑 other vs RDKit=none
+463,NCCNCCNCCN,triethylenetetramine,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→6"
+468,O=P(O)(O)c1ccccc1,phenylphosphonic acid,review,type 存疑 other vs RDKit=none
+470,O=c1[nH]c2ccc3c(=O)[nH]c(=O)c4ccc5c6ccc7c8ccc9c(=O)[nH]c3c4c5c6c7c8c9ccc12,"perylene-3,4,9,10-tetracarboxylic diimide",review,type 存疑 other vs RDKit=none
+473,NNC(=O)C(O)C(O)C(=O)NN,L-tartaric acid dihydrazide,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+475,Nc1ccc2c(c1)C=c1ccc(cc1)=C2,M-PhDBC-NH2,fixed,is_amine False→True
+481,OB(O)c1ccc2cc3cccc(B(O)O)c3cc2c1,pyrene diboronic acid,review,type 存疑 other vs RDKit=none
+485,Nc1ccc(C=O)c(N)c1,"2,5-diaminobenzaldehyde",fixed,is_aldehyde False→True; type 存疑 aldehyde-amine vs RDKit=both
+487,CN(C)C=CC(=O)c1cccc(C(=O)C=CN(C)C)c1,"1,1'-(1,3-Phenylene)bis[3-(dimethylamino)-2-propen-1-one]",review,type 存疑 other vs RDKit=none
+488,CN(C)C=CC(=O)c1cccc(C=O)c1,1-(3-Formylphenyl)-3-(dimethylamino)-2-propen-1-one,fixed,is_aldehyde False→True; type 存疑 aldehyde-amine vs RDKit=aldehyde
+489,O=Cc1cc2sc3sc4sc3c2c14,"benzo[1,2-b:3,4-b':5,6-b'']trithiophene-2,5,8-tricarbaldehyde",fixed,is_aldehyde False→True
+490,NNC(=O)c1cc(C(N)=O)cc(C(=O)NN)c1,"benzene-1,3,5-tricarbohydrazide",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→0; type 存疑 other vs RDKit=none"
+491,Brc1ccc2nsnc2c1Br,"4,7-dibromobenzo[c][1,2,5]thiadiazole",review,type 存疑 other vs RDKit=none
+494,N#Cc1ccc(F)cc1,4-fluorobenzonitrile,review,type 存疑 other vs RDKit=none
+495,OB(O)C1=CC2=C3C1=CC=C1C=C(C=C2)C13B(O)O,"pyrene-2,7-diboronic acid",review,type 存疑 other vs RDKit=none
+496,COc1cc(C=O)ccc1O,4-hydroxy-3-methoxybenzaldehyde,fixed,is_aldehyde False→True
+498,N/N=C/c1ccc(/C=N/N)cc1,"1,4-bis(Z)-hydrazonomethyl benzene",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+504,c1ccc(-c2cccnc2)nc1,"2,2'-bipyridine",review,type 存疑 other vs RDKit=none
+505,N=C(N)NN(N)N,triaminoguanidine,fixed,"计数修正 n_aldehyde 0→0, n_amine 3→1"
+506,OB(O)c1ccc(Br)cc1,4-bromobenzeneboronic acid,review,type 存疑 other vs RDKit=none
+507,Nc1ccc(N=Nc2ccccc2)cc1,4-aminoazobenzene,fixed,is_amine False→True
+515,N#Cc1ccc(C(c2ccc(C#N)cc2)(c2ccc(C#N)cc2)c2ccc(C#N)cc2)cc1,tetrakis(4-cyanophenyl)methane,review,type 存疑 other vs RDKit=none
+516,CC1(C)OB(c2ccc([N+](=O)[O-])cc2)OC1(C)C,"4,4,5,5-tetramethyl-2-(4-nitrophenyl)-1,3,2-dioxaborolane",review,type 存疑 other vs RDKit=none
+518,OBc1ccc(-c2cc(-c3ccc(B(O)O)cc3)cc(-c3ccc(B(O)O)cc3)c2)cc1,"1,3,5-tris[(4-phenylboronic acid)]benzene",review,type 存疑 other vs RDKit=none
+519,OBc1ccc(-c2ccc(B(O)O)cc2)cc1,"4,4'-biphenyldiboronic acid",review,type 存疑 other vs RDKit=none
+520,OBc1cc(B(O)O)cc(B(O)O)c1,"1,3,5-benzenetriboronic acid",review,type 存疑 other vs RDKit=none
+521,COc1ccc(N)cc1,4-methoxyaniline,fixed,is_amine False→True
+522,Cc1cc(C)cc(N)c1,"3,5-dimethylaniline",fixed,is_amine False→True
+524,Brc1cc(Br)c(Br)c(Br)c1,"1,2,4,5-tetrabromobenzene",review,type 存疑 other vs RDKit=none
+525,Brc1ccc(C(=C(c2ccc(Br)cc2)c2ccc(Br)cc2)c2ccc(Br)cc2)cc1,tetrakis(4-bromophenyl)ethylene,review,type 存疑 other vs RDKit=none
+526,Brc1ccc(C(=C(c2ccccc2)c2ccc(Br)cc2)c2ccccc2)cc1,"1,2-bis(4-bromophenyl)-1,2-diphenylethylene",review,type 存疑 other vs RDKit=none
+528,CC(C)(C)OC(=O)Nc1ccccc1N,"N-(tert-butyloxycarbonyl)-1,2-diaminobenzene",fixed,is_amine False→True
+529,OB(O)c1ccc(C=C(c2ccc(B(O)O)cc2)c2ccc(B(O)O)cc2)cc1,Tetrakis(4-boronophenyl)ethylene,review,type 存疑 other vs RDKit=none
+530,Oc1cc(O)c(O)cc1O,"1,2,4,5-Tetrahydroxybenzene",review,type 存疑 other vs RDKit=none
+531,Oc1cc2c(O)c3ccc4c(O)c(O)ccc4c3cc2c(O)c1O,"2,3,6,7,10,11-hexahydroxytriphenylene",review,type 存疑 other vs RDKit=none
+536,c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34,pyrene,review,type 存疑 other vs RDKit=none
+537,c1cncc(-c2ccncc2)c1,"4,4'-bipyridine",review,type 存疑 other vs RDKit=none
+538,NC(CCC(=O)NC(CS)C(=O)NCC(=O)O)C(=O)O,glutathione,fixed,is_amine False→True
+540,Nc1ccc(-c2ccc3nc4cc5nc(ccc5c3c4)cc3nc4ccc3=c3ccc(c2)nc3c4)cc1,"5,10,15,20-tetrakis(p-aminophenyl)porphyrin",fixed,is_amine False→True
+542,Brc1ccc(N(c2ccc(Br)cc2)c2ccc(Br)cc2)cc1,tribromo dimethylmethylene-bridged triphenylamine,review,type 存疑 other vs RDKit=none
+543,Brc1cc(Br)cc(Br)c1,"1,3,5-tribromobenzene",review,type 存疑 other vs RDKit=none
+544,NNC(=O)c1cc(O)c(C(=O)NN)c(O)c1,"2,5-dihydroxyterephthalohydrazide",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; type 存疑 other vs RDKit=none"
+545,Cc1nnc(C)s1,"2,5-dimethyl-1,3,4-thiadiazole",review,type 存疑 other vs RDKit=none
+546,Brc1cc(Br)c2[nH]c3cc(-c4ccc5c(c4)[nH]c4c(Br)c(Br)ccc45)ccc3c2c1,"3,3′,6,6′-tetrabromo-9,9′-bicarbazole",review,type 存疑 other vs RDKit=none
+551,Brc1cc(Br)c(Br)cc1Br,"1,2,4,5-tetrabromobenzene",review,type 存疑 other vs RDKit=none
+562,O=C(O)c1cc(C(=O)O)c(C(=O)O)c(C(=O)O)c1,pyromellitic acid,review,type 存疑 other vs RDKit=none
+564,O=c1c(=O)c2c(=O)c(=O)c3c2c2ccc4c5ccc1c1c5c2c3c41,"pyrene-4,5,9,10-tetraone",review,type 存疑 other vs RDKit=none
+565,O=Cc1ccc2c(c1)cc1ccc3cccc4ccc2c1c34,"pyrene-2,7-dicarbaldehyde",fixed,is_aldehyde False→True
+566,O=Cc1cc2ccc3cccc4ccc(c1)c2c34,"pyrene-2,7-dicarboxaldehyde",fixed,is_aldehyde False→True
+567,Nc1ccccc1O,2-aminophenol,fixed,is_amine False→True
+568,O=Cc1ccccc1O,2-hydroxybenzaldehyde,fixed,is_aldehyde False→True
+570,Clc1nc2cc(Br)c(Br)cc2[nH]1,"4,7-dibromo-2-chloro-1H-benzo[d]imidazole",review,type 存疑 other vs RDKit=none
+571,C=Cc1ccc(N)cc1,4-vinylaniline,fixed,is_amine False→True
+572,O=C=Nc1ccc(N=C=O)cc1,"1,4-phenylene diisocyanate",review,type 存疑 other vs RDKit=none
+573,OC1=C(O)c2cc3cc(O)c1cc3c(O)c2O,"2,3,6,7,10,11-hexahydroxytriphenylene",review,type 存疑 other vs RDKit=none
+574,N#Cc1c(F)c(F)c(C#N)c(F)c1F,tetrafluoroterephthalonitrile,review,type 存疑 other vs RDKit=none
+575,O=C1c2ccc(F)c(F)c2C(=O)c2ccc(F)c(F)c21,"2,3,6,7-tetrafluoroanthraquinone",review,type 存疑 other vs RDKit=none
+580,CCCCCCCCCCCC(=O)c1c(O)cc(O)cc1O,"2,5-二戊氧基-1,4-对苯二甲醛",review,type 存疑 other vs RDKit=none
+584,O=C1Cc2cc3c(cc2O1)CC(=O)O3,"苯并[1,2-b:4,5-二呋喃]-2,6(3H,7H)-二酮",review,type 存疑 other vs RDKit=none
+598,O=Cc1ccc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)cc1,"1,1,2-三苯基-2-(4-甲酰基苯)乙烯",fixed,is_aldehyde False→True
+612,O=Cc1ncc[nH]1,2-咪唑甲醛,fixed,is_aldehyde False→True
+615,N#Cc1ccc(O)c(C=O)c1,3-甲酰基-4-羟基苯腈,fixed,is_aldehyde False→True
+616,COc1cc(I)cc(C=O)c1O,5-碘-邻香兰素,fixed,is_aldehyde False→True
+617,O=Cc1ccc(-c2ccc(-c3ccc(N(c4ccccc4)c4ccccc4)cc3)s2)s1,"5-(4-(二苯氨基)苯基)-2,2'-联噻吩-5-甲醛",fixed,is_aldehyde False→True
+620,Nc1ccc(-c2cc(-c3ccc(C=O)cc3)c3ccc4c(-c5ccc(N)cc5)cc(-c5ccc(C=O)cc5)c5ccc2c3c45)cc1,"4,4'-(3,8-二溴芘-1,6-二基)二苯甲醛",review,type 存疑 aldehyde-amine vs RDKit=both
+621,C#Cc1ccc(C=O)cc1,4-乙炔基苯甲醛,fixed,is_aldehyde False→True
+626,O=Cc1cc(S(=O)(=O)[O-])ccc1O.[Na+],3-醛基-4-羟基苯磺酸钠（Na盐形式）,fixed,is_aldehyde False→True
+631,COc1ccc(C(=C(c2ccccc2)c2ccc(C=O)cc2)c2ccc(OC)cc2)cc1,"4,4'-双[4-(4-甲氧基苯基)-1-苯乙基]苯甲醛",fixed,is_aldehyde False→True
+634,CC(C)(C)OC(=O)c1ccc(Br)c(C=O)c1,4-溴-3-甲酰基苯甲酸叔丁酯,fixed,is_aldehyde False→True
+636,CN1c2ccccc2Sc2cc(C=O)ccc21,10-甲基-10H-吩噻嗪-3-甲醛,fixed,is_aldehyde False→True
+637,COC(=O)c1cc(C=O)cc(C(=O)OC)c1,5-甲酰基间苯二甲酸二甲酯,fixed,is_aldehyde False→True
+639,O=Cc1ccc(-c2cn[nH]c2)cc1,4-(1H-吡唑-4-基)苯甲醛,fixed,is_aldehyde False→True
+640,CCOC(=O)c1cc(C=O)cc(C(=O)OCC)c1,5-甲酰基间苯二甲酸二乙酯,fixed,is_aldehyde False→True
+642,O=Cc1ccc(-c2ccc(Br)s2)s1,"5-溴-2,2'-联噻吩-5'-甲醛",fixed,is_aldehyde False→True
+644,C#Cc1ccc(C=CC=O)cc1,3-(4-乙炔基苯基)丙烯醛,fixed,is_aldehyde False→True
+658,O=Cc1cc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)ccc1O,"2-羟基-5-(1,2,2-三苯基乙烯基)苯甲醛",fixed,is_aldehyde False→True
+665,Cc1cc(CO)ccc1C=O,4-(羟甲基)-2-甲基苯甲醛,fixed,is_aldehyde False→True
+667,COc1ccc(OC)c(C=O)c1,"2,5-二甲氧基苯甲醛",fixed,is_aldehyde False→True
+668,Cc1ccc(C)c(C=O)c1,"2,5-二甲基苯甲醛",fixed,is_aldehyde False→True
+673,O=Cc1ccc(Br)c2nsnc12,"7-溴-4-醛基苯并[C][1,2,5]噻二唑",fixed,is_aldehyde False→True
+677,O=Cc1ccc(-c2cc(-c3ccccn3)nc(-c3ccccn3)c2)cc1,"4-(2,2':6',2''-三联吡啶)-4'-二苯甲醛",fixed,is_aldehyde False→True
+679,O=COc1cc(OC=O)cc(OC=O)c1,"1,3,5-苯三甲醛",fixed,"计数修正 n_aldehyde 0→3, n_amine 0→0; is_aldehyde False→True; type 存疑 other vs RDKit=aldehyde"
+681,CC1(C)OB(c2ccc(C=O)c(O)c2)OC1(C)C,"2-(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)苯甲醛",fixed,is_aldehyde False→True
+682,CC1(C)COC(c2ccc(C=O)cc2)OC1,"4-(5,5-二甲基-1,3-二氧六环-2-基)苯甲醛",fixed,is_aldehyde False→True
+684,O=Cc1ccc(OCC2CC2)cc1,4-(环丙基甲氧基)苯甲醛,fixed,is_aldehyde False→True
+686,O=Cc1ccc(-c2ccc(N(c3ccc(Br)cc3)c3ccc(Br)cc3)cc2)s1,5-(4-(双(4-溴苯基)(苯基)甲基)噻吩-2-甲醛,fixed,is_aldehyde False→True
+692,O=CCc1ccc(Br)cc1,4-溴苯乙醛,fixed,is_aldehyde False→True
+695,CC(C)(C)c1cc(CCl)cc(C=O)c1O,3-(叔丁基)-5-(氯甲基)-2-羟基苯甲醛,fixed,is_aldehyde False→True
+698,O=Cc1nc2c(s1)CCC2,"5,6-二氢-4H-环戊[d]噻唑-2-甲醛",fixed,is_aldehyde False→True
+721,O=Cc1cc(-c2ccccn2)nc(-c2ccccn2)c1,"2,2':6',2''-三联吡啶-4-甲醛",fixed,is_aldehyde False→True
+735,O=Cc1cccc(-c2ccc3ccccc3n2)c1,"3,3'-(蒽-9,10-二基)二苯甲醛",fixed,is_aldehyde False→True
+737,O=Cc1ccc2c(c1)OCCOCCOCCOCCO2,"2,3,5,6,8,9,11,12-octahydrobenzo[b][1,4,7,10,13]pentaoxacyclopentadecine-15-carbaldehyde",fixed,is_aldehyde False→True
+743,O=Cc1ccc(N(c2ccc(N3c4ccccc4Sc4ccccc43)cc2)c2ccc(N3c4ccccc4Sc4ccccc43)cc2)cc1,"4-(N,N-双(4-(苯并噻唑基)苯基)氨基)苯甲醛",fixed,is_aldehyde False→True
+744,CC(C)(C)c1ccc2c(c1)c1cc(C(C)(C)C)ccc1n2-c1ccc(N(c2ccc(C=O)cc2)c2ccc(-n3c4ccc(C(C)(C)C)cc4c4cc(C(C)(C)C)ccc43)cc2)cc1,"4-(双(4-(3,6-二叔丁基-9H-咔唑-9-基)苯基)氨基)苯甲醛",fixed,is_aldehyde False→True
+745,O=Cc1ccc(N(c2ccc(-n3c4ccccc4c4ccccc43)cc2)c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1,4-(双(4-(9H-咔唑-9-基)苯基)氨基)苯甲醛,fixed,is_aldehyde False→True
+747,O=Cc1ccc(N2c3ccccc3Oc3ccccc32)cc1,4-(10H-吩噻嗪-10-基)苯甲醛,fixed,is_aldehyde False→True
+748,CCn1c2ccccc2c2ccc(C=O)cc21,9-乙基-9H-咔唑-2-甲醛,fixed,is_aldehyde False→True
+749,CCCCCCCCn1c2ccccc2c2ccc(C=O)cc21,9-辛基-9H-咔唑-2-甲醛,fixed,is_aldehyde False→True
+750,Nc1ccc(-c2cc(-c3ccc(C=O)cc3)c(-c3ccc(N)cc3)cc2-c2ccc(C=O)cc2)cc1,"2',5'-双(4-氨基苯基)-[1,1':4',1''-三联苯]-4,4''-二甲醛",review,type 存疑 aldehyde-amine vs RDKit=both
+751,Nc1ccc(-c2cc(-c3ccc(N)cc3)c(-c3ccc(C=O)cc3)cc2-c2ccc(C=O)cc2)cc1,"4',6'-双(4-氨基苯基)-[1,1':3',1''-三联苯]-4,4''-二甲醛",review,type 存疑 aldehyde-amine vs RDKit=both
+752,Nc1ccc(-c2cc(-c3ccc(C=O)cc3)c(-c3ccc(C=O)cc3)cc2-c2ccc(N)cc2)cc1,"4',5'-双(4-氨基苯基)-[1,1':2',1''-三联苯]-4,4''-二甲醛",review,type 存疑 aldehyde-amine vs RDKit=both
+758,O=Cc1[nH]nc2ccc(Br)cc12,5-溴吲哚-3-甲醛,fixed,is_aldehyde False→True
+760,O=Cc1ccc(-c2ccc(C(=O)O)cc2)cc1,"4-甲酰基-[1,1'-联苯]-4-羧酸",fixed,is_aldehyde False→True
+761,O=Cc1ccc(N(c2ccc(Br)cc2)c2ccc(Br)cc2)cc1,4-双(4-溴苯基)氨基苯甲醛,fixed,is_aldehyde False→True
+762,CC(C)(C)c1ccc2c(c1)c1cc(C(C)(C)C)ccc1n2-c1ccc(C=O)cc1,"4-(3,6-二叔丁基-9H-咔唑-9-基)苯甲醛",fixed,is_aldehyde False→True
+763,CC(C)c1cc(C=O)cc(C(C)C)c1O,"4-羟基-3,5-二异丙基苯甲醛",fixed,is_aldehyde False→True
+765,COc1c(O)cc2c3c(ccc(-c4ccccc4)c13)C=CC2=O,"2'-羟基-1,1':3',1''-三联苯-4,4''-二甲醛",review,type 存疑 other vs RDKit=none
+769,O=C(c1ccccc1)c1cc(C(=O)c2ccccc2)cc(C(=O)c2ccccc2)c1,"5-(4-甲酰基苯基)-1,1':3',1''-三联苯-3,4'',5-三甲醛",review,type 存疑 other vs RDKit=none
+770,O=C(O)c1ccc(C#Cc2ccc(C#Cc3ccc(C(=O)O)cc3)cc2)cc1,"5,5''-(丁-1,3-二炔-1,4-二基)二间苯二甲醛",review,type 存疑 other vs RDKit=none
+773,O=Cc1cn2ccccc2n1,"咪唑[1,2-a]吡啶-2-甲醛",fixed,is_aldehyde False→True
+777,O=C(O)C=Cc1cn(-c2ccccc2)nc1-c1ccc(-c2ccccc2)cc1,"5-(苯基偶氮基)-[1,1':3',1''-三联苯]-4,4''-二甲醛",review,type 存疑 other vs RDKit=none
+786,COc1cc(C=CCO)ccc1OC1OC(CO)C(O)C(O)C1O,"1,2-双[2-(2-羧基乙氧基)乙氧基]苯",review,type 存疑 other vs RDKit=none
+791,O=c1c2ccccc2cc(Br)c2ccccc12,9-溴蒽-10-甲醛,review,type 存疑 other vs RDKit=none
+808,N=c1nc2n3c(nc(N)nc3n1)NC(N)=N2,蜜勒胺,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→4"
+809,Nc1ccc2ccc3cccc4ccc1c2c34,1-氨基芘,fixed,is_amine False→True
+810,Nc1ccc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)cc1,"1-(4-氨基苯基)-1,2,2-三苯乙烯",fixed,is_amine False→True
+818,COc1cc(C(=O)NN)c(OC)cc1C(=O)NN,"2,5-二甲氨基对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+819,NNC(=O)c1cc(OCc2ccccc2)c(C(=O)NN)cc1OCc1ccccc1,"(2,5-双(苄氧基)-1,4-亚苯基)双(酰肼)",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+820,C#CCOc1cc(C(=O)NN)c(OCC#C)cc1C(=O)NN,"2,5-双(丙-2-炔-1-基氨基)对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+821,CCSCCCOc1cc(C(=O)NN)c(OCCCSCC)cc1C(=O)NN,"2,5-双(3-(乙硫基)丙氨基)对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+822,C=CCOc1cc(C(=O)NN)c(OCC=C)cc1C(=O)NN,"2,5-双(烯丙氧基)对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+838,NC(=O)Nc1ccc(NC(N)=O)cc1,"1,1'-(1,4-亚苯基)二脲",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+840,NNC(=O)c1ccc(-c2c3nc(c(-c4ccc(C(=O)NN)cc4)c4ccc([nH]4)c(-c4ccc(C(=O)NN)cc4)c4nc(c(-c5ccc(C(=O)NN)cc5)c5ccc2[nH]5)C=C4)C=C3)cc1,"4,4',4'',4'''-(卟啉-5,10,15,20-四基)四(苯甲酰胺)",fixed,"计数修正 n_aldehyde 0→0, n_amine 4→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+842,Cl.NN=C(NN)NN,三氨基胍盐酸盐,fixed,"计数修正 n_aldehyde 0→0, n_amine 3→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+849,Nc1ccc(-c2cc(-c3ccccn3)nc(-c3ccccn3)c2)cc1,"4'-(4-氨基苯基)-2,2':6',2''-联三吡啶",fixed,is_amine False→True
+859,NNC(=O)c1cc(O)c(C(=O)NN)cc1O,"2,5-二(肼基羰基)苯-1,4-二醇",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+860,N#Cc1ccc(-c2ccc(N)cc2)cc1,4-氨基-4'-氰基联苯,fixed,is_amine False→True
+861,Nc1ccc2c(c1)OCCOCCOCCOCCO2,4'-氨基苯并-15-冠-5-醚,fixed,is_amine False→True
+865,CC1(C)COC(c2ccc(N)cc2)OC1,"4-(5,5-二甲基-1,3-二噁烷-2-基)苯胺",fixed,is_amine False→True
+869,NNC(=O)c1ccc(N)cc1O,4-氨基水杨酰肼,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→1"
+880,Nc1c2ccccc2cc2ccccc12,9-氨基蒽,fixed,is_amine False→True
+884,CCCOc1cc(C#Cc2ccc(C(=O)NN)c(OCCC)c2)ccc1C(=O)NN,"4,4'-(乙烯-1,2-二基)双(2-丙氧基苯甲酰肼)",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+886,NCCC[P+](c1ccccc1)(c1ccccc1)c1ccccc1,(3-氨基丙基)三苯基鏻,fixed,is_amine False→True
+888,[Br-].[Br-].c1cc[n+](CC[n+]2ccccc2)cc1,联苯胺氢溴酸盐,review,type 存疑 other vs RDKit=none
+891,Cn1cc(I)c(CN)n1,"3,5-二氨基吡啶氢碘酸盐",fixed,is_amine False→True
+895,Nc1cc(-c2ccccn2)nc(-c2ccccn2)c1,"2,2':6',2''-三联吡啶-4'-胺",fixed,is_amine False→True
+896,COC(=O)C1CC2(CCN(Cc3ccccc3)CC2)CCN1Cc1ccc(OC)cc1,"[4,4'-氨基-3(甲氧基)-3',3''-二甲氧基-2',4',6'-三甲基-1,1':3',1''-三联苯]-4,4''-二胺",review,type 存疑 other vs RDKit=none
+899,NN1C(=O)c2ccc3c4c(ccc(c24)C1=O)C(=O)N(N)C3=O,"2,7-二氨基苯并[1,2-d:4,5-d']二咪唑",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+909,NC(=O)c1cc(N)cc(N)c1,"3,5-二氨基苯甲酰胺",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→2"
+912,COCCOc1cc(C(=O)NN)c(OCCOC)cc1C(=O)NN,"2,5-双(2-甲氧基乙氧基)对苯二甲酰胺",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+913,NCCCN1CCCCCC1,3-氨基哌啶-1-丙胺,fixed,is_amine False→True
+914,N=c1cccc(N)n1O,"2,6-二氨基吡啶-1-氧化物",fixed,is_amine False→True
+917,NNc1ccc(-c2nc(-c3ccc(NN)cc3)nc(-c3ccc(NN)cc3)n2)cc1,"1,3,5-三(4-氨基苯基)-2,4,6-三嗪",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+918,CCCCCCCCCCCCOc1cc(C(=O)NN)c(OCCCCCCCCCCCC)cc1C(=O)NN,"1,4-苯二甲酸-2,5-双(十二酰基)-二酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+919,CCCCCCCCCCOc1cc(C(=O)NN)c(OCCCCCCCCCC)cc1C(=O)NN,"1,4-苯二甲酸-2,5-双(癸酰基)-1,4-二酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+920,NNC(=O)c1ccc(Nc2nc(Nc3ccc(C(=O)NN)cc3)nc(Nc3ccc(C(=O)NN)cc3)n2)cc1,"4,4',4''-(1,3,5-三嗪-2,4,6-三基)三(氮亚甲基)三(苯甲酰肼)",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→6"
+921,CCCCCCCOc1cc(C(=O)NN)c(OCCCCCCC)cc1C(=O)NN,"2,5-双(十二酰氧基)对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+922,CCCCOc1cc(C(=O)NN)c(OCCCC)cc1C(=O)NN,"2,5-二丁氧基对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+923,CC(C)COc1cc(C(=O)NN)c(OCC(C)C)cc1C(=O)NN,"2,5-二异丁氧基对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+924,CCCCCCCCOc1cc(C(=O)NN)c(OCCCCCCCC)cc1C(=O)NN,"2,5-二辛氧基对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+929,Nc1ccc(NC(=S)Nc2ccc(N)cc2)cc1,"1,3-双(4-氨基苯基)硫脲",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→6"
+931,CC(C)CCOc1cc(C(=O)NN)c(OCCC(C)C)cc1C(=O)NN,"2,5-双(异丙氨基羰基)对苯二甲酸二水合物",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+935,CCn1c2ccc(C)cc2c2cc(-c3nc4c(C)c(C(=O)O)ccc4n3CCOC)ccc21,"5'-(4-氨基苯基)-2',4',6'-三甲氧基-[1,1':3',1''-三联苯]-4,4''-二胺",review,type 存疑 other vs RDKit=none
+939,NC(=O)Cc1ccncc1,4-吡啶乙酰胺,fixed,"计数修正 n_aldehyde 0→0, n_amine 1→0; type 存疑 amine vs RDKit=none"
+944,NCc1ccc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)cc1,"[1-(4-氨甲基苯基)-1,1,2-三苯基乙烯]",fixed,is_amine False→True
+945,CCCCCCC(CCCC)CCCOc1cc(C(=O)NN)c(OCCCC(CCCC)CCCCCC)cc1C(=O)NN,"2,5-双(4-丁氧基)间苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+946,CCCCCCCCCCCCCCCCOc1cc(C(=O)NN)c(OCCCCCCCCCCCCCCCC)cc1C(=O)NN,"2,5-双（十五烷氧基）对苯二酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+947,CCCCC(CC)COc1cc(C(=O)NN)c(OC)cc1C(=O)NN,"2,5-双(辛-3-基氧基)对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+948,C=CCCOc1cc(C(=O)NN)c(OCCC=C)cc1C(=O)NN,"2,5-双(丁-3-烯-1-基氧基)对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+949,CCCCCOc1cc(C(=O)NN)c(OCCCCC)cc1C(=O)NN,"2,5-双(戊氧基)对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+955,Cl.N=C(N)c1ccc(C(=C(c2ccccc2)c2ccccc2)c2ccccc2)cc1,"4-(1,2,2-三苯基乙烯基)苯甲脒",fixed,is_amine False→True
+964,Cc1cccc(C(=O)C(=O)c2ccc3ncnn3c2)n1,"2,3,6,7-四氨基蒽醌-9,10-二酮",review,type 存疑 other vs RDKit=none
+975,Cn1ccnc1-c1nccn1CCCCCCN,"6-(1'-甲基-1H,1'H-2,2'-联咪唑-1-基)己-1-胺",fixed,is_amine False→True
+976,NNC(=O)c1ccc(-c2cc(-c3ccc(C(=O)NN)cc3)cc(-c3ccc(C(=O)NN)cc3)c2)cc1,"5,5'-(4-肼基羰基苯基)-[1,1':3',1''-三联苯]-4,4''-二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+977,NNC(=O)c1ccc(-c2ccc(C(=O)NN)cn2)nc1,"[2,2'-联吡啶]-5,5'-二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+978,CSc1ccc(C(C)=O)c(N)c1,1-(2-氨基-4-(甲硫基)苯基)乙-1-酮,fixed,is_amine False→True
+986,NNC(=O)c1cc(Cc2ccccc2)cc(C(=O)NN)c1,5-苄基邻苯二甲酰肼,fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+987,CCCOc1cc(-c2cc(-c3ccc(C(=O)NN)c(OCCC)c3)cc(-c3ccc(C(=O)NN)c(OCCC)c3)c2)ccc1C(=O)NN,"5'-(4-(羟基羰基)-3-异丙氧基苯基)-3,3''-二丙氧基-[1,1':3',1''-三联苯]-4,4''-二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+988,Nc1ccc(-c2ccc([N+](=O)[O-])cc2)cc1,4-氨基-4'-硝基联苯,fixed,is_amine False→True
+991,NNC(=O)c1ccc(N(c2ccc(C(=O)NN)cc2)c2ccc(C(=O)NN)cc2)cc1,"4,4',4''-次氮基三(苯甲酰肼)",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+993,NNC(=O)c1ccc2ccc3ccc(C(=O)NN)nc3c2n1,"1,10-菲咯啉-2,9-二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+996,CC(C)(C)c1ccc2c(c1)c1cc(C(C)(C)C)ccc1n2-c1ccc(N)cc1,"9-(4-苯胺基)-3,6-二叔丁基咔唑",fixed,is_amine False→True
+997,Nc1ccc2c(c1)OCCOCCOCCOCCOCCO2,4'-氨基苯并-18-冠醚-6,fixed,is_amine False→True
+998,COCCOCCOc1cc(C(=O)NN)c(OCCOCCOC)cc1C(=O)NN,"2,5-双[2-(2-甲氧基乙氧基)乙氧基]对苯二甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+1000,Nc1ccc(C#Cc2ccc(C(=O)O)cc2)cc1,4-(4-氨基苯基乙炔基)苯甲酸,fixed,is_amine False→True
+1005,NC(=O)c1cc(C(N)=O)[nH]n1,"1H-吡唑-3,5-二甲酰胺",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+1006,NCc1ccc(C2OCCO2)cc1,"(4-(1,3-二氧戊环-2-基)苯基)甲胺",fixed,is_amine False→True
+1007,C=Cc1ccc(CN)cc1,4-乙烯基苄胺,fixed,is_amine False→True
+1009,Cc1ccc(-c2ccc(CN)cn2)nc1,"(5-甲基-[2,2'-联吡啶]-5-基)甲胺",fixed,is_amine False→True
+1011,NNC(=O)c1cc(C(=O)NN)c(C(=O)NN)cc1C(=O)NN,"苯-1,2,4,5-四甲酰肼",fixed,"计数修正 n_aldehyde 0→0, n_amine 4→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+1014,NNC(=O)c1cc(C(=O)O)cc(C(=O)NN)c1,"3,5-二肼基羰基苯甲酸",fixed,"计数修正 n_aldehyde 0→0, n_amine 2→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+1017,Nc1ccc2cc3ccccc3cc2c1,2-氨基蒽,fixed,is_amine False→True
+1028,COC(=O)c1nn(-c2ccc(C(C)(C)C)cc2)c(=O)cc1O,"4,4'-二氨基-[1,1'-联苯]-2,2'-二羧酸二甲酯",review,type 存疑 other vs RDKit=none
+1029,NC(=O)c1cc(C(N)=O)cc(C(N)=O)c1,均苯三甲酰胺,fixed,"计数修正 n_aldehyde 0→0, n_amine 3→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+1032,NNC(=O)c1ccc(-c2nc(-c3ccc(C(=O)NN)cc3)nc(-c3ccc(C(=O)NN)cc3)n2)cc1,"4,4',4''-(1,3,6-三嗪-2,4,6-三基)三(苯甲酰胺)",fixed,"计数修正 n_aldehyde 0→0, n_amine 3→0; is_amine True→False; type 存疑 amine vs RDKit=none"
+1036,Cc1n[nH]c(C)c1C(=O)NN,"3,5-二甲基-1H-吡唑-4-甲酰胺",fixed,"计数修正 n_aldehyde 0→0, n_amine 1→0; type 存疑 amine vs RDKit=none"
+1040,Nc1cc(I)cc(I)c1,"2,5-二碘苯胺",fixed,is_amine False→True
+1044,N#N,"N,N'-双(2-溴-2-丙烯基)对苯二甲酰肼",review,type 存疑 other vs RDKit=none
+1045,COC(=O)c1ccc(Nc2ccccc2)c([N+](=O)[O-])c1,"2,2'-二氨基-4,4'-联苯二甲酸",fixed,"计数修正 n_aldehyde 0→0, n_amine 0→2; is_amine False→True; type 存疑 other vs RDKit=amine"
+1047,COc1ccc(Nc2ccc(N)cc2)cc1,"4,4',4''-三氨基三苯胺",fixed,"计数修正 n_aldehyde 0→0, n_amine 1→3; is_amine False→True"
+1049,Cl.Cl.NCCNc1cccc2ccccc12,"9,10-二(氨基甲基)蒽",fixed,"计数修正 n_aldehyde 0→0, n_amine 1→3; is_amine False→True"
+1050,N=S(=N)(c1ccccc1)c1ccccc1,"4,4'-二氨基二苯硫醚",review,type 存疑 other vs RDKit=none
+1054,CC(C)(C)c1ccnc(-c2ccc(F)nc2F)c1,"2,2'-二氟-4,4'-二氨基-5,5'-二甲基-1,1'-联苯",review,type 存疑 other vs RDKit=none
+1056,O=C(Nc1ccccc1)Nc1cccc([N+](=O)[O-])c1,4-氨基-3-((吡啶-3-基)氨基甲酰基)苯甲酸,review,type 存疑 other vs RDKit=none
+1057,Nc1cc(C(=O)O)ccc1-c1ccncc1,3-氨基-4-(吡啶-4-基)苯甲酸,fixed,is_amine False→True
+1060,Nc1ccc(-c2nn[nH]n2)cc1,5-(4-氨基苯基)-1H-四唑,fixed,is_amine False→True

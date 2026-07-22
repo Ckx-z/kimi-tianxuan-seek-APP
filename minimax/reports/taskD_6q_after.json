@@ -1,0 +1,398 @@
+{
+ "TAPT 含氟二胺 成膜条件": {
+  "n_reactions": 1973,
+  "n_lits": 30,
+  "top5": [
+   {
+    "id": "R-106-1",
+    "score": 6.13,
+    "ald": "2,4,6-trihydroxybenzene-1,3,5-trica",
+    "am": "2-(trifluoromethyl)benzene-1,4-diam",
+    "sol": "dichloromethane (DCM, organic phase",
+    "T": "room temperatur",
+    "cat": "acetic acid（乙酸，用于F-COF合成）",
+    "out": "film"
+   },
+   {
+    "id": "R-106-2",
+    "score": 6.13,
+    "ald": "benzene-1,3,5-tricarbaldehyde (TFB)",
+    "am": "2-(trifluoromethyl)benzene-1,4-diam",
+    "sol": "dichloromethane (DCM, organic phase",
+    "T": "room temperatur",
+    "cat": "acetic acid（乙酸，用于F-COF合成）",
+    "out": "film"
+   },
+   {
+    "id": "R-260-2",
+    "score": 6.13,
+    "ald": "1,3,5-triformylphloroglucinol (Tp)",
+    "am": "5-ethyl-6-phenyl-phenanthridine-3,8",
+    "sol": "dry dichloromethane (DCM), 100 mL",
+    "T": "30°C preheating",
+    "cat": "TFA（trifluoroacetic acid，",
+    "out": "film"
+   },
+   {
+    "id": "R-267-1",
+    "score": 6.13,
+    "ald": "1,3,5-triformylphloroglucinol (TFP)",
+    "am": "9,9-dihexylfluorene-2,7-diamine (DH",
+    "sol": "甲苯(toluene)为单体溶剂；水为反应介质",
+    "T": "室温（~25°C）",
+    "cat": "",
+    "out": "film"
+   },
+   {
+    "id": "R-aug_876-",
+    "score": 6.13,
+    "ald": "2,4,6-trihydroxybenzene-1,3,5-trica",
+    "am": "2-(trifluoromethyl)benzene-1,4-diam",
+    "sol": "水相（二氯甲烷溶解Tp）、有机相（o-DCB和DMAC混合溶剂用于F-",
+    "T": "",
+    "cat": "acetic acid（乙酸，用于F-COF合成）",
+    "out": "film"
+   }
+  ],
+  "lit_top5": [
+   [
+    "L-8ad5cb41a03d",
+    0.8
+   ],
+   [
+    "L-c17d93c50587",
+    0.8
+   ],
+   [
+    "L-213aad69963b",
+    0.79
+   ],
+   [
+    "L-28d2ddb06663",
+    0.77
+   ],
+   [
+    "L-7f153cdba183",
+    0.74
+   ]
+  ]
+ },
+ "界面法 甲苯 120度 乙酸催化": {
+  "n_reactions": 1814,
+  "n_lits": 30,
+  "top5": [
+   {
+    "id": "R-138-8",
+    "score": 14.3,
+    "ald": "4,4',4'',4'''-(porphyrin-5,10,15,20",
+    "am": "4-(tert-butoxycarbonylamino)-anilin",
+    "sol": "toluene:ethanol (0.3 mL:0.7 mL)",
+    "T": "120°C",
+    "cat": "6 M AcOH（6 M乙酸）",
+    "out": "film"
+   },
+   {
+    "id": "R-84-1",
+    "score": 14.3,
+    "ald": "1,3,5-triformylbenzene (benzene-1,3",
+    "am": "PEO-3 hydrazide (三聚乙二醇酰肼)",
+    "sol": "mesitylene/dioxane (均三甲苯/1,4-二氧六环) ",
+    "T": "120°C",
+    "cat": "乙酸（acetic acid，6 M水溶液）",
+    "out": "crystal"
+   },
+   {
+    "id": "R-1523-1",
+    "score": 13.28,
+    "ald": "1,3,5-triformylbenzene (TFB)",
+    "am": "3,3'-diaminobenzidine tetrahydrochl",
+    "sol": "water/toluene (liquid-liquid interf",
+    "T": "298 K",
+    "cat": "乙酸（acetic acid，6 M水溶液）",
+    "out": "crystal"
+   },
+   {
+    "id": "R-235-1",
+    "score": 12.26,
+    "ald": "2,4,6-trihydroxybenzene-1,3,5-trica",
+    "am": "2,5-diaminobenzenesulfonic acid (Pa",
+    "sol": "1,4-dioxane/mesitylene (for COF syn",
+    "T": "120°C (COF synt",
+    "cat": "acetic acid（乙酸，用于F-COF合成）",
+    "out": "film"
+   },
+   {
+    "id": "R-547-6",
+    "score": 12.26,
+    "ald": "1,3,5-tris(4-formylphenyl)benzene (",
+    "am": "p-phenylenediamine (Pa)",
+    "sol": "o-dichlorobenzene (o-DCB)蒸汽",
+    "T": "120 °C",
+    "cat": "acetic acid（乙酸，用于F-COF合成）",
+    "out": "film"
+   }
+  ],
+  "lit_top5": [
+   [
+    "L-753d62ff956f",
+    0.77
+   ],
+   [
+    "L-0f123b6567aa",
+    0.73
+   ],
+   [
+    "L-fc7d199ad78e",
+    0.7
+   ],
+   [
+    "L-903bfee1cbc3",
+    0.66
+   ],
+   [
+    "L-c500296d0f2d",
+    0.5
+   ]
+  ]
+ },
+ "反应时间不够 膜不连续": {
+  "n_reactions": 5475,
+  "n_lits": 0,
+  "top5": [
+   {
+    "id": "R-371-2",
+    "score": 4.09,
+    "ald": "三苯基芳醛 (triphenylaldehyde derivative",
+    "am": "肼 (hydrazine)",
+    "sol": "PBS缓冲液(pH 7)",
+    "T": "",
+    "cat": "",
+    "out": "powder"
+   },
+   {
+    "id": "R-371-3",
+    "score": 4.09,
+    "ald": "二嗪基三苯基芳醛 (diazine-containing triphe",
+    "am": "肼 (hydrazine)",
+    "sol": "PBS缓冲液(pH 7)",
+    "T": "",
+    "cat": "",
+    "out": "powder"
+   },
+   {
+    "id": "R-371-4",
+    "score": 4.09,
+    "ald": "吡嗪基三苯基芳醛 (pyridazine-containing tri",
+    "am": "肼 (hydrazine)",
+    "sol": "PBS缓冲液(pH 7)",
+    "T": "",
+    "cat": "",
+    "out": "powder"
+   },
+   {
+    "id": "R-371-5",
+    "score": 4.09,
+    "ald": "嘧啶基三苯基芳醛 (pyrimidine-containing tri",
+    "am": "肼 (hydrazine)",
+    "sol": "PBS缓冲液(pH 7)",
+    "T": "",
+    "cat": "",
+    "out": "powder"
+   },
+   {
+    "id": "R-371-6",
+    "score": 4.09,
+    "ald": "含吡啶的三苯基芳醛 (pyridine-containing trip",
+    "am": "肼 (hydrazine)",
+    "sol": "PBS缓冲液(pH 7)",
+    "T": "",
+    "cat": "",
+    "out": "powder"
+   }
+  ],
+  "lit_top5": []
+ },
+ "苯胺 调制剂 用量": {
+  "n_reactions": 155,
+  "n_lits": 30,
+  "top5": [
+   {
+    "id": "R-163-1",
+    "score": 4.09,
+    "ald": "1,4-diformyl-p-carborane (DFCB)",
+    "am": "1,3,5,7-tetraaminoadamantane (TAA)",
+    "sol": "o-dichlorobenzene (o-DCB) + n-butan",
+    "T": "120 °C",
+    "cat": "Sc(SO3CF3)3（Scandium trif",
+    "out": "film"
+   },
+   {
+    "id": "R-hr_6021-",
+    "score": 4.09,
+    "ald": "4',5'-双(4-氨基苯基)-[1,1':2',1''-三联苯]-4",
+    "am": "1,3,5,7-四氨基金刚烷",
+    "sol": "1,4-dioxane（1,4-二氧六环）",
+    "T": "",
+    "cat": "Sc(SO3CF3)3（Scandium trif",
+    "out": "film"
+   },
+   {
+    "id": "R-hr_6022-",
+    "score": 4.09,
+    "ald": "4',6'-双(4-氨基苯基)-[1,1':3',1''-三联苯]-4",
+    "am": "1,3,5,7-四氨基金刚烷",
+    "sol": "1,4-dioxane（1,4-二氧六环）",
+    "T": "",
+    "cat": "Sc(SO3CF3)3（Scandium trif",
+    "out": "film"
+   },
+   {
+    "id": "R-hr_6029-",
+    "score": 4.09,
+    "ald": "2',5'-双(4-氨基苯基)-[1,1':4',1''-三联苯]-4",
+    "am": "1,3,5,7-四氨基金刚烷",
+    "sol": "1,4-dioxane（1,4-二氧六环）",
+    "T": "",
+    "cat": "Sc(SO3CF3)3（Scandium trif",
+    "out": "film"
+   },
+   {
+    "id": "R-hr_6116-",
+    "score": 4.09,
+    "ald": "4',6'-双(4-氨基苯基)-[1,1':3',1''-三联苯]-4",
+    "am": "1,3,5,7-tetraaminoadamantane",
+    "sol": "1,4-dioxane（1,4-二氧六环）",
+    "T": "",
+    "cat": "Sc(SO3CF3)3（Scandium trif",
+    "out": "film"
+   }
+  ],
+  "lit_top5": [
+   [
+    "L-6664d6ca448c",
+    0.66
+   ],
+   [
+    "L-4b96db2e6d35",
+    0.65
+   ],
+   [
+    "L-523fdb3b2086",
+    0.65
+   ],
+   [
+    "L-16e3a8baa358",
+    0.6
+   ],
+   [
+    "L-5ec68e56b4e0",
+    0.55
+   ]
+  ]
+ },
+ "洗脱剂 索氏提取": {
+  "n_reactions": 0,
+  "n_lits": 11,
+  "top5": [],
+  "lit_top5": [
+   [
+    "L-e896540ff9b0",
+    0.65
+   ],
+   [
+    "L-bd5fc0526ee4",
+    0.5
+   ],
+   [
+    "L-6809da011318",
+    0.35
+   ],
+   [
+    "L-b267a10319da",
+    0.33
+   ],
+   [
+    "L-0f9f8a5909d3",
+    0.32
+   ]
+  ]
+ },
+ "醛胺比例 结晶度": {
+  "n_reactions": 785,
+  "n_lits": 19,
+  "top5": [
+   {
+    "id": "R-161-3",
+    "score": 4.09,
+    "ald": "terephthalaldehyde (TA)",
+    "am": "2,4,6-tris(4-aminophenyl)-1,3,5-tri",
+    "sol": "mesitylene:1,4-dioxane (1:1, v/v)",
+    "T": "120°C",
+    "cat": "TFA-COF（四氟代COF）、TA-COF（未氟",
+    "out": "crystal"
+   },
+   {
+    "id": "R-277-2",
+    "score": 4.09,
+    "ald": "1,3,5-triformylphloroglucinol (TP)",
+    "am": "4,4'-(ethyne-1,2-diyl)dianiline (ED",
+    "sol": "1:1 mesitylene/1,4-dioxane",
+    "T": "120°C",
+    "cat": "",
+    "out": "crystal"
+   },
+   {
+    "id": "R-277-3",
+    "score": 4.09,
+    "ald": "1,3,5-triformylphloroglucinol (TP)",
+    "am": "4,4'-(buta-1,3-diyne-1,4-diyl)diani",
+    "sol": "1:1 mesitylene/1,4-dioxane",
+    "T": "120°C",
+    "cat": "",
+    "out": "crystal"
+   },
+   {
+    "id": "R-290-2",
+    "score": 4.09,
+    "ald": "2,5-dimethoxyterephthalaldehyde (DM",
+    "am": "5'-(4-aminophenyl)-[1,1':3',1''-ter",
+    "sol": "o-dichlorobenzene/n-butanol (1:1, v",
+    "T": "120 °C",
+    "cat": "6M acetic acid（6摩尔每升乙酸）",
+    "out": "crystal"
+   },
+   {
+    "id": "R-316-1",
+    "score": 4.09,
+    "ald": "2,5-dimethoxyterephthalaldehyde",
+    "am": "5,10,15,20-tetrakis(4-aminophenyl)-",
+    "sol": "dichlorobenzene + ethanol (1:1, v/v",
+    "T": "120 °C",
+    "cat": "6M acetic acid（6摩尔每升乙酸）",
+    "out": "crystal"
+   }
+  ],
+  "lit_top5": [
+   [
+    "L-1d9c6bb84644",
+    0.7
+   ],
+   [
+    "L-258810f5464a",
+    0.5
+   ],
+   [
+    "L-54dee1dde702",
+    0.49
+   ],
+   [
+    "L-81b1617c7718",
+    0.49
+   ],
+   [
+    "L-4036e85dd1ce",
+    0.44
+   ]
+  ]
+ }
+}

@@ -164,16 +164,112 @@ def build_query_text(question: str, aldehyde: dict, amine: dict, records) -> str
     return '\n'.join(p for p in parts if p)
 
 
-def retrieve_evidence(query_text: str, aldehyde: dict, amine: dict):
-    """检索取证（降级链）。返回 (证据文本, literature_refs)
+# ---------------------------------------------------------------- failure 专家语料
 
-    - 优先 search_local_pdfs.search() + format_results_for_prompt()
+def _split_md_sections(md_text: str):
+    """按 markdown 二级标题（## ）切块，返回 [(标题, 整块文本), ...]"""
+    sections = []
+    cur_title, cur_lines = None, []
+    for line in md_text.splitlines():
+        if line.startswith('## '):
+            if cur_title is not None:
+                sections.append((cur_title, '\n'.join(cur_lines).strip()))
+            cur_title = line[3:].strip()
+            cur_lines = [line]
+        elif cur_title is not None:
+            cur_lines.append(line)
+    if cur_title is not None:
+        sections.append((cur_title, '\n'.join(cur_lines).strip()))
+    return sections
+
+
+def retrieve_failure_corpus(records, app_root: Path, favorite=None):
+    """第三路取证：内部失败处置专家语料（降级链，任何失败静默跳过）
+
+    - failure_criteria.md：按实验记录的 failure_class（A~G）抽对应 Class 段落
+    - failure_playbook.md：按实验号（experiment_no，如 A1/D7）抽对应小节；
+      有命中时附带「全局观察」小节
+    返回 (证据文本, 命中段数)；无命中返回 ('', 0)
+    """
+    blocks = []
+    n_hit = 0
+    exp_dir = Path(app_root) / 'minimax' / 'experiment'
+
+    # 1. failure_criteria.md：按 failure_class 抽 Class 段落
+    try:
+        classes = set()
+        for r in (records or []):
+            fc = str(r.get('failure_class') or '').strip()
+            # 先剥掉 "CLASS" 前缀再取字母，避免 'Class A' 误匹配到 C
+            m = re.search(r'([A-G])', re.sub(r'CLASS', '', fc.upper()))
+            if m:
+                classes.add(m.group(1))
+        if classes:
+            md = (exp_dir / 'failure_criteria.md').read_text(encoding='utf-8')
+            for title, body in _split_md_sections(md):
+                m = re.match(r'Class\s+([A-G])', title)
+                if m and m.group(1) in classes:
+                    blocks.append(body)
+                    n_hit += 1
+    except Exception as e:
+        print(f'[iterate_suggest] failure_criteria 读取失败（降级继续）: {e}',
+              file=sys.stderr)
+
+    # 2. failure_playbook.md：按实验号 / favorite 抽对应小节
+    try:
+        exp_keys = set()
+        for r in (records or []):
+            no = str(r.get('experiment_no') or '').strip()
+            if no:
+                exp_keys.add(no.upper())
+        # favorite 里也可能带实验号字段
+        for k in ('experiment_no', 'exp_no', 'plan_no'):
+            no = str((favorite or {}).get(k) or '').strip()
+            if no:
+                exp_keys.add(no.upper())
+        if exp_keys:
+            md = (exp_dir / 'failure_playbook.md').read_text(encoding='utf-8')
+            sections = _split_md_sections(md)
+            matched = False
+            for title, body in sections:
+                first = title.split()[0].upper() if title.split() else ''
+                if first in exp_keys:
+                    blocks.append(body)
+                    n_hit += 1
+                    matched = True
+            if matched:
+                # 有具体实验命中时附带「全局观察」共同问题小节
+                for title, body in sections:
+                    if title.startswith('全局观察'):
+                        blocks.append(body)
+                        n_hit += 1
+                        break
+    except Exception as e:
+        print(f'[iterate_suggest] failure_playbook 读取失败（降级继续）: {e}',
+              file=sys.stderr)
+
+    if not blocks:
+        return '', 0
+    text = '## 内部失败处置经验（failure_criteria / failure_playbook 专家语料）\n\n' \
+           + '\n\n'.join(blocks)
+    return text, n_hit
+
+
+def retrieve_evidence(query_text: str, aldehyde: dict, amine: dict,
+                      records=None, app_root=None, favorite=None):
+    """检索取证（降级链）。返回 (证据文本, literature_refs, 图节点可引用 ID 列表)
+
+    - 优先 search_local_pdfs.search() 五路召回 + format_results_for_prompt()
     - GraphRAG 图检索 import/运行失败（如缺 networkx）时静默跳过
+    - GraphRAG 命中反应节点后接 graphrag_v2 多跳 BFS 路径（失败静默跳过）
+    - failure 专家语料（failure_criteria / failure_playbook）按 Class/实验号注入
+    - 全程 stderr 打印每路实际命中数，便于体检核对
     """
     evidence_blocks = []
     lit_refs = []
+    graph_ref_ids = []  # 图检索命中的反应/文献节点 ID（纳入引用白名单）
 
-    # 1. 本地 PDF / 反馈库 / embedding 检索
+    # 1. 本地 PDF / 反馈库 / embedding 检索（五路召回）
     try:
         import search_local_pdfs
         results = search_local_pdfs.search({
@@ -185,6 +281,14 @@ def retrieve_evidence(query_text: str, aldehyde: dict, amine: dict):
             'top_k_embedding': 5,
         })
         evidence_blocks.append(search_local_pdfs.format_results_for_prompt(results))
+        # 五路召回各自命中数日志
+        print('[iterate_suggest] 五路召回命中: '
+              f'feedback={len(results.get("feedback_matches") or [])} '
+              f'history_doc={len(results.get("history_doc_matches") or [])} '
+              f'embedding={len(results.get("embedding_matches") or [])} '
+              f'tianxuan={len(results.get("tianxuan_matches") or [])} '
+              f'pdf_keyword={len(results.get("pdf_keyword_matches") or [])}',
+              file=sys.stderr)
         # 收集文献引用（供 evidence_refs 使用）
         for p in (results.get('pdf_keyword_matches') or [])[:5]:
             lit_refs.append({'kind': 'literature', 'ref': p.get('name', ''),
@@ -205,16 +309,25 @@ def retrieve_evidence(query_text: str, aldehyde: dict, amine: dict):
     # 2. GraphRAG 图检索（可选，失败静默跳过）
     try:
         import query_graphrag
+        # rerank 点亮状态：HAS_EMBED 为 True 且文献有命中时 rerank 实际生效
+        print(f'[iterate_suggest] GraphRAG rerank: HAS_EMBED='
+              f'{getattr(query_graphrag, "HAS_EMBED", False)}', file=sys.stderr)
         gres = query_graphrag.query(query_text)
+        print(f'[iterate_suggest] GraphRAG 图检索命中: '
+              f'reactions={len(gres.get("reactions") or [])} '
+              f'literatures={len(gres.get("literatures") or [])}',
+              file=sys.stderr)
         lines = ['## GraphRAG 图检索']
         for h in (gres.get('reactions') or [])[:5]:
             d = h['data']
+            graph_ref_ids.append(str(h['id']))
             lines.append(
                 f"- [{h['score']}★] 醛 {d.get('aldehyde_name','?')} + 胺 {d.get('amine_name','?')} | "
                 f"溶剂 {d.get('solvent','?')} | 温度 {d.get('temperature','?')} | "
                 f"产物 {d.get('outcome','?')}")
         for h in (gres.get('literatures') or [])[:5]:
             d = h['data']
+            graph_ref_ids.append(str(h['id']))
             lines.append(
                 f"- [{h['score']}★] {h['id']} | {d.get('journal','?')} | "
                 f"{str(d.get('innovation',''))[:120]}")
@@ -222,12 +335,42 @@ def retrieve_evidence(query_text: str, aldehyde: dict, amine: dict):
                              'note': f"GraphRAG 文献节点 {d.get('journal','')}"})
         if len(lines) > 1:
             evidence_blocks.append('\n'.join(lines))
+
+        # 2b. 多跳 BFS：反应→溶剂/催化剂→同类成功反应→文献（import/运行失败静默跳过）
+        try:
+            from graphrag_v2.reasoning import multi_hop_paths, format_paths
+            # 注意：用 graph.pkl（v1 图）跑多跳，与 graph_v2.pkl 节点 ID 可能不一致
+            G = query_graphrag.load_graph()
+            start_ids = [str(h['id']) for h in (gres.get('reactions') or [])[:3]
+                         if str(h['id']) in G]
+            if start_ids:
+                paths = multi_hop_paths(G, start_ids, max_hops=3, max_paths=10)
+                print(f'[iterate_suggest] 多跳 BFS: 起点 {len(start_ids)} 个反应节点, '
+                      f'路径 {len(paths)} 条', file=sys.stderr)
+                if paths:
+                    evidence_blocks.append(
+                        '## GraphRAG 多跳推理路径（反应→溶剂/催化剂→同类反应→文献）\n'
+                        + format_paths(G, paths, max_paths=5))
+        except Exception as e:
+            # graphrag_v2 不可 import / 图结构不符等：静默跳过
+            print(f'[iterate_suggest] 多跳 BFS 跳过（降级继续）: {e}',
+                  file=sys.stderr)
     except Exception:
         # 缺 networkx / graph.pkl 不存在等情况：静默跳过
         pass
 
+    # 3. failure 专家语料（按 failure_class / 实验号注入，失败静默跳过）
+    try:
+        fc_text, fc_n = retrieve_failure_corpus(records, app_root, favorite)
+        print(f'[iterate_suggest] failure 专家语料命中: {fc_n} 段', file=sys.stderr)
+        if fc_text:
+            evidence_blocks.append(fc_text)
+    except Exception as e:
+        print(f'[iterate_suggest] failure 语料注入失败（降级继续）: {e}',
+              file=sys.stderr)
+
     text = '\n\n'.join(b for b in evidence_blocks if b and b != '(无匹配)')
-    return text or '(本次检索无匹配证据)', lit_refs
+    return text or '(本次检索无匹配证据)', lit_refs, graph_ref_ids
 
 
 # ---------------------------------------------------------------- 状态去重
@@ -288,7 +431,14 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
         '"detail": "具体可操作的建议内容（条件调整需写明 字段/原值/改为/理由；'
         '新候选需写明醛胺 CAS 或名称及理由）", '
         '"evidence_refs": [{"kind": "experiment_record|literature|prediction", '
-        '"ref": "rec_xxx 或文献名或 DOI", "note": "一句话说明"}]}'
+        '"ref": "rec_xxx 或文献名或 DOI", "note": "一句话说明"}], '
+        '"confidence": {"level": "high|medium|low", '
+        '"reason": "一句话自评理由（依据证据充分程度）"}}'
+        '注意：kind=experiment_record 时 ref 必须原样使用下方'
+        '「可引用的实验记录 ID」列表中的真实 record_id（形如 rec_YYYYMMDD_NNN），'
+        '不要写 "1★"、"实验1" 之类的自然语言标记。'
+        'kind=literature 时 ref 必须来自下方检索证据中真实出现的文献名/节点 ID，'
+        '严禁编造引用；每条建议必须给出 confidence 自评。'
     )
 
     rec_lines = []
@@ -304,6 +454,10 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
 
     rejected_text = ('\n'.join(f'- {x}' for x in rejected)
                      if rejected else '(无)')
+    # 可引用 record_id 白名单：显式写进 prompt，约束 LLM 引用真实 ID
+    rec_ids = [r.get('record_id') for r in records if r.get('record_id')]
+    rec_ids_text = ('\n'.join(f'- {rid}' for rid in rec_ids)
+                    if rec_ids else '(无)')
     user_prompt = f"""## 用户问题
 {question}
 
@@ -313,6 +467,9 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
 
 ## 相关实验记录
 {records_text}
+
+## 可引用的实验记录 ID（evidence_refs 中 kind=experiment_record 的 ref 必须从中原样选择）
+{rec_ids_text}
 
 ## 检索到的证据
 {evidence_text}
@@ -368,23 +525,144 @@ def normalize_payload(item: dict):
     return 'literature', {'title': title, 'detail': detail}
 
 
-def normalize_evidence(item: dict, records, lit_refs):
-    """规整 evidence_refs：只保留合法 kind，空的补检索证据"""
+def _correct_rec_ref(ref: str, whitelist):
+    """对非白名单的实验记录引用做模糊匹配纠正。
+
+    匹配策略（依次尝试）：
+      1. 忽略大小写/空白后完全相等
+      2. 互为子串（如 LLM 写 "rec_20260722" 漏了序号）
+      3. 数字序列相等（如 "20260722-1" 与 "rec_20260722_001"）
+    返回纠正后的 record_id；匹配不上返回 None。
+    """
+    ref_norm = re.sub(r'\s+', '', str(ref)).lower()
+    if not ref_norm:
+        return None
+    digits = re.findall(r'\d+', ref_norm)
+    for cand in whitelist:
+        cand_norm = cand.lower()
+        if ref_norm == cand_norm:
+            return cand
+    for cand in whitelist:
+        cand_norm = cand.lower()
+        if len(ref_norm) >= 8 and (ref_norm in cand_norm or cand_norm in ref_norm):
+            return cand
+    if digits:
+        for cand in whitelist:
+            cand_digits = re.findall(r'\d+', cand.lower())
+            if cand_digits == digits:
+                return cand
+    return None
+
+
+def _correct_lit_ref(ref: str, whitelist):
+    """对非白名单的文献/图节点引用做模糊匹配纠正。
+
+    匹配策略（依次尝试）：
+      1. 忽略大小写/空白后完全相等
+      2. 互为子串（长度 ≥6 防误配）
+    返回纠正后的白名单条目；匹配不上返回 None。
+    """
+    ref_norm = re.sub(r'\s+', '', str(ref)).lower()
+    if not ref_norm:
+        return None
+    for cand in whitelist:
+        if ref_norm == re.sub(r'\s+', '', cand).lower():
+            return cand
+    for cand in whitelist:
+        cand_norm = re.sub(r'\s+', '', cand).lower()
+        if len(ref_norm) >= 6 and (ref_norm in cand_norm or cand_norm in ref_norm):
+            return cand
+    return None
+
+
+def normalize_evidence(item: dict, records, lit_refs, graph_ref_ids=None):
+    """规整 evidence_refs（波次 2 白名单校验）。
+
+    白名单 = 可引用实验记录 ID + retrieve_evidence 返回的文献引用 + 图节点 ID。
+    - experiment_record：按白名单模糊纠正；匹配不上整条剔除进 unverified_refs
+    - literature：大小写/空白/子串模糊纠正；匹配不上整条剔除进 unverified_refs
+      （绝不让编造引用静默通过）
+    返回 (refs, unverified_refs, n_valid)
+      n_valid = 落在白名单内的有效证据条数（用于 confidence 规则校验）
+    """
+    rec_whitelist = [r.get('record_id') for r in records if r.get('record_id')]
+    lit_whitelist = ([str(e.get('ref', '')) for e in (lit_refs or [])
+                      if e.get('ref')]
+                     + [str(x) for x in (graph_ref_ids or []) if x])
     refs = []
+    unverified = []
+    n_valid = 0
     for e in (item.get('evidence_refs') or []):
         if not isinstance(e, dict):
             continue
         kind = e.get('kind')
         if kind not in ('experiment_record', 'literature', 'prediction'):
             continue
-        refs.append({'kind': kind, 'ref': str(e.get('ref', '')),
-                     'note': str(e.get('note', ''))})
+        ref = str(e.get('ref', ''))
+        note = str(e.get('note', ''))
+        if kind == 'experiment_record':
+            if ref in rec_whitelist:
+                n_valid += 1
+            elif rec_whitelist:
+                fixed = _correct_rec_ref(ref, rec_whitelist)
+                if fixed:
+                    # 模糊纠正为真实 record_id（LLM 常写自然语言标记）
+                    note = (note + f'（原引用「{ref}」已自动纠正）').strip()
+                    ref = fixed
+                    n_valid += 1
+                else:
+                    # 匹配不上：整条剔除，记录原文，不让编造引用静默通过
+                    unverified.append({'kind': kind, 'ref': ref, 'note': note})
+                    continue
+        elif kind == 'literature':
+            if lit_whitelist:
+                if ref in lit_whitelist:
+                    n_valid += 1
+                else:
+                    fixed = _correct_lit_ref(ref, lit_whitelist)
+                    if fixed:
+                        note = (note + f'（原引用「{ref}」已自动纠正）').strip()
+                        ref = fixed
+                        n_valid += 1
+                    else:
+                        unverified.append({'kind': kind, 'ref': ref, 'note': note})
+                        continue
+            # 无任何文献白名单（检索全失败）时文献引用一律不可信，剔除
+            else:
+                unverified.append({'kind': kind, 'ref': ref, 'note': note})
+                continue
+        refs.append({'kind': kind, 'ref': ref, 'note': note})
     if not refs:
-        # 兜底：引用相关实验记录 + 检索文献
+        # 兜底：引用相关实验记录 + 检索文献（均为白名单内真实 ID）
         refs = [{'kind': 'experiment_record', 'ref': r.get('record_id', ''),
                  'note': '相关历史实验记录'} for r in records[:2]]
         refs.extend(lit_refs[:2])
-    return refs
+        n_valid = len(refs)
+    return refs, unverified, n_valid
+
+
+def normalize_confidence(item: dict, n_valid: int):
+    """规整 confidence 自评（波次 2）。
+
+    - 接受 {"level": ..., "reason": ...} 或裸字符串；非法等级默认 medium
+    - 规则校验：0 条有效证据（白名单内）的建议强制降为 low 并标注
+    返回 {'level': 'high|medium|low', 'reason': str}
+    """
+    raw = item.get('confidence')
+    if isinstance(raw, dict):
+        level = str(raw.get('level', '')).strip().lower()
+        reason = str(raw.get('reason', '')).strip()
+    else:
+        level = str(raw or '').strip().lower()
+        reason = ''
+    if level not in ('high', 'medium', 'low'):
+        level = 'medium'
+        reason = (reason + '（等级缺失/非法，默认 medium）').strip()
+    if n_valid == 0:
+        # 0 条有效证据：强制降为 low 并标注
+        level = 'low'
+        reason = (reason + '（无白名单内有效证据，置信度强制降为 low）').strip()
+    return {'level': level, 'reason': reason}
 
 
 def next_sug_ids(sug_dir: Path, n: int):
@@ -399,12 +677,35 @@ def next_sug_ids(sug_dir: Path, n: int):
     return [f'sug_{date}_{max_n + k + 1:03d}' for k in range(n)]
 
 
+def _monomer_ok(obj) -> bool:
+    """单体对象是否可采纳（含非空 smiles）"""
+    return (isinstance(obj, dict)
+            and isinstance(obj.get('smiles'), str)
+            and bool(obj['smiles'].strip()))
+
+
+def _inject_monomers(payload: dict, aldehyde, amine):
+    """游离建议兜底：payload 缺少合法醛/胺单体时，写入从最近实验记录带出的单体。
+
+    只对缺 smiles 的字段做填充——new_candidate 型建议若 LLM 已给出带 smiles 的
+    新候选单体则保留原样，不覆盖其语义。
+    """
+    if aldehyde and not _monomer_ok(payload.get('aldehyde')):
+        payload['aldehyde'] = dict(aldehyde)
+    if amine and not _monomer_ok(payload.get('amine')):
+        payload['amine'] = dict(amine)
+    return payload
+
+
 def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
-                      batch, max_n=2):
+                      batch, max_n=2, aldehyde=None, amine=None, graph_ref_ids=None):
     """状态去重后按 Schema 3 落盘，返回写出的 suggestion_id 列表
 
     batch: 本次运行批次号，写入每条建议的 "batch" 字段（Schema 3 可选字段）
     max_n: 每次运行最多写出的建议条数
+    aldehyde/amine: 游离路径（fav_id 为空）时从最近实验记录带出的单体对象，
+      写入每条建议 payload（所有 type），保证 adopt_suggestion 可直接采纳
+    graph_ref_ids: 图检索命中的节点 ID（纳入 evidence_refs 白名单）
     """
     sug_dir.mkdir(parents=True, exist_ok=True)
     kept = []
@@ -422,6 +723,19 @@ def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
     written = []
     for sid, item in zip(ids, kept):
         t, payload = normalize_payload(item)
+        if not fav_id:
+            # 游离建议：写入单体对象，修复 adopt_suggestion 无法解析单体的问题
+            payload = _inject_monomers(payload, aldehyde, amine)
+        refs, unverified, n_valid = normalize_evidence(
+            item, records, lit_refs, graph_ref_ids)
+        # 置信度自评 + 规则校验（0 条有效证据强制 low）
+        payload['confidence'] = normalize_confidence(item, n_valid)
+        if unverified:
+            # 匹配不上白名单的引用：整条剔除并记录原文，便于人工复核
+            payload['unverified_refs'] = unverified
+            print(f'[iterate_suggest] {sid}: 剔除 {len(unverified)} 条'
+                  f'未通过白名单校验的引用: '
+                  f'{[u.get("ref") for u in unverified]}', file=sys.stderr)
         doc = {
             'schema_version': SCHEMA_VERSION,
             'record_type': 'suggestion',
@@ -430,7 +744,7 @@ def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
             'batch': batch,
             'type': t,
             'payload': payload,
-            'evidence_refs': normalize_evidence(item, records, lit_refs),
+            'evidence_refs': refs,
             'created_at': now_iso(),
             'status': 'new',
         }
@@ -441,16 +755,24 @@ def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
 
 
 def write_fallback_suggestion(sug_dir: Path, fav_id, question, evidence_text,
-                              lit_refs, records, reason, batch):
+                              lit_refs, records, reason, batch,
+                              aldehyde=None, amine=None):
     """LLM 失败/输出无法解析时的降级：写一条 type=literature 建议（只含检索证据）
 
     降级建议固定 1 条，同样带本次运行的 batch 批次号。
+    游离路径（fav_id 为空）时同样注入单体对象，保证可采纳。
     """
     sug_dir.mkdir(parents=True, exist_ok=True)
     sid = next_sug_ids(sug_dir, 1)[0]
     refs = list(lit_refs[:5])
     refs.extend({'kind': 'experiment_record', 'ref': r.get('record_id', ''),
                  'note': '相关历史实验记录'} for r in records[:3])
+    payload = {
+        'title': f'LLM 暂不可用，以下为针对「{question[:30]}」检索到的原始证据',
+        'detail': f'（降级建议，生成原因: {reason}）\n\n{evidence_text[:3000]}',
+    }
+    if not fav_id:
+        payload = _inject_monomers(payload, aldehyde, amine)
     doc = {
         'schema_version': SCHEMA_VERSION,
         'record_type': 'suggestion',
@@ -458,10 +780,7 @@ def write_fallback_suggestion(sug_dir: Path, fav_id, question, evidence_text,
         'favorite_id': fav_id,
         'batch': batch,
         'type': 'literature',
-        'payload': {
-            'title': f'LLM 暂不可用，以下为针对「{question[:30]}」检索到的原始证据',
-            'detail': f'（降级建议，生成原因: {reason}）\n\n{evidence_text[:3000]}',
-        },
+        'payload': payload,
         'evidence_refs': refs or [{'kind': 'literature', 'ref': '',
                                    'note': '本次检索无匹配证据'}],
         'created_at': now_iso(),
@@ -512,8 +831,10 @@ def main():
     # 2. 模板化拼检索查询
     query_text = build_query_text(args.question, aldehyde, amine, records)
 
-    # 3. 检索取证（降级链）
-    evidence_text, lit_refs = retrieve_evidence(query_text, aldehyde, amine)
+    # 3. 检索取证（降级链，含 failure 专家语料与多跳 BFS）
+    evidence_text, lit_refs, graph_ref_ids = retrieve_evidence(
+        query_text, aldehyde, amine,
+        records=records, app_root=app_root, favorite=favorite)
 
     # 4. 状态去重：收集已否决方向
     rejected = load_rejected_directions(sug_dir, args.favorite_id)
@@ -532,7 +853,8 @@ def main():
         print(f'[iterate_suggest] LLM 失败，写降级建议: {e}', file=sys.stderr)
         written = write_fallback_suggestion(
             sug_dir, args.favorite_id, args.question, evidence_text,
-            lit_refs, records, reason=str(e)[:200], batch=batch)
+            lit_refs, records, reason=str(e)[:200], batch=batch,
+            aldehyde=aldehyde, amine=amine)
         print(json.dumps({'written': written, 'count': len(written),
                           'batch': batch}, ensure_ascii=False))
         return
@@ -542,15 +864,19 @@ def main():
     if not items:
         written = write_fallback_suggestion(
             sug_dir, args.favorite_id, args.question, evidence_text,
-            lit_refs, records, reason='LLM 返回空数组', batch=batch)
+            lit_refs, records, reason='LLM 返回空数组', batch=batch,
+            aldehyde=aldehyde, amine=amine)
     else:
         written = write_suggestions(sug_dir, items, args.favorite_id,
                                     records, lit_refs, rejected,
-                                    batch=batch, max_n=max_n)
+                                    batch=batch, max_n=max_n,
+                                    aldehyde=aldehyde, amine=amine,
+                                    graph_ref_ids=graph_ref_ids)
         if not written:  # 全部被去重
             written = write_fallback_suggestion(
                 sug_dir, args.favorite_id, args.question, evidence_text,
-                lit_refs, records, reason='建议均与已否决方向重复', batch=batch)
+                lit_refs, records, reason='建议均与已否决方向重复', batch=batch,
+                aldehyde=aldehyde, amine=amine)
 
     # 7. stdout 打印一行 JSON 摘要
     print(json.dumps({'written': written, 'count': len(written),

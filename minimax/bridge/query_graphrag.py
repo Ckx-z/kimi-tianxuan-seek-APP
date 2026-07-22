@@ -1,9 +1,7 @@
 """
 bridge/query_graphrag.py
 ========================
-GraphRAG 查询接口 (Phase 3 demo)
-
-直接以 reaction 节点为核心查询 (因为 monomer_pool.csv 有 LLM 抽取错误)
+GraphRAG 查询接口 (Phase 3 demo · 波次2 检索底座升级)
 
 用法:
     python bridge/query_graphrag.py "TAPT 含氟二胺 膜"
@@ -29,7 +27,34 @@ try:
 except ImportError:
     HAS_EMBED = False
 
+# 波次2: nl2graph 中文解析 (加载失败静默降级为旧硬编码关键词)
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent / 'graphrag_v2'))
+    from nl2graph import nl_to_query
+    HAS_NL2GRAPH = True
+except Exception:
+    HAS_NL2GRAPH = False
+
 GRAPH_DIR = Path(__file__).resolve().parent / 'graphrag'
+
+# 波次2: importance.json 惰性加载 (加载失败静默跳过, 不加权)
+_IMPORTANCE = None
+_IMPORTANCE_TRIED = False
+
+
+def _load_importance():
+    """加载 graphrag_v2/cached/importance.json; 任何失败都静默返回 {}"""
+    global _IMPORTANCE, _IMPORTANCE_TRIED
+    if _IMPORTANCE_TRIED:
+        return _IMPORTANCE or {}
+    _IMPORTANCE_TRIED = True
+    try:
+        fp = Path(__file__).resolve().parent / 'graphrag_v2' / 'cached' / 'importance.json'
+        raw = json.load(open(fp, encoding='utf-8'))
+        _IMPORTANCE = {nid: float(v.get('importance', 0.0)) for nid, v in raw.items()}
+    except Exception:
+        _IMPORTANCE = {}
+    return _IMPORTANCE
 
 
 def load_graph():
@@ -62,6 +87,54 @@ def match_score(text, keywords):
     return score
 
 
+# 波次2: 过滤条件 → reaction 节点字段文本 的映射
+REACTION_FIELD_MAP = {
+    'temperature': ['temperature'],
+    'solvent': ['solvent'],
+    'catalyst': ['catalyst'],
+    'outcome': ['outcome'],
+    'synthesis_mode': ['synthesis_mode'],
+    'interface_type': ['interface_type'],
+    # modulator 无独立字段, 在单体名/催化剂/溶剂文本里近似匹配
+    'modulator': ['aldehyde_name', 'amine_name', 'catalyst', 'solvent', 'stoichiometry'],
+}
+
+
+def filter_bonus(filters, data, extra_text=''):
+    """波次2: 结构化过滤条件软加权 (可解释, 不做硬过滤, 永不清空结果)
+
+    - op='contains': 字段文本包含 value → +2
+    - op='in': 字段文本包含 value 列表中任一 token → +2
+    - op='=': 字段值相等 (如 outcome=film) → +2
+    - op='keyword': 任意字段文本/extra_text 含 token → +1
+    - outcome 'in' 过滤 (失败诊断反面教材) 命中时 +3, 让失败/部分成膜反应排前
+    """
+    bonus = 0
+    for f in filters:
+        field, op, value = f.get('field'), f.get('op'), f.get('value')
+        cols = REACTION_FIELD_MAP.get(field)
+        if cols is None:
+            continue  # has_fluorine / innovation 等无 reaction 字段, 由关键词或 literature 侧处理
+        text = ' '.join(str(data.get(c, '')) for c in cols).lower() + ' ' + extra_text.lower()
+        if op == 'contains' and str(value).lower() in text:
+            bonus += 2
+        elif op == 'in':
+            tokens = value if isinstance(value, list) else [value]
+            if any(str(t).lower() in text for t in tokens):
+                bonus += 3 if field == 'outcome' else 2
+        elif op == '=':
+            if field == 'outcome':
+                if str(data.get('outcome', '')).lower() == str(value).lower():
+                    bonus += 2
+            elif str(value).lower() in text:
+                bonus += 2
+        elif op == 'keyword':
+            tokens = value if isinstance(value, list) else [value]
+            if any(str(t).lower() in text for t in tokens):
+                bonus += 1
+    return bonus
+
+
 def query(query_text, verbose=False):
     """GraphRAG 查询
 
@@ -77,7 +150,7 @@ def query(query_text, verbose=False):
 
     q = query_text.lower()
 
-    # 关键词提取
+    # 关键词提取 (旧硬编码, 保留兜底)
     keywords = []
     if 'tapt' in q:
         keywords.append('tapt')
@@ -90,7 +163,7 @@ def query(query_text, verbose=False):
     if 'tfmb' in q:
         keywords.append('tfmb')
     if '含氟' in q or 'fluorine' in q:
-        keywords.append('f')
+        keywords.append('fluor')
     if '二胺' in q or 'diamine' in q:
         keywords.append('diamine')
     if '膜' in q:
@@ -114,10 +187,27 @@ def query(query_text, verbose=False):
     if '160' in q:
         keywords.append('160')
 
+    # 波次2: nl2graph 中文解析 → 补充关键词 + 结构化过滤条件 (可解释)
+    parsed = None
+    filters = []
+    if HAS_NL2GRAPH:
+        try:
+            parsed = nl_to_query(query_text)
+            filters = parsed.get('filters', [])
+            for kw in parsed.get('keywords', []):
+                if kw and kw not in keywords:
+                    keywords.append(kw)
+        except Exception as e:
+            if verbose:
+                print(f'  (nl2graph 解析失败, 降级旧关键词: {e})')
+
     if not keywords:
         keywords = [query_text.lower()]
 
-    # 扫 reaction 节点
+    if verbose and parsed:
+        print(f'  波次2解析: intent={parsed.get("intent")}, filters={len(filters)} 条')
+
+    # 扫 reaction 节点 (关键词打分 + 过滤条件软加权)
     reaction_hits = []
     for rid, r in get_reactions(G):
         text = ' '.join([
@@ -131,10 +221,10 @@ def query(query_text, verbose=False):
             str(r.get('catalyst', '')),
         ]).lower()
         score = match_score(text, keywords)
+        if filters:
+            score += filter_bonus(filters, r)
         if score > 0:
             reaction_hits.append({'id': rid, 'score': score, 'data': dict(r)})
-
-    reaction_hits.sort(key=lambda x: -x['score'])
 
     # 扫 literature 节点
     lit_hits = []
@@ -145,10 +235,39 @@ def query(query_text, verbose=False):
             str(l.get('innovation', '')),
         ]).lower()
         score = match_score(text, keywords)
+        if filters:
+            score += filter_bonus(filters, {}, extra_text=text)
         if score > 0:
             lit_hits.append({'id': lid, 'score': score, 'data': dict(l)})
 
+    # 波次2: importance 加权 (score *= (1+imp)); importance.json 缺失/加载失败静默跳过
+    importance = _load_importance()
+    if importance:
+        for h in reaction_hits:
+            h['score'] = h['score'] * (1 + importance.get(h['id'], 0.0))
+        for h in lit_hits:
+            h['score'] = h['score'] * (1 + importance.get(h['id'], 0.0))
+
+    reaction_hits.sort(key=lambda x: -x['score'])
     lit_hits.sort(key=lambda x: -x['score'])
+
+    # 波次2: 零结果兜底 (降级链: 永不整体失败) —— 双链全空时按单词边界逐词重试
+    if not reaction_hits and not lit_hits and len(keywords) > 1:
+        for kw in keywords:
+            kw_low = kw.lower()
+            for rid, r in get_reactions(G):
+                text = ' '.join(str(r.get(c, '')) for c in
+                                ['aldehyde_name', 'amine_name', 'solvent', 'temperature',
+                                 'outcome', 'synthesis_mode', 'interface_type', 'catalyst']).lower()
+                if kw_low in text:
+                    reaction_hits.append({'id': rid, 'score': 0.5, 'data': dict(r)})
+            for lid, l in get_literatures(G):
+                text = ' '.join(str(l.get(c, '')) for c in
+                                ['journal', 'system', 'innovation']).lower()
+                if kw_low in text:
+                    lit_hits.append({'id': lid, 'score': 0.5, 'data': dict(l)})
+            if reaction_hits or lit_hits:
+                break
 
     # summary
     outcomes_count = {}

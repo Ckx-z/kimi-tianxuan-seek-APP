@@ -195,6 +195,16 @@ def create_record(
         "minimax_plan_no": None,
     }
 
+    # 实验编号重复警告：同 favorite 下已存在相同 experiment_no 的记录时，
+    # 仅在返回 dict 上加 duplicate_experiment_no=True（不落盘、不拦截保存，
+    # 用户可能有意重复实验）
+    duplicate = False
+    if favorite_id is not None:
+        duplicate = any(
+            r.get("experiment_no") == experiment_no
+            for r in list_records(favorite_id=favorite_id)
+        )
+
     RECORDS_DIR.mkdir(parents=True, exist_ok=True)
     path = RECORDS_DIR / f"{rec['record_id']}.json"
     path.write_text(
@@ -207,6 +217,8 @@ def create_record(
         ids.append(rec["record_id"])
         favorites_store.update_favorite(favorite_id, experiment_record_ids=ids)
 
+    if duplicate:
+        rec["duplicate_experiment_no"] = True
     return rec
 
 

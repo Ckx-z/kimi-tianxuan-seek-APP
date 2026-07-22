@@ -51,22 +51,25 @@ def build_prediction_payload(ald_smiles: str, amine_smiles: str,
                              pred_result: dict, source: str = "api") -> dict:
     """组装 API 响应 + 预测日志记录（契约同 data/prediction_log.jsonl）。
 
-    OOD=out 时 score 置 null（⛔ 优先于打分）。
+    OOD=out 时 score 置 null（⛔ 优先于打分）；tree/gnn 分量与 std 同步
+    置 null，防止 API 消费方绕过 score 直读分量被误导。log_prediction
+    直接读本 payload 的分量字段，落盘随之同样置空。
     """
     ood = (pred_result or {}).get("ood") or {}
+    ood_out = ood.get("level") == "out"
     score, score_source = headline_score(pred_result)
     return {
         "ald_smiles": ald_smiles,
         "amine_smiles": amine_smiles,
-        "score": None if ood.get("level") == "out" else score,
+        "score": None if ood_out else score,
         "score_source": score_source,
         "score_policy": "max_tree_gnn",
-        "tree_score": pred_result.get("tree_probability"),
-        "tree_std": pred_result.get("tree_std"),
+        "tree_score": None if ood_out else pred_result.get("tree_probability"),
+        "tree_std": None if ood_out else pred_result.get("tree_std"),
         "tree_model_name": pred_result.get("tree_model_name"),
         "tree_route": pred_result.get("tree_route"),
-        "gnn_score": pred_result.get("gnn_probability"),
-        "gnn_std": pred_result.get("gnn_std"),
+        "gnn_score": None if ood_out else pred_result.get("gnn_probability"),
+        "gnn_std": None if ood_out else pred_result.get("gnn_std"),
         "ood": ood,
         "source": source,
         "timestamp": datetime.now().isoformat(timespec="seconds"),

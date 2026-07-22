@@ -232,6 +232,34 @@ def adopt_suggestion(suggestion_id: str, template_id: str | None = None) -> dict
     safe_id = re.sub(r"[^A-Za-z0-9_\-]", "_", suggestion_id)
     suggestion = _read_json(SUGGESTIONS_DIR / f"{safe_id}.json", "建议")
 
+    # 幂等保护：已采纳过的建议直接返回已有 plan，不重复生成
+    if suggestion.get("status") == "adopted":
+        old_plan_id = str(suggestion.get("adopted_plan_id") or "").strip()
+        if old_plan_id:
+            safe_plan_id = re.sub(r"[^A-Za-z0-9_\-]", "_", old_plan_id)
+            old_path = PLANS_DIR / f"{safe_plan_id}.json"
+            if old_path.exists():
+                try:
+                    plan = json.loads(old_path.read_text(encoding="utf-8"))
+                    if isinstance(plan, dict):
+                        logger.info(
+                            "建议 %s 已采纳，直接返回已有方案 %s",
+                            suggestion_id, old_plan_id,
+                        )
+                        return plan
+                except Exception as exc:
+                    # 旧 plan 文件损坏：降级为重新生成
+                    logger.warning(
+                        "已有方案 %s 读取失败，改为重新生成: %s",
+                        old_plan_id, exc,
+                    )
+            else:
+                # 找不到旧 plan 文件：重新生成（仍会回写 adopted_plan_id）
+                logger.warning(
+                    "建议 %s 标记为已采纳但方案文件 %s 不存在，重新生成",
+                    suggestion_id, old_plan_id,
+                )
+
     ald, amine, favorite_id = _resolve_monomers(suggestion)
     template, template_name = _resolve_template(template_id)
 

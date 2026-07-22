@@ -81,6 +81,24 @@ def test_predict_ood_out_nulls_score(monkeypatch):
     assert r.json()["score"] is None        # ⛔ 优先于打分
 
 
+def test_predict_ood_out_nulls_components(monkeypatch):
+    """OOD=out 时 tree/gnn 分量与 std 同步置 None（防止绕过 score 读分量）。"""
+    class _Ood(_FakePredictor):
+        def predict(self, a, b):
+            r = super().predict(a, b)
+            r["gnn_probability"] = 0.7
+            r["gnn_std"] = 0.05
+            r["ood"] = {"level": "out", "reasons": ["非标准官能团"]}
+            return r
+    monkeypatch.setattr(deps, "_PREDICTOR", _Ood())
+    r = client.post("/api/predict",
+                    json={"ald_smiles": "X", "amine_smiles": "Y"})
+    d = r.json()
+    assert d["score"] is None
+    for k in ("tree_score", "gnn_score", "tree_std", "gnn_std"):
+        assert d[k] is None, k
+
+
 def test_predict_empty_400():
     r = client.post("/api/predict", json={"ald_smiles": "", "amine_smiles": "N"})
     assert r.status_code == 400
@@ -147,6 +165,22 @@ def test_records_crud_and_validation(isolated_data):
     assert client.get(f"/api/records/{rid}").status_code == 404
 
 
+def test_records_duplicate_experiment_no_warning(isolated_data):
+    """同 favorite 下重复 experiment_no：返回警告字段但不拦截保存。"""
+    r = client.post("/api/favorites", json={
+        "aldehyde_smiles": "O=Cc1ccccc1", "amine_smiles": "Nc1ccccc1"})
+    assert r.status_code == 201
+    fid = r.json()["id"]
+    body = {"favorite_id": fid, "outcome": "film", "experiment_no": "A5"}
+    r1 = client.post("/api/records", json=body)
+    assert r1.status_code == 201
+    assert "duplicate_experiment_no" not in r1.json()   # 首次创建无警告
+    r2 = client.post("/api/records", json=body)
+    assert r2.status_code == 201                        # 不拦截保存
+    assert r2.json()["duplicate_experiment_no"] is True
+    assert r2.json()["record_id"] != r1.json()["record_id"]
+
+
 # ---------------------------------------------------------------------------
 # 单体 / 模板 / LLM
 # ---------------------------------------------------------------------------
@@ -163,6 +197,18 @@ def test_monomer_props_rdkit_only():
                    params={"smiles": "Nc1ccccc1", "name": "苯胺"})
     assert r.status_code == 200
     assert r.json()["facts"]["mw"] > 90
+
+
+def test_monomer_props_invalid_smiles_400_no_llm(monkeypatch):
+    """非法 SMILES → 400，且在 RDKit 校验阶段拦截，不烧 LLM。"""
+    import recommend.monomer_props as mp
+
+    def _boom(*a, **k):  # 若走到性质卡/LLM 流程则直接失败
+        raise AssertionError("非法 SMILES 不应进入 get_monomer_properties")
+
+    monkeypatch.setattr(mp, "get_monomer_properties", _boom)
+    r = client.get("/api/monomers/props", params={"smiles": "not_a_smiles!!"})
+    assert r.status_code == 400
 
 
 def test_plan_templates_builtin():

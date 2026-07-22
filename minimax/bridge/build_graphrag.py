@@ -33,6 +33,11 @@ TIANXUAN = Path(r'C:\Users\ckx\Desktop\tianxuan seek\data')
 OUT_DIR = Path(__file__).resolve().parent / 'graphrag'
 OUT_DIR.mkdir(exist_ok=True)
 
+# 波次2: 单体池优先使用清洗后的 minimax 副本 (predict/data/processed),
+# 不存在时回退到天璇原始数据 (降级链: 保证管线可运行)
+_CLEANED_MONOMER_CSV = OUT_DIR.parent.parent / 'predict' / 'data' / 'processed' / 'merged_monomer_pool.csv'
+MONOMER_CSV = _CLEANED_MONOMER_CSV if _CLEANED_MONOMER_CSV.exists() else TIANXUAN / 'processed' / 'merged_monomer_pool.csv'
+
 
 # ====== 工具函数 ======
 
@@ -116,8 +121,9 @@ def normalize_interface(text: str) -> str:
 # ====== 节点构造 ======
 
 def build_monomer_nodes():
-    """从 merged_monomer_pool.csv 构造 Monomer 节点"""
-    fp = TIANXUAN / 'processed' / 'merged_monomer_pool.csv'
+    """从 merged_monomer_pool.csv 构造 Monomer 节点 (波次2: 优先清洗后副本)"""
+    fp = MONOMER_CSV
+    print(f'  单体数据源: {fp}')
     nodes = []
     with open(fp, encoding='utf-8') as f:
         reader = csv.DictReader(f)
