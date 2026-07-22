@@ -1,0 +1,54 @@
+"""Pydantic 请求/响应模型。"""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+
+class PredictRequest(BaseModel):
+    ald_smiles: str = Field(..., description="醛单体 SMILES")
+    amine_smiles: str = Field(..., description="胺单体 SMILES")
+
+
+class PairItem(BaseModel):
+    ald_smiles: str
+    amine_smiles: str
+
+
+class BatchPredictRequest(BaseModel):
+    pairs: list[PairItem]
+
+
+class FavoriteCreate(BaseModel):
+    aldehyde_smiles: str
+    amine_smiles: str
+    ald_name: str = ""
+    amine_name: str = ""
+    notes: str = ""
+
+
+class RecordCreate(BaseModel):
+    favorite_id: str | None = None
+    aldehyde_smiles: str = ""
+    amine_smiles: str = ""
+    conditions: dict = Field(default_factory=dict)
+    outcome: str = Field(..., description="film | partial | failed")
+    strength: str = ""
+    notes: str = ""
+    operator: str = ""
+    experiment_no: str = Field(..., description="实验编号（必填）")
+
+
+class PlanCardRequest(BaseModel):
+    aldehyde_smiles: str
+    amine_smiles: str
+    ald_name: str = ""
+    amine_name: str = ""
+    template_id: str | None = Field(
+        None, description="方案卡模板 id；空则内置侯老师 v3.9")
+
+
+class LLMSettings(BaseModel):
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
