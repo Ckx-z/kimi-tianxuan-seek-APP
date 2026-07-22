@@ -80,12 +80,59 @@ def get_fallback_order():
     return list(order) if order else list(FALLBACK_ORDER)
 
 
-def chat_completion(messages, model=None, provider=None, max_tokens=2000,
-                    temperature=0.3, timeout=60):
+def _extract_content(resp_json, provider_name):
+    """从 chat completion 响应中容错提取正文文本。
+
+    LongCat-2.0 为推理模型：正式回答可能在 message.content，思考过程在
+    reasoning_content；个别实现下 content 字段可能缺失、为 None、或为
+    分片列表（[{"type": "text", "text": ...}, ...]）。这里统一容错：
+    1. message.content 按 字符串 / 列表分片拼接 处理；
+    2. 缺失时回退顶层 choices[0].content；
+    3. 均为空时显式抛异常（不静默吞掉，避免上层把空回答当成功）。
+    """
+    choices = resp_json.get('choices') or []
+    if not choices:
+        raise RuntimeError(f'{provider_name} 响应缺少 choices 字段')
+    choice = choices[0] or {}
+    message = choice.get('message') or {}
+
+    raw = message.get('content')
+    if raw is None:
+        # 顶层 content 回退（部分兼容实现把文本放在 choice 层）
+        raw = choice.get('content')
+
+    if isinstance(raw, list):
+        # 列表分片拼接：兼容 [{type: text, text: ...}] / 纯字符串分片
+        parts = []
+        for seg in raw:
+            if isinstance(seg, str):
+                parts.append(seg)
+            elif isinstance(seg, dict):
+                parts.append(seg.get('text') or seg.get('content') or '')
+        content = ''.join(parts)
+    elif isinstance(raw, str):
+        content = raw
+    else:
+        content = ''
+
+    content = content.strip()
+    if not content:
+        # content 为空时给出可读错误，并提示 reasoning_content 是否存在以便排查
+        has_reasoning = bool(message.get('reasoning_content'))
+        raise RuntimeError(
+            f'{provider_name} 返回的 message.content 为空'
+            f'（reasoning_content {"存在，疑似仅返回思考过程" if has_reasoning else "也不存在"}）'
+        )
+    return content
+
+
+def chat_completion(messages, model=None, provider=None, max_tokens=8000,
+                    temperature=0.3, timeout=120):
     """OpenAI 兼容 chat completion，主端点失败/未配置时按 fallback_order 回落。
 
     provider: 指定则只用该端点；None 则按 fallback_order 依次尝试。
-    返回: (content: str, used_provider: str)
+    max_tokens 默认 8000、timeout 默认 120s（长文生成/推理模型需要更大余量）。
+    返回: (content: str, used_provider: str)；content 保证非空，为空时抛异常。
     失败: 抛出最后一次异常（所有端点均失败时）。
     """
     import requests
@@ -112,7 +159,8 @@ def chat_completion(messages, model=None, provider=None, max_tokens=2000,
             )
             r.raise_for_status()
             j = r.json()
-            content = j['choices'][0]['message'].get('content') or ''
+            # 容错解析（LongCat-2.0 推理模型 content 可能缺失/为列表分片）
+            content = _extract_content(j, name)
             return content, name
         except Exception as e:
             last_err = e

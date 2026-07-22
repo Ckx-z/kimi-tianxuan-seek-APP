@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -950,7 +951,8 @@ class TestIterationTab:
         monkeypatch.setattr(gradio_app, "_rec_list",
                             lambda favorite_id=None: ([], None))
         monkeypatch.setattr(gradio_app, "_fav_list", lambda: ([], None))
-        summary, timeline, sug_html, sel, status = gradio_app.refresh_iteration_tab("")
+        summary, timeline, sug_html, sel, gen_sel, status = \
+            gradio_app.refresh_iteration_tab("")
         assert "尚未上线" in sug_html and "尚未上线" in status
         assert "暂无实验记录" in summary
 
@@ -969,7 +971,7 @@ class TestIterationTab:
         monkeypatch.setattr(gradio_app, "_fav_get",
                             lambda fid: (dict(_FAKE_FAV), None))
         monkeypatch.setattr(gradio_app, "_resolve_ref_title", lambda ref: None)
-        summary, timeline, sug_html, sel, status = \
+        summary, timeline, sug_html, sel, gen_sel, status = \
             gradio_app.refresh_iteration_tab("fav_20260722_001")
         assert seen["fid"] == "fav_20260722_001"     # 过滤透传
         assert "共 **1** 条实验记录" in summary and "⛔ 失败 1" in summary
@@ -984,6 +986,85 @@ class TestIterationTab:
         summary = gradio_app._records_summary(recs)
         assert "共 **2** 条" in summary and "✓ 成膜 1" in summary
         assert "⛔ 失败 1" in summary and "2026-07-22" in summary
+
+
+# ---------------------------------------------------------------------------
+# 任务C：页⑤ 自然语言方案迭代（subprocess 调 minimax orchestrator）
+# ---------------------------------------------------------------------------
+
+class TestIterateSuggest:
+    """monkeypatch subprocess.run，验证成功 / 失败 / 超时的 UI 行为。"""
+
+    @pytest.fixture(autouse=True)
+    def _isolate(self, monkeypatch):
+        # 保证解释器/脚本路径存在检查通过；刷新建议区不依赖真实 suggestions 模块
+        monkeypatch.setattr(gradio_app, "ITERATE_PYTHON", sys.executable)
+        monkeypatch.setattr(gradio_app, "ITERATE_SCRIPT",
+                            Path(gradio_app.__file__))
+        monkeypatch.setattr(gradio_app, "refresh_suggestions",
+                            lambda fav_filter="": ("<html/>", "共 0 条建议。"))
+
+    def test_success_writes_and_refresh(self, monkeypatch):
+        """exit 0 + stdout JSON 摘要 → 状态列出写入的 suggestion_id 并刷新。"""
+        called = {}
+
+        def _fake_run(cmd, **kwargs):
+            called["cmd"] = cmd
+            called["kwargs"] = kwargs
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0,
+                stdout='日志行...\n{"written": ["sug_20260723_001", '
+                       '"sug_20260723_002"], "count": 2}\n',
+                stderr="")
+
+        monkeypatch.setattr(gradio_app.subprocess, "run", _fake_run)
+        html_out, status = gradio_app.run_iterate_suggest(
+            "上次失败了怎么调", "fav_20260722_001")
+        assert html_out == "<html/>"                      # 成功 → 刷新建议区
+        assert "sug_20260723_001" in status and "sug_20260723_002" in status
+        assert "✓" in status and "2 条" in status
+        # 契约：命令含脚本与 --favorite-id / --question
+        assert called["cmd"][1] == str(gradio_app.ITERATE_SCRIPT)
+        assert "--favorite-id" in called["cmd"] and "--question" in called["cmd"]
+        assert called["kwargs"]["timeout"] == 180
+        assert called["kwargs"]["capture_output"] is True
+        assert called["kwargs"]["errors"] == "replace"
+
+    def test_failure_exit_nonzero(self, monkeypatch):
+        """exit 非 0 → 建议区不刷新，状态回显 stderr 末行人读错误。"""
+        def _fake_run(cmd, **kwargs):
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=2, stdout="",
+                stderr="Traceback...\nValueError: 没有任何实验记录可检索")
+
+        monkeypatch.setattr(gradio_app.subprocess, "run", _fake_run)
+        html_out, status = gradio_app.run_iterate_suggest("为什么失败", "fav_x")
+        assert "生成失败" in status and "exit 2" in status
+        assert "没有任何实验记录可检索" in status        # stderr 人读错误回显
+
+    def test_timeout_message(self, monkeypatch):
+        """subprocess.TimeoutExpired → 明确超时提示，不抛异常。"""
+        def _fake_run(cmd, **kwargs):
+            raise subprocess.TimeoutExpired(cmd=cmd, timeout=180)
+
+        monkeypatch.setattr(gradio_app.subprocess, "run", _fake_run)
+        html_out, status = gradio_app.run_iterate_suggest("怎么调", "")
+        assert "超时" in status and "180" in status
+
+    def test_empty_question_no_subprocess(self, monkeypatch):
+        """空问题直接拦截，不启动子进程。"""
+        monkeypatch.setattr(
+            gradio_app.subprocess, "run",
+            lambda *a, **k: pytest.fail("空问题不应调 subprocess.run"))
+        _, status = gradio_app.run_iterate_suggest("   ", "fav_x")
+        assert "请先输入问题" in status
+
+    def test_python_missing_message(self, monkeypatch):
+        """E:\\python3.12\\python.exe 不存在 → 明确提示文案。"""
+        monkeypatch.setattr(gradio_app, "ITERATE_PYTHON",
+                            r"E:\nonexistent_venv_xyz\python.exe")
+        _, status = gradio_app.run_iterate_suggest("怎么调", "")
+        assert "找不到 orchestrator 解释器" in status
 
 
 # ---------------------------------------------------------------------------

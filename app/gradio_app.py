@@ -10,7 +10,8 @@
 - ④ 实验记录：标准化录入表单（支持关联收藏 / 游离记录）+ 时间线
   （当初预测快照 vs 实际结果对比）。
 - ⑤ 方案迭代（RAG 对接）：实验记录时间线摘要 + RAG 建议卡片回显
-  （src.rag.suggestions，未就位时优雅降级为占位提示）。
+  （src.rag.suggestions，未就位时优雅降级为占位提示）+ 自然语言提问
+  生成迭代建议（subprocess 调 minimax orchestrator，防重复点击）。
 - ⑥ 设置（P4b）：LLM 配置（base_url / api_key / 模型名，OpenAI 兼容端点）
   + 连通性测试；密钥仅存本地 gitignored 配置，界面掩码显示。
 
@@ -37,6 +38,7 @@ import html
 import io
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -2097,7 +2099,8 @@ def _records_summary(recs: list) -> str:
 
 
 def refresh_iteration_tab(fav_filter=""):
-    """页⑤ 进入/刷新 → (记录摘要, 记录时间线, 建议卡片, 过滤下拉, 状态)。"""
+    """页⑤ 进入/刷新 → (记录摘要, 记录时间线, 建议卡片, 过滤下拉,
+    生成用收藏下拉, 状态)。"""
     recs, rerr = _rec_list()
     recs = recs or []
     summary = f"⚠️ {rerr}" if rerr else _records_summary(recs)
@@ -2114,7 +2117,8 @@ def refresh_iteration_tab(fav_filter=""):
     favs, _ = _fav_list()
     choices = [("全部", "")] + [(_fav_label(f), f.get("id")) for f in (favs or [])]
     return (summary, timeline, sug_html,
-            gr.update(choices=choices, value=fav_filter or ""), status)
+            gr.update(choices=choices, value=fav_filter or ""),
+            gr.update(choices=_iterate_fav_choices()), status)
 
 
 def refresh_suggestions(fav_filter=""):
@@ -2124,6 +2128,88 @@ def refresh_suggestions(fav_filter=""):
         return f'<div class="placeholder-page">{_esc(serr)}</div>', serr
     return (_render_suggestion_cards(sugs),
             f"共 {len(sugs)} 条建议。" if sugs else "")
+
+
+# ---------------------------------------------------------------------------
+# 页⑤ 任务C：自然语言方案迭代 → subprocess 调 minimax orchestrator
+# ---------------------------------------------------------------------------
+
+# 钉死的协作契约：orchestrator CLI 入口与解释器路径（任务B提供脚本本体）
+ITERATE_PYTHON = r"E:\python3.12\python.exe"
+ITERATE_SCRIPT = PROJECT_ROOT / "minimax" / "adapters" / "iterate_suggest.py"
+ITERATE_TIMEOUT_S = 180
+
+
+def _iterate_fav_choices():
+    """生成用收藏下拉选项（复用 _fav_list 标签模式；空值 = 用全部实验记录）。"""
+    favs, _ = _fav_list()
+    return [("全部实验记录（不指定收藏）", "")] + [
+        (_fav_label(f), f.get("id")) for f in (favs or [])]
+
+
+def run_iterate_suggest(question, fav_id=""):
+    """「生成迭代建议」→ (建议卡片, 状态)。
+
+    subprocess 调 `minimax/adapters/iterate_suggest.py --question <text>
+    [--favorite-id <id>]`：成功 exit 0 且 stdout 末行 JSON {"written": [...],
+    "count": N}，失败 exit 非 0 / stderr 人读错误。成功后全量刷新建议列表。
+    """
+    q = (question or "").strip()
+    if not q:
+        return (gr.update(),
+                "⚠️ 请先输入问题——例如「上次失败了怎么调」。")
+    if not Path(ITERATE_PYTHON).exists():
+        return (gr.update(),
+                f"⚠️ 找不到 orchestrator 解释器 `{ITERATE_PYTHON}`——请确认 "
+                "python3.12 环境已安装，或联系维护者核对路径。")
+    if not ITERATE_SCRIPT.exists():
+        return (gr.update(),
+                "⏳ `minimax/adapters/iterate_suggest.py` 尚未就位（后端开发中）"
+                "——建议生成暂不可用，可先手动查看已有建议。")
+
+    cmd = [ITERATE_PYTHON, str(ITERATE_SCRIPT), "--question", q]
+    fid = (fav_id or "").strip()
+    if fid:
+        cmd += ["--favorite-id", fid]
+    try:
+        proc = subprocess.run(
+            cmd, cwd=str(PROJECT_ROOT), timeout=ITERATE_TIMEOUT_S,
+            capture_output=True, text=True, encoding="utf-8", errors="replace")
+    except subprocess.TimeoutExpired:
+        return (gr.update(),
+                f"⚠️ 生成超时（{ITERATE_TIMEOUT_S}s 无响应）——请稍后重试，"
+                "或缩短问题后重试。")
+    except OSError as e:
+        return (gr.update(), f"⚠️ 无法启动 orchestrator 子进程：{_brief_error(e)}")
+
+    if proc.returncode != 0:
+        err_lines = [ln for ln in (proc.stderr or "").splitlines() if ln.strip()]
+        tail = err_lines[-1].strip() if err_lines else "（stderr 为空）"
+        return (gr.update(),
+                f"⚠️ 生成失败（exit {proc.returncode}）：{tail}")
+
+    # 成功：从 stdout 末行解析 JSON 摘要 {"written": [...], "count": N}
+    written, count = [], None
+    for ln in reversed((proc.stdout or "").splitlines()):
+        ln = ln.strip()
+        if not ln.startswith("{"):
+            continue
+        try:
+            summary = json.loads(ln)
+        except json.JSONDecodeError:
+            continue
+        written = summary.get("written") or []
+        count = summary.get("count")
+        break
+
+    sug_html, s_status = refresh_suggestions("")  # 成功后全量刷新建议区
+    done_msg = "✓ 已生成迭代建议"
+    if count is not None:
+        done_msg += f"（{count} 条）"
+    if written:
+        done_msg += "：" + "、".join(f"`{w}`" for w in written)
+    done_msg += "。已刷新建议列表" + (f"（{s_status}）" if s_status else "。")
+    return sug_html, done_msg
 
 
 # ---------------------------------------------------------------------------
@@ -2642,9 +2728,22 @@ def create_app() -> gr.Blocks:
                             interactive=True, allow_custom_value=True, scale=3)
                     iter_sug_html = gr.HTML()
                     iter_status = gr.Markdown()
+                # 任务C：自然语言方案迭代（subprocess → minimax orchestrator）
+                with gr.Group():
+                    gr.Markdown("#### 自然语言方案迭代")
+                    iter_question = gr.Textbox(
+                        label="向 RAG 提问", lines=2,
+                        placeholder="例如：上次失败了怎么调？为什么这组单体不成膜？")
+                    with gr.Row():
+                        iter_gen_fav = gr.Dropdown(
+                            label="针对收藏（可选）",
+                            choices=[("全部实验记录（不指定收藏）", "")], value="",
+                            interactive=True, allow_custom_value=True, scale=3)
+                        iter_gen_btn = gr.Button("生成迭代建议", variant="primary",
+                                                 scale=1)
 
                 _iter_outputs = [iter_rec_summary, iter_rec_html, iter_sug_html,
-                                 iter_fav_filter, iter_status]
+                                 iter_fav_filter, iter_gen_fav, iter_status]
                 iter_tab.select(fn=refresh_iteration_tab, inputs=[iter_fav_filter],
                                 outputs=_iter_outputs)
                 iter_refresh_btn.click(fn=refresh_iteration_tab,
@@ -2653,6 +2752,16 @@ def create_app() -> gr.Blocks:
                 iter_fav_filter.change(fn=refresh_suggestions,
                                        inputs=[iter_fav_filter],
                                        outputs=[iter_sug_html, iter_status])
+                # 生成期间 disable 按钮防重复点击，完成后恢复
+                _gen_evt = iter_gen_btn.click(
+                    fn=lambda: gr.update(interactive=False),
+                    outputs=[iter_gen_btn], queue=False)
+                _gen_evt = _gen_evt.then(
+                    fn=run_iterate_suggest,
+                    inputs=[iter_question, iter_gen_fav],
+                    outputs=[iter_sug_html, iter_status])
+                _gen_evt.then(fn=lambda: gr.update(interactive=True),
+                              outputs=[iter_gen_btn], queue=False)
 
             # ===================== 页⑥ 设置 =====================
             with gr.Tab("⑥ 设置") as settings_tab:
