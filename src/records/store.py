@@ -235,3 +235,29 @@ def get_record(rec_id: str) -> dict | None:
         return None
     path = RECORDS_DIR / f"{rec_id}.json"
     return _read_file(path) if path.exists() else None
+
+
+def delete_record(rec_id: str) -> bool:
+    """删除记录：移除落盘文件，并从关联收藏的 experiment_record_ids 解挂。
+
+    返回是否实际删除（记录不存在/损坏返回 False）。
+    """
+    rec = get_record(rec_id)
+    if rec is None:
+        return False
+    fid = rec.get("favorite_id")
+    if fid:
+        fav = favorites_store.get_favorite(fid)
+        if fav:
+            ids = [r for r in (fav.get("experiment_record_ids") or [])
+                   if r != rec_id]
+            try:
+                favorites_store.update_favorite(fid, experiment_record_ids=ids)
+            except Exception as exc:  # 解挂失败不阻塞文件删除，仅告警
+                logger.warning("删除记录 %s 时解挂收藏 %s 失败: %s", rec_id, fid, exc)
+    try:
+        (RECORDS_DIR / f"{rec_id}.json").unlink()
+    except OSError as exc:
+        logger.warning("删除记录文件 %s 失败: %s", rec_id, exc)
+        return False
+    return True

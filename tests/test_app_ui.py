@@ -472,7 +472,7 @@ class TestRecordsPage:
             or (dict(_FAKE_REC), None))
         monkeypatch.setattr(gradio_app, "_rec_list",
                             lambda favorite_id=None: ([dict(_FAKE_REC)], None))
-        st, timeline, _, *resets = gradio_app.submit_record(
+        st, timeline, _, _pick, *resets = gradio_app.submit_record(
             "fav_20260722_001", "A5", "甲苯", "二氧六环", "氯仿", "",
             "6M 乙酸", "120", "3", "先醛后胺", "失败", "膜脆", "测试员", "乙酸用错")
         assert "✓" in st and "rec_20260722_001" in st and "A5" in st
@@ -490,7 +490,7 @@ class TestRecordsPage:
 
     def test_submit_requires_experiment_no(self):
         """P4a 修复 b：实验编号为独立必填字段，空则前端拦截。"""
-        st, timeline, _, *resets = gradio_app.submit_record(
+        st, timeline, _, _pick, *resets = gradio_app.submit_record(
             "fav_x", "  ", "甲苯", "", "", "", "", "", "", "", "成膜", "", "", "")
         assert "实验编号" in st and "必填" in st and "⚠️" in st
         assert timeline == ""
@@ -527,7 +527,7 @@ class TestRecordsPage:
     def test_refresh_records_tab_missing(self, monkeypatch):
         monkeypatch.setattr(gradio_app, "_rec_list",
                             lambda favorite_id=None: (None, "⏳ 实验记录后端模块尚未上线"))
-        _, recs_html = gradio_app.refresh_records_tab()
+        _, recs_html, _pick = gradio_app.refresh_records_tab()
         assert "尚未上线" in recs_html
 
 
@@ -803,7 +803,7 @@ class TestFreeRecord:
             or (dict(_FAKE_REC), None))
         monkeypatch.setattr(gradio_app, "_rec_list",
                             lambda favorite_id=None: ([dict(_FAKE_REC)], None))
-        st, timeline, _, *resets = gradio_app.submit_record(
+        st, timeline, _, _pick, *resets = gradio_app.submit_record(
             "", "G2-3", "甲苯", "", "", "", "6M 乙酸", "120", "3", "",
             "成膜", "", "测试员", "",
             True, "O=Cc1ccccc1", "Nc1ccc(N)cc1")
@@ -1001,7 +1001,7 @@ class TestRecordsTabP4a:
 
         monkeypatch.setattr(gradio_app, "_rec_list", _rec_list)
         monkeypatch.setattr(gradio_app, "_fav_list", lambda: ([], None))
-        _, html_out = gradio_app.refresh_records_tab("fav_20260722_001", False)
+        _, html_out, _pick = gradio_app.refresh_records_tab("fav_20260722_001", False)
         assert seen["fid"] == "fav_20260722_001"
         assert "rec_20260722_001" in html_out
 
@@ -1027,7 +1027,7 @@ class TestRecordsTabP4a:
             lambda favorite_id=None: seen.update(fid=favorite_id)
             or ([dict(_FAKE_REC)], None))
         out = gradio_app.on_record_fav_change("fav_20260722_001", False)
-        timeline, resets = out[0], out[1:]
+        timeline, resets = out[0], out[2:]  # out[1] 为记录管理下拉
         assert seen["fid"] == "fav_20260722_001"
         assert "rec_20260722_001" in timeline
         assert len(resets) == 17
@@ -1039,7 +1039,7 @@ class TestRecordsTabP4a:
     def test_show_all_toggle_refreshes_only_timeline(self, monkeypatch):
         monkeypatch.setattr(gradio_app, "_rec_list",
                             lambda favorite_id=None: ([dict(_FAKE_REC)], None))
-        html_out = gradio_app.on_show_all_toggle("fav_x", True)
+        html_out, _pick = gradio_app.on_show_all_toggle("fav_x", True)
         assert "rec_20260722_001" in html_out
 
     def test_timeline_shows_experiment_no(self):

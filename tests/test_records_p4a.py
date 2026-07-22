@@ -204,3 +204,41 @@ class TestContractSchemaP4a:
             (rec_d / f"{rec['record_id']}.json").read_text(encoding="utf-8")
         )
         assert saved == rec
+
+
+class TestDeleteRecord:
+    """记录删除：文件移除 + 收藏解挂 + 幂等。"""
+
+    def test_delete_free_record(self, tmp_path, monkeypatch):
+        from records import store
+        monkeypatch.setattr(store, "RECORDS_DIR", tmp_path)
+        rec = store.create_record(
+            favorite_id=None, aldehyde_smiles="O=Cc1ccccc1",
+            amine_smiles="Nc1ccccc1", conditions={"solvent_1": "甲苯"},
+            outcome="film", experiment_no="DEL-1")
+        rid = rec["record_id"]
+        assert store.get_record(rid) is not None
+        assert store.delete_record(rid) is True
+        assert store.get_record(rid) is None
+        assert store.delete_record(rid) is False  # 幂等
+
+    def test_delete_unlinks_favorite(self, tmp_path, monkeypatch):
+        from records import store
+        from favorites import store as fav_store
+        monkeypatch.setattr(store, "RECORDS_DIR", tmp_path)
+        fav = {"id": "fav_20990101_001",
+               "experiment_record_ids": ["rec_20990101_001", "rec_20990101_002"]}
+        monkeypatch.setattr(store.favorites_store, "get_favorite",
+                            lambda fid: fav if fid == fav["id"] else None)
+        seen = {}
+        monkeypatch.setattr(store.favorites_store, "update_favorite",
+                            lambda fid, **kw: seen.update(kw) or fav)
+        rec = store.create_record(
+            favorite_id="fav_20990101_001", aldehyde_smiles="O=Cc1ccccc1",
+            amine_smiles="Nc1ccccc1", conditions={}, outcome="failed",
+            experiment_no="DEL-2")
+        # create_record 内部会回挂；monkeypatch 的 update 已记录，重设后再删
+        rid = rec["record_id"]
+        fav["experiment_record_ids"] = [rid, "rec_20990101_002"]
+        assert store.delete_record(rid) is True
+        assert seen["experiment_record_ids"] == ["rec_20990101_002"]

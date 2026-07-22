@@ -940,6 +940,29 @@ def _rec_list(favorite_id=None):
         return None, f"⚠️ 实验记录读取失败：{_brief_error(e)}"
 
 
+def _rec_get(rec_id):
+    store, err = _load_records_store()
+    if err:
+        return None, err
+    try:
+        return store.get_record(rec_id), None
+    except Exception as e:
+        return None, f"⚠️ 实验记录读取失败：{_brief_error(e)}"
+
+
+def _rec_delete(rec_id):
+    store, err = _load_records_store()
+    if err:
+        return None, err
+    try:
+        ok = store.delete_record(rec_id)
+    except Exception as e:
+        return None, f"⚠️ 实验记录删除失败：{_brief_error(e)}"
+    if not ok:
+        return None, f"⚠️ 记录 {rec_id} 不存在或已删除。"
+    return True, None
+
+
 def _plan_generate(ald, amine, ald_name, amine_name, template=None):
     """生成方案卡。P4b：template 为钉死的新参数（模板名）；后端未就位
     （TypeError）时降级为旧签名，模板选择暂不生效但不报错。"""
@@ -1514,6 +1537,108 @@ def _render_records_timeline(records: list) -> str:
     return '<div class="rec-timeline">' + "".join(items) + "</div>"
 
 
+def _record_pick_choices(records: list):
+    """记录管理下拉的 choices：「日期｜实验编号｜单体对」→ record_id。"""
+    choices = []
+    for rec in records or []:
+        rid = rec.get("record_id") or rec.get("id")
+        if not rid:
+            continue
+        date = rec.get("date") or str(rec.get("created_at") or "")[:10] or "?"
+        exp_no = rec.get("experiment_no") or "—"
+        pair = _record_pair_names(rec)
+        choices.append((f"{date}｜编号 {exp_no}｜{pair}", rid))
+    return gr.update(choices=choices, value=None)
+
+
+def _render_record_detail(rec: dict) -> str:
+    """单条记录放大详情卡（大字号全字段）。"""
+    label, color = _OUTCOME_ZH.get(rec.get("outcome"), (rec.get("outcome") or "—", "#64748b"))
+    date = rec.get("date") or str(rec.get("created_at") or "")[:10] or "?"
+    pair = _esc(_record_pair_names(rec))
+    rid = _esc(rec.get("record_id") or "?")
+
+    rows = []
+    if rec.get("experiment_no"):
+        rows.append(("实验编号", _esc(rec["experiment_no"])))
+    conds = rec.get("conditions") or {}
+    for k, v in conds.items():
+        if v not in (None, ""):
+            rows.append((_COND_LABELS.get(k, k), _esc(str(v))))
+    if rec.get("strength"):
+        rows.append(("机械强度/膜质量", _esc(rec["strength"])))
+    if rec.get("operator"):
+        rows.append(("操作人", _esc(rec["operator"])))
+    if rec.get("notes"):
+        rows.append(("备注", _esc(rec["notes"])))
+    rows_html = "".join(
+        f'<tr><td class="rd-k">{k}</td><td class="rd-v">{v}</td></tr>'
+        for k, v in rows) or '<tr><td class="rd-v">（无更多字段）</td></tr>'
+
+    snap = rec.get("prediction_snapshot") or {}
+    snap_score, snap_std = snap.get("score"), snap.get("std", snap.get("score_std"))
+    snap_ood = snap.get("ood", "none")
+    if isinstance(snap_ood, dict):
+        snap_ood = snap_ood.get("level", "none")
+    if snap_ood == "out":
+        snap_html = '<div class="rd-snap">当初预测：⛔ OOD 不适用</div>'
+    elif isinstance(snap_score, (int, float)):
+        txt = f"当初预测：{snap_score:.3f}"
+        if isinstance(snap_std, (int, float)):
+            txt += f" ± {snap_std:.3f}"
+        snap_html = f'<div class="rd-snap">{_esc(txt)}（{_ood_label(snap_ood)}）</div>'
+    else:
+        snap_html = '<div class="rd-snap">当初预测：无快照（游离记录）</div>'
+
+    return (
+        '<div class="rec-detail">'
+        f'<div class="rd-head"><span class="rec-date">{_esc(date)}</span> '
+        f'<b>{pair}</b> '
+        f'<span class="rec-outcome" style="background:{color}">{label}</span>'
+        f'<span class="rd-id"><code>{rid}</code></span></div>'
+        f"{snap_html}"
+        f'<table class="rd-table">{rows_html}</table>'
+        "</div>")
+
+
+def view_record_detail(rec_id: str) -> str:
+    """「放大查看」回调：选中记录 → 大字号详情卡。"""
+    rid = (rec_id or "").strip()
+    if not rid:
+        return '<div class="placeholder-page">先在上方下拉选择一条记录。</div>'
+    rec, err = _rec_get(rid)
+    if err:
+        return f'<div class="placeholder-page">{_esc(err)}</div>'
+    if not rec:
+        return f'<div class="placeholder-page">记录 {_esc(rid)} 不存在（可能已删除）。</div>'
+    return _render_record_detail(rec)
+
+
+def delete_record_clicked(rec_id: str, armed: bool, fav_id: str, show_all: bool):
+    """「删除」回调（两段确认）：第一次点击进入待确认态，第二次执行删除。
+
+    返回 (状态, 删除按钮, armed状态, 时间线HTML, 记录下拉, 详情区)。
+    """
+    disarm = (gr.update(value="🗑 删除所选记录", variant="stop"), False)
+    rid = (rec_id or "").strip()
+    if not rid:
+        return ("⚠️ 先在上方下拉选择要删除的记录。", *disarm,
+                gr.update(), gr.update(), gr.update())
+    if not armed:
+        return (f"⚠️ 确认删除记录 {rid}？此操作不可恢复——再点一次红色按钮执行。",
+                gr.update(value="⚠️ 再点一次确认删除", variant="primary"), True,
+                gr.update(), gr.update(), gr.update())
+    ok, err = _rec_delete(rid)
+    if err:
+        return (err, *disarm, gr.update(), gr.update(), gr.update())
+    fid = (fav_id or "") or None
+    recs, _ = _rec_list(favorite_id=None if (show_all or not fid) else fid)
+    return (f"✓ 记录 {rid} 已删除。", *disarm,
+            _render_records_timeline(recs or []),
+            _record_pick_choices(recs),
+            '<div class="placeholder-page">记录已删除。</div>')
+
+
 # ---------------------------------------------------------------------------
 # 页① 增强回调：收藏 + 方案卡
 # ---------------------------------------------------------------------------
@@ -1753,7 +1878,7 @@ def _record_fav_choices():
 
 
 def refresh_records_tab(fav_id: str = "", show_all: bool = True):
-    """页④ 进入/刷新：更新收藏下拉 + 记录时间线。
+    """页④ 进入/刷新：更新收藏下拉 + 记录时间线 + 记录管理下拉。
 
     P4a：选中收藏且未开「显示全部」时，时间线只显示该 fav 的记录。
     """
@@ -1761,7 +1886,7 @@ def refresh_records_tab(fav_id: str = "", show_all: bool = True):
     recs, err = _rec_list(favorite_id=None if (show_all or not fid) else fid)
     recs_html = (f'<div class="placeholder-page">{_esc(err)}</div>'
                  if err else _render_records_timeline(recs or []))
-    return _record_fav_choices(), recs_html
+    return _record_fav_choices(), recs_html, _record_pick_choices(recs or [])
 
 
 def reset_record_form():
@@ -1780,20 +1905,21 @@ def reset_record_form():
 def on_record_fav_change(fav_id: str, show_all: bool):
     """收藏下拉变化（P4a 修复 a+c）：重置全部表单字段 + 按收藏过滤时间线。
 
-    返回 (时间线HTML, *表单重置)。"""
+    返回 (时间线HTML, 记录下拉, *表单重置)。"""
     fid = (fav_id or "") or None
     recs, err = _rec_list(favorite_id=None if (show_all or not fid) else fid)
     recs_html = (f'<div class="placeholder-page">{_esc(err)}</div>'
                  if err else _render_records_timeline(recs or []))
-    return (recs_html,) + reset_record_form()
+    return (recs_html, _record_pick_choices(recs or [])) + reset_record_form()
 
 
 def on_show_all_toggle(fav_id: str, show_all: bool):
-    """「显示全部」开关变化：仅刷新时间线。"""
+    """「显示全部」开关变化：刷新时间线 + 记录下拉。"""
     fid = (fav_id or "") or None
     recs, err = _rec_list(favorite_id=None if (show_all or not fid) else fid)
-    return (f'<div class="placeholder-page">{_esc(err)}</div>'
-            if err else _render_records_timeline(recs or []))
+    recs_html = (f'<div class="placeholder-page">{_esc(err)}</div>'
+                 if err else _render_records_timeline(recs or []))
+    return recs_html, _record_pick_choices(recs or [])
 
 
 def submit_record(fav_id, experiment_no, solvent_1, solvent_2, eluent,
@@ -1809,7 +1935,7 @@ def submit_record(fav_id, experiment_no, solvent_1, solvent_2, eluent,
     experiment_no = (experiment_no or "").strip()
     if not experiment_no:
         return ("⚠️ 请填写「实验编号」（如 A5、G2-3）——这是必填字段。",
-                "", gr.update()) + (gr.update(),) * 17
+                "", gr.update(), gr.update()) + (gr.update(),) * 17
     conditions = {
         "solvent_1": (solvent_1 or "").strip(),
         "solvent_2": (solvent_2 or "").strip(),
@@ -1822,7 +1948,7 @@ def submit_record(fav_id, experiment_no, solvent_1, solvent_2, eluent,
     }
     if not any(conditions.values()) and not (notes or "").strip():
         return ("⚠️ 请至少填写一项实际条件或备注再保存。",
-                "", gr.update()) + (gr.update(),) * 17
+                "", gr.update(), gr.update()) + (gr.update(),) * 17
     outcome = _OUTCOME_MAP.get(outcome_zh, "failed")
     strength, notes, operator = ((strength or "").strip(), (notes or "").strip(),
                                  (operator or "").strip())
@@ -1830,22 +1956,22 @@ def submit_record(fav_id, experiment_no, solvent_1, solvent_2, eluent,
         ald_s, amine_s = (free_ald or "").strip(), (free_amine or "").strip()
         if not ald_s or not amine_s:
             return ("⚠️ 游离记录需填写醛和胺的 SMILES（或取消勾选并选择收藏条目）。",
-                    "", gr.update()) + (gr.update(),) * 17
+                    "", gr.update(), gr.update()) + (gr.update(),) * 17
         rec, err = _rec_create_free(ald_s, amine_s, conditions, outcome,
                                     strength, notes, operator, experiment_no)
     else:
         if not fav_id:
             return ("⚠️ 请先选择关联的收藏条目——或勾选「不关联收藏（游离记录）」"
-                    "后直接填写醛/胺 SMILES。", "", gr.update()) + (gr.update(),) * 17
+                    "后直接填写醛/胺 SMILES。", "", gr.update(), gr.update()) + (gr.update(),) * 17
         rec, err = _rec_create_linked(fav_id, conditions, outcome,
                                       strength, notes, operator, experiment_no)
     if err:
-        return (err, "", gr.update()) + (gr.update(),) * 17
+        return (err, "", gr.update(), gr.update()) + (gr.update(),) * 17
     recs, _ = _rec_list()
     rid = rec.get("record_id") or rec.get("id") or "?"
     return (f"✓ 实验记录已保存（{rid}，实验编号 {experiment_no}）。",
             _render_records_timeline(recs or []), _record_fav_choices(),
-            *reset_record_form())
+            _record_pick_choices(recs or []), *reset_record_form())
 
 
 # ---------------------------------------------------------------------------
@@ -2044,6 +2170,15 @@ CUSTOM_CSS = """
 .rec-conds { color: #334155; font-size: 0.85rem; margin: 4px 0; }
 .rec-meta { color: #64748b; font-size: 0.8rem; }
 .rec-notes { color: #475569; font-size: 0.85rem; margin-top: 4px; }
+/* 记录放大详情卡 */
+.rec-detail { border: 1px solid #0f766e; border-radius: 10px; background: #f0fdfa; padding: 18px 22px; margin: 10px 0; font-size: 1.05rem; }
+.rd-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 1.15rem; margin-bottom: 8px; }
+.rd-id { margin-left: auto; color: #64748b; font-size: 0.85rem; }
+.rd-snap { color: #0f766e; font-weight: 600; margin: 6px 0 10px; }
+.rd-table { width: 100%; border-collapse: collapse; }
+.rd-table td { padding: 7px 10px; border-top: 1px solid #ccfbf1; vertical-align: top; }
+.rd-k { color: #64748b; white-space: nowrap; width: 130px; font-size: 0.95rem; }
+.rd-v { color: #0f172a; font-size: 1.05rem; line-height: 1.6; }
 /* P3：RAG 建议卡片 / 文献 paper_id 小字 */
 .sug-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .sug-card { border: 1px solid #e2e8f0; border-left: 4px solid #0f766e; border-radius: 10px; padding: 10px 14px; background: #fff; }
@@ -2428,6 +2563,20 @@ def create_app() -> gr.Blocks:
                             label="显示全部记录（关闭则只看上方选中收藏的记录）",
                             value=True, scale=3)
                     rec_list_html = gr.HTML()
+                with gr.Group():
+                    gr.Markdown("#### 记录管理（放大查看 / 删除）")
+                    with gr.Row():
+                        rec_pick = gr.Dropdown(
+                            label="选择记录", choices=[], interactive=True,
+                            allow_custom_value=True, scale=3)
+                        rec_detail_btn = gr.Button("🔍 放大查看", size="sm",
+                                                   scale=1)
+                        rec_del_btn = gr.Button("🗑 删除所选记录", size="sm",
+                                                variant="stop", scale=1)
+                    rec_detail_html = gr.HTML(
+                        '<div class="placeholder-page">选择记录后点击「放大查看」，'
+                        '此处显示完整详情。</div>')
+                    rec_del_armed = gr.State(False)
 
                 # 表单字段输出顺序（reset_record_form / submit_record 共用）
                 _REC_FORM_OUTPUTS = [rec_exp_no, rec_solvent1, rec_solvent2,
@@ -2439,19 +2588,21 @@ def create_app() -> gr.Blocks:
 
                 rec_tab.select(fn=refresh_records_tab,
                                inputs=[rec_fav_select, rec_show_all],
-                               outputs=[rec_fav_select, rec_list_html])
+                               outputs=[rec_fav_select, rec_list_html, rec_pick])
                 rec_refresh_btn.click(fn=refresh_records_tab,
                                       inputs=[rec_fav_select, rec_show_all],
-                                      outputs=[rec_fav_select, rec_list_html])
+                                      outputs=[rec_fav_select, rec_list_html,
+                                               rec_pick])
                 rec_free.change(fn=lambda v: gr.update(visible=bool(v)),
                                 inputs=[rec_free], outputs=[rec_free_row])
                 # P4a 修复 a+c：切换收藏 → 重置全部表单 + 时间线只看该收藏
                 rec_fav_select.change(fn=on_record_fav_change,
                                       inputs=[rec_fav_select, rec_show_all],
-                                      outputs=[rec_list_html] + _REC_FORM_OUTPUTS)
+                                      outputs=[rec_list_html, rec_pick]
+                                      + _REC_FORM_OUTPUTS)
                 rec_show_all.change(fn=on_show_all_toggle,
                                     inputs=[rec_fav_select, rec_show_all],
-                                    outputs=[rec_list_html])
+                                    outputs=[rec_list_html, rec_pick])
                 rec_submit_btn.click(
                     fn=submit_record,
                     inputs=[rec_fav_select, rec_exp_no, rec_solvent1,
@@ -2459,8 +2610,18 @@ def create_app() -> gr.Blocks:
                             rec_catalyst, rec_temp, rec_time, rec_order,
                             rec_outcome, rec_strength, rec_operator, rec_notes,
                             rec_free, rec_free_ald, rec_free_amine],
-                    outputs=[rec_status, rec_list_html, rec_fav_select]
+                    outputs=[rec_status, rec_list_html, rec_fav_select, rec_pick]
                             + _REC_FORM_OUTPUTS)
+                # 记录管理：放大查看 / 两段确认删除
+                rec_detail_btn.click(fn=view_record_detail,
+                                     inputs=[rec_pick],
+                                     outputs=[rec_detail_html])
+                rec_del_btn.click(fn=delete_record_clicked,
+                                  inputs=[rec_pick, rec_del_armed,
+                                          rec_fav_select, rec_show_all],
+                                  outputs=[rec_status, rec_del_btn,
+                                           rec_del_armed, rec_list_html,
+                                           rec_pick, rec_detail_html])
 
             # ===================== 页⑤ 方案迭代（RAG 对接） =====================
             with gr.Tab("⑤ 方案迭代") as iter_tab:
