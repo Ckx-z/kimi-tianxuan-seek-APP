@@ -2011,76 +2011,130 @@ _EV_KIND_ZH = {"experiment_record": "实验记录", "literature": "文献",
                "prediction": "预测"}
 
 
+def _batch_label(batch_id) -> str:
+    """批次号 batch_YYYYMMDD_HHMMSS → 人读时间；解析失败原样返回。"""
+    b = str(batch_id or "")
+    if len(b) == len("batch_YYYYMMDD_HHMMSS") and b.startswith("batch_"):
+        body = b[6:]
+        date, tme = body.split("_", 1)
+        if date.isdigit() and tme.isdigit():
+            return (f"{date[:4]}-{date[4:6]}-{date[6:8]} "
+                    f"{tme[:2]}:{tme[2:4]}:{tme[4:6]}")
+    return b
+
+
+def _render_one_suggestion(sug: dict, highlight: bool = False) -> str:
+    """单张建议卡 HTML（highlight=True 用于本次新建议高亮边框）。"""
+    stype = sug.get("type") or "?"
+    type_zh = _SUG_TYPE_ZH.get(stype, _esc(stype))
+    status, color = _SUG_STATUS_ZH.get(
+        sug.get("status"), (sug.get("status") or "—", "#64748b"))
+    created = str(sug.get("created_at") or "")[:16].replace("T", " ")
+    sid = _esc(sug.get("suggestion_id") or sug.get("id") or "?")
+
+    payload = sug.get("payload") or {}
+    if stype == "condition_adjust":
+        rows = ""
+        for adj in payload.get("adjustments") or []:
+            if isinstance(adj, dict):
+                field = _COND_LABELS.get(adj.get("field"), adj.get("field") or "?")
+                rows += (f"<li>{_esc(field)}：{_esc(adj.get('from'))} → "
+                         f"<b>{_esc(adj.get('to'))}</b>"
+                         + (f"<br><i>{_esc(adj['rationale'])}</i>"
+                            if adj.get("rationale") else "")
+                         + "</li>")
+        body = f"<ul>{rows}</ul>" if rows else f"<i>{_esc(payload.get('rationale') or '')}</i>"
+    elif stype == "new_candidate":
+        ald = payload.get("aldehyde") or {}
+        amine = payload.get("amine") or {}
+        pair = (f"{_esc(ald.get('name') or ald.get('smiles') or '?')} × "
+                f"{_esc(amine.get('name') or amine.get('smiles') or '?')}")
+        body = f"<div>候选组合：<b>{pair}</b></div>"
+        if payload.get("rationale"):
+            body += f"<i>{_esc(payload['rationale'])}</i>"
+    else:
+        body = f"<pre>{_esc(json.dumps(payload, ensure_ascii=False))}</pre>"
+
+    ev_items = ""
+    for ev in sug.get("evidence_refs") or []:
+        if not isinstance(ev, dict):
+            ev_items += f"<li>{_esc(ev)}</li>"
+            continue
+        kind = _EV_KIND_ZH.get(ev.get("kind"), ev.get("kind") or "依据")
+        ref = str(ev.get("ref") or "")
+        shown = _resolve_ref_title(ref) if ev.get("kind") == "literature" else None
+        ref_txt = f"{_esc(shown)}（{_esc(ref)}）" if shown else _esc(ref)
+        note = f" — {_esc(ev['note'])}" if ev.get("note") else ""
+        ev_items += f"<li>{_esc(kind)}：{ref_txt}{note}</li>"
+    ev_html = (f'<div class="sug-ev"><b>依据</b><ul>{ev_items}</ul></div>'
+               if ev_items else "")
+
+    link = ""
+    fid = sug.get("favorite_id")
+    if fid:
+        fav, _ = _fav_get(fid)
+        if fav:
+            _, _, ald_n, amine_n = _fav_pair(fav)
+            link = f"关联收藏：{_esc(ald_n)} × {_esc(amine_n)}（{_esc(fid)}）"
+        else:
+            link = f"关联收藏：{_esc(fid)}"
+
+    # 卡片样式：本次新建议高亮边框；已采纳卡片变淡（蓝色左边条）
+    cls = "sug-card"
+    if highlight:
+        cls += " sug-card-new"
+    if sug.get("status") == "adopted":
+        cls += " sug-adopted"
+
+    meta = " · ".join(x for x in (f"<code>{sid}</code>", created, link) if x)
+    return (
+        f'<div class="{cls}">'
+        f'<div class="sug-head">{type_zh} '
+        f'<span class="rec-outcome" style="background:{color}">{_esc(status)}</span></div>'
+        f"{body}{ev_html}"
+        f'<div class="sug-meta">{meta}</div>'
+        "</div>")
+
+
 def _render_suggestion_cards(sugs: list) -> str:
-    """RAG 建议卡片墙：类型 / 内容 / 依据 / 状态 / 时间 / 关联收藏。"""
+    """RAG 建议卡片墙：按 batch 分组——「✨ 本次新建议」（最新批次，高亮）
+    在上，历史批次（灰显「历史建议 · 批次时间」）在下；无 batch 字段的旧
+    建议归为「历史建议」。全部无 batch 时保持旧版平铺。"""
     if not sugs:
         return ('<div class="placeholder-page">暂无 RAG 建议——迭代建议 JSON '
                 "落回 data/rag_export/suggestions/ 后在此回显。</div>")
-    cards = []
-    for sug in sugs:
-        stype = sug.get("type") or "?"
-        type_zh = _SUG_TYPE_ZH.get(stype, _esc(stype))
-        status, color = _SUG_STATUS_ZH.get(
-            sug.get("status"), (sug.get("status") or "—", "#64748b"))
-        created = str(sug.get("created_at") or "")[:16].replace("T", " ")
-        sid = _esc(sug.get("suggestion_id") or sug.get("id") or "?")
 
-        payload = sug.get("payload") or {}
-        if stype == "condition_adjust":
-            rows = ""
-            for adj in payload.get("adjustments") or []:
-                if isinstance(adj, dict):
-                    field = _COND_LABELS.get(adj.get("field"), adj.get("field") or "?")
-                    rows += (f"<li>{_esc(field)}：{_esc(adj.get('from'))} → "
-                             f"<b>{_esc(adj.get('to'))}</b>"
-                             + (f"<br><i>{_esc(adj['rationale'])}</i>"
-                                if adj.get("rationale") else "")
-                             + "</li>")
-            body = f"<ul>{rows}</ul>" if rows else f"<i>{_esc(payload.get('rationale') or '')}</i>"
-        elif stype == "new_candidate":
-            ald = payload.get("aldehyde") or {}
-            amine = payload.get("amine") or {}
-            pair = (f"{_esc(ald.get('name') or ald.get('smiles') or '?')} × "
-                    f"{_esc(amine.get('name') or amine.get('smiles') or '?')}")
-            body = f"<div>候选组合：<b>{pair}</b></div>"
-            if payload.get("rationale"):
-                body += f"<i>{_esc(payload['rationale'])}</i>"
-        else:
-            body = f"<pre>{_esc(json.dumps(payload, ensure_ascii=False))}</pre>"
+    batches = [s.get("batch") for s in sugs if s.get("batch")]
+    if not batches:  # 旧数据无批次字段：保持平铺渲染
+        return ('<div class="sug-wall">'
+                + "".join(_render_one_suggestion(s) for s in sugs) + "</div>")
 
-        ev_items = ""
-        for ev in sug.get("evidence_refs") or []:
-            if not isinstance(ev, dict):
-                ev_items += f"<li>{_esc(ev)}</li>"
-                continue
-            kind = _EV_KIND_ZH.get(ev.get("kind"), ev.get("kind") or "依据")
-            ref = str(ev.get("ref") or "")
-            shown = _resolve_ref_title(ref) if ev.get("kind") == "literature" else None
-            ref_txt = f"{_esc(shown)}（{_esc(ref)}）" if shown else _esc(ref)
-            note = f" — {_esc(ev['note'])}" if ev.get("note") else ""
-            ev_items += f"<li>{_esc(kind)}：{ref_txt}{note}</li>"
-        ev_html = (f'<div class="sug-ev"><b>依据</b><ul>{ev_items}</ul></div>'
-                   if ev_items else "")
-
-        link = ""
-        fid = sug.get("favorite_id")
-        if fid:
-            fav, _ = _fav_get(fid)
-            if fav:
-                _, _, ald_n, amine_n = _fav_pair(fav)
-                link = f"关联收藏：{_esc(ald_n)} × {_esc(amine_n)}（{_esc(fid)}）"
-            else:
-                link = f"关联收藏：{_esc(fid)}"
-
-        meta = " · ".join(x for x in (f"<code>{sid}</code>", created, link) if x)
-        cards.append(
-            '<div class="sug-card">'
-            f'<div class="sug-head">{type_zh} '
-            f'<span class="rec-outcome" style="background:{color}">{_esc(status)}</span></div>'
-            f"{body}{ev_html}"
-            f'<div class="sug-meta">{meta}</div>'
-            "</div>")
-    return '<div class="sug-wall">' + "".join(cards) + "</div>"
+    latest = max(str(b) for b in batches)  # batch_YYYYMMDD_HHMMSS 字典序即时间序
+    parts = []
+    new_group = [s for s in sugs if str(s.get("batch")) == latest]
+    if new_group:
+        parts.append(
+            '<div class="sug-batch-head sug-batch-new">✨ 本次新建议'
+            f'<span class="sug-batch-time">{_esc(_batch_label(latest))}</span>'
+            "</div>"
+            '<div class="sug-wall">'
+            + "".join(_render_one_suggestion(s, highlight=True) for s in new_group)
+            + "</div>")
+    # 历史批次：时间倒序，灰显标题
+    for b in sorted({str(x) for x in batches if str(x) != latest}, reverse=True):
+        grp = [s for s in sugs if str(s.get("batch")) == b]
+        parts.append(
+            f'<div class="sug-batch-head sug-batch-hist">历史建议 · '
+            f'{_esc(_batch_label(b))}</div>'
+            '<div class="sug-wall">'
+            + "".join(_render_one_suggestion(s) for s in grp) + "</div>")
+    legacy = [s for s in sugs if not s.get("batch")]
+    if legacy:
+        parts.append(
+            '<div class="sug-batch-head sug-batch-hist">历史建议</div>'
+            '<div class="sug-wall">'
+            + "".join(_render_one_suggestion(s) for s in legacy) + "</div>")
+    return "".join(parts)
 
 
 def _records_summary(recs: list) -> str:
@@ -2098,9 +2152,26 @@ def _records_summary(recs: list) -> str:
     return f"共 **{total}** 条实验记录（{' · '.join(parts)}{latest}）。"
 
 
+def _adopt_sug_choices(sugs: list | None) -> list:
+    """采纳下拉选项：只列 status=new 的建议，标签「序号｜标题｜sug_id」。
+
+    标题取 payload.title，缺省回退到建议类型中文名；序号按创建时间倒序
+    从 1 编号（最新的排最前，方便点选刚生成的新建议）。
+    """
+    news = [s for s in (sugs or []) if s.get("status") == "new"]
+    news.sort(key=lambda s: str(s.get("created_at") or ""), reverse=True)
+    choices = []
+    for i, s in enumerate(news, 1):
+        sid = s.get("suggestion_id") or s.get("id") or "?"
+        title = ((s.get("payload") or {}).get("title")
+                 or _SUG_TYPE_ZH.get(s.get("type"), s.get("type") or "建议"))
+        choices.append((f"{i}｜{title}｜{sid}", sid))
+    return choices
+
+
 def refresh_iteration_tab(fav_filter=""):
     """页⑤ 进入/刷新 → (记录摘要, 记录时间线, 建议卡片, 过滤下拉,
-    生成用收藏下拉, 状态)。"""
+    生成用收藏下拉, 采纳下拉, 状态)。"""
     recs, rerr = _rec_list()
     recs = recs or []
     summary = f"⚠️ {rerr}" if rerr else _records_summary(recs)
@@ -2110,24 +2181,29 @@ def refresh_iteration_tab(fav_filter=""):
     if serr:
         sug_html = f'<div class="placeholder-page">{_esc(serr)}</div>'
         status = serr
+        adopt_choices = []
     else:
         sug_html = _render_suggestion_cards(sugs)
         status = f"共 {len(sugs)} 条建议。" if sugs else ""
+        adopt_choices = _adopt_sug_choices(sugs)
 
     favs, _ = _fav_list()
     choices = [("全部", "")] + [(_fav_label(f), f.get("id")) for f in (favs or [])]
     return (summary, timeline, sug_html,
             gr.update(choices=choices, value=fav_filter or ""),
-            gr.update(choices=_iterate_fav_choices()), status)
+            gr.update(choices=_iterate_fav_choices()),
+            gr.update(choices=adopt_choices, value=None), status)
 
 
 def refresh_suggestions(fav_filter=""):
-    """仅刷新建议区（按收藏过滤下拉变更）→ (建议卡片, 状态)。"""
+    """仅刷新建议区（按收藏过滤下拉变更）→ (建议卡片, 状态, 采纳下拉)。"""
     sugs, serr = _sug_list(favorite_id=(fav_filter or None))
     if serr:
-        return f'<div class="placeholder-page">{_esc(serr)}</div>', serr
+        return (f'<div class="placeholder-page">{_esc(serr)}</div>', serr,
+                gr.update(choices=[], value=None))
     return (_render_suggestion_cards(sugs),
-            f"共 {len(sugs)} 条建议。" if sugs else "")
+            f"共 {len(sugs)} 条建议。" if sugs else "",
+            gr.update(choices=_adopt_sug_choices(sugs), value=None))
 
 
 # ---------------------------------------------------------------------------
@@ -2157,15 +2233,15 @@ def run_iterate_suggest(question, fav_id=""):
     q = (question or "").strip()
     if not q:
         return (gr.update(),
-                "⚠️ 请先输入问题——例如「上次失败了怎么调」。")
+                "⚠️ 请先输入问题——例如「上次失败了怎么调」。", gr.update())
     if not Path(ITERATE_PYTHON).exists():
         return (gr.update(),
                 f"⚠️ 找不到 orchestrator 解释器 `{ITERATE_PYTHON}`——请确认 "
-                "python3.12 环境已安装，或联系维护者核对路径。")
+                "python3.12 环境已安装，或联系维护者核对路径。", gr.update())
     if not ITERATE_SCRIPT.exists():
         return (gr.update(),
                 "⏳ `minimax/adapters/iterate_suggest.py` 尚未就位（后端开发中）"
-                "——建议生成暂不可用，可先手动查看已有建议。")
+                "——建议生成暂不可用，可先手动查看已有建议。", gr.update())
 
     cmd = [ITERATE_PYTHON, str(ITERATE_SCRIPT), "--question", q]
     fid = (fav_id or "").strip()
@@ -2178,15 +2254,16 @@ def run_iterate_suggest(question, fav_id=""):
     except subprocess.TimeoutExpired:
         return (gr.update(),
                 f"⚠️ 生成超时（{ITERATE_TIMEOUT_S}s 无响应）——请稍后重试，"
-                "或缩短问题后重试。")
+                "或缩短问题后重试。", gr.update())
     except OSError as e:
-        return (gr.update(), f"⚠️ 无法启动 orchestrator 子进程：{_brief_error(e)}")
+        return (gr.update(), f"⚠️ 无法启动 orchestrator 子进程：{_brief_error(e)}",
+                gr.update())
 
     if proc.returncode != 0:
         err_lines = [ln for ln in (proc.stderr or "").splitlines() if ln.strip()]
         tail = err_lines[-1].strip() if err_lines else "（stderr 为空）"
         return (gr.update(),
-                f"⚠️ 生成失败（exit {proc.returncode}）：{tail}")
+                f"⚠️ 生成失败（exit {proc.returncode}）：{tail}", gr.update())
 
     # 成功：从 stdout 末行解析 JSON 摘要 {"written": [...], "count": N}
     written, count = [], None
@@ -2202,14 +2279,97 @@ def run_iterate_suggest(question, fav_id=""):
         count = summary.get("count")
         break
 
-    sug_html, s_status = refresh_suggestions("")  # 成功后全量刷新建议区
+    # 成功后全量刷新建议区，并同步刷新采纳下拉（新建议变为可采纳项）
+    sug_html, s_status, adopt_upd = refresh_suggestions("")
     done_msg = "✓ 已生成迭代建议"
     if count is not None:
         done_msg += f"（{count} 条）"
     if written:
         done_msg += "：" + "、".join(f"`{w}`" for w in written)
     done_msg += "。已刷新建议列表" + (f"（{s_status}）" if s_status else "。")
-    return sug_html, done_msg
+    return sug_html, done_msg, adopt_upd
+
+
+# ---------------------------------------------------------------------------
+# 页⑤ 任务C（并行）：建议采纳 → 生成实验方案卡
+# ---------------------------------------------------------------------------
+
+def _load_generated_plans():
+    """安全导入采纳后端 src/recommend/generated_plans.py（并行开发中）。
+
+    钉死的契约：adopt_suggestion(suggestion_id, template_id=None) -> dict，
+    返回含 plan_id/seq/template_name/plan_card/adjustments_applied 的 plan。
+    模块未就位时优雅降级为提示文案，不抛异常。
+    """
+    try:
+        from recommend import generated_plans as gp_mod
+        return gp_mod, None
+    except ImportError:
+        return None, ("⏳ 方案生成模块（recommend.generated_plans）尚未就位"
+                      "（后端开发中）——「采纳并生成方案」暂不可用。")
+
+
+def _render_generated_plan_html(plan: dict) -> str:
+    """采纳生成的方案详情大卡：「方案 vN」+ 模板名 + 本次调整 + 方案卡全文。"""
+    if not plan:
+        return ""
+    seq = plan.get("seq")
+    ver = f"方案 v{seq}" if seq is not None else "方案"
+    head = (f'<div class="gp-head">🧪 {_esc(ver)}'
+            f'<span class="gp-id">{_esc(plan.get("plan_id") or "")}</span>'
+            + (f'<span class="gp-tpl">模板：{_esc(plan["template_name"])}</span>'
+               if plan.get("template_name") else "")
+            + "</div>")
+    # 本次调整区块：采纳建议实际套用进方案的调整项
+    adj_html = ""
+    adjs = plan.get("adjustments_applied") or []
+    if adjs:
+        items = ""
+        for a in adjs:
+            if isinstance(a, dict):
+                field = _COND_LABELS.get(a.get("field"), a.get("field") or "调整")
+                items += (f"<li>{_esc(field)}：{_esc(a.get('from'))} → "
+                          f"<b>{_esc(a.get('to'))}</b>"
+                          + (f"<br><i>{_esc(a['rationale'])}</i>"
+                             if a.get("rationale") else "")
+                          + "</li>")
+            else:
+                items += f"<li>{_esc(a)}</li>"
+        adj_html = f'<div class="gp-adj"><h4>本次调整</h4><ul>{items}</ul></div>'
+    card_html = _render_plan_card_html(plan.get("plan_card") or {})
+    return f'<div class="gen-plan">{head}{adj_html}{card_html}</div>'
+
+
+def adopt_suggestion_clicked(sug_id: str):
+    """「✅ 采纳并生成方案」→ (状态, 建议墙, 采纳下拉, 方案展示区)。
+
+    调 adopt_suggestion(suggestion_id)（契约见 _load_generated_plans），
+    成功后刷新建议墙（被采纳卡片变「已采纳」样式）与采纳下拉（去掉已
+    采纳项），并在方案展示区渲染新方案大卡。
+    """
+    sid = (sug_id or "").strip()
+    if not sid:
+        return ("⚠️ 请先在下拉中选择一条「新建议」。",
+                gr.update(), gr.update(), gr.update())
+    mod, err = _load_generated_plans()
+    if err:  # 后端未就位：优雅降级提示，不动其他区域
+        return (err, gr.update(), gr.update(), gr.update())
+    try:
+        plan = mod.adopt_suggestion(suggestion_id=sid)
+    except Exception as e:
+        return (f"⚠️ 采纳失败：{_brief_error(e)}",
+                gr.update(), gr.update(), gr.update())
+
+    sugs, serr = _sug_list()  # 全量刷新建议墙 + 采纳下拉
+    if serr:
+        sug_html = f'<div class="placeholder-page">{_esc(serr)}</div>'
+        adopt_upd = gr.update(choices=[], value=None)
+    else:
+        sug_html = _render_suggestion_cards(sugs)
+        adopt_upd = gr.update(choices=_adopt_sug_choices(sugs), value=None)
+    status = (f"✓ 已生成 方案 v{plan.get('seq')}"
+              f"（{plan.get('plan_id')}，{plan.get('template_name')}）")
+    return (status, sug_html, adopt_upd, _render_generated_plan_html(plan))
 
 
 # ---------------------------------------------------------------------------
@@ -2268,6 +2428,19 @@ CUSTOM_CSS = """
 /* P3：RAG 建议卡片 / 文献 paper_id 小字 */
 .sug-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .sug-card { border: 1px solid #e2e8f0; border-left: 4px solid #0f766e; border-radius: 10px; padding: 10px 14px; background: #fff; }
+/* 任务C：批次分组——本次新建议高亮，历史批次灰显；已采纳卡片变淡 */
+.sug-batch-head { font-weight: 600; margin: 16px 0 6px; }
+.sug-batch-new { color: #0f766e; font-size: 1.05rem; }
+.sug-batch-time { color: #64748b; font-weight: 400; font-size: 0.8rem; margin-left: 8px; }
+.sug-batch-hist { color: #94a3b8; }
+.sug-card-new { border: 2px solid #0f766e; box-shadow: 0 1px 6px rgba(15,118,110,.18); }
+.sug-adopted { opacity: 0.72; border-left-color: #1d4ed8; background: #f8fafc; }
+/* 任务C：采纳生成的方案大卡 */
+.gen-plan { border: 2px solid #0f766e; border-radius: 12px; background: #f0fdfa; padding: 18px 22px; margin: 12px 0; font-size: 1.05rem; }
+.gp-head { font-size: 1.3rem; font-weight: 700; color: #0f766e; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.gp-id { color: #64748b; font-size: 0.85rem; font-weight: 400; }
+.gp-tpl { color: #334155; font-size: 0.9rem; font-weight: 400; }
+.gp-adj h4 { margin: 10px 0 4px; }
 .sug-head { font-weight: 600; display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
 .sug-ev { font-size: 0.85rem; color: #334155; margin-top: 6px; }
 .sug-meta { color: #64748b; font-size: 0.78rem; margin-top: 6px; }
@@ -2741,9 +2914,29 @@ def create_app() -> gr.Blocks:
                             interactive=True, allow_custom_value=True, scale=3)
                         iter_gen_btn = gr.Button("生成迭代建议", variant="primary",
                                                  scale=1)
+                # 任务C：采纳建议 → 生成实验方案卡
+                # （HTML 卡片里按钮无法直接绑定事件，用「下拉 + 按钮」模式，
+                #   与页④ 记录管理一致；下拉只列 status=new 的建议）
+                with gr.Group():
+                    gr.Markdown("#### 采纳建议 → 生成实验方案")
+                    with gr.Row():
+                        iter_adopt_pick = gr.Dropdown(
+                            label="选择建议（仅列「新建议」，序号｜标题｜sug_id）",
+                            choices=[], interactive=True,
+                            allow_custom_value=True, scale=3)
+                        iter_adopt_btn = gr.Button("✅ 采纳并生成方案",
+                                                   variant="primary", scale=1)
+                    iter_adopt_status = gr.Markdown()
+                with gr.Group():
+                    gr.Markdown("#### 生成的实验方案")
+                    iter_plan_html = gr.HTML(
+                        '<div class="placeholder-page">采纳建议后，此处显示生成的'
+                        '方案卡（标「方案 vN」，含模板名 + 步骤 + 防错清单 + '
+                        '本次调整）。</div>')
 
                 _iter_outputs = [iter_rec_summary, iter_rec_html, iter_sug_html,
-                                 iter_fav_filter, iter_gen_fav, iter_status]
+                                 iter_fav_filter, iter_gen_fav, iter_adopt_pick,
+                                 iter_status]
                 iter_tab.select(fn=refresh_iteration_tab, inputs=[iter_fav_filter],
                                 outputs=_iter_outputs)
                 iter_refresh_btn.click(fn=refresh_iteration_tab,
@@ -2751,7 +2944,8 @@ def create_app() -> gr.Blocks:
                                        outputs=_iter_outputs)
                 iter_fav_filter.change(fn=refresh_suggestions,
                                        inputs=[iter_fav_filter],
-                                       outputs=[iter_sug_html, iter_status])
+                                       outputs=[iter_sug_html, iter_status,
+                                                iter_adopt_pick])
                 # 生成期间 disable 按钮防重复点击，完成后恢复
                 _gen_evt = iter_gen_btn.click(
                     fn=lambda: gr.update(interactive=False),
@@ -2759,9 +2953,16 @@ def create_app() -> gr.Blocks:
                 _gen_evt = _gen_evt.then(
                     fn=run_iterate_suggest,
                     inputs=[iter_question, iter_gen_fav],
-                    outputs=[iter_sug_html, iter_status])
+                    outputs=[iter_sug_html, iter_status, iter_adopt_pick])
                 _gen_evt.then(fn=lambda: gr.update(interactive=True),
                               outputs=[iter_gen_btn], queue=False)
+                # 采纳：调 adopt_suggestion → 状态回显 + 刷新建议墙/采纳下拉
+                # + 方案展示区渲染新方案大卡
+                iter_adopt_btn.click(
+                    fn=adopt_suggestion_clicked,
+                    inputs=[iter_adopt_pick],
+                    outputs=[iter_adopt_status, iter_sug_html, iter_adopt_pick,
+                             iter_plan_html])
 
             # ===================== 页⑥ 设置 =====================
             with gr.Tab("⑥ 设置") as settings_tab:

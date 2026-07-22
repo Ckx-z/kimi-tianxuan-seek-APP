@@ -951,7 +951,7 @@ class TestIterationTab:
         monkeypatch.setattr(gradio_app, "_rec_list",
                             lambda favorite_id=None: ([], None))
         monkeypatch.setattr(gradio_app, "_fav_list", lambda: ([], None))
-        summary, timeline, sug_html, sel, gen_sel, status = \
+        summary, timeline, sug_html, sel, gen_sel, adopt_sel, status = \
             gradio_app.refresh_iteration_tab("")
         assert "尚未上线" in sug_html and "尚未上线" in status
         assert "暂无实验记录" in summary
@@ -971,7 +971,7 @@ class TestIterationTab:
         monkeypatch.setattr(gradio_app, "_fav_get",
                             lambda fid: (dict(_FAKE_FAV), None))
         monkeypatch.setattr(gradio_app, "_resolve_ref_title", lambda ref: None)
-        summary, timeline, sug_html, sel, gen_sel, status = \
+        summary, timeline, sug_html, sel, gen_sel, adopt_sel, status = \
             gradio_app.refresh_iteration_tab("fav_20260722_001")
         assert seen["fid"] == "fav_20260722_001"     # 过滤透传
         assert "共 **1** 条实验记录" in summary and "⛔ 失败 1" in summary
@@ -1002,7 +1002,8 @@ class TestIterateSuggest:
         monkeypatch.setattr(gradio_app, "ITERATE_SCRIPT",
                             Path(gradio_app.__file__))
         monkeypatch.setattr(gradio_app, "refresh_suggestions",
-                            lambda fav_filter="": ("<html/>", "共 0 条建议。"))
+                            lambda fav_filter="": ("<html/>", "共 0 条建议。",
+                                                   None))
 
     def test_success_writes_and_refresh(self, monkeypatch):
         """exit 0 + stdout JSON 摘要 → 状态列出写入的 suggestion_id 并刷新。"""
@@ -1018,7 +1019,7 @@ class TestIterateSuggest:
                 stderr="")
 
         monkeypatch.setattr(gradio_app.subprocess, "run", _fake_run)
-        html_out, status = gradio_app.run_iterate_suggest(
+        html_out, status, _ = gradio_app.run_iterate_suggest(
             "上次失败了怎么调", "fav_20260722_001")
         assert html_out == "<html/>"                      # 成功 → 刷新建议区
         assert "sug_20260723_001" in status and "sug_20260723_002" in status
@@ -1038,7 +1039,7 @@ class TestIterateSuggest:
                 stderr="Traceback...\nValueError: 没有任何实验记录可检索")
 
         monkeypatch.setattr(gradio_app.subprocess, "run", _fake_run)
-        html_out, status = gradio_app.run_iterate_suggest("为什么失败", "fav_x")
+        html_out, status, _ = gradio_app.run_iterate_suggest("为什么失败", "fav_x")
         assert "生成失败" in status and "exit 2" in status
         assert "没有任何实验记录可检索" in status        # stderr 人读错误回显
 
@@ -1048,7 +1049,7 @@ class TestIterateSuggest:
             raise subprocess.TimeoutExpired(cmd=cmd, timeout=180)
 
         monkeypatch.setattr(gradio_app.subprocess, "run", _fake_run)
-        html_out, status = gradio_app.run_iterate_suggest("怎么调", "")
+        html_out, status, _ = gradio_app.run_iterate_suggest("怎么调", "")
         assert "超时" in status and "180" in status
 
     def test_empty_question_no_subprocess(self, monkeypatch):
@@ -1056,15 +1057,114 @@ class TestIterateSuggest:
         monkeypatch.setattr(
             gradio_app.subprocess, "run",
             lambda *a, **k: pytest.fail("空问题不应调 subprocess.run"))
-        _, status = gradio_app.run_iterate_suggest("   ", "fav_x")
+        _, status, _ = gradio_app.run_iterate_suggest("   ", "fav_x")
         assert "请先输入问题" in status
 
     def test_python_missing_message(self, monkeypatch):
         """E:\\python3.12\\python.exe 不存在 → 明确提示文案。"""
         monkeypatch.setattr(gradio_app, "ITERATE_PYTHON",
                             r"E:\nonexistent_venv_xyz\python.exe")
-        _, status = gradio_app.run_iterate_suggest("怎么调", "")
+        _, status, _ = gradio_app.run_iterate_suggest("怎么调", "")
         assert "找不到 orchestrator 解释器" in status
+
+
+# ---------------------------------------------------------------------------
+# 任务C：页⑤ 批次分组渲染 + 采纳建议 → 生成方案
+# ---------------------------------------------------------------------------
+
+class TestAdoptSuggestion:
+    def test_batch_grouping_render(self, monkeypatch):
+        """有 batch 字段 → 「✨ 本次新建议」（最新批次，高亮）在上，历史批次
+        灰显标题在下；无 batch 的旧建议归为「历史建议」。"""
+        monkeypatch.setattr(gradio_app, "_fav_get", lambda fid: (None, None))
+        monkeypatch.setattr(gradio_app, "_resolve_ref_title", lambda ref: None)
+        sugs = [
+            dict(_FAKE_SUG, suggestion_id="sug_old_1", status="adopted",
+                 batch="batch_20260722_090000"),
+            dict(_FAKE_SUG, suggestion_id="sug_new_1",
+                 batch="batch_20260723_101500"),
+            dict(_FAKE_SUG, suggestion_id="sug_legacy_1"),  # 无 batch
+        ]
+        html_out = gradio_app._render_suggestion_cards(sugs)
+        assert "✨ 本次新建议" in html_out
+        assert "2026-07-23 10:15:00" in html_out          # 批次号转人读时间
+        assert "历史建议 · 2026-07-22 09:00:00" in html_out
+        # 分组顺序：本次新建议 → 历史批次 → 无 batch 历史建议
+        assert html_out.index("✨ 本次新建议") < html_out.index("历史建议 ·")
+        assert html_out.index("历史建议 ·") < html_out.index(
+            "历史建议</div>")
+        assert "sug-card-new" in html_out                  # 新批次高亮边框
+        assert "sug-adopted" in html_out                   # 已采纳变淡样式
+        # 无 batch 的旧建议归到「历史建议」组（标题不含批次时间）
+        legacy_pos = html_out.index("历史建议</div>")
+        assert html_out.index("sug_legacy_1") > legacy_pos
+
+    def test_adopt_success_flow(self, monkeypatch):
+        """采纳成功：monkeypatch adopt_suggestion → 状态回显方案 vN +
+        plan_id + 模板名，建议墙刷新为已采纳样式，方案区渲染大卡，
+        采纳下拉去掉已采纳项。"""
+        called = {}
+
+        class _FakePlans:  # 模拟 recommend.generated_plans 模块
+            @staticmethod
+            def adopt_suggestion(suggestion_id, template_id=None):
+                called["sid"] = suggestion_id
+                called["template_id"] = template_id
+                return {
+                    "plan_id": "plan_20260723_001",
+                    "seq": 2,
+                    "template_name": "侯老师 v3.9 默认模板",
+                    "plan_card": {
+                        "title": "实验方案卡：A2 × TAPT",
+                        "template": "侯老师 v3.9 默认模板",
+                        "steps": ["先醛+苯胺", "后胺", "最后乙酸"],
+                        "checklist": [{"item": "核对酸浓度", "detail": "6M≠18M"}],
+                    },
+                    "adjustments_applied": [
+                        {"field": "catalyst", "from": "6M 乙酸 0.2 mL",
+                         "to": "6M 乙酸 0.1 mL", "rationale": "酸过量"},
+                    ],
+                }
+
+        monkeypatch.setattr(gradio_app, "_load_generated_plans",
+                            lambda: (_FakePlans, None))
+        # 采纳后建议墙全量刷新：该建议已变为 adopted
+        adopted_sug = dict(_FAKE_SUG, status="adopted",
+                           adopted_plan_id="plan_20260723_001",
+                           batch="batch_20260723_101500")
+        monkeypatch.setattr(gradio_app, "_sug_list",
+                            lambda favorite_id=None: ([adopted_sug], None))
+        monkeypatch.setattr(gradio_app, "_fav_get",
+                            lambda fid: (dict(_FAKE_FAV), None))
+        monkeypatch.setattr(gradio_app, "_resolve_ref_title", lambda ref: None)
+
+        status, sug_html, adopt_upd, plan_html = \
+            gradio_app.adopt_suggestion_clicked("sug_20260722_001")
+
+        assert called["sid"] == "sug_20260722_001"         # 契约参数透传
+        assert called["template_id"] is None               # 未指定模板 → None
+        assert "已生成 方案 v2" in status
+        assert "plan_20260723_001" in status
+        assert "侯老师 v3.9 默认模板" in status
+        assert "已采纳" in sug_html and "sug-adopted" in sug_html  # 卡片变样式
+        assert "方案 v2" in plan_html                      # 大字号详情卡
+        assert "本次调整" in plan_html and "6M 乙酸 0.1 mL" in plan_html
+        assert "核对酸浓度" in plan_html                   # checklist 渲染
+        assert adopt_upd["choices"] == []                  # 已采纳 → 下拉清空
+
+    def test_adopt_backend_missing_degrades(self, monkeypatch):
+        """generated_plans 未就位 → 优雅降级提示，不抛异常、不动其他区域。"""
+        monkeypatch.setattr(
+            gradio_app, "_load_generated_plans",
+            lambda: (None, "⏳ 方案生成模块（recommend.generated_plans）尚未就位"))
+        status, sug_html, adopt_upd, plan_html = \
+            gradio_app.adopt_suggestion_clicked("sug_20260722_001")
+        assert "尚未就位" in status
+        # 其余区域返回 gr.update() 占位（dict），不触发建议墙重渲染
+        assert isinstance(sug_html, dict) and isinstance(plan_html, dict)
+        # 空选择也拦截
+        status2, *_ = gradio_app.adopt_suggestion_clicked("")
+        assert "请先" in status2
 
 
 # ---------------------------------------------------------------------------

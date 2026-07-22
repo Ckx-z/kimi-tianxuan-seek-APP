@@ -103,3 +103,5 @@ data/rag_export/suggestions/*
 !data/rag_export/suggestions/example.json
 data/plan_templates/*
 !data/plan_templates/builtin_hou_v3_9.json
+data/generated_plans/*
+!data/generated_plans/.gitkeep

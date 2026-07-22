@@ -90,14 +90,14 @@ assert "最新预测快照" in snap
 print("文献自动匹配条数:", refs.count("相关文献·自动匹配"))
 plan_html, st = g.plan_card_for_favorite(fid)
 print("方案卡:", st, "| 防错清单:", "防错清单" in plan_html)
-st, timeline, _, *resets = g.submit_record(
+st, timeline, _, _pick1, *resets = g.submit_record(
     fid, "P4冒烟-1", "甲苯", "", "", "", "6M 乙酸", "120", "3",
     "先醛后胺", "部分成膜", "", "冒烟", "测试")
 print(st, "| 时间线含对比:", "实际" in timeline)
 assert "P4冒烟-1" in st and len(resets) == 17, "提交成功应重置 17 个表单字段"
 
 print("== 9. 游离实验记录（不关联收藏） ==")
-st2, timeline2, _, *r2 = g.submit_record(
+st2, timeline2, _, _pick2, *r2 = g.submit_record(
     "", "P4冒烟-2", "甲苯", "", "", "", "6M 乙酸", "120", "3",
     "", "成膜", "", "冒烟", "游离测试", True, ald, amine)
 print(st2)
@@ -105,18 +105,18 @@ assert "✓" in st2, "游离记录应保存成功（后端签名已就位）"
 assert "游离" not in timeline2 or "×" in timeline2
 
 print("== 10. 页⑤ 方案迭代展示 ==")
-summary5, timeline5, sug_html5, sel5, status5 = g.refresh_iteration_tab("")
+summary5, timeline5, sug_html5, sel5, status5, _gen_fav, _adopt_pick = g.refresh_iteration_tab("")
 print("摘要:", summary5[:80])
 print("建议区:", (status5 or sug_html5[:80]))
 assert summary5 and sug_html5
-html_sug2, status_sug2 = g.refresh_suggestions(fid)
+html_sug2, status_sug2, _adopt2 = g.refresh_suggestions(fid)
 print("按收藏过滤:", status_sug2 or html_sug2[:60])
 
 print("== 11. P4a 页④ 四项修复（真实后端） ==")
 # a. 收藏联动过滤
-_, html_f = g.refresh_records_tab(fid, False)
+_, html_f, _pk1 = g.refresh_records_tab(fid, False)
 assert "P4冒烟" in html_f, "过滤后应显示该收藏的记录"
-_, html_all = g.refresh_records_tab(fid, True)
+_, html_all, _pk2 = g.refresh_records_tab(fid, True)
 assert "游离测试" in html_all or "P4冒烟-2" in html_all, "显示全部应含游离记录"
 print("a. 收藏过滤 + 显示全部 OK")
 # b. 实验编号必填拦截

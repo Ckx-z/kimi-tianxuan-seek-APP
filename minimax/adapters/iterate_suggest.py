@@ -58,6 +58,11 @@ def now_iso() -> str:
     return datetime.datetime.now(LOCAL_TZ).replace(microsecond=0).isoformat()
 
 
+def make_batch_id() -> str:
+    """生成本次运行的批次号 batch_YYYYMMDD_HHMMSS（同次运行所有建议共用）"""
+    return 'batch_' + datetime.datetime.now(LOCAL_TZ).strftime('%Y%m%d_%H%M%S')
+
+
 def today_str() -> str:
     return datetime.datetime.now(LOCAL_TZ).strftime('%Y%m%d')
 
@@ -269,11 +274,13 @@ def is_rejected_direction(item: dict, rejected) -> bool:
 
 # ---------------------------------------------------------------- LLM
 
-def build_messages(question, aldehyde, amine, records, evidence_text, rejected):
-    """拼 prompt：证据文本 + 实验记录 + 严格 JSON 输出要求"""
+def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
+                   max_n=2):
+    """拼 prompt：证据文本 + 实验记录 + 严格 JSON 输出要求（最多 max_n 条）"""
     sys_prompt = (
         '你是 COF（共价有机框架）成膜实验的迭代顾问。'
         '基于用户的历史实验记录与检索到的文献证据，给出下一步可操作的实验建议。'
+        f'最多给 {max_n} 条最有价值的建议，宁缺毋滥。'
         '只输出一个严格 JSON 数组，不要输出任何其他文字、不要 markdown 代码块。'
         '数组元素格式: '
         '{"type": "condition_adjust|new_candidate|literature", '
@@ -313,7 +320,7 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected):
 ## 已被用户否决的建议方向（不要重复）
 {rejected_text}
 
-请输出 1~3 条建议的 JSON 数组。"""
+请输出 1~{max_n} 条建议的 JSON 数组（最多 {max_n} 条最有价值的建议）。"""
     return [{'role': 'system', 'content': sys_prompt},
             {'role': 'user', 'content': user_prompt}]
 
@@ -392,11 +399,18 @@ def next_sug_ids(sug_dir: Path, n: int):
     return [f'sug_{date}_{max_n + k + 1:03d}' for k in range(n)]
 
 
-def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected):
-    """状态去重后按 Schema 3 落盘，返回写出的 suggestion_id 列表"""
+def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
+                      batch, max_n=2):
+    """状态去重后按 Schema 3 落盘，返回写出的 suggestion_id 列表
+
+    batch: 本次运行批次号，写入每条建议的 "batch" 字段（Schema 3 可选字段）
+    max_n: 每次运行最多写出的建议条数
+    """
     sug_dir.mkdir(parents=True, exist_ok=True)
     kept = []
     for item in items:
+        if len(kept) >= max_n:
+            break  # 限量：最多 max_n 条
         if not isinstance(item, dict):
             continue
         if is_rejected_direction(item, rejected):
@@ -413,6 +427,7 @@ def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected)
             'record_type': 'suggestion',
             'suggestion_id': sid,
             'favorite_id': fav_id,
+            'batch': batch,
             'type': t,
             'payload': payload,
             'evidence_refs': normalize_evidence(item, records, lit_refs),
@@ -426,8 +441,11 @@ def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected)
 
 
 def write_fallback_suggestion(sug_dir: Path, fav_id, question, evidence_text,
-                              lit_refs, records, reason):
-    """LLM 失败/输出无法解析时的降级：写一条 type=literature 建议（只含检索证据）"""
+                              lit_refs, records, reason, batch):
+    """LLM 失败/输出无法解析时的降级：写一条 type=literature 建议（只含检索证据）
+
+    降级建议固定 1 条，同样带本次运行的 batch 批次号。
+    """
     sug_dir.mkdir(parents=True, exist_ok=True)
     sid = next_sug_ids(sug_dir, 1)[0]
     refs = list(lit_refs[:5])
@@ -438,6 +456,7 @@ def write_fallback_suggestion(sug_dir: Path, fav_id, question, evidence_text,
         'record_type': 'suggestion',
         'suggestion_id': sid,
         'favorite_id': fav_id,
+        'batch': batch,
         'type': 'literature',
         'payload': {
             'title': f'LLM 暂不可用，以下为针对「{question[:30]}」检索到的原始证据',
@@ -462,7 +481,12 @@ def main():
     ap.add_argument('--question', required=True, help='用户问题原文')
     ap.add_argument('--app-root', default=str(DEFAULT_APP_ROOT),
                     help='App 侧根目录（默认钉死，测试可覆盖）')
+    ap.add_argument('--max', type=int, default=2, dest='max_n',
+                    help='每次运行最多写出的建议条数（默认 2）')
     args = ap.parse_args()
+
+    max_n = max(1, args.max_n)  # 至少 1 条，防误传 0/负数
+    batch = make_batch_id()     # 本次运行批次号：batch_YYYYMMDD_HHMMSS
 
     app_root = Path(args.app_root)
     records_dir = app_root / 'data' / 'rag_export' / 'records'
@@ -498,7 +522,7 @@ def main():
     try:
         from llm_client import chat_completion
         messages = build_messages(args.question, aldehyde, amine, records,
-                                  evidence_text, rejected)
+                                  evidence_text, rejected, max_n=max_n)
         content, provider = chat_completion(messages, max_tokens=8000, timeout=120)
         print(f'[iterate_suggest] LLM 端点: {provider}', file=sys.stderr)
         items = parse_llm_json(content)
@@ -508,27 +532,29 @@ def main():
         print(f'[iterate_suggest] LLM 失败，写降级建议: {e}', file=sys.stderr)
         written = write_fallback_suggestion(
             sug_dir, args.favorite_id, args.question, evidence_text,
-            lit_refs, records, reason=str(e)[:200])
-        print(json.dumps({'written': written, 'count': len(written)},
-                         ensure_ascii=False))
+            lit_refs, records, reason=str(e)[:200], batch=batch)
+        print(json.dumps({'written': written, 'count': len(written),
+                          'batch': batch}, ensure_ascii=False))
         return
 
-    # 6. 去重 + 落盘
+    # 6. 限量 + 去重 + 落盘
+    items = items[:max_n]  # LLM 返回多条时只取前 max_n 条
     if not items:
         written = write_fallback_suggestion(
             sug_dir, args.favorite_id, args.question, evidence_text,
-            lit_refs, records, reason='LLM 返回空数组')
+            lit_refs, records, reason='LLM 返回空数组', batch=batch)
     else:
         written = write_suggestions(sug_dir, items, args.favorite_id,
-                                    records, lit_refs, rejected)
+                                    records, lit_refs, rejected,
+                                    batch=batch, max_n=max_n)
         if not written:  # 全部被去重
             written = write_fallback_suggestion(
                 sug_dir, args.favorite_id, args.question, evidence_text,
-                lit_refs, records, reason='建议均与已否决方向重复')
+                lit_refs, records, reason='建议均与已否决方向重复', batch=batch)
 
     # 7. stdout 打印一行 JSON 摘要
-    print(json.dumps({'written': written, 'count': len(written)},
-                     ensure_ascii=False))
+    print(json.dumps({'written': written, 'count': len(written),
+                      'batch': batch}, ensure_ascii=False))
 
 
 if __name__ == '__main__':
