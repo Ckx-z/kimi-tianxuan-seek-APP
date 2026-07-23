@@ -64,16 +64,22 @@ module.exports = {
       },
       // 中文字体栈：学术工具气质
       fontFamily: {
+        // 用户定稿：英文 Times New Roman + 中文宋体
         sans: [
-          '"Inter"',
-          '"PingFang SC"',
-          '"Hiragino Sans GB"',
-          '"Microsoft YaHei"',
-          '"Noto Sans SC"',
-          'system-ui',
-          'sans-serif',
+          '"Times New Roman"',
+          '"SimSun"',
+          '"宋体"',
+          '"NSimSun"',
+          '"Songti SC"',
+          'serif',
         ],
-        serif: ['"Noto Serif SC"', '"Songti SC"', 'serif'],
+        serif: [
+          '"Times New Roman"',
+          '"SimSun"',
+          '"宋体"',
+          '"Songti SC"',
+          'serif',
+        ],
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
