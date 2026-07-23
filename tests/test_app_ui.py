@@ -1101,6 +1101,60 @@ class TestIterateSuggest:
         _, status, _ = gradio_app.run_iterate_suggest("怎么调", "")
         assert "找不到 orchestrator 解释器" in status
 
+    def test_cascade_refresh_record_choices(self, monkeypatch):
+        """收藏 change → 级联刷新「实验记录」下拉：首项「全部记录（不锚定单条）」，
+        其余按「日期｜编号｜结果」标签 → record_id，且 favorite_id 透传过滤。"""
+        seen = {}
+
+        def _rec_list(favorite_id=None):
+            seen["fid"] = favorite_id
+            return [dict(_FAKE_REC, record_id="rec_20260722_001",
+                         experiment_no="A5", outcome="film",
+                         date="2026-07-22")], None
+
+        monkeypatch.setattr(gradio_app, "_rec_list", _rec_list)
+        upd = gradio_app.refresh_iterate_records("fav_20260722_001")
+        assert seen["fid"] == "fav_20260722_001"        # 按收藏过滤
+        choices = upd["choices"]
+        assert choices[0] == ("全部记录（不锚定单条）", "")   # 首项不锚定
+        assert ("2026-07-22｜编号 A5｜✓ 成膜", "rec_20260722_001") in choices
+        assert upd["value"] == ""                        # 级联后回到首项
+
+    def test_record_id_passed_to_subprocess(self, monkeypatch):
+        """record_id 非空 → 命令行追加 --record-id，状态提示「基于记录 X」。"""
+        called = {}
+
+        def _fake_run(cmd, **kwargs):
+            called["cmd"] = cmd
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0,
+                stdout='{"written": ["sug_20260723_001"], "count": 1}\n',
+                stderr="")
+
+        monkeypatch.setattr(gradio_app.subprocess, "run", _fake_run)
+        _, status, _ = gradio_app.run_iterate_suggest(
+            "怎么调", "fav_x", "rec_20260722_001")
+        cmd = called["cmd"]
+        assert "--record-id" in cmd
+        assert cmd[cmd.index("--record-id") + 1] == "rec_20260722_001"
+        assert "--favorite-id" in cmd                    # 可与收藏同传
+        assert "基于记录 `rec_20260722_001`" in status
+
+    def test_empty_record_id_keeps_legacy_command(self, monkeypatch):
+        """record_id 为空（默认）→ 命令行不含 --record-id，行为与旧契约一致。"""
+        called = {}
+
+        def _fake_run(cmd, **kwargs):
+            called["cmd"] = cmd
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0,
+                stdout='{"written": [], "count": 0}\n', stderr="")
+
+        monkeypatch.setattr(gradio_app.subprocess, "run", _fake_run)
+        _, status, _ = gradio_app.run_iterate_suggest("怎么调", "fav_x")
+        assert "--record-id" not in called["cmd"]
+        assert "基于记录" not in status
+
 
 # ---------------------------------------------------------------------------
 # 任务C：页⑤ 批次分组渲染 + 采纳建议 → 生成方案

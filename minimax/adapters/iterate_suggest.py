@@ -23,9 +23,19 @@ adapters/iterate_suggest.py
 
 LLM 失败时不报错退出：写一条 type=literature 的降级建议（只含检索证据）。
 
+锚定单条实验记录（页⑤ 迭代锚定）:
+  --record-id rec_YYYYMMDD_NNN 可选，与 --favorite-id 可同传；
+  传了 record-id 时它必须是存在的记录，favorite-id 缺省时从该记录的
+  favorite_id 推断。锚定后：该记录作为「本次迭代基线」在 prompt 里单独突出，
+  同收藏其他记录降级为「历史参考」次要段落（无收藏时只有基线段），
+  检索查询以锚定记录的条件+现象为主拼，建议 payload 增加 anchor_record_id。
+  不传 --record-id 时行为与之前完全一致。
+
 用法:
   python minimax/adapters/iterate_suggest.py --favorite-id fav_20260722_001 \
       --question "这组单体上次失败了，下次怎么调条件"
+  python minimax/adapters/iterate_suggest.py --record-id rec_20260722_001 \
+      --question "这次失败了怎么调"
   python minimax/adapters/iterate_suggest.py --question "..."   # 省略 = 全部实验记录
 
 退出码: 0 成功；非 0 失败（stderr 给人读的错误）。
@@ -128,6 +138,27 @@ def select_records(records, fav_id, favorite):
     return picked
 
 
+def resolve_anchor(all_records, record_id, fav_id):
+    """解析锚定记录（--record-id）。
+
+    - 传了 record_id 时必须在 all_records 中找到对应记录，否则报错退出（非 0）
+    - fav_id 缺省时从锚定记录的 favorite_id 推断
+    返回 (锚定记录 dict, 最终 fav_id)
+    """
+    anchor = None
+    if record_id:
+        for r in all_records:
+            if r.get('record_id') == record_id:
+                anchor = r
+                break
+        if anchor is None:
+            err_exit(f'锚定实验记录不存在: {record_id}', code=2)
+        if not fav_id:
+            # favorite 缺省：从锚定记录的 favorite_id 推断（可能仍为空 = 游离锚定）
+            fav_id = anchor.get('favorite_id') or None
+    return anchor, fav_id
+
+
 # ---------------------------------------------------------------- 检索取证
 
 def monomer_keywords(monomer: dict):
@@ -144,23 +175,37 @@ def monomer_keywords(monomer: dict):
     return kws
 
 
-def build_query_text(question: str, aldehyde: dict, amine: dict, records) -> str:
-    """模板化拼检索查询：用户问题原文 + 醛胺 name/CAS + 失败记录概况"""
+def _record_condition_seg(r: dict) -> str:
+    """一条记录的条件+现象概要片段（拼检索查询用）"""
+    cond = r.get('conditions') or {}
+    seg = (f"实验{r.get('experiment_no', '')} outcome={r.get('outcome')} "
+           f"失败分类={r.get('failure_class') or '未知'} "
+           f"溶剂={cond.get('solvent_1') or cond.get('solvent', '')} "
+           f"催化={cond.get('catalyst', '')} 温度={cond.get('temperature_c', '')} "
+           f"现象={r.get('strength', '')} {r.get('notes', '')}")
+    return seg.strip()
+
+
+def build_query_text(question: str, aldehyde: dict, amine: dict, records,
+                     anchor=None) -> str:
+    """模板化拼检索查询：用户问题原文 + 醛胺 name/CAS + 失败记录概况
+
+    有锚定记录时：以锚定记录的条件+现象为主拼（放在问题之后最优先位置），
+    其余失败记录概况仅作补充。
+    """
     parts = [question]
     for label, m in (('醛', aldehyde), ('胺', amine)):
         name = (m or {}).get('name', '')
         cas = (m or {}).get('cas', '')
         if name or cas:
             parts.append(f'{label}单体 {name} CAS {cas}'.strip())
-    failed = [r for r in records if r.get('outcome') in ('failed', 'partial')]
+    if anchor is not None:
+        # 锚定记录的条件+现象是本次检索的主线
+        parts.append('本次迭代基线实验 ' + _record_condition_seg(anchor))
+    failed = [r for r in records
+              if r.get('outcome') in ('failed', 'partial') and r is not anchor]
     for r in failed[-3:]:  # 最近几条失败/部分成功记录的现象一并拼入
-        cond = r.get('conditions') or {}
-        seg = (f"实验{r.get('experiment_no', '')} outcome={r.get('outcome')} "
-               f"失败分类={r.get('failure_class') or '未知'} "
-               f"溶剂={cond.get('solvent_1') or cond.get('solvent', '')} "
-               f"催化={cond.get('catalyst', '')} 温度={cond.get('temperature_c', '')} "
-               f"现象={r.get('strength', '')} {r.get('notes', '')}")
-        parts.append(seg.strip())
+        parts.append(_record_condition_seg(r))
     return '\n'.join(p for p in parts if p)
 
 
@@ -417,9 +462,24 @@ def is_rejected_direction(item: dict, rejected) -> bool:
 
 # ---------------------------------------------------------------- LLM
 
+def _record_prompt_line(r: dict) -> str:
+    """一条实验记录在 prompt 里的完整描述行（含 conditions/outcome/strength/notes/failure_class）"""
+    cond = r.get('conditions') or {}
+    return (f"- {r.get('record_id')} (实验编号 {r.get('experiment_no', '?')}, "
+            f"{r.get('date', '?')}): outcome={r.get('outcome')}, "
+            f"failure_class={r.get('failure_class')}, "
+            f"条件={json.dumps(cond, ensure_ascii=False)}, "
+            f"现象/强度={r.get('strength', '')}, 备注={r.get('notes', '')}")
+
+
 def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
-                   max_n=2):
-    """拼 prompt：证据文本 + 实验记录 + 严格 JSON 输出要求（最多 max_n 条）"""
+                   max_n=2, anchor=None):
+    """拼 prompt：证据文本 + 实验记录 + 严格 JSON 输出要求（最多 max_n 条）
+
+    有锚定记录（anchor）时：锚定记录作为「本次迭代基线」单独突出
+    （基于以下这次实验迭代），同收藏其他记录降级为「历史参考」次要段落；
+    无锚定时保持原有单一「相关实验记录」段落，行为完全不变。
+    """
     sys_prompt = (
         '你是 COF（共价有机框架）成膜实验的迭代顾问。'
         '基于用户的历史实验记录与检索到的文献证据，给出下一步可操作的实验建议。'
@@ -441,20 +501,27 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
         '严禁编造引用；每条建议必须给出 confidence 自评。'
     )
 
-    rec_lines = []
-    for r in records:
-        cond = r.get('conditions') or {}
-        rec_lines.append(
-            f"- {r.get('record_id')} (实验编号 {r.get('experiment_no', '?')}, "
-            f"{r.get('date', '?')}): outcome={r.get('outcome')}, "
-            f"failure_class={r.get('failure_class')}, "
-            f"条件={json.dumps(cond, ensure_ascii=False)}, "
-            f"现象/强度={r.get('strength', '')}, 备注={r.get('notes', '')}")
-    records_text = '\n'.join(rec_lines) if rec_lines else '(无关联实验记录)'
+    if anchor is not None:
+        # 锚定语义：基线记录单独突出，同收藏其他记录降级为历史参考次要段落
+        anchor_text = _record_prompt_line(anchor)
+        history = [r for r in records
+                   if r.get('record_id') != anchor.get('record_id')]
+        history_text = ('\n'.join(_record_prompt_line(r) for r in history)
+                        if history else '(无其他历史记录)')
+        records_section = (
+            '## 本次迭代基线（基于以下这次实验迭代，建议须围绕它给出）\n'
+            f'{anchor_text}\n\n'
+            '## 历史参考（同收藏的其他实验记录，仅作次要参考）\n'
+            f'{history_text}')
+    else:
+        rec_lines = [_record_prompt_line(r) for r in records]
+        records_text = '\n'.join(rec_lines) if rec_lines else '(无关联实验记录)'
+        records_section = f'## 相关实验记录\n{records_text}'
 
     rejected_text = ('\n'.join(f'- {x}' for x in rejected)
                      if rejected else '(无)')
     # 可引用 record_id 白名单：显式写进 prompt，约束 LLM 引用真实 ID
+    # （锚定时白名单仍包含全部纳入记录 ID，锚定记录 ID 自然是首选引用）
     rec_ids = [r.get('record_id') for r in records if r.get('record_id')]
     rec_ids_text = ('\n'.join(f'- {rid}' for rid in rec_ids)
                     if rec_ids else '(无)')
@@ -465,8 +532,7 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
 醛: {json.dumps(aldehyde or {}, ensure_ascii=False)}
 胺: {json.dumps(amine or {}, ensure_ascii=False)}
 
-## 相关实验记录
-{records_text}
+{records_section}
 
 ## 可引用的实验记录 ID（evidence_refs 中 kind=experiment_record 的 ref 必须从中原样选择）
 {rec_ids_text}
@@ -698,7 +764,8 @@ def _inject_monomers(payload: dict, aldehyde, amine):
 
 
 def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
-                      batch, max_n=2, aldehyde=None, amine=None, graph_ref_ids=None):
+                      batch, max_n=2, aldehyde=None, amine=None, graph_ref_ids=None,
+                      anchor_record_id=None):
     """状态去重后按 Schema 3 落盘，返回写出的 suggestion_id 列表
 
     batch: 本次运行批次号，写入每条建议的 "batch" 字段（Schema 3 可选字段）
@@ -706,6 +773,8 @@ def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
     aldehyde/amine: 游离路径（fav_id 为空）时从最近实验记录带出的单体对象，
       写入每条建议 payload（所有 type），保证 adopt_suggestion 可直接采纳
     graph_ref_ids: 图检索命中的节点 ID（纳入 evidence_refs 白名单）
+    anchor_record_id: 锚定记录 ID（--record-id）；有锚定时写入 payload，
+      无锚定（未传该参数）则不出现该字段
     """
     sug_dir.mkdir(parents=True, exist_ok=True)
     kept = []
@@ -726,6 +795,9 @@ def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
         if not fav_id:
             # 游离建议：写入单体对象，修复 adopt_suggestion 无法解析单体的问题
             payload = _inject_monomers(payload, aldehyde, amine)
+        if anchor_record_id:
+            # 锚定语义：建议 payload 记录本次迭代基线记录 ID
+            payload['anchor_record_id'] = anchor_record_id
         refs, unverified, n_valid = normalize_evidence(
             item, records, lit_refs, graph_ref_ids)
         # 置信度自评 + 规则校验（0 条有效证据强制 low）
@@ -756,11 +828,12 @@ def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
 
 def write_fallback_suggestion(sug_dir: Path, fav_id, question, evidence_text,
                               lit_refs, records, reason, batch,
-                              aldehyde=None, amine=None):
+                              aldehyde=None, amine=None, anchor_record_id=None):
     """LLM 失败/输出无法解析时的降级：写一条 type=literature 建议（只含检索证据）
 
     降级建议固定 1 条，同样带本次运行的 batch 批次号。
     游离路径（fav_id 为空）时同样注入单体对象，保证可采纳。
+    有锚定时 payload 同样写入 anchor_record_id。
     """
     sug_dir.mkdir(parents=True, exist_ok=True)
     sid = next_sug_ids(sug_dir, 1)[0]
@@ -773,6 +846,9 @@ def write_fallback_suggestion(sug_dir: Path, fav_id, question, evidence_text,
     }
     if not fav_id:
         payload = _inject_monomers(payload, aldehyde, amine)
+    if anchor_record_id:
+        # 锚定语义：降级建议 payload 同样记录基线记录 ID
+        payload['anchor_record_id'] = anchor_record_id
     doc = {
         'schema_version': SCHEMA_VERSION,
         'record_type': 'suggestion',
@@ -797,6 +873,9 @@ def main():
     ap = argparse.ArgumentParser(description='页⑤ 自然语言方案迭代编排器')
     ap.add_argument('--favorite-id', default=None,
                     help='收藏条目 id；省略表示用全部实验记录')
+    ap.add_argument('--record-id', default=None,
+                    help='锚定实验记录 id（rec_YYYYMMDD_NNN）；可与 --favorite-id 同传，'
+                         'favorite-id 缺省时从该记录的 favorite_id 推断')
     ap.add_argument('--question', required=True, help='用户问题原文')
     ap.add_argument('--app-root', default=str(DEFAULT_APP_ROOT),
                     help='App 侧根目录（默认钉死，测试可覆盖）')
@@ -811,25 +890,36 @@ def main():
     records_dir = app_root / 'data' / 'rag_export' / 'records'
     sug_dir = app_root / 'data' / 'rag_export' / 'suggestions'
 
-    # 1. 读实验记录 + 收藏单体
+    # 1. 读实验记录 + 收藏单体（含锚定记录解析与 favorite 推断）
+    all_records = load_json_dir(records_dir)
+    anchor, fav_id = resolve_anchor(all_records, args.record_id,
+                                    args.favorite_id)
     favorite = None
     aldehyde = amine = None
-    if args.favorite_id:
-        favorite = load_favorite(app_root, args.favorite_id)
+    if fav_id:
+        favorite = load_favorite(app_root, fav_id)
         aldehyde = favorite.get('aldehyde') or {}
         amine = favorite.get('amine') or {}
-    all_records = load_json_dir(records_dir)
-    records = select_records(all_records, args.favorite_id, favorite)
+    if anchor is not None and not fav_id:
+        # 游离锚定（记录无 favorite_id 且未传 --favorite-id）：只有基线段
+        records = [anchor]
+    else:
+        records = select_records(all_records, fav_id, favorite)
+        if anchor is not None:
+            # 锚定记录排最前（检索主线/prompt 基线），其余为历史参考
+            records = [anchor] + [r for r in records
+                                  if r.get('record_id') != anchor.get('record_id')]
     if not records:
         print('[iterate_suggest] 警告: 未找到关联实验记录，将仅基于检索证据生成',
               file=sys.stderr)
     # 未指定 favorite 时，从最近一条记录带出单体信息（便于检索）
-    if not args.favorite_id and records:
+    if not fav_id and records:
         aldehyde = records[-1].get('aldehyde') or {}
         amine = records[-1].get('amine') or {}
 
-    # 2. 模板化拼检索查询
-    query_text = build_query_text(args.question, aldehyde, amine, records)
+    # 2. 模板化拼检索查询（有锚定时以锚定记录条件+现象为主拼）
+    query_text = build_query_text(args.question, aldehyde, amine, records,
+                                  anchor=anchor)
 
     # 3. 检索取证（降级链，含 failure 专家语料与多跳 BFS）
     evidence_text, lit_refs, graph_ref_ids = retrieve_evidence(
@@ -837,13 +927,15 @@ def main():
         records=records, app_root=app_root, favorite=favorite)
 
     # 4. 状态去重：收集已否决方向
-    rejected = load_rejected_directions(sug_dir, args.favorite_id)
+    rejected = load_rejected_directions(sug_dir, fav_id)
 
     # 5. LLM 生成建议（失败则写降级建议）
+    anchor_record_id = anchor.get('record_id') if anchor else None
     try:
         from llm_client import chat_completion
         messages = build_messages(args.question, aldehyde, amine, records,
-                                  evidence_text, rejected, max_n=max_n)
+                                  evidence_text, rejected, max_n=max_n,
+                                  anchor=anchor)
         content, provider = chat_completion(messages, max_tokens=8000, timeout=120)
         print(f'[iterate_suggest] LLM 端点: {provider}', file=sys.stderr)
         items = parse_llm_json(content)
@@ -852,9 +944,9 @@ def main():
     except Exception as e:
         print(f'[iterate_suggest] LLM 失败，写降级建议: {e}', file=sys.stderr)
         written = write_fallback_suggestion(
-            sug_dir, args.favorite_id, args.question, evidence_text,
+            sug_dir, fav_id, args.question, evidence_text,
             lit_refs, records, reason=str(e)[:200], batch=batch,
-            aldehyde=aldehyde, amine=amine)
+            aldehyde=aldehyde, amine=amine, anchor_record_id=anchor_record_id)
         print(json.dumps({'written': written, 'count': len(written),
                           'batch': batch}, ensure_ascii=False))
         return
@@ -863,20 +955,21 @@ def main():
     items = items[:max_n]  # LLM 返回多条时只取前 max_n 条
     if not items:
         written = write_fallback_suggestion(
-            sug_dir, args.favorite_id, args.question, evidence_text,
+            sug_dir, fav_id, args.question, evidence_text,
             lit_refs, records, reason='LLM 返回空数组', batch=batch,
-            aldehyde=aldehyde, amine=amine)
+            aldehyde=aldehyde, amine=amine, anchor_record_id=anchor_record_id)
     else:
-        written = write_suggestions(sug_dir, items, args.favorite_id,
+        written = write_suggestions(sug_dir, items, fav_id,
                                     records, lit_refs, rejected,
                                     batch=batch, max_n=max_n,
                                     aldehyde=aldehyde, amine=amine,
-                                    graph_ref_ids=graph_ref_ids)
+                                    graph_ref_ids=graph_ref_ids,
+                                    anchor_record_id=anchor_record_id)
         if not written:  # 全部被去重
             written = write_fallback_suggestion(
-                sug_dir, args.favorite_id, args.question, evidence_text,
+                sug_dir, fav_id, args.question, evidence_text,
                 lit_refs, records, reason='建议均与已否决方向重复', batch=batch,
-                aldehyde=aldehyde, amine=amine)
+                aldehyde=aldehyde, amine=amine, anchor_record_id=anchor_record_id)
 
     # 7. stdout 打印一行 JSON 摘要
     print(json.dumps({'written': written, 'count': len(written),

@@ -2237,12 +2237,39 @@ def _iterate_fav_choices():
         (_fav_label(f), f.get("id")) for f in (favs or [])]
 
 
-def run_iterate_suggest(question, fav_id=""):
+def _iterate_rec_choices(fav_id=""):
+    """页⑤「实验记录」级联下拉选项：首项「全部记录（不锚定单条）」值为空，
+    其余为所选收藏下的实验记录，标签「日期｜编号｜结果」→ record_id。
+    收藏为空时列全部实验记录（与「不指定收藏」语义一致）。"""
+    recs, err = _rec_list(favorite_id=(fav_id or None))
+    choices = [("全部记录（不锚定单条）", "")]
+    if err:
+        return choices  # 读取失败时仅保留首项，不阻断提问
+    for rec in recs or []:
+        rid = rec.get("record_id") or rec.get("id")
+        if not rid:
+            continue
+        date = rec.get("date") or str(rec.get("created_at") or "")[:10] or "?"
+        exp_no = rec.get("experiment_no") or "—"
+        outcome = _OUTCOME_ZH.get(rec.get("outcome"),
+                                  (rec.get("outcome") or "—", ""))[0]
+        choices.append((f"{date}｜编号 {exp_no}｜{outcome}", rid))
+    return choices
+
+
+def refresh_iterate_records(fav_id=""):
+    """收藏下拉 change → 级联刷新「实验记录」下拉（值重置为首项）。"""
+    return gr.update(choices=_iterate_rec_choices(fav_id), value="")
+
+
+def run_iterate_suggest(question, fav_id="", record_id=""):
     """「生成迭代建议」→ (建议卡片, 状态)。
 
     subprocess 调 `minimax/adapters/iterate_suggest.py --question <text>
-    [--favorite-id <id>]`：成功 exit 0 且 stdout 末行 JSON {"written": [...],
-    "count": N}，失败 exit 非 0 / stderr 人读错误。成功后全量刷新建议列表。
+    [--favorite-id <id>] [--record-id <id>]`：成功 exit 0 且 stdout 末行 JSON
+    {"written": [...], "count": N}，失败 exit 非 0 / stderr 人读错误。
+    record_id 非空时锚定该条实验记录做 RAG 迭代；为空（默认）时行为与
+    旧契约完全一致。成功后全量刷新建议列表。
     """
     q = (question or "").strip()
     if not q:
@@ -2261,6 +2288,9 @@ def run_iterate_suggest(question, fav_id=""):
     fid = (fav_id or "").strip()
     if fid:
         cmd += ["--favorite-id", fid]
+    rid = (record_id or "").strip()
+    if rid:
+        cmd += ["--record-id", rid]
     try:
         proc = subprocess.run(
             cmd, cwd=str(PROJECT_ROOT), timeout=ITERATE_TIMEOUT_S,
@@ -2296,6 +2326,8 @@ def run_iterate_suggest(question, fav_id=""):
     # 成功后全量刷新建议区，并同步刷新采纳下拉（新建议变为可采纳项）
     sug_html, s_status, adopt_upd = refresh_suggestions("")
     done_msg = "✓ 已生成迭代建议"
+    if rid:
+        done_msg += f"（基于记录 `{rid}`）"
     if count is not None:
         done_msg += f"（{count} 条）"
     if written:
@@ -2933,6 +2965,10 @@ def create_app() -> gr.Blocks:
                             label="针对收藏（可选）",
                             choices=[("全部实验记录（不指定收藏）", "")], value="",
                             interactive=True, allow_custom_value=True, scale=3)
+                        iter_gen_rec = gr.Dropdown(
+                            label="实验记录（可选，锚定单条迭代）",
+                            choices=[("全部记录（不锚定单条）", "")], value="",
+                            interactive=True, allow_custom_value=True, scale=3)
                         iter_gen_btn = gr.Button("生成迭代建议", variant="primary",
                                                  scale=1)
                 # 任务C：采纳建议 → 生成实验方案卡
@@ -2967,13 +3003,17 @@ def create_app() -> gr.Blocks:
                                        inputs=[iter_fav_filter],
                                        outputs=[iter_sug_html, iter_status,
                                                 iter_adopt_pick])
+                # 收藏下拉 change → 级联刷新「实验记录」下拉
+                iter_gen_fav.change(fn=refresh_iterate_records,
+                                    inputs=[iter_gen_fav],
+                                    outputs=[iter_gen_rec])
                 # 生成期间 disable 按钮防重复点击，完成后恢复
                 _gen_evt = iter_gen_btn.click(
                     fn=lambda: gr.update(interactive=False),
                     outputs=[iter_gen_btn], queue=False)
                 _gen_evt = _gen_evt.then(
                     fn=run_iterate_suggest,
-                    inputs=[iter_question, iter_gen_fav],
+                    inputs=[iter_question, iter_gen_fav, iter_gen_rec],
                     outputs=[iter_sug_html, iter_status, iter_adopt_pick])
                 _gen_evt.then(fn=lambda: gr.update(interactive=True),
                               outputs=[iter_gen_btn], queue=False)

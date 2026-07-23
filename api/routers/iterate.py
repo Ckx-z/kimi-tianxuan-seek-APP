@@ -9,14 +9,17 @@
 
 编排器协作契约（钉死，勿改）：
     E:\\python3.12\\python.exe minimax/adapters/iterate_suggest.py
-        [--favorite-id ID] --question "文本"
+        [--favorite-id ID] [--record-id rec_YYYYMMDD_NNN] --question "文本"
 成功 exit 0 且 stdout 末行 {"written": [...], "count": N, "batch": "..."}。
+--record-id 可选、与 --favorite-id 可同传；favorite 缺省时编排器从记录的
+favorite_id 推断。不传 --record-id 的现有行为完全不变。
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -43,6 +46,9 @@ PLANS_DIR = PROJECT_ROOT / "data" / "generated_plans"
 ITERATE_PYTHON = r"E:\python3.12\python.exe"
 ITERATE_SCRIPT = PROJECT_ROOT / "minimax" / "adapters" / "iterate_suggest.py"
 ITERATE_TIMEOUT_S = 300
+
+# 锚定记录 id 格式（与编排器契约一致）：rec_YYYYMMDD_NNN
+_RECORD_ID_RE = re.compile(r"^rec_\d{8}_\d{3}$")
 
 
 def _load_json_list(directory: Path, pattern: str, what: str) -> list[dict]:
@@ -99,8 +105,18 @@ def run_suggest(req: SuggestRequest):
 
     cmd = [ITERATE_PYTHON, str(ITERATE_SCRIPT), "--question", question]
     fav = (req.favorite_id or "").strip()
+    rec = (req.record_id or "").strip()
+    if rec:
+        # 锚定记录 id 格式校验：不符契约 → 400（不放行给编排器）
+        if not _RECORD_ID_RE.match(rec):
+            raise HTTPException(
+                400, "record_id 格式非法：应为 rec_YYYYMMDD_NNN，"
+                f"收到 {rec!r}")
     if fav:
         cmd += ["--favorite-id", fav]
+    if rec:
+        # 与 favorite-id 可同传；favorite 缺省时编排器从记录推断
+        cmd += ["--record-id", rec]
 
     try:
         proc = subprocess.run(

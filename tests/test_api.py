@@ -332,6 +332,69 @@ def test_iterate_suggest_success(monkeypatch):
     assert sp is it.subprocess  # 确实走 subprocess 通道
 
 
+def test_iterate_suggest_record_id_passed_through(monkeypatch):
+    """record_id 透传：命令行追加 --record-id（可与 --favorite-id 同传）。"""
+    import api.routers.iterate as it
+
+    captured = {}
+
+    class _Proc:
+        returncode = 0
+        stdout = '{"written": ["sug_20260722_001"], "count": 1, "batch": "b1"}'
+        stderr = ""
+
+    def _run(cmd, **k):
+        captured["cmd"] = cmd
+        return _Proc()
+
+    monkeypatch.setattr(it.subprocess, "run", _run)
+    r = client.post("/api/iterate/suggest", json={
+        "question": "基于这条记录迭代", "favorite_id": "fav_a",
+        "record_id": "rec_20260722_001"})
+    assert r.status_code == 200
+    cmd = captured["cmd"]
+    assert "--record-id" in cmd
+    assert cmd[cmd.index("--record-id") + 1] == "rec_20260722_001"
+    assert "--favorite-id" in cmd  # 同传不受 record_id 影响
+
+
+def test_iterate_suggest_record_id_without_favorite(monkeypatch):
+    """仅传 record_id 不传 favorite_id 也接受（favorite 由编排器推断）。"""
+    import api.routers.iterate as it
+
+    captured = {}
+
+    class _Proc:
+        returncode = 0
+        stdout = '{"written": [], "count": 0, "batch": "b2"}'
+        stderr = ""
+
+    def _run(cmd, **k):
+        captured["cmd"] = cmd
+        return _Proc()
+
+    monkeypatch.setattr(it.subprocess, "run", _run)
+    r = client.post("/api/iterate/suggest", json={
+        "question": "只锚定记录", "record_id": "rec_20260722_002"})
+    assert r.status_code == 200
+    assert "--record-id" in captured["cmd"]
+    assert "--favorite-id" not in captured["cmd"]
+
+
+def test_iterate_suggest_record_id_invalid_400(monkeypatch):
+    """record_id 格式非法（非 rec_YYYYMMDD_NNN）→ 400，不起 subprocess。"""
+    import api.routers.iterate as it
+
+    def _boom(*a, **k):
+        raise AssertionError("格式非法时不应调用 subprocess.run")
+
+    monkeypatch.setattr(it.subprocess, "run", _boom)
+    r = client.post("/api/iterate/suggest", json={
+        "question": "怎么调", "record_id": "abc123"})
+    assert r.status_code == 400
+    assert "record_id 格式非法" in r.json()["detail"]
+
+
 def test_iterate_suggest_interpreter_missing_503(monkeypatch):
     """解释器不存在 → 明确 503，且不真正起 subprocess。"""
     import api.routers.iterate as it

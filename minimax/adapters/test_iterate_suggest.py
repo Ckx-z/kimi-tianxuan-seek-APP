@@ -317,3 +317,59 @@ class TestRegression:
         t, payload = it.normalize_payload({'type': 'weird', 'title': 't',
                                            'detail': 'd'})
         assert t == 'literature'
+
+
+# ---------------------------------------------------------------- ⑥ 锚定记录
+
+class TestAnchorRecord:
+    """--record-id 迭代锚定：基线突出 / favorite 推断 / 不存在报错"""
+
+    def _anchor(self):
+        """一条带完整条件的锚定记录"""
+        r = _rec('rec_20260722_001', failure_class='A', experiment_no='A1')
+        r['conditions'] = {'solvent_1': '甲苯', 'catalyst': '6M 乙酸',
+                           'temperature_c': 120}
+        r['strength'] = '无固体析出'
+        r['notes'] = '72h 液面澄清'
+        r['favorite_id'] = 'fav_20260722_001'
+        return r
+
+    def test_anchor_highlighted_in_prompt(self):
+        """锚定记录在 prompt 中作为基线单独突出，其他记录降级为历史参考"""
+        anchor = self._anchor()
+        other = _rec('rec_20260722_002')
+        records = [anchor, other]
+        msgs = it.build_messages('这次失败了怎么调', {}, {}, records,
+                                 '(证据)', [], anchor=anchor)
+        user = msgs[1]['content']
+        assert '基于以下这次实验迭代' in user          # 基线段标题
+        assert '历史参考' in user                       # 次要段落
+        # 基线段在历史参考段之前，且锚定记录先于其他记录出现
+        assert user.index('基于以下这次实验迭代') < user.index('历史参考')
+        assert user.index('rec_20260722_001') < user.index('rec_20260722_002')
+        # 锚定记录的完整字段（条件/现象/备注/failure_class）出现在基线段
+        baseline_seg = user.split('历史参考')[0]
+        assert '无固体析出' in baseline_seg
+        assert '72h 液面澄清' in baseline_seg
+        assert 'failure_class=A' in baseline_seg
+        # 白名单仍包含全部纳入记录 ID
+        whitelist_seg = user.split('可引用的实验记录 ID')[1]
+        assert 'rec_20260722_001' in whitelist_seg
+        assert 'rec_20260722_002' in whitelist_seg
+
+    def test_favorite_inferred_from_record(self):
+        """favorite-id 缺省时从锚定记录的 favorite_id 推断"""
+        anchor = self._anchor()
+        a, fav = it.resolve_anchor([anchor], 'rec_20260722_001', None)
+        assert a is anchor
+        assert fav == 'fav_20260722_001'
+        # 显式传 favorite-id 时不被覆盖
+        _, fav2 = it.resolve_anchor([anchor], 'rec_20260722_001', 'fav_x')
+        assert fav2 == 'fav_x'
+
+    def test_missing_record_id_exits_nonzero(self):
+        """record-id 不存在：报错并非 0 退出"""
+        with pytest.raises(SystemExit) as exc:
+            it.resolve_anchor([_rec('rec_20260722_001')],
+                              'rec_99999999_999', None)
+        assert exc.value.code != 0

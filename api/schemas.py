@@ -58,6 +58,9 @@ class SuggestRequest(BaseModel):
     question: str = Field(..., description="迭代问题原文（自然语言）")
     favorite_id: str | None = Field(
         None, description="收藏条目 id；空则基于全部实验记录")
+    record_id: str | None = Field(
+        None, description="锚定实验记录 id（rec_YYYYMMDD_NNN）；"
+        "与 favorite_id 可同传，favorite 缺省时由编排器从记录推断")
 
 
 class AdoptRequest(BaseModel):
