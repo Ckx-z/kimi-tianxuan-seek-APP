@@ -2,6 +2,11 @@
 
 策略：通过 subprocess 调用旧项目 predict_pair.py，避免新旧项目 src 包名冲突。
 这样新工作台无需安装 torch/torch_geometric，也绝不修改旧项目代码。
+
+分发适配：旧项目根与 dphuanjing 解释器路径不再硬编码为唯一来源，
+统一走 src/runtime_config（环境变量 > config/runtime.local.json >
+探测 > 不可用）。环境缺失时抛出带明确原因的 RuntimeError，由
+FilmPredictor 捕获后记 gnn_error 并继续 tree 预测（优雅降级）。
 """
 
 from __future__ import annotations
@@ -10,17 +15,22 @@ import re
 import subprocess
 from pathlib import Path
 
-OLD_PROJECT_ROOT = Path(r"C:\Users\ckx\Desktop\tianxuan seek")
+try:
+    from src import runtime_config
+except ImportError:  # src/ 直接上 sys.path 的兜底
+    import runtime_config  # type: ignore
+
+OLD_PROJECT_ROOT = runtime_config.gnn_project_root()
 DEFAULT_CHECKPOINT = OLD_PROJECT_ROOT / "models" / "v5.3" / "v5_model.pt"
-DPHUANJING_PYTHON = Path(r"E:\ANACONDA\envs\dphuanjing\python.exe")
+# 模块级常量保留以便排查/测试 monkeypatch；None 表示 GNN 环境不可用
+DPHUANJING_PYTHON = runtime_config.gnn_python()
 
 
-def _find_python() -> Path:
-    """优先使用 dphuanjing 环境 Python，否则尝试系统 Python。"""
-    if DPHUANJING_PYTHON.exists():
+def _find_python() -> Path | None:
+    """解析 GNN 推理解释器；环境不存在时返回 None（由调用方降级）。"""
+    if DPHUANJING_PYTHON is not None and DPHUANJING_PYTHON.exists():
         return DPHUANJING_PYTHON
-    # fallback：尝试旧项目环境里的 python（如果配置不同）
-    return Path("python")
+    return None
 
 
 def _decode_output(raw: bytes) -> str:
@@ -54,11 +64,26 @@ class GNNFilmPredictor:
         return prob, std
 
     def predict_single(self, ald_smiles: str, amine_smiles: str, mc_samples: int = 10) -> dict:
-        """预测单个单体对，返回概率 + 不确定性。"""
+        """预测单个单体对，返回概率 + 不确定性。
+
+        GNN 环境（dphuanjing 解释器 / 旧项目目录）缺失时抛出带明确原因的
+        RuntimeError —— FilmPredictor 会捕获并降级为仅 tree 预测。
+        """
+        python = _find_python()
+        if python is None:
+            raise RuntimeError(
+                "GNN 不可用：未找到 dphuanjing 推理环境"
+                f"（配置值: {DPHUANJING_PYTHON}）。可通过环境变量 "
+                "COF_GNN_PYTHON 或 config/runtime.local.json 指定；"
+                "未配置时 GNN 分量自动降级，不影响树模型预测。")
+        if not OLD_PROJECT_ROOT.exists():
+            raise RuntimeError(
+                f"GNN 不可用：旧项目目录不存在: {OLD_PROJECT_ROOT}。"
+                "可通过环境变量 COF_GNN_PROJECT_ROOT 或 "
+                "config/runtime.local.json 的 gnn_project_root 指定。")
         if not self.checkpoint_path.exists():
             raise FileNotFoundError(f"找不到 GNN 模型：{self.checkpoint_path}")
 
-        python = _find_python()
         cmd = [
             str(python),
             str(OLD_PROJECT_ROOT / "predict_pair.py"),

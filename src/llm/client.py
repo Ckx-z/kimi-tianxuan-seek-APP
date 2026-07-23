@@ -21,10 +21,16 @@ from typing import Any, Optional
 
 import requests
 
-ROOT = Path(__file__).resolve().parents[2]
-LOCAL_SETTINGS = ROOT / "config" / "llm_settings.local.json"
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+ROOT = runtime_config.resource_root()
+# 可写：LLM 本机配置与缓存（frozen 时落 %APPDATA%/COF-Film-Recommend）
+LOCAL_SETTINGS = runtime_config.user_app_root() / "config" / "llm_settings.local.json"
 MINIMAX_SECRETS = ROOT / "minimax" / "config" / "secrets.local.json"
-CACHE_DIR = ROOT / "data" / "llm_cache"
+CACHE_DIR = runtime_config.user_data_root() / "llm_cache"
 
 TIMEOUT = 120  # seconds（推理型模型长输出需要更长等待）
 

@@ -18,7 +18,12 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
 BUILTIN_PATH = PROJECT_ROOT / "data" / "builtin_monomers.json"
 
 TEMPLATE_NAME = "侯老师法（v3.9 方案）"

@@ -17,9 +17,14 @@ from rdkit import Chem
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
 BUILTIN_PATH = PROJECT_ROOT / "data" / "builtin_monomers.json"
-CACHE_PATH = PROJECT_ROOT / "data" / "cas_cache.json"
+CACHE_PATH = runtime_config.user_data_root() / "cas_cache.json"
 
 PUBCHEM_URL = (
     "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/"

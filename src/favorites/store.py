@@ -21,8 +21,14 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-FAVORITES_DIR = PROJECT_ROOT / "data" / "favorites"
+try:
+    from src import runtime_config
+except ImportError:  # 裸名导入（src/ 直接在 sys.path 上）
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
+# 用户数据（可写）：frozen 时落 %APPDATA%/COF-Film-Recommend/data
+FAVORITES_DIR = runtime_config.user_data_root() / "favorites"
 BUILTIN_PATH = PROJECT_ROOT / "data" / "builtin_monomers.json"
 TRAIN_CSV = PROJECT_ROOT / "data" / "interim" / "v5_train_stage1_cond_filled.csv"
 

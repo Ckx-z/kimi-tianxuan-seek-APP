@@ -19,8 +19,13 @@ from .conformer import DESCRIPTOR_NAMES, compute_3d_descriptors
 from .dimer import DIMER_DESCRIPTOR_NAMES, compute_dimer_3d
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_CACHE_DIR = PROJECT_ROOT / "data" / "interim" / "3d_cache"
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
+DEFAULT_CACHE_DIR = runtime_config.user_data_root() / "interim" / "3d_cache"
 DEFAULT_MONOMER_CACHE = DEFAULT_CACHE_DIR / "monomer_3d.joblib"
 DEFAULT_DIMER_CACHE = DEFAULT_CACHE_DIR / "dimer_3d.joblib"
 

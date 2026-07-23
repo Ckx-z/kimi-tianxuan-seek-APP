@@ -22,8 +22,13 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CACHE_DIR = PROJECT_ROOT / "data" / "llm_cache" / "monomer_props"
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
+CACHE_DIR = runtime_config.user_data_root() / "llm_cache" / "monomer_props"
 
 _FACT_KEYS = (
     "mw", "xlogp", "tpsa", "hbd", "hba",

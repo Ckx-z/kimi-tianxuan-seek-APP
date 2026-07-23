@@ -31,7 +31,12 @@ from pathlib import Path
 
 from rdkit import Chem
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
 ENVELOPE_PATH = PROJECT_ROOT / "models" / "feature_envelope.json"
 
 # 等级常量

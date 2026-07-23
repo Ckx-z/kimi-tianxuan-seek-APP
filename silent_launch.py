@@ -35,8 +35,17 @@ HOST = "127.0.0.1"
 PORT = 7860
 URL = f"http://{HOST}:{PORT}"
 MUTEX_NAME = "Local\\COFFilmAppLauncher_SingleInstance"
+
+# App 进程解释器：经 src/runtime_config 解析（环境变量 COF_APP_PYTHONW >
+# config/runtime.local.json > 开发机历史路径 > PATH 探测 pythonw/python）。
 # App 依赖 base 环境（gradio 6.20）；.venv 没有 gradio，不能用它启动 App
-PYTHONW = Path(r"E:\ANACONDA\pythonw.exe")
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+try:
+    from src import runtime_config as _rc
+except ImportError:
+    _rc = None
+PYTHONW = _rc.app_pythonw() if _rc is not None else None
 
 STILL_ACTIVE = 259
 ERROR_ALREADY_EXISTS = 183
@@ -172,10 +181,12 @@ def main() -> int:
             show_error("COF App 启动失败", f"找不到 App 脚本：\n{APP_PATH}")
             return 1
 
-        if not PYTHONW.exists():
+        if PYTHONW is None or not PYTHONW.exists():
             show_error(
                 "COF App 启动失败",
-                f"找不到 Python 环境：\n{PYTHONW}\n\n请确认 Anaconda base 环境存在（App 依赖 gradio）。",
+                "找不到可用的 Python 环境（App 依赖 gradio）。\n\n"
+                "请安装 Anaconda，或通过环境变量 COF_APP_PYTHONW / "
+                "config/runtime.local.json 指定 pythonw 路径。",
             )
             return 1
 

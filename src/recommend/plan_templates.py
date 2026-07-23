@@ -20,7 +20,12 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
 TEMPLATES_DIR = PROJECT_ROOT / "data" / "plan_templates"
 BUILTIN_ID = "builtin_hou_v3_9"
 

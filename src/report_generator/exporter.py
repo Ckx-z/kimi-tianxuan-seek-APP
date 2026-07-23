@@ -14,8 +14,13 @@ from docx.shared import Inches
 
 from utils.molecule_viz import png_temp_file
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-REPORTS_DIR = PROJECT_ROOT / "reports"
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
+REPORTS_DIR = runtime_config.user_app_root() / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 

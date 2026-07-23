@@ -28,3 +28,20 @@ def test_connection():
     from llm import client
     ok, msg = client.test_connection()
     return {"ok": ok, "message": msg}
+
+
+@router.get("/env-status")
+def env_status():
+    """运行环境能力总览（供前端设置页展示，不触发任何重活）。
+
+    返回 {tree, gnn, graphrag, llm}：各项为 "ok" 或
+    "disabled: <原因>"；llm 为 "configured"/"not_configured"。
+    """
+    from llm import client
+    try:
+        from src import runtime_config
+    except ImportError:  # src/ 直接上 sys.path 的兜底
+        import runtime_config  # type: ignore
+    status = runtime_config.capability_status()
+    status["llm"] = "configured" if client.is_configured() else "not_configured"
+    return status

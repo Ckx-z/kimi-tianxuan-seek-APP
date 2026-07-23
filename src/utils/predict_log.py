@@ -13,8 +13,13 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-LOG_PATH = PROJECT_ROOT / "data" / "prediction_log.jsonl"
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
+LOG_PATH = runtime_config.user_data_root() / "prediction_log.jsonl"
 
 SCHEMA_VERSION = 1
 

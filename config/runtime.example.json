@@ -1,0 +1,9 @@
+{
+  "_comment": "运行时环境配置模板（本文件入库，仅作示例）。复制为 config/runtime.local.json 并填写本机真实路径（该文件已 gitignore）。解析优先级：环境变量（COF_GRAPHRAG_PYTHON / COF_GNN_PYTHON / COF_APP_PYTHONW / COF_GNN_PROJECT_ROOT）> 本文件 > 自动探测 > 能力标记为不可用并优雅降级。所有字段均可省略，省略即走探测/降级。",
+  "pythons": {
+    "graphrag": "E:\\python3.12\\python.exe",
+    "gnn": "E:\\ANACONDA\\envs\\dphuanjing\\python.exe",
+    "app": "E:\\ANACONDA\\pythonw.exe"
+  },
+  "gnn_project_root": "C:\\Users\\ckx\\Desktop\\tianxuan seek"
+}

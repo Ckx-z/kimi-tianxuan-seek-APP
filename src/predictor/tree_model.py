@@ -24,9 +24,15 @@ from features.fingerprints import featurize_fingerprints
 from features.target_encoding import apply_film_rates
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
 MODELS_DIR = PROJECT_ROOT / "models"
-MODELS_DIR.mkdir(parents=True, exist_ok=True)
+if not runtime_config.is_frozen():
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _get_monomer_group(df: pd.DataFrame, group_by: str = "aldehyde") -> pd.Series:

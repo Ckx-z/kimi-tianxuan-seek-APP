@@ -25,8 +25,13 @@ from favorites import store as favorites_store
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RECORDS_DIR = PROJECT_ROOT / "data" / "rag_export" / "records"
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
+RECORDS_DIR = runtime_config.user_data_root() / "rag_export" / "records"
 
 SCHEMA_VERSION = "1.0"
 RECORD_TYPE = "experiment_record"

@@ -32,11 +32,17 @@ from src.recommend import plan_card, plan_templates
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SUGGESTIONS_DIR = PROJECT_ROOT / "data" / "rag_export" / "suggestions"
-RECORDS_DIR = PROJECT_ROOT / "data" / "rag_export" / "records"
-FAVORITES_DIR = PROJECT_ROOT / "data" / "favorites"
-PLANS_DIR = PROJECT_ROOT / "data" / "generated_plans"
+try:
+    from src import runtime_config
+except ImportError:
+    import runtime_config  # type: ignore
+
+PROJECT_ROOT = runtime_config.resource_root()
+_UD = runtime_config.user_data_root()
+SUGGESTIONS_DIR = _UD / "rag_export" / "suggestions"
+RECORDS_DIR = _UD / "rag_export" / "records"
+FAVORITES_DIR = _UD / "favorites"
+PLANS_DIR = _UD / "generated_plans"
 
 
 class AdoptError(Exception):

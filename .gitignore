@@ -108,3 +108,11 @@ data/generated_plans/*
 
 # 本地安全备份（ dated ）
 *.bak_*
+
+# 本机运行时环境覆盖（分发机路径配置，不入库）
+config/runtime.local.json
+
+# 打包产物（体积大，不入库，本地构建）
+dist-backend/
+webapp/release/
+cof-clean-test/
