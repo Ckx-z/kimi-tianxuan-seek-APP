@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * 紫金主题 design tokens
+ * 主紫：#6d28d9 系（皇家紫）；金色点缀：#d4af37 / #b8860b 系
+ * 亮色 / 暗色双套，通过 <html class="dark"> 切换
+ */
+@layer base {
+  :root {
+    --background: 270 20% 98.5%;
+    --foreground: 262 30% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 262 30% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 262 30% 14%;
+    /* 主紫 #6d28d9 */
+    --primary: 263 70% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 262 30% 94%;
+    --secondary-foreground: 263 60% 30%;
+    --muted: 262 20% 94%;
+    --muted-foreground: 262 10% 42%;
+    --accent: 262 40% 92%;
+    --accent-foreground: 263 60% 32%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 262 20% 88%;
+    --input: 262 20% 85%;
+    --ring: 263 70% 50%;
+    /* 金色点缀 #d4af37 */
+    --gold: 46 65% 52%;
+    --gold-foreground: 40 30% 12%;
+    --gold-muted: 46 45% 88%;
+    --radius: 0.625rem;
+    /* 侧栏（深紫底） */
+    --sidebar-background: 264 45% 16%;
+    --sidebar-foreground: 262 25% 88%;
+    --sidebar-primary: 263 70% 62%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 263 40% 24%;
+    --sidebar-accent-foreground: 46 65% 62%;
+    --sidebar-border: 263 35% 26%;
+    --sidebar-ring: 46 65% 52%;
+  }
+
+  .dark {
+    --background: 264 35% 8%;
+    --foreground: 262 20% 92%;
+    --card: 264 30% 12%;
+    --card-foreground: 262 20% 92%;
+    --popover: 264 30% 12%;
+    --popover-foreground: 262 20% 92%;
+    --primary: 263 75% 66%;
+    --primary-foreground: 264 40% 10%;
+    --secondary: 263 25% 20%;
+    --secondary-foreground: 262 25% 88%;
+    --muted: 263 22% 18%;
+    --muted-foreground: 262 12% 60%;
+    --accent: 263 30% 24%;
+    --accent-foreground: 262 30% 90%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 263 25% 24%;
+    --input: 263 25% 28%;
+    --ring: 263 75% 66%;
+    /* 暗色下金色提亮 */
+    --gold: 46 70% 60%;
+    --gold-foreground: 40 35% 10%;
+    --gold-muted: 46 30% 20%;
+    --sidebar-background: 265 50% 10%;
+    --sidebar-foreground: 262 22% 85%;
+    --sidebar-primary: 263 75% 66%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 263 35% 20%;
+    --sidebar-accent-foreground: 46 70% 65%;
+    --sidebar-border: 263 30% 22%;
+    --sidebar-ring: 46 70% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+/* 紫金渐变装饰条（Logo 区、标题装饰用） */
+@layer utilities {
+  .gradient-royal {
+    background-image: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--gold)));
+  }
+  .text-gradient-royal {
+    background-image: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--gold)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
