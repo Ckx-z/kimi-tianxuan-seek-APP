@@ -84,9 +84,10 @@ export function suggestIterate(
   return request('/iterate/suggest', { method: 'POST', body: payload, signal });
 }
 
-/** 建议列表 */
-export async function listSuggestions(signal?: AbortSignal): Promise<Suggestion[]> {
-  const data = await request<SuggestionsResp | Suggestion[]>('/iterate/suggestions', { signal });
+/** 建议列表（可选按收藏单体组过滤：每组只显示本组的迭代建议） */
+export async function listSuggestions(favoriteId?: string, signal?: AbortSignal): Promise<Suggestion[]> {
+  const q = favoriteId ? `?favorite_id=${encodeURIComponent(favoriteId)}` : '';
+  const data = await request<SuggestionsResp | Suggestion[]>(`/iterate/suggestions${q}`, { signal });
   return Array.isArray(data) ? data : (data.suggestions ?? []);
 }
 

@@ -4,7 +4,7 @@
  * - 点击卡片弹出详情 Dialog：单体信息 / 预测快照 / 文献列表 / 该收藏的实验记录简表
  * - 删除经 AlertDialog 确认后调用 DELETE /api/favorites/{id}
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { Trash2, BookOpen, FlaskConical } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,9 +40,23 @@ import {
   deleteFavorite,
   fetchRecordsByFavorite,
   type FavoriteItem,
+  type PredictionSnapshot,
   type RecordItem,
   type ReferenceItem,
 } from './api';
+// 只读复用查询打分页的结果组件与 API（不修改其文件），保证放大详情与查询打分页内容一致
+import ResultCard from '@/components/query/ResultCard';
+import MonomerPropsCard from '@/components/query/MonomerPropsCard';
+import PlanCardPanel from '@/components/query/PlanCardPanel';
+import {
+  fetchMonomerProps,
+  fetchPlanCard,
+  fetchPlanTemplates,
+  type MonomerProps,
+  type PlanCardData,
+  type PlanTemplateItem,
+  type PredictResult,
+} from '@/components/query/api';
 
 /** 截断 SMILES 显示 */
 function shortSmiles(s?: string, n = 42): string {
@@ -101,7 +115,54 @@ function ReferenceList({ refs }: { refs?: ReferenceItem[] }) {
   );
 }
 
-/** 收藏详情 Dialog */
+/** 单体 2D 结构图（/api/monomers/structure.svg，失败时静默隐藏） */
+function StructureImg({ smiles, label }: { smiles?: string; label: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!smiles || failed) return null;
+  return (
+    <img
+      src={`/api/monomers/structure.svg?smiles=${encodeURIComponent(smiles)}`}
+      alt={`${label}结构图`}
+      onError={() => setFailed(true)}
+      className="mt-2 h-28 w-full rounded-md border border-border bg-white object-contain dark:bg-white/95"
+    />
+  );
+}
+
+/** 收藏快照 → 查询打分页 ResultCard 的 PredictResult（口径对齐） */
+function snapshotToResult(p?: PredictionSnapshot | null): PredictResult | null {
+  if (!p) return null;
+  const oodRaw = p.ood;
+  const ood =
+    typeof oodRaw === 'string'
+      ? { level: oodRaw || 'none', reasons: [] as string[] }
+      : { level: oodRaw?.level ?? 'none', reasons: oodRaw?.reasons ?? [] };
+  const hasScore = typeof p.score === 'number';
+  const hasSub = typeof p.tree_score === 'number' || typeof p.gnn_score === 'number';
+  if (!hasScore && !hasSub && ood.level !== 'out') return null;
+  const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+  return {
+    score: num(p.score),
+    score_policy: p.score_policy ?? 'max_tree_gnn',
+    tree_score: num(p.tree_score),
+    tree_std: num(p.tree_std) ?? num(p.std),
+    tree_model_name: p.tree_model_name ?? p.arm ?? null,
+    tree_route: p.tree_route ?? null,
+    gnn_score: num(p.gnn_score),
+    gnn_std: num(p.gnn_std),
+    ood,
+  };
+}
+
+/** 单侧性质卡状态 */
+interface PropsState {
+  loading: boolean;
+  error: string | null;
+  data: MonomerProps | null;
+}
+const emptyProps: PropsState = { loading: false, error: null, data: null };
+
+/** 收藏详情 Dialog（与查询打分页结果内容一致：分数/OOD/结构图/性质卡/方案卡） */
 function FavoriteDetailDialog({
   fav,
   open,
@@ -113,8 +174,16 @@ function FavoriteDetailDialog({
 }) {
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [recLoading, setRecLoading] = useState(false);
+  const [aldProps, setAldProps] = useState<PropsState>(emptyProps);
+  const [amineProps, setAmineProps] = useState<PropsState>(emptyProps);
+  const [planCard, setPlanCard] = useState<PlanCardData | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<PlanTemplateItem[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templateId, setTemplateId] = useState('');
 
-  // 打开时拉取该收藏关联的实验记录
+  // 打开时拉取：实验记录 + 性质卡×2 + 方案卡模板/方案卡（与查询页联动口径一致）
   useEffect(() => {
     if (!open || !fav) return;
     let cancelled = false;
@@ -123,17 +192,83 @@ function FavoriteDetailDialog({
       .then((list) => !cancelled && setRecords(list))
       .catch(() => !cancelled && setRecords([]))
       .finally(() => !cancelled && setRecLoading(false));
+
+    const loadProps = (
+      smiles: string | undefined,
+      name: string | undefined,
+      setter: Dispatch<SetStateAction<PropsState>>,
+    ) => {
+      if (!smiles) {
+        setter(emptyProps);
+        return;
+      }
+      setter({ loading: true, error: null, data: null });
+      fetchMonomerProps(smiles, name ?? '')
+        .then((data) => !cancelled && setter({ loading: false, error: null, data }))
+        .catch((e) =>
+          !cancelled &&
+          setter({ loading: false, error: e instanceof Error ? e.message : '未知错误', data: null }),
+        );
+    };
+    loadProps(fav.aldehyde?.smiles, fav.aldehyde?.name, setAldProps);
+    loadProps(fav.amine?.smiles, fav.amine?.name, setAmineProps);
+
+    setTemplatesLoading(true);
+    fetchPlanTemplates()
+      .then((list) => !cancelled && setTemplates(list))
+      .catch(() => !cancelled && setTemplates([]))
+      .finally(() => !cancelled && setTemplatesLoading(false));
+
+    setTemplateId('');
+    if (fav.aldehyde?.smiles && fav.amine?.smiles) {
+      setPlanLoading(true);
+      setPlanError(null);
+      setPlanCard(null);
+      fetchPlanCard({
+        aldehyde_smiles: fav.aldehyde.smiles,
+        amine_smiles: fav.amine.smiles,
+        ald_name: fav.aldehyde.name ?? '',
+        amine_name: fav.amine.name ?? '',
+        template_id: null,
+      })
+        .then((card) => !cancelled && setPlanCard(card))
+        .catch((e) => !cancelled && setPlanError(e instanceof Error ? e.message : '未知错误'))
+        .finally(() => !cancelled && setPlanLoading(false));
+    }
     return () => {
       cancelled = true;
     };
   }, [open, fav]);
 
+  /** 切换模板 → 重新生成方案卡（与查询页一致） */
+  const handleTemplateChange = (id: string) => {
+    setTemplateId(id);
+    if (!fav?.aldehyde?.smiles || !fav?.amine?.smiles) return;
+    setPlanLoading(true);
+    setPlanError(null);
+    fetchPlanCard({
+      aldehyde_smiles: fav.aldehyde.smiles,
+      amine_smiles: fav.amine.smiles,
+      ald_name: fav.aldehyde.name ?? '',
+      amine_name: fav.amine.name ?? '',
+      template_id: id || null,
+    })
+      .then((card) => setPlanCard(card))
+      .catch((e) => setPlanError(e instanceof Error ? e.message : '未知错误'))
+      .finally(() => setPlanLoading(false));
+  };
+
+  const handleTemplateUploaded = (tpl: PlanTemplateItem) => {
+    setTemplates((prev) => [...prev.filter((t) => t.id !== tpl.id), tpl]);
+    handleTemplateChange(tpl.id);
+  };
+
   if (!fav) return null;
-  const p = fav.latest_prediction;
+  const result = snapshotToResult(fav.latest_prediction);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-gradient-royal">
             {fav.aldehyde?.name || '未知醛'} × {fav.amine?.name || '未知胺'}
@@ -144,7 +279,7 @@ function FavoriteDetailDialog({
         </DialogHeader>
 
         <div className="space-y-5">
-          {/* 单体信息 */}
+          {/* 单体信息（含 2D 结构图） */}
           <section>
             <h3 className="mb-2 text-sm font-semibold text-foreground">单体信息</h3>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -161,6 +296,7 @@ function FavoriteDetailDialog({
                     {m?.smiles || '—'}
                   </div>
                   {m?.cas && <div className="mt-1 text-xs text-muted-foreground">CAS: {m.cas}</div>}
+                  <StructureImg smiles={m?.smiles} label={label} />
                 </div>
               ))}
             </div>
@@ -171,28 +307,51 @@ function FavoriteDetailDialog({
             )}
           </section>
 
-          {/* 预测快照 */}
+          {/* 打分结果（复用查询页 ResultCard：主分数 + 树/GNN 分量 + OOD 横幅） */}
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">最新预测快照</h3>
-            {p && typeof p.score === 'number' ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {(
-                  [
-                    ['综合分', p.score?.toFixed(3)],
-                    ['树模型', typeof p.tree_score === 'number' ? p.tree_score.toFixed(3) : '—'],
-                    ['GNN', typeof p.gnn_score === 'number' ? p.gnn_score.toFixed(3) : '—'],
-                    ['不确定度', typeof p.tree_std === 'number' ? `±${p.tree_std.toFixed(3)}` : '—'],
-                  ] as const
-                ).map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-border bg-muted/40 p-3 text-center">
-                    <div className="text-xs text-muted-foreground">{label}</div>
-                    <div className="mt-1 text-lg font-semibold text-primary">{value}</div>
-                  </div>
-                ))}
-              </div>
+            {result ? (
+              <ResultCard result={result} loading={false} />
             ) : (
-              <p className="text-sm text-muted-foreground">尚未打分，可在查询页对该组合进行预测。</p>
+              <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                尚未打分，可在查询页对该组合进行预测；打分后此处显示与查询打分页一致的完整结果。
+              </div>
             )}
+          </section>
+
+          {/* 单体性质卡（复用查询页 MonomerPropsCard：RDKit facts + LLM 解读） */}
+          <section>
+            <h3 className="mb-2 text-sm font-semibold text-foreground">单体性质</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <MonomerPropsCard
+                title="醛单体性质"
+                name={fav.aldehyde?.name || undefined}
+                loading={aldProps.loading}
+                error={aldProps.error}
+                props={aldProps.data}
+              />
+              <MonomerPropsCard
+                title="胺单体性质"
+                name={fav.amine?.name || undefined}
+                loading={amineProps.loading}
+                error={amineProps.error}
+                props={amineProps.data}
+              />
+            </div>
+          </section>
+
+          {/* 方案卡（复用查询页 PlanCardPanel，可切换模板） */}
+          <section>
+            <PlanCardPanel
+              card={planCard}
+              loading={planLoading}
+              error={planError}
+              templates={templates}
+              templatesLoading={templatesLoading}
+              templateId={templateId}
+              onTemplateChange={handleTemplateChange}
+              onTemplateUploaded={handleTemplateUploaded}
+              disabled={!fav.aldehyde?.smiles || !fav.amine?.smiles}
+            />
           </section>
 
           {/* 文献列表 */}

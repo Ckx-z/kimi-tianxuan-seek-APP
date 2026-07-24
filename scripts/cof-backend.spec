@@ -71,6 +71,12 @@ hiddenimports = [
     # FastAPI 应用本体（uvicorn.run("api.main:app") 为字符串引用，
     # 分析器看不到，显式指定后其静态 import 会级联打包 src 全栈）
     "api.main",
+    # frozen 下 sys.path[0]=_MEIPASS/src（api/deps.py 插入），其 finder 前缀为
+    # "src"，惰性导入的 recommend.* 子模块会被解析为 src.recommend.*；
+    # 缺哪个就在 frozen 下 ModuleNotFoundError（源码模式无此问题）。
+    # 此处显式补齐 src.* 命名空间变体。
+    "recommend.monomer_props",
+    "src.recommend.monomer_props",
 ]
 
 a = Analysis(

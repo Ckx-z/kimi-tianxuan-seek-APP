@@ -67,7 +67,7 @@ export default function RecordForm({ favorites, favoriteId, onFavoriteChange, on
   const [strength, setStrength] = useState('');
   const [operator, setOperator] = useState('');
   const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<'draft' | 'final' | null>(null);
   /** 编号为空的前端拦截提示 */
   const [noError, setNoError] = useState(false);
 
@@ -100,10 +100,10 @@ export default function RecordForm({ favorites, favoriteId, onFavoriteChange, on
   const setCond = (key: string, value: string) =>
     setConditions((prev) => ({ ...prev, [key]: value }));
 
-  /** 提交保存 */
-  const handleSubmit = async () => {
-    // 实验编号必填拦截
-    if (!experimentNo.trim()) {
+  /** 提交保存；draft=true 走草稿暂存（宽松校验，编号可留空） */
+  const handleSubmit = async (draft: boolean) => {
+    // 实验编号必填拦截（仅正式保存）
+    if (!draft && !experimentNo.trim()) {
       setNoError(true);
       toast.error('请填写实验编号（必填）');
       return;
@@ -112,25 +112,28 @@ export default function RecordForm({ favorites, favoriteId, onFavoriteChange, on
       toast.error('请选择关联收藏，或开启「游离记录」并填写醛/胺 SMILES');
       return;
     }
-    if (freeMode && (!aldehydeSmiles.trim() || !amineSmiles.trim())) {
+    if (!draft && freeMode && (!aldehydeSmiles.trim() || !amineSmiles.trim())) {
       toast.error('游离记录需填写醛单体与胺单体 SMILES');
       return;
     }
-    setSaving(true);
+    setSaving(draft ? 'draft' : 'final');
     try {
       const rec = await createRecord({
         favorite_id: freeMode ? null : favoriteId,
         aldehyde_smiles: freeMode ? aldehydeSmiles.trim() : '',
         amine_smiles: freeMode ? amineSmiles.trim() : '',
         conditions,
-        outcome,
+        outcome: draft && !outcome ? '' : outcome,
         strength: strength.trim(),
         notes: notes.trim(),
         operator: operator.trim(),
         experiment_no: experimentNo.trim(),
+        status: draft ? 'draft' : 'final',
       });
-      // 重复编号警告：金色警示（后端不落盘拦截，仅提示）
-      if (rec.duplicate_experiment_no) {
+      if (draft) {
+        toast.success('草稿已暂存，可在右侧时间线继续编辑');
+      } else if (rec.duplicate_experiment_no) {
+        // 重复编号警告：金色警示（后端不落盘拦截，仅提示）
         toast.warning(`已保存，但注意：该收藏下实验编号「${rec.experiment_no}」已存在（重复编号警告）`, {
           duration: 8000,
         });
@@ -142,7 +145,7 @@ export default function RecordForm({ favorites, favoriteId, onFavoriteChange, on
     } catch {
       // 错误提示已由 api 封装弹出
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   };
 
@@ -279,10 +282,22 @@ export default function RecordForm({ favorites, favoriteId, onFavoriteChange, on
         />
       </div>
 
-      <Button onClick={handleSubmit} disabled={saving} className="w-full">
-        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-        保存记录
-      </Button>
+      {/* 保存按钮：正式保存（完整校验）+ 草稿暂存（宽松校验） */}
+      <div className="flex gap-3">
+        <Button onClick={() => void handleSubmit(false)} disabled={saving !== null} className="flex-1">
+          {saving === 'final' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          保存记录
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => void handleSubmit(true)}
+          disabled={saving !== null}
+          className="flex-1"
+        >
+          {saving === 'draft' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          暂时保存为草稿
+        </Button>
+      </div>
     </div>
   );
 }

@@ -137,6 +137,84 @@ def _path_of(fav_id: str) -> Path | None:
     return path if path.exists() else None
 
 
+# ---------------------------------------------------------------- 预测快照回填（页① React 链路兼容）
+
+def _prediction_log_path() -> Path:
+    """预测日志路径：与 FAVORITES_DIR 同级的 prediction_log.jsonl。
+
+    由 FAVORITES_DIR 推导而非重新算 user_data_root，保证测试 monkeypatch
+    FAVORITES_DIR 到 tmp 时读取的日志同样隔离。
+    """
+    return FAVORITES_DIR.parent / "prediction_log.jsonl"
+
+
+def _snapshot_from_log(ald_smiles: str, amine_smiles: str) -> dict | None:
+    """从 prediction_log.jsonl 反查该单体对最近一次预测，组装快照。
+
+    React/FastAPI 链路打分只写 prediction_log（不回写收藏），导致收藏页误显
+    「未打分」；此函数按 RDKit 规范化 SMILES 匹配日志，取最后一条（日志按时间
+    追加，越靠后越新）。返回 latest_prediction 同口径 dict；无命中返回 None。
+    """
+    ca, cm = _canonical(ald_smiles), _canonical(amine_smiles)
+    if not ca or not cm:
+        return None
+    path = _prediction_log_path()
+    if not path.exists():
+        return None
+    best: dict | None = None
+    try:
+        with path.open(encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                if not isinstance(rec, dict) or rec.get("type") != "prediction":
+                    continue
+                if _canonical(str(rec.get("ald_smiles") or "")) == ca and \
+                        _canonical(str(rec.get("amine_smiles") or "")) == cm:
+                    best = rec
+    except Exception as exc:
+        logger.warning("prediction_log 读取失败: %s", exc)
+        return None
+    if best is None:
+        return None
+    snap = {
+        "score": best.get("score"),
+        "std": best.get("std"),
+        "arm": best.get("arm") or "",
+        "ood": best.get("ood_level") or "none",
+        "date": str(best.get("timestamp") or ""),
+    }
+    for k, src in (("score_policy", "score_policy"),
+                   ("tree_score", "tree_score"),
+                   ("gnn_score", "gnn_score")):
+        if best.get(src) is not None:
+            snap[k] = best[src]
+    return snap
+
+
+def _ensure_snapshot(fav: dict) -> dict:
+    """latest_prediction 无有效分数时从预测日志回填（读时兼容旧数据，同时落盘）。"""
+    p = fav.get("latest_prediction")
+    if isinstance(p, dict) and p.get("score") is not None:
+        return fav
+    snap = _snapshot_from_log(
+        str((fav.get("aldehyde") or {}).get("smiles") or ""),
+        str((fav.get("amine") or {}).get("smiles") or ""))
+    if snap is None:
+        return fav
+    fav["latest_prediction"] = snap
+    try:
+        _write(fav)
+    except Exception as exc:  # 回填落盘失败不影响读取
+        logger.warning("快照回填落盘失败 %s: %s", fav.get("id"), exc)
+    return fav
+
+
 # ---------------------------------------------------------------- 文献自动匹配
 
 def auto_match_references(
@@ -252,13 +330,14 @@ def list_favorites() -> list[dict]:
         if fav and _ID_RE.match(str(fav.get("id", ""))):
             favs.append(fav)
     favs.sort(key=lambda f: str(f.get("created_at", "")), reverse=True)
-    return favs
+    return [_ensure_snapshot(f) for f in favs]
 
 
 def get_favorite(fav_id: str) -> dict | None:
     """按 id 取收藏条目；不存在/损坏返回 None。"""
     path = _path_of(fav_id)
-    return _read_file(path) if path else None
+    fav = _read_file(path) if path else None
+    return _ensure_snapshot(fav) if fav else None
 
 
 def update_favorite(fav_id: str, **fields) -> dict:
@@ -306,6 +385,29 @@ def update_prediction_snapshot(fav_id: str, prediction: dict) -> dict:
         if prediction.get(k) is not None:
             fav["latest_prediction"][k] = prediction[k]
     return _write(fav)
+
+
+def update_snapshot_for_pair(
+    aldehyde_smiles: str, amine_smiles: str, prediction: dict
+) -> int:
+    """FastAPI /api/predict 打分后：按单体对回写所有匹配收藏的快照。
+
+    同一对单体可能被重复收藏（多条 fav_*），逐条回写。返回更新条数。
+    任何单条失败不影响其余，不抛异常。
+    """
+    ca, cm = _canonical(aldehyde_smiles), _canonical(amine_smiles)
+    if not ca or not cm:
+        return 0
+    n = 0
+    for fav in list_favorites():
+        try:
+            if _canonical(str((fav.get("aldehyde") or {}).get("smiles") or "")) == ca \
+                    and _canonical(str((fav.get("amine") or {}).get("smiles") or "")) == cm:
+                update_prediction_snapshot(str(fav.get("id")), prediction)
+                n += 1
+        except Exception as exc:
+            logger.warning("按单体对回写快照失败 %s: %s", fav.get("id"), exc)
+    return n
 
 
 def add_reference(

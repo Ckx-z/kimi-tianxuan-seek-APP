@@ -51,6 +51,22 @@ export interface PredictResult {
   gnn_score: number | null;
   gnn_std: number | null;
   ood: { level: string; reasons: string[] };
+  explanation?: ScoreExplanation;
+}
+
+/** 打分理由（SHAP 归因或全局特征重要性回退） */
+export interface ScoreExplanation {
+  method: 'shap' | 'global_importance' | 'none';
+  items: {
+    feature: string;
+    label: string;
+    value?: number | string | null;
+    weight: number;
+    direction?: string;
+  }[];
+  route_reason?: string;
+  dominant_side?: string;
+  note?: string;
 }
 
 /** 内置单体库条目（data/builtin_monomers.json，含 name/role/cas/smiles） */
@@ -161,3 +177,45 @@ export const createFavorite = (payload: {
   ald_name?: string;
   amine_name?: string;
 }) => request('/favorites', { method: 'POST', body: payload, silent: true });
+
+// ---------- 收藏状态 / 取消收藏 / 查询历史 ----------
+
+/** 收藏条目（仅取查询页所需字段） */
+export interface FavoriteItem {
+  id: string;
+  aldehyde_smiles: string;
+  amine_smiles: string;
+}
+
+/** 收藏列表（静默，失败时调用方自行降级） */
+export const fetchFavorites = async (): Promise<FavoriteItem[]> => {
+  const data = await request<{ favorites: FavoriteItem[] }>('/favorites', { silent: true });
+  return data.favorites ?? [];
+};
+
+/** 取消收藏 */
+export const deleteFavorite = (id: string) =>
+  request<void>(`/favorites/${id}`, { method: 'DELETE' });
+
+/** 查询历史条目（data/prediction_log.jsonl 的 prediction 记录） */
+export interface PredictHistoryEntry {
+  timestamp?: string;
+  ald_smiles: string;
+  amine_smiles: string;
+  score: number | null;
+  tree_score?: number | null;
+  gnn_score?: number | null;
+  std?: number | null;
+  arm?: string | null;
+  route?: string | null;
+  ood_level?: string;
+  score_policy?: string;
+  source?: string;
+}
+
+/** 查询历史（新→旧） */
+export const fetchPredictHistory = async (limit = 50): Promise<PredictHistoryEntry[]> => {
+  const data = await request<{ history: PredictHistoryEntry[] }>(
+    `/predict/history?limit=${limit}`, { silent: true });
+  return data.history ?? [];
+};

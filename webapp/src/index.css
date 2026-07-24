@@ -21,16 +21,18 @@
     --secondary: 262 30% 94%;
     --secondary-foreground: 263 60% 30%;
     --muted: 262 20% 94%;
-    --muted-foreground: 262 10% 42%;
+    /* 浅色模式次要文字调深（原 42% 对比度不足，32% 约 7:1） */
+    --muted-foreground: 262 14% 32%;
     --accent: 262 40% 92%;
     --accent-foreground: 263 60% 32%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 262 20% 88%;
-    --input: 262 20% 85%;
+    /* 浅色模式边框/输入框边框调深，避免看不清 */
+    --border: 262 18% 78%;
+    --input: 262 18% 72%;
     --ring: 263 70% 50%;
-    /* 金色点缀 #d4af37 */
-    --gold: 46 65% 52%;
+    /* 金色点缀 #d4af37；浅色下作文字用时调深为暗金 #b8860b 系保证可读 */
+    --gold: 45 75% 40%;
     --gold-foreground: 40 30% 12%;
     --gold-muted: 46 45% 88%;
     --radius: 0.625rem;

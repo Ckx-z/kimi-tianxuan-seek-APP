@@ -87,12 +87,12 @@ export default function Iterate() {
     listRecords(favId).then(setRecords).catch(() => setRecords([]));
   }, [favId]);
 
-  // 刷新建议与方案列表
+  // 刷新建议与方案列表（建议按当前选中的收藏单体组过滤，切组即切换显示）
   const refreshLists = useCallback(() => {
     setListError(false);
-    listSuggestions().then(setSuggestions).catch(() => { setSuggestions([]); setListError(true); });
+    listSuggestions(favId || undefined).then(setSuggestions).catch(() => { setSuggestions([]); setListError(true); });
     listPlans().then(setPlans).catch(() => setPlans([]));
-  }, []);
+  }, [favId]);
   useEffect(refreshLists, [refreshLists]);
 
   // 生成迭代建议（异步体验：转圈 + 提示，完成 toast + 刷新列表）

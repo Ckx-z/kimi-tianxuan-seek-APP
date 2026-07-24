@@ -32,11 +32,27 @@ class RecordCreate(BaseModel):
     aldehyde_smiles: str = ""
     amine_smiles: str = ""
     conditions: dict = Field(default_factory=dict)
-    outcome: str = Field(..., description="film | partial | failed")
+    outcome: str = Field("", description="film | partial | failed（draft 可留空）")
     strength: str = ""
     notes: str = ""
     operator: str = ""
-    experiment_no: str = Field(..., description="实验编号（必填）")
+    experiment_no: str = Field("", description="实验编号（final 必填，draft 可留空）")
+    status: str = Field("final", description="draft 草稿暂存（宽松校验）| final 正式")
+    process_notes: str = Field("", description="完整实验流程（长文本）")
+    timeline: list[dict] = Field(default_factory=list, description="时间点记录条目")
+
+
+class RecordUpdate(BaseModel):
+    """草稿继续编辑 / 转正式 / 正式记录更新流程与时间线（全字段可选）。"""
+    status: str | None = Field(None, description="draft | final（final 走完整校验）")
+    experiment_no: str | None = None
+    outcome: str | None = None
+    strength: str | None = None
+    notes: str | None = None
+    operator: str | None = None
+    process_notes: str | None = None
+    conditions: dict | None = None
+    timeline: list[dict] | None = None
 
 
 class PlanCardRequest(BaseModel):

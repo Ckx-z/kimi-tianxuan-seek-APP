@@ -20,6 +20,48 @@ from pathlib import Path
 
 SECRETS_PATH = Path(__file__).resolve().parent.parent / 'config' / 'secrets.local.json'
 
+# 设置页统一配置（src/llm/client.py 的 save_settings 落盘处）：/api/llm/env-status
+# 的 llm=configured 口径以此为准。迭代链路必须读同一文件，否则设置页配好 LLM、
+# 迭代页却走不到同一配置而误报「LLM 暂不可用」。
+def _unified_settings_paths():
+    """llm_settings.local.json 候选位置（COF_DATA_DIR > %APPDATA% frozen > 项目根）。"""
+    paths = []
+    env = os.environ.get('COF_DATA_DIR', '').strip()
+    if env:
+        paths.append(Path(env) / 'config' / 'llm_settings.local.json')
+    appdata = os.environ.get('APPDATA', '').strip()
+    if appdata:
+        paths.append(Path(appdata) / 'COF-Film-Recommend' / 'config'
+                     / 'llm_settings.local.json')
+    paths.append(Path(__file__).resolve().parent.parent.parent / 'config'
+                 / 'llm_settings.local.json')
+    return paths
+
+
+def get_settings_page_config():
+    """读设置页统一 LLM 配置；未配置返回 None。
+
+    返回与 get_provider_config 同形的 dict（provider='settings_page'），
+    作为 chat_completion 的最高优先级端点——用户在设置页显式配置并测试通过的
+    LLM 应优先生效。
+    """
+    for p in _unified_settings_paths():
+        try:
+            if p.is_file():
+                d = json.loads(p.read_text(encoding='utf-8'))
+                base_url = str(d.get('base_url') or '').strip()
+                api_key = str(d.get('api_key') or '').strip()
+                if base_url and api_key:
+                    return {
+                        'provider': 'settings_page',
+                        'base_url': base_url,
+                        'chat_model': str(d.get('model') or '').strip(),
+                        'api_key': api_key,
+                    }
+        except Exception:
+            continue
+    return None
+
 # 环境变量名 -> secrets.local.json 中的 (provider, 字段)
 _DEFAULTS = {
     'minimax': {
@@ -137,10 +179,19 @@ def chat_completion(messages, model=None, provider=None, max_tokens=8000,
     """
     import requests
 
-    order = [provider] if provider else get_fallback_order()
+    if provider:
+        candidates = [get_provider_config(provider)]
+    else:
+        # 设置页统一配置优先（与 /api/llm/env-status 口径对齐），
+        # 未配置或调用失败再按 fallback_order 回落 minimax/longcat
+        sp = get_settings_page_config()
+        candidates = ([sp] if sp else []) + \
+            [get_provider_config(n) for n in get_fallback_order()]
     last_err = None
-    for name in order:
-        cfg = get_provider_config(name)
+    for cfg in candidates:
+        if cfg is None:
+            continue
+        name = cfg.get('provider') or 'unknown'
         if not cfg.get('api_key'):
             last_err = RuntimeError(f'{name} API key 未配置（env 或 secrets.local.json）')
             continue

@@ -58,12 +58,18 @@ export interface ReferenceItem {
 
 /** 预测快照（latest_prediction，结构与 /api/predict 响应一致） */
 export interface PredictionSnapshot {
-  score?: number;
+  score?: number | null;
   score_policy?: string;
-  tree_score?: number;
-  gnn_score?: number;
-  tree_std?: number;
-  ood?: { level?: string; reasons?: string[] };
+  tree_score?: number | null;
+  gnn_score?: number | null;
+  tree_std?: number | null;
+  std?: number | null;
+  arm?: string;
+  gnn_std?: number | null;
+  tree_model_name?: string | null;
+  tree_route?: string | null;
+  ood?: { level?: string; reasons?: string[] } | string;
+  date?: string;
   [key: string]: unknown;
 }
 

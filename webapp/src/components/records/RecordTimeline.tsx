@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Maximize2, RefreshCw, Trash2 } from 'lucide-react';
+import { Loader2, Maximize2, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +29,8 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import DraftEditDialog from './DraftEditDialog';
+import ProcessPanel from './ProcessPanel';
 import { deleteRecord, type RecordItem } from './api';
 
 /** conditions 九键中文名 */
@@ -44,11 +46,12 @@ const CONDITION_LABELS: Record<string, string> = {
   addition_order: '加料顺序',
 };
 
-/** 结果徽章配置：成膜紫 / 部分金 / 失败灰 */
+/** 结果徽章配置：成膜紫 / 部分金 / 失败灰 / 未定（草稿留空） */
 const OUTCOME_META: Record<string, { label: string; className: string }> = {
   film: { label: '成膜', className: 'bg-primary text-primary-foreground' },
   partial: { label: '部分成膜', className: 'bg-gold text-gold-foreground' },
   failed: { label: '失败', className: 'bg-muted text-muted-foreground' },
+  '': { label: '未定', className: 'bg-muted text-muted-foreground' },
 };
 
 export interface RecordTimelineProps {
@@ -116,6 +119,8 @@ export default function RecordTimeline({
 }: RecordTimelineProps) {
   /** 放大详情的记录 */
   const [detailRec, setDetailRec] = useState<RecordItem | null>(null);
+  /** 继续编辑的草稿 */
+  const [editingRec, setEditingRec] = useState<RecordItem | null>(null);
   /** 待删除确认的记录 */
   const [deletingRec, setDeletingRec] = useState<RecordItem | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -187,14 +192,34 @@ export default function RecordTimeline({
         <div className="space-y-3">
           {[...records].reverse().map((rec) => {
             const meta = OUTCOME_META[rec.outcome] ?? OUTCOME_META.failed;
+            const isDraft = rec.status === 'draft';
             return (
-              <div key={rec.record_id} className="rounded-xl border border-border bg-card p-4">
+              <div
+                key={rec.record_id}
+                className={
+                  isDraft
+                    ? 'rounded-xl border border-dashed border-gold/60 bg-card p-4'
+                    : 'rounded-xl border border-border bg-card p-4'
+                }
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm text-muted-foreground">{rec.date}</span>
                   <span className="font-medium text-foreground">{pairLabel(rec)}</span>
                   <Badge className={meta.className}>{meta.label}</Badge>
-                  <span className="text-xs text-muted-foreground">编号 {rec.experiment_no}</span>
+                  {isDraft && (
+                    <Badge variant="outline" className="border-gold/60 text-gold-foreground">
+                      草稿
+                    </Badge>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    编号 {rec.experiment_no || '（未填写）'}
+                  </span>
                   <div className="ml-auto flex gap-1">
+                    {isDraft && (
+                      <Button variant="ghost" size="sm" onClick={() => setEditingRec(rec)}>
+                        <Pencil className="mr-1 h-3.5 w-3.5" /> 继续编辑
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => setDetailRec(rec)}>
                       <Maximize2 className="mr-1 h-3.5 w-3.5" /> 放大
                     </Button>
@@ -223,7 +248,12 @@ export default function RecordTimeline({
             <>
               <DialogHeader>
                 <DialogTitle className="text-xl">
-                  实验记录 {detailRec.experiment_no}
+                  实验记录 {detailRec.experiment_no || '（未填编号）'}
+                  {detailRec.status === 'draft' && (
+                    <Badge variant="outline" className="ml-2 border-gold/60 text-gold-foreground">
+                      草稿
+                    </Badge>
+                  )}
                 </DialogTitle>
                 <DialogDescription>
                   {detailRec.date}｜{detailRec.record_id}
@@ -284,11 +314,28 @@ export default function RecordTimeline({
                       : ''}
                   </div>
                 )}
+                {/* 实验过程时间线：完整流程 + 时间点记录（可编辑） */}
+                <ProcessPanel
+                  rec={detailRec}
+                  onChanged={(updated) => {
+                    setDetailRec(updated);
+                    onRefresh();
+                  }}
+                />
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 草稿继续编辑 Dialog */}
+      {editingRec && (
+        <DraftEditDialog
+          rec={editingRec}
+          onClose={() => setEditingRec(null)}
+          onSaved={onRefresh}
+        />
+      )}
 
       {/* 删除确认 AlertDialog */}
       <AlertDialog open={deletingRec !== null} onOpenChange={(open) => !open && setDeletingRec(null)}>

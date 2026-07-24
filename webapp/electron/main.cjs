@@ -13,7 +13,7 @@
  *      只杀自己 spawn 的 PID，不碰其它用户进程）
  */
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const { spawn, execSync } = require('child_process');
 const net = require('net');
 const http = require('http');
@@ -28,6 +28,74 @@ const PREFERRED_PORT = 18765;
 let backendProc = null;
 let backendPort = null;
 let mainWindow = null;
+
+// ── 防多开：单实例锁 ─────────────────────────────────────────
+// 连续双击桌面图标时，第二个实例直接退出；已有实例收到
+// second-instance 事件后 restore + focus 主窗口。
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  console.log('[electron] 已有实例在运行，本实例退出');
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
+// ── 自动更新（electron-updater + GitHub Releases）────────────
+// 仅打包后生效；检查 GitHub Releases（Ckx-z/kimi-tianxuan-seek-APP），
+// 有新版本时弹窗询问，确认后下载，下载完成提示重启安装。
+function setupAutoUpdater() {
+  if (!app.isPackaged) {
+    console.log('[electron] dev 模式，跳过自动更新检查');
+    return;
+  }
+  let autoUpdater;
+  try {
+    ({ autoUpdater } = require('electron-updater'));
+  } catch (e) {
+    console.warn('[electron] electron-updater 不可用，跳过自动更新:', e.message);
+    return;
+  }
+  autoUpdater.autoDownload = false; // 用户确认后再下载
+  autoUpdater.on('update-available', (info) => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: '发现新版本',
+      message: `发现新版本 v${info.version}`,
+      detail: '是否立即下载更新？下载完成后会提示重启安装。',
+      buttons: ['立即下载', '稍后'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.downloadUpdate();
+    }).catch(() => {});
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: '更新已就绪',
+      message: `新版本 v${info.version} 已下载完成`,
+      detail: '重启应用以完成安装。是否现在重启？',
+      buttons: ['重启安装', '稍后'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.quitAndInstall();
+    }).catch(() => {});
+  });
+  autoUpdater.on('error', (e) => {
+    // 未发布 Release / 网络问题时静默记录，不打扰用户
+    console.warn('[electron] 自动更新检查失败:', e.message || e);
+  });
+  autoUpdater.checkForUpdates().catch((e) => {
+    console.warn('[electron] 自动更新检查失败:', e.message || e);
+  });
+}
 
 /** dev: 返回 python 命令；prod: 优先同目录 backend exe，缺失时回退 python 占位 */
 function resolveBackendCommand(port) {
@@ -147,9 +215,12 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // 未拿到单实例锁的第二实例已在 app.quit() 路径上，不再启动后端
+  if (!gotSingleInstanceLock) return;
   try {
     await startBackend();
     createWindow();
+    setupAutoUpdater();
   } catch (e) {
     console.error('[electron] 启动失败:', e);
     killBackend();

@@ -166,8 +166,10 @@ def generate_narrative(smiles: str, name: str, facts: dict) -> str | None:
     if llm is None:
         return None
     try:
+        # longcat 为推理型模型，推理过程会大量消耗 max_tokens；3000 常被推理
+        # 吃光导致 content 为空、性质卡解读生成失败，故给到 8000
         text = llm.chat_completion(
-            _build_prompt(canon, name, facts), max_tokens=3000, temperature=0.3
+            _build_prompt(canon, name, facts), max_tokens=8000, temperature=0.3
         )
     except Exception as exc:
         logger.warning("LLM 性质解读调用失败: %s", exc)
