@@ -116,3 +116,6 @@ config/runtime.local.json
 dist-backend/
 webapp/release/
 cof-clean-test/
+
+# 桌面快捷方式（本机文件，不入库）
+*.lnk
