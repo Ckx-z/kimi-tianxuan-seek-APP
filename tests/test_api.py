@@ -477,3 +477,37 @@ def test_monomer_props_batch_partial_invalid():
     assert "error" not in ok
     assert ok["facts"]["mw"] > 90
     assert "非法 SMILES" in bad["error"]
+
+
+# ---------------------------------------------------------------------------
+# CAS 解析端点（四路链：内置库→缓存→PubChem→LLM 兜底）
+# ---------------------------------------------------------------------------
+
+def test_resolve_cas_builtin_hit():
+    """命中内置库（TAPT 14544-47-9）→ 200 + smiles/source=builtin。"""
+    r = client.get("/api/monomers/resolve-cas", params={"cas": "14544-47-9"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["source"] == "builtin"
+    assert data["smiles"]
+    assert "N" in data["smiles"]  # TAPT 三氨基三嗪含氮
+
+
+def test_resolve_cas_invalid_format():
+    """非法 CAS 格式 → 400。"""
+    for bad in ("not-a-cas", "14544479", "", "12-3-4"):
+        r = client.get("/api/monomers/resolve-cas", params={"cas": bad})
+        assert r.status_code == 400, bad
+        assert r.json()["detail"]
+
+
+def test_resolve_cas_not_found(monkeypatch):
+    """四路均未命中 → 404 友好 detail（断 PubChem/LLM 兜底，避免联网）。"""
+    from src.utils import cas_lookup
+    monkeypatch.setattr(cas_lookup, "_fetch_pubchem", lambda cas: None)
+    monkeypatch.setattr(cas_lookup, "_fetch_llm", lambda cas: None)
+    monkeypatch.setattr(cas_lookup, "CACHE_PATH",
+                        cas_lookup.CACHE_PATH.parent / "__nope__.json")
+    r = client.get("/api/monomers/resolve-cas", params={"cas": "999-99-9"})
+    assert r.status_code == 404
+    assert "999-99-9" in r.json()["detail"]

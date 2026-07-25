@@ -118,6 +118,34 @@ def dimer_structure(ald: str, amine: str, w: int = 600, h: int = 300):
     return Response(content=drawer.GetDrawingText(), media_type="image/svg+xml")
 
 
+@router.get("/resolve-cas")
+def resolve_cas_endpoint(cas: str):
+    """CAS 号 → SMILES 解析（四路链：内置库→缓存→PubChem→LLM 兜底）。
+
+    浏览器直连 PubChem 在国内不可达，前端改走本端点由后端解析。
+    命中返回 {smiles, name, source}；格式非法 400；四路未命中 404。
+    """
+    cas = (cas or "").strip()
+    if not cas:
+        raise HTTPException(400, "cas 不能为空")
+    try:
+        from src.utils.cas_lookup import is_valid_cas, resolve_cas
+    except ImportError:
+        from utils.cas_lookup import is_valid_cas, resolve_cas  # type: ignore
+    if not is_valid_cas(cas):
+        raise HTTPException(
+            400, f"非法 CAS 号格式（应为 数字-数字-数字，如 100-52-7）: {cas!r}"
+        )
+    hit = resolve_cas(cas)
+    if hit is None:
+        raise HTTPException(
+            404,
+            f"未找到 CAS「{cas}」对应的化合物（内置库 / 缓存 / PubChem / LLM 均未命中）",
+        )
+    return {"smiles": hit["smiles"], "name": hit.get("name", ""),
+            "source": hit.get("source", "")}
+
+
 @router.get("/props")
 def monomer_props(smiles: str, name: str = ""):
     smiles = smiles.strip()

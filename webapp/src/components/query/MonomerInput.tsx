@@ -32,20 +32,51 @@ interface Props {
   disabled?: boolean;
 }
 
-/** 调 PubChem PUG REST 将 CAS/名称解析为 Canonical SMILES（CORS 开放，浏览器直连） */
-async function resolveCasToSmiles(cas: string): Promise<string> {
-  const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cas)}/property/CanonicalSMILES/JSON`;
+/** CAS 号格式：2-7 位数字 - 2 位数字 - 1 位校验数字 */
+const CAS_RE = /^\d{2,7}-\d{2}-\d$/;
+
+/** CAS 号 → 后端四路解析链（内置库→缓存→PubChem→LLM 兜底），区分「未找到」与「服务不可用」 */
+async function resolveCasViaBackend(cas: string): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/monomers/resolve-cas?cas=${encodeURIComponent(cas)}`);
+  } catch {
+    throw new Error('解析服务不可用：无法连接后端，请确认后端已启动');
+  }
+  if (!res.ok) {
+    let detail = `解析失败（${res.status}）`;
+    try {
+      const data = await res.json();
+      if (typeof data?.detail === 'string') detail = data.detail;
+    } catch {
+      // 响应体非 JSON，保留默认提示
+    }
+    throw new Error(detail);
+  }
+  const data = await res.json();
+  if (!data?.smiles) throw new Error(`「${cas}」解析结果中没有 SMILES`);
+  return data.smiles as string;
+}
+
+/** 英文名 → PubChem PUG REST 直连解析（国内网络可能不可达，CAS 号请直接输入走后端解析） */
+async function resolveNameViaPubChem(name: string): Promise<string> {
+  const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/property/CanonicalSMILES/JSON`;
   let res: Response;
   try {
     res = await fetch(url);
   } catch {
-    throw new Error('无法访问 PubChem，请检查网络');
+    throw new Error('无法访问 PubChem（国内网络可能不可达），建议直接输入 CAS 号由后端解析');
   }
-  if (!res.ok) throw new Error(`未在 PubChem 找到「${cas}」对应的化合物`);
+  if (!res.ok) throw new Error(`未在 PubChem 找到「${name}」对应的化合物`);
   const data = await res.json();
   const smiles = data?.PropertyTable?.Properties?.[0]?.CanonicalSMILES;
-  if (!smiles) throw new Error(`「${cas}」解析结果中没有 SMILES`);
+  if (!smiles) throw new Error(`「${name}」解析结果中没有 SMILES`);
   return smiles as string;
+}
+
+/** 智能路由：CAS 号格式走后端四路解析链；英文名走 PubChem 直连 */
+async function resolveCasToSmiles(query: string): Promise<string> {
+  return CAS_RE.test(query) ? resolveCasViaBackend(query) : resolveNameViaPubChem(query);
 }
 
 export default function MonomerInput({ title, value, onChange, library, libraryLoading, disabled }: Props) {
@@ -111,7 +142,7 @@ export default function MonomerInput({ title, value, onChange, library, libraryL
           <Label>CAS 号 / 英文名</Label>
           <div className="flex gap-2">
             <Input
-              placeholder="如 100-52-7"
+              placeholder="如 100-52-7（CAS 号走后端解析；英文名走 PubChem，国内可能不可用）"
               value={cas}
               disabled={disabled || resolving}
               onChange={(e) => setCas(e.target.value)}
@@ -122,7 +153,7 @@ export default function MonomerInput({ title, value, onChange, library, libraryL
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            通过 PubChem PUG REST API 解析为 SMILES 后自动填入。
+            CAS 号由后端四路链（内置库→缓存→PubChem→LLM）解析为 SMILES；英文名走 PubChem 直连（国内可能不可用）。
           </p>
         </TabsContent>
 
