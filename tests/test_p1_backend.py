@@ -88,6 +88,8 @@ class TestCasLookup:
         # 无网络降级：_fetch_pubchem 返回 None（内部已吞掉连接异常）
         monkeypatch.setattr(cas_lookup, "CACHE_PATH", tmp_path / "nope.json")
         monkeypatch.setattr(cas_lookup, "_fetch_pubchem", lambda cas: None)
+        # 同时关闭 LLM 兜底，保证本测试只验证无网络降级语义
+        monkeypatch.setattr(cas_lookup, "_fetch_llm", lambda cas: None)
         assert cas_lookup.resolve_cas("50-00-0") is None
 
     def test_pubchem_invalid_smiles_rejected(self, tmp_path, monkeypatch):
@@ -97,7 +99,96 @@ class TestCasLookup:
             "_fetch_pubchem",
             lambda cas: {"smiles": "not_a_smiles_((((", "name": ""},
         )
+        # 同时关闭 LLM 兜底，保证本测试只验证 PubChem 非法 SMILES 拒绝语义
+        monkeypatch.setattr(cas_lookup, "_fetch_llm", lambda cas: None)
         assert cas_lookup.resolve_cas("50-00-0") is None
+
+    def test_llm_fallback_success_writes_cache(self, tmp_path, monkeypatch):
+        # PubChem 失败后走 LLM 兜底：合法 SMILES 接受、source='llm' 并写缓存
+        cache_file = tmp_path / "cas_cache.json"
+        monkeypatch.setattr(cas_lookup, "CACHE_PATH", cache_file)
+        monkeypatch.setattr(cas_lookup, "_fetch_pubchem", lambda cas: None)
+        monkeypatch.setattr(
+            cas_lookup,
+            "_fetch_llm",
+            lambda cas: {"smiles": "Nc1ccc(N)cc1", "name": ""},
+        )
+        r = cas_lookup.resolve_cas("106-50-3")  # 对苯二胺，不在内置库
+        assert r == {"smiles": "Nc1ccc(N)cc1", "name": "", "source": "llm"}
+        cache = json.loads(cache_file.read_text(encoding="utf-8"))
+        assert cache["106-50-3"]["smiles"] == "Nc1ccc(N)cc1"
+
+    def test_llm_invalid_smiles_rejected(self, tmp_path, monkeypatch):
+        # LLM hallucinate 出非法 SMILES 时 RDKit 校验拒绝，返回 None
+        monkeypatch.setattr(cas_lookup, "CACHE_PATH", tmp_path / "c.json")
+        monkeypatch.setattr(cas_lookup, "_fetch_pubchem", lambda cas: None)
+        monkeypatch.setattr(
+            cas_lookup,
+            "_fetch_llm",
+            lambda cas: {"smiles": "garbage_(((", "name": ""},
+        )
+        assert cas_lookup.resolve_cas("106-50-3") is None
+
+    def test_llm_unconfigured_returns_none(self, monkeypatch):
+        # LLM 未配置时 _fetch_llm 直接返回 None，不发请求
+        monkeypatch.setattr(
+            "src.llm.client.is_configured", lambda: False, raising=False
+        )
+        assert cas_lookup._fetch_llm("106-50-3") is None
+
+    def test_llm_unknown_answer_rejected(self, monkeypatch):
+        # LLM 自言不知（UNKNOWN）时返回 None
+        class FakeClient:
+            @staticmethod
+            def is_configured():
+                return True
+
+            @staticmethod
+            def chat_completion(messages, max_tokens, temperature, extra_body=None):
+                return "UNKNOWN"
+
+        import src.llm.client as real_client
+
+        monkeypatch.setattr(real_client, "is_configured", FakeClient.is_configured)
+        monkeypatch.setattr(real_client, "chat_completion", FakeClient.chat_completion)
+        assert cas_lookup._fetch_llm("999999-99-9") is None
+
+    def _patch_llm(self, monkeypatch, dispatch):
+        """按 prompt 内容分发假回答，模拟双路查询。"""
+        import src.llm.client as real_client
+
+        def fake_chat(messages, max_tokens, temperature, extra_body=None):
+            return dispatch(messages[0]["content"])
+
+        monkeypatch.setattr(real_client, "is_configured", lambda: True)
+        monkeypatch.setattr(real_client, "chat_completion", fake_chat)
+
+    def test_llm_consistency_accept(self, monkeypatch):
+        # 双路一致（CAS 直查与 名称→SMILES 结构相同）→ 接受，带名称
+        def dispatch(prompt):
+            if "名称" in prompt and "SMILES" not in prompt:
+                return "甲醛"
+            if "甲醛" in prompt:
+                return "C=O"
+            return "O=C"  # 直查，规范化后与 C=O 相同
+
+        self._patch_llm(monkeypatch, dispatch)
+        r = cas_lookup._fetch_llm("50-00-0")
+        assert r is not None
+        assert r["smiles"] == "C=O"
+        assert r["name"] == "甲醛"
+
+    def test_llm_consistency_reject(self, monkeypatch):
+        # 双路不一致（直查 C=O vs 名称路径 CCO）→ 返回 None，防幻觉写缓存
+        def dispatch(prompt):
+            if "名称" in prompt and "SMILES" not in prompt:
+                return "乙醇"
+            if "乙醇" in prompt:
+                return "CCO"
+            return "C=O"
+
+        self._patch_llm(monkeypatch, dispatch)
+        assert cas_lookup._fetch_llm("50-00-0") is None
 
 
 class TestSimilarCases:

@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BackendUnavailableError } from '@/lib/api';
 import {
@@ -286,6 +287,188 @@ function BackendStatusCard({
   );
 }
 
+/** ── 软件更新（Electron 桌面版）──────────────────────────── */
+
+/** preload 暴露的更新 API 类型（浏览器 dev 模式下不存在） */
+interface UpdaterStatusPayload {
+  state: 'checking' | 'latest' | 'available' | 'downloading' | 'downloaded' | 'error';
+  version?: string;
+  percent?: number;
+  message?: string;
+}
+interface UpdaterCheckResult {
+  ok: boolean;
+  state?: string;
+  message?: string;
+  currentVersion?: string;
+  latestVersion?: string;
+}
+interface UpdaterApi {
+  getVersion(): Promise<string>;
+  check(): Promise<UpdaterCheckResult>;
+  download(): Promise<void>;
+  install(): Promise<void>;
+  onStatus(cb: (payload: UpdaterStatusPayload) => void): () => void;
+}
+
+type UpdateUiState =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'latest'; version?: string }
+  | { kind: 'available'; version?: string }
+  | { kind: 'downloading'; percent: number }
+  | { kind: 'downloaded'; version?: string }
+  | { kind: 'error'; message: string };
+
+function getUpdater(): UpdaterApi | undefined {
+  return (window as unknown as { updater?: UpdaterApi }).updater;
+}
+
+/** 软件更新卡 */
+function SoftwareUpdateCard() {
+  const updater = getUpdater();
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [ui, setUi] = useState<UpdateUiState>({ kind: 'idle' });
+
+  useEffect(() => {
+    if (!updater) return;
+    let cancelled = false;
+    updater.getVersion().then((v) => {
+      if (!cancelled) setAppVersion(v);
+    }).catch(() => {});
+    const unsubscribe = updater.onStatus((p) => {
+      switch (p.state) {
+        case 'checking':
+          setUi({ kind: 'checking' });
+          break;
+        case 'latest':
+          setUi({ kind: 'latest', version: p.version });
+          break;
+        case 'available':
+          setUi({ kind: 'available', version: p.version });
+          break;
+        case 'downloading':
+          setUi({ kind: 'downloading', percent: p.percent ?? 0 });
+          break;
+        case 'downloaded':
+          setUi({ kind: 'downloaded', version: p.version });
+          break;
+        case 'error':
+          setUi({ kind: 'error', message: p.message || '检查更新失败，请稍后重试' });
+          break;
+      }
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [updater]);
+
+  async function handleCheck() {
+    if (!updater) return;
+    setUi({ kind: 'checking' });
+    try {
+      const r = await updater.check();
+      // 检查结果的细节由状态事件流驱动；这里只处理即时失败
+      if (!r.ok && r.state !== 'checking') {
+        setUi({ kind: 'error', message: r.message || '检查更新失败，请稍后重试' });
+      }
+    } catch {
+      setUi({ kind: 'error', message: '检查更新失败，请稍后重试' });
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">软件更新</CardTitle>
+        <CardDescription>检查并安装桌面端新版本。</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!updater ? (
+          <p className="text-sm text-muted-foreground">仅桌面版可用：浏览器模式下无法检查应用更新。</p>
+        ) : (
+          <>
+            <div className="text-sm text-muted-foreground">
+              当前版本：
+              <span className="font-medium text-foreground">
+                {appVersion ? `v${appVersion}` : '读取中…'}
+              </span>
+            </div>
+
+            {/* 状态提示 */}
+            {ui.kind === 'latest' && (
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>已是最新版本 ✅</span>
+              </div>
+            )}
+            {ui.kind === 'available' && (
+              <div className="rounded-lg border border-gold/50 bg-gold-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                发现新版本
+                <span className="font-medium text-foreground">{ui.version ? ` v${ui.version}` : ''}</span>
+                ，点击下方按钮开始下载。
+              </div>
+            )}
+            {ui.kind === 'downloading' && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>
+                    正在下载更新… <span className="font-medium text-foreground">{ui.percent}%</span>
+                  </span>
+                </div>
+                <Progress value={ui.percent} className="h-2" />
+              </div>
+            )}
+            {ui.kind === 'downloaded' && (
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>
+                  新版本{ui.version ? ` v${ui.version}` : ''}已下载完成，重启后生效。
+                </span>
+              </div>
+            )}
+            {ui.kind === 'error' && (
+              <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                {ui.message}
+              </div>
+            )}
+
+            {/* 操作按钮 */}
+            <div className="flex items-center gap-3">
+              {(ui.kind === 'idle' || ui.kind === 'latest' || ui.kind === 'error') && (
+                <Button variant="outline" onClick={handleCheck}>
+                  检查更新
+                </Button>
+              )}
+              {ui.kind === 'checking' && (
+                <Button variant="outline" disabled>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  正在检查…
+                </Button>
+              )}
+              {ui.kind === 'available' && (
+                <Button
+                  onClick={() => {
+                    setUi({ kind: 'downloading', percent: 0 });
+                    void updater.download();
+                  }}
+                >
+                  下载更新{ui.version ? ` v${ui.version}` : ''}
+                </Button>
+              )}
+              {ui.kind === 'downloaded' && (
+                <Button onClick={() => void updater.install()}>重启安装</Button>
+              )}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [offline, setOffline] = useState(false);
@@ -325,6 +508,7 @@ export default function Settings() {
         <LlmSettingsCard offline={offline} />
         <div className="space-y-6">
           <BackendStatusCard health={health} offline={offline} loading={healthLoading} />
+          <SoftwareUpdateCard />
 
           {/* 关于 */}
           <Card>

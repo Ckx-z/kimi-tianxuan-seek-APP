@@ -154,14 +154,26 @@ def _chat_url(base_url: str) -> str:
     return base_url.rstrip("/") + "/chat/completions"
 
 
-def _http_chat(cfg: dict, messages: list, max_tokens: int, temperature: float) -> str:
-    """底层 HTTP 调用（测试时 monkeypatch 此函数，不依赖真实网络）。"""
+def _http_chat(
+    cfg: dict,
+    messages: list,
+    max_tokens: int,
+    temperature: float,
+    extra_body: Optional[dict] = None,
+) -> str:
+    """底层 HTTP 调用（测试时 monkeypatch 此函数，不依赖真实网络）。
+
+    ``extra_body``：可选的额外请求字段（如关闭推理的
+    ``{"thinking": {"type": "disabled"}}``），合并进 payload 顶层。
+    """
     payload = {
         "model": cfg.get("model") or "",
         "messages": messages,
         "max_tokens": max_tokens,
         "temperature": temperature,
     }
+    if extra_body:
+        payload.update(extra_body)
     resp = requests.post(
         _chat_url(cfg["base_url"]),
         headers={
@@ -190,13 +202,20 @@ def _http_chat(cfg: dict, messages: list, max_tokens: int, temperature: float) -
     return content
 
 
-def _cache_key(cfg: dict, messages: list, max_tokens: int, temperature: float) -> str:
+def _cache_key(
+    cfg: dict,
+    messages: list,
+    max_tokens: int,
+    temperature: float,
+    extra_body: Optional[dict] = None,
+) -> str:
     blob = json.dumps(
         {
             "model": cfg.get("model") or "",
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
+            "extra_body": extra_body,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -209,17 +228,20 @@ def chat_completion(
     max_tokens: int = 2000,
     temperature: float = 0.3,
     nocache: bool = False,
+    extra_body: Optional[dict] = None,
 ) -> Optional[str]:
     """OpenAI 兼容 chat 调用。
 
     未配置或调用失败时返回 None（绝不抛异常）。命中缓存免调用；
     ``nocache=True`` 跳过缓存读写（调试用）。
+    ``extra_body``：可选额外请求字段（如 ``{"thinking": {"type": "disabled"}}``
+    关闭推理型模型的思考过程），参与缓存键计算。
     """
     cfg = _resolve()
     if not cfg:
         return None
 
-    key = _cache_key(cfg, messages, max_tokens, temperature)
+    key = _cache_key(cfg, messages, max_tokens, temperature, extra_body)
     cache_file = CACHE_DIR / f"{key}.json"
 
     if not nocache and cache_file.is_file():
@@ -232,7 +254,13 @@ def chat_completion(
             pass
 
     try:
-        content = _http_chat(cfg, messages, max_tokens, temperature)
+        if extra_body:
+            # 仅在需要时传 extra_body，保持旧 mock（四参签名）兼容
+            content = _http_chat(
+                cfg, messages, max_tokens, temperature, extra_body=extra_body
+            )
+        else:
+            content = _http_chat(cfg, messages, max_tokens, temperature)
     except Exception:
         return None
 

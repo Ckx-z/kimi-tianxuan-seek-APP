@@ -13,7 +13,7 @@
  *      只杀自己 spawn 的 PID，不碰其它用户进程）
  */
 
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const { spawn, execSync } = require('child_process');
 const net = require('net');
 const http = require('http');
@@ -47,22 +47,94 @@ if (!gotSingleInstanceLock) {
 }
 
 // ── 自动更新（electron-updater + GitHub Releases）────────────
-// 仅打包后生效；检查 GitHub Releases（Ckx-z/kimi-tianxuan-seek-APP），
-// 有新版本时弹窗询问，确认后下载，下载完成提示重启安装。
-function setupAutoUpdater() {
-  if (!app.isPackaged) {
-    console.log('[electron] dev 模式，跳过自动更新检查');
-    return;
+// 检查 GitHub Releases（Ckx-z/kimi-tianxuan-seek-APP）。
+// - 启动时静默检查（仅打包后）：发现新版本弹系统对话框，确认后下载，
+//   下载完成提示重启安装。
+// - 设置页手动检查：渲染进程经 preload（window.updater）调
+//   check-for-updates / download-update / install-update IPC，
+//   各阶段状态（检查中/已是最新/发现新版/下载进度/下载完成/错误）
+//   通过 updater:status 事件推给渲染进程，由设置页内 UI 承接（不弹对话框）。
+
+/** 手动检查进行中：该轮事件不弹系统对话框，交给设置页 UI 处理 */
+let manualCheckInFlight = false;
+/** 防止重复点击触发并发检查 */
+let updateCheckRunning = false;
+
+/** 把更新状态推给渲染进程（窗口可能尚未创建或已销毁，需判空） */
+function sendUpdaterStatus(payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updater:status', payload);
   }
-  let autoUpdater;
+}
+
+/** 把底层错误翻成用户友好的提示语 */
+function friendlyUpdateError(e) {
+  const msg = String((e && e.message) || e || '');
+  if (/app-update\.yml|ENOENT/i.test(msg)) return '更新组件缺失，请重新安装最新版本';
+  if (/ERR_INTERNET_DISCONNECTED|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ECONNRESET|network|getaddrinfo/i.test(msg))
+    return '网络连接失败，请检查网络后重试';
+  if (/404|not found/i.test(msg)) return '暂未找到更新服务（可能尚未发布新版本）';
+  return '检查更新失败，请稍后重试';
+}
+
+function setupAutoUpdater() {
+  // IPC 与 dev/prod 无关，先注册，dev 下也能给出友好答复
+  ipcMain.handle('get-app-version', () => app.getVersion());
+
+  let autoUpdater = null;
   try {
     ({ autoUpdater } = require('electron-updater'));
   } catch (e) {
-    console.warn('[electron] electron-updater 不可用，跳过自动更新:', e.message);
-    return;
+    console.warn('[electron] electron-updater 不可用:', e.message);
   }
+
+  ipcMain.handle('check-for-updates', async () => {
+    if (!app.isPackaged) {
+      return { ok: false, state: 'dev', message: '开发模式不支持更新检查，仅打包后的桌面版可用' };
+    }
+    if (!autoUpdater) {
+      return { ok: false, state: 'error', message: '更新组件不可用' };
+    }
+    if (updateCheckRunning) {
+      return { ok: true, state: 'checking', currentVersion: app.getVersion() };
+    }
+    updateCheckRunning = true;
+    manualCheckInFlight = true;
+    sendUpdaterStatus({ state: 'checking' });
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      // 结果细节由事件流推送；这里返回即时摘要
+      return {
+        ok: true,
+        state: 'done',
+        currentVersion: app.getVersion(),
+        latestVersion: result && result.updateInfo ? result.updateInfo.version : undefined,
+      };
+    } catch (e) {
+      manualCheckInFlight = false;
+      const message = friendlyUpdateError(e);
+      sendUpdaterStatus({ state: 'error', message });
+      return { ok: false, state: 'error', message };
+    } finally {
+      updateCheckRunning = false;
+    }
+  });
+
+  ipcMain.handle('download-update', () => {
+    if (autoUpdater) autoUpdater.downloadUpdate();
+  });
+
+  ipcMain.handle('install-update', () => {
+    if (autoUpdater) autoUpdater.quitAndInstall();
+  });
+
+  if (!autoUpdater) return;
+
   autoUpdater.autoDownload = false; // 用户确认后再下载
+
   autoUpdater.on('update-available', (info) => {
+    sendUpdaterStatus({ state: 'available', version: info.version });
+    if (manualCheckInFlight) return; // 手动检查：设置页内 UI 承接确认
     dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: '发现新版本',
@@ -75,7 +147,22 @@ function setupAutoUpdater() {
       if (response === 0) autoUpdater.downloadUpdate();
     }).catch(() => {});
   });
+
+  autoUpdater.on('update-not-available', (info) => {
+    manualCheckInFlight = false;
+    sendUpdaterStatus({ state: 'latest', version: info && info.version });
+  });
+
+  autoUpdater.on('download-progress', (p) => {
+    sendUpdaterStatus({ state: 'downloading', percent: Math.round(p.percent || 0) });
+  });
+
   autoUpdater.on('update-downloaded', (info) => {
+    sendUpdaterStatus({ state: 'downloaded', version: info.version });
+    if (manualCheckInFlight) {
+      manualCheckInFlight = false;
+      return; // 手动检查：设置页内显示“重启安装”按钮
+    }
     dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: '更新已就绪',
@@ -88,13 +175,25 @@ function setupAutoUpdater() {
       if (response === 0) autoUpdater.quitAndInstall();
     }).catch(() => {});
   });
+
   autoUpdater.on('error', (e) => {
-    // 未发布 Release / 网络问题时静默记录，不打扰用户
+    manualCheckInFlight = false;
+    sendUpdaterStatus({ state: 'error', message: friendlyUpdateError(e) });
     console.warn('[electron] 自动更新检查失败:', e.message || e);
   });
-  autoUpdater.checkForUpdates().catch((e) => {
-    console.warn('[electron] 自动更新检查失败:', e.message || e);
-  });
+
+  // 启动时的静默检查仅打包后执行
+  if (!app.isPackaged) {
+    console.log('[electron] dev 模式，跳过启动时的自动更新检查');
+    return;
+  }
+  updateCheckRunning = true;
+  autoUpdater.checkForUpdates()
+    .catch((e) => {
+      // 未发布 Release / 网络问题时静默记录，不打扰用户
+      console.warn('[electron] 自动更新检查失败:', e.message || e);
+    })
+    .finally(() => { updateCheckRunning = false; });
 }
 
 /** dev: 返回 python 命令；prod: 优先同目录 backend exe，缺失时回退 python 占位 */
@@ -206,6 +305,7 @@ function createWindow() {
     icon: fs.existsSync(ICON_PATH) ? ICON_PATH : undefined,
     autoHideMenuBar: true,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
