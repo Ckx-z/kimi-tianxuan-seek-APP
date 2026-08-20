@@ -40,6 +40,8 @@ class RecordCreate(BaseModel):
     status: str = Field("final", description="draft 草稿暂存（宽松校验）| final 正式")
     process_notes: str = Field("", description="完整实验流程（长文本）")
     timeline: list[dict] = Field(default_factory=list, description="时间点记录条目")
+    self_summary: str = Field("", description="自我总结（草稿也可填）")
+    mistakes: str = Field("", description="本人认为的失误（草稿也可填）")
 
 
 class RecordUpdate(BaseModel):
@@ -51,6 +53,8 @@ class RecordUpdate(BaseModel):
     notes: str | None = None
     operator: str | None = None
     process_notes: str | None = None
+    self_summary: str | None = None
+    mistakes: str | None = None
     conditions: dict | None = None
     timeline: list[dict] | None = None
 

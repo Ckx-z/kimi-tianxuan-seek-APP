@@ -48,7 +48,9 @@ def create_record(req: RecordCreate):
             experiment_no=req.experiment_no.strip(),
             status=req.status.strip() or "final",
             process_notes=req.process_notes,
-            timeline=req.timeline)
+            timeline=req.timeline,
+            self_summary=req.self_summary,
+            mistakes=req.mistakes)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     except KeyError as exc:

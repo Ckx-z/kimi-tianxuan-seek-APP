@@ -123,6 +123,10 @@ export interface RecordItem {
   notes: string;
   /** 完整实验流程（长文本） */
   process_notes: string;
+  /** 自我总结（草稿也可填，旧记录读取时默认空串） */
+  self_summary: string;
+  /** 本人认为的失误（草稿也可填，旧记录读取时默认空串） */
+  mistakes: string;
   /** 时间点记录条目 */
   timeline: TimelineEntry[];
   operator: string;
@@ -145,6 +149,8 @@ export interface RecordCreateBody {
   /** draft 草稿暂存（宽松校验）；final 正式（默认，完整校验） */
   status?: 'draft' | 'final';
   process_notes?: string;
+  self_summary?: string;
+  mistakes?: string;
   timeline?: Partial<TimelineEntry>[];
 }
 
@@ -157,6 +163,8 @@ export interface RecordUpdateBody {
   notes?: string;
   operator?: string;
   process_notes?: string;
+  self_summary?: string;
+  mistakes?: string;
   conditions?: Record<string, unknown>;
   timeline?: Partial<TimelineEntry>[];
 }

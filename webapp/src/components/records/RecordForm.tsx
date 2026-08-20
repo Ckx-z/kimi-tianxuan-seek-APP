@@ -67,6 +67,8 @@ export default function RecordForm({ favorites, favoriteId, onFavoriteChange, on
   const [strength, setStrength] = useState('');
   const [operator, setOperator] = useState('');
   const [notes, setNotes] = useState('');
+  const [selfSummary, setSelfSummary] = useState('');
+  const [mistakes, setMistakes] = useState('');
   const [saving, setSaving] = useState<'draft' | 'final' | null>(null);
   /** 编号为空的前端拦截提示 */
   const [noError, setNoError] = useState(false);
@@ -79,6 +81,8 @@ export default function RecordForm({ favorites, favoriteId, onFavoriteChange, on
     setStrength('');
     setOperator('');
     setNotes('');
+    setSelfSummary('');
+    setMistakes('');
     setNoError(false);
   };
 
@@ -129,6 +133,8 @@ export default function RecordForm({ favorites, favoriteId, onFavoriteChange, on
         operator: operator.trim(),
         experiment_no: experimentNo.trim(),
         status: draft ? 'draft' : 'final',
+        self_summary: selfSummary.trim(),
+        mistakes: mistakes.trim(),
       });
       if (draft) {
         toast.success('草稿已暂存，可在右侧时间线继续编辑');
@@ -278,6 +284,28 @@ export default function RecordForm({ favorites, favoriteId, onFavoriteChange, on
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="其他观察、异常情况……"
+          rows={3}
+        />
+      </div>
+
+      {/* 自我总结（草稿也可填） */}
+      <div className="space-y-1.5">
+        <Label>自我总结</Label>
+        <Textarea
+          value={selfSummary}
+          onChange={(e) => setSelfSummary(e.target.value)}
+          placeholder="本次实验的收获、结论与体会……"
+          rows={3}
+        />
+      </div>
+
+      {/* 我认为的失误（草稿也可填） */}
+      <div className="space-y-1.5">
+        <Label>我认为的失误</Label>
+        <Textarea
+          value={mistakes}
+          onChange={(e) => setMistakes(e.target.value)}
+          placeholder="本次操作中认为存在的失误、可能的根因……"
           rows={3}
         />
       </div>

@@ -175,14 +175,31 @@ def monomer_keywords(monomer: dict):
     return kws
 
 
+def _timeline_seg(r: dict) -> str:
+    """时间线摘要：第几天/时间点 + 过程描述（附件不进入检索/提示语料）"""
+    segs = []
+    for e in r.get('timeline') or []:
+        if not isinstance(e, dict):
+            continue
+        label = str(e.get('time_label') or '').strip()
+        desc = str(e.get('description') or '').strip()
+        if label or desc:
+            segs.append(f'{label}: {desc}' if label else desc)
+    return '；'.join(segs)
+
+
 def _record_condition_seg(r: dict) -> str:
-    """一条记录的条件+现象概要片段（拼检索查询用）"""
+    """一条记录的条件+现象概要片段（拼检索查询用，含失误/总结关键语料）"""
     cond = r.get('conditions') or {}
     seg = (f"实验{r.get('experiment_no', '')} outcome={r.get('outcome')} "
            f"失败分类={r.get('failure_class') or '未知'} "
            f"溶剂={cond.get('solvent_1') or cond.get('solvent', '')} "
            f"催化={cond.get('catalyst', '')} 温度={cond.get('temperature_c', '')} "
            f"现象={r.get('strength', '')} {r.get('notes', '')}")
+    if r.get('mistakes'):
+        seg += f" 本人失误={r['mistakes']}"
+    if r.get('self_summary'):
+        seg += f" 自我总结={r['self_summary']}"
     return seg.strip()
 
 
@@ -463,13 +480,32 @@ def is_rejected_direction(item: dict, rejected) -> bool:
 # ---------------------------------------------------------------- LLM
 
 def _record_prompt_line(r: dict) -> str:
-    """一条实验记录在 prompt 里的完整描述行（含 conditions/outcome/strength/notes/failure_class）"""
+    """一条实验记录在 prompt 里的完整描述行。
+
+    除 conditions/outcome/strength/notes/failure_class 外，纳入完整实验流程
+    （process_notes）、实验过程时间线（第几天做了什么+结果）、自我总结
+    （self_summary）与本人认为的失误（mistakes）——失败/失误语料对迭代
+    建议最有价值，必须让 LLM 直接可见。
+    """
     cond = r.get('conditions') or {}
-    return (f"- {r.get('record_id')} (实验编号 {r.get('experiment_no', '?')}, "
+    line = (f"- {r.get('record_id')} (实验编号 {r.get('experiment_no', '?')}, "
             f"{r.get('date', '?')}): outcome={r.get('outcome')}, "
             f"failure_class={r.get('failure_class')}, "
             f"条件={json.dumps(cond, ensure_ascii=False)}, "
             f"现象/强度={r.get('strength', '')}, 备注={r.get('notes', '')}")
+    extras = []
+    if str(r.get('process_notes') or '').strip():
+        extras.append(f"完整实验流程={r['process_notes']}")
+    tl = _timeline_seg(r)
+    if tl:
+        extras.append(f"实验过程时间线={tl}")
+    if str(r.get('self_summary') or '').strip():
+        extras.append(f"自我总结={r['self_summary']}")
+    if str(r.get('mistakes') or '').strip():
+        extras.append(f"本人认为的失误={r['mistakes']}")
+    if extras:
+        line += '，' + '，'.join(extras)
+    return line
 
 
 def build_messages(question, aldehyde, amine, records, evidence_text, rejected,

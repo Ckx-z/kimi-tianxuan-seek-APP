@@ -106,9 +106,12 @@ def _normalize_record(rec: dict) -> dict:
     """旧数据兼容：缺新字段（status/process_notes/timeline）时补默认值。
 
     旧记录一律视为 final（草稿为本功能新增语义，历史记录全部是正式记录）。
+    缺 self_summary/mistakes（自我总结/本人认为的失误，本功能新增字段）时补空串。
     """
     rec.setdefault("status", "final")
     rec.setdefault("process_notes", "")
+    rec.setdefault("self_summary", "")
+    rec.setdefault("mistakes", "")
     tl = rec.get("timeline")
     rec["timeline"] = tl if isinstance(tl, list) else []
     return rec
@@ -152,6 +155,8 @@ def create_record(
     status: str = "final",
     process_notes: str = "",
     timeline: list | None = None,
+    self_summary: str = "",
+    mistakes: str = "",
 ) -> dict:
     """创建实验记录并按 RAG 契约落盘，返回完整记录 dict。
 
@@ -267,6 +272,8 @@ def create_record(
         "notes": notes,
         "process_notes": (process_notes or "").strip(),
         "timeline": _sanitize_timeline(timeline or []),
+        "self_summary": (self_summary or "").strip(),
+        "mistakes": (mistakes or "").strip(),
         "attachments": [],
         "operator": operator or "",
         "date": _today(),
@@ -368,7 +375,7 @@ def delete_record(rec_id: str) -> bool:
 
 _UPDATABLE_FIELDS = (
     "experiment_no", "outcome", "strength", "notes", "operator",
-    "process_notes",
+    "process_notes", "self_summary", "mistakes",
 )
 
 
@@ -379,7 +386,8 @@ def update_record(rec_id: str, fields: dict | None = None, **kwargs) -> dict:
     - status："draft" 继续暂存（宽松校验）；"final" 转正式（走与创建一致
       的完整校验：experiment_no 必填、outcome 三选、游离记录 SMILES 非空，
       并把编号并入 notes 前缀）；
-    - experiment_no / outcome / strength / notes / operator / process_notes；
+    - experiment_no / outcome / strength / notes / operator / process_notes
+      / self_summary / mistakes；
     - conditions：与现有 conditions 合并（九键外的额外键原样保留）；
     - timeline：时间点记录条目（附件元数据按 entry_id 回接服务端登记值）。
 

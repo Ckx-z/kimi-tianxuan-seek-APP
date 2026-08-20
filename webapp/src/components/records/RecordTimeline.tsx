@@ -303,6 +303,14 @@ export default function RecordTimeline({
                   <p className="text-sm text-muted-foreground">备注</p>
                   <p className="mt-1 whitespace-pre-wrap text-base">{detailRec.notes || '—'}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">自我总结</p>
+                  <p className="mt-1 whitespace-pre-wrap text-base">{detailRec.self_summary || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">我认为的失误</p>
+                  <p className="mt-1 whitespace-pre-wrap text-base">{detailRec.mistakes || '—'}</p>
+                </div>
                 {detailRec.prediction_snapshot && detailRec.prediction_snapshot.score != null && (
                   <div className="rounded-lg border border-gold/50 bg-gold-muted px-3 py-2 text-sm">
                     <span className="font-medium">预测快照：</span>

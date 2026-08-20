@@ -98,6 +98,19 @@ def monomer(m: dict):
     return m.get('cas', ''), m.get('smiles', ''), m.get('name', '')
 
 
+def timeline_digest(rec: dict) -> str:
+    """实验过程时间线 -> 可读摘要（time_label + description，附件不摄入）"""
+    segs = []
+    for e in rec.get('timeline') or []:
+        if not isinstance(e, dict):
+            continue
+        label = str(e.get('time_label') or '').strip()
+        desc = str(e.get('description') or '').strip()
+        if label or desc:
+            segs.append(f'{label}: {desc}' if label else desc)
+    return ' → '.join(segs)
+
+
 def record_to_feedback_row(rec: dict) -> dict:
     """experiment_record -> feedback_db.csv 行 (dict)
 
@@ -106,6 +119,9 @@ def record_to_feedback_row(rec: dict) -> dict:
       不写 tianxuan_预测概率 列, 放 备注
     - conditions 无独立列 -> 并入 备注
     - 失败Class 优先 record.failure_class, 缺失时按 outcome 兜底
+    - 本人认为的失误 (mistakes) 是迭代最有价值的失败语料 -> 根因Notes
+    - 自我总结 (self_summary) 并入 失败现象描述
+    - 完整实验流程 (process_notes) 与时间线摘要并入 备注
     """
     ald_cas, ald_smi, ald_name = monomer(rec.get('aldehyde'))
     am_cas, am_smi, am_name = monomer(rec.get('amine'))
@@ -123,6 +139,17 @@ def record_to_feedback_row(rec: dict) -> dict:
     phenomenon = rec.get('strength') or ''
     if rec.get('notes'):
         phenomenon = f'{phenomenon}; {rec["notes"]}' if phenomenon else rec['notes']
+    if rec.get('self_summary'):
+        phenomenon = (f'{phenomenon}; 自我总结: {rec["self_summary"]}'
+                      if phenomenon else f'自我总结: {rec["self_summary"]}')
+
+    process_note = ''
+    if str(rec.get('process_notes') or '').strip():
+        process_note = f'实验流程: {rec["process_notes"]}'
+    tl_note = ''
+    digest = timeline_digest(rec)
+    if digest:
+        tl_note = f'时间线: {digest}'
 
     # 方案编号: 优先回链 minimax 编号, 否则用 app record_id (独立体系, 不混)
     plan_no = rec.get('minimax_plan_no') or f'APP-{rec.get("record_id", "")}'
@@ -138,12 +165,12 @@ def record_to_feedback_row(rec: dict) -> dict:
         '试剂状态': '', '阳性对照': '', '单一变量': '', '科学问题': '',
         '失败Class': failure_class,
         '失败现象描述': phenomenon,
-        '根因Type': '', '根因Notes': '',
+        '根因Type': '', '根因Notes': str(rec.get('mistakes') or ''),
         'PXRD文件': '', 'FTIR文件': '', 'SEM文件': '',
         '关联历史失败': rec.get('favorite_id') or '',
         '关联外推依据': rec.get('prediction_id') or '',
         '下一轮建议': '',
-        '备注': '; '.join(x for x in [score_note, cond_note] if x),
+        '备注': '; '.join(x for x in [score_note, cond_note, process_note, tl_note] if x),
     }
 
 

@@ -56,6 +56,8 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
   const [strength, setStrength] = useState(rec.strength || '');
   const [operator, setOperator] = useState(rec.operator || '');
   const [notes, setNotes] = useState(rec.notes || '');
+  const [selfSummary, setSelfSummary] = useState(rec.self_summary || '');
+  const [mistakes, setMistakes] = useState(rec.mistakes || '');
   const [saving, setSaving] = useState<'draft' | 'final' | null>(null);
   /** 编号为空的前端拦截提示（仅转正式时） */
   const [noError, setNoError] = useState(false);
@@ -82,6 +84,8 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
         strength: strength.trim(),
         operator: operator.trim(),
         notes: notes.trim(),
+        self_summary: selfSummary.trim(),
+        mistakes: mistakes.trim(),
         conditions,
       });
       toast.success(
@@ -179,6 +183,28 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
           <div className="space-y-1.5">
             <Label>备注</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+          </div>
+
+          {/* 自我总结（草稿也可填） */}
+          <div className="space-y-1.5">
+            <Label>自我总结</Label>
+            <Textarea
+              value={selfSummary}
+              onChange={(e) => setSelfSummary(e.target.value)}
+              placeholder="本次实验的收获、结论与体会……"
+              rows={3}
+            />
+          </div>
+
+          {/* 我认为的失误（草稿也可填） */}
+          <div className="space-y-1.5">
+            <Label>我认为的失误</Label>
+            <Textarea
+              value={mistakes}
+              onChange={(e) => setMistakes(e.target.value)}
+              placeholder="本次操作中认为存在的失误、可能的根因……"
+              rows={3}
+            />
           </div>
 
           {/* 实验过程时间线（草稿也可维护） */}
