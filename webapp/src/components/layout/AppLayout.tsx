@@ -9,6 +9,7 @@ import {
   BarChart3,
   FlaskConical,
   Lightbulb,
+  Bot,
   Star,
   Settings,
   Moon,
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { to: '/batch', label: '批量排序', icon: BarChart3 },
   { to: '/records', label: '实验记录', icon: FlaskConical },
   { to: '/iterate', label: '方案迭代', icon: Lightbulb },
+  { to: '/assistant', label: '科研助手', icon: Bot },
   { to: '/mine', label: '我的', icon: Star },
 ];
 

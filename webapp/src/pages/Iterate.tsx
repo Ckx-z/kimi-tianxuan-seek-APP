@@ -3,6 +3,7 @@
  * 采纳生成方案、已生成方案展示。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, MessagesSquare, Sparkles } from 'lucide-react';
 import type { ExperimentRecord, Favorite, Plan, Suggestion } from '@/types';
 import {
   listFavorites,
@@ -51,6 +52,7 @@ function favoriteLabel(f: Favorite): string {
 }
 
 export default function Iterate() {
+  const navigate = useNavigate();
   // 顶部提问区状态
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [favId, setFavId] = useState<string>('');
@@ -147,6 +149,25 @@ export default function Iterate() {
 
   const loadingLists = suggestions === null || plans === null;
 
+  // 转科研助手：携带当前收藏单体与最新批次建议 id，跳到助手页自动建会话并开场
+  const handleDiscussWithAssistant = () => {
+    const fav = favorites.find((f) => f.id === favId) as unknown as
+      | { aldehyde?: { smiles?: string }; amine?: { smiles?: string } }
+      | undefined;
+    const latestIds = batches[0]?.items.map((s) => s.suggestion_id) ?? [];
+    navigate('/assistant', {
+      state: {
+        assistantContext: {
+          favorite_id: favId || undefined,
+          ald_smiles: fav?.aldehyde?.smiles,
+          amine_smiles: fav?.amine?.smiles,
+          suggestion_ids: latestIds,
+        },
+        openingMessage: '我想深入讨论这组单体的迭代建议',
+      },
+    });
+  };
+
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-semibold text-foreground">方案迭代</h1>
@@ -233,7 +254,21 @@ export default function Iterate() {
       {/* ② 建议列表（按批次分组） */}
       {!loadingLists && !listError && (
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">迭代建议</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-foreground">迭代建议</h2>
+            {/* 转科研助手深入讨论（携带最新批次建议上下文） */}
+            {batches.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDiscussWithAssistant}
+                className="border-primary/40 text-primary hover:bg-accent"
+              >
+                <MessagesSquare className="mr-1.5 h-4 w-4" />
+                转科研助手深入讨论
+              </Button>
+            )}
+          </div>
           {batches.length === 0 ? (
             /* ⑤ 空态引导 */
             <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">

@@ -6,6 +6,7 @@ import Query from '@/pages/Query';
 import Batch from '@/pages/Batch';
 import Records from '@/pages/Records';
 import Iterate from '@/pages/Iterate';
+import Assistant from '@/pages/Assistant';
 import Mine from '@/pages/Mine';
 import Settings from '@/pages/Settings';
 
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/batch" element={<Batch />} />
           <Route path="/records" element={<Records />} />
           <Route path="/iterate" element={<Iterate />} />
+          <Route path="/assistant" element={<Assistant />} />
           <Route path="/mine" element={<Mine />} />
           <Route path="/settings" element={<Settings />} />
         </Route>

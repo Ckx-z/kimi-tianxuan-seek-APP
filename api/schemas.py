@@ -97,3 +97,18 @@ class PropsItem(BaseModel):
 class PropsBatchRequest(BaseModel):
     items: list[PropsItem] = Field(
         ..., description="批量性质卡请求列表（单项非法 SMILES 不影响其他项）")
+
+
+class AssistantSessionCreate(BaseModel):
+    title: str | None = Field(None, description="会话标题（空则取首条消息前 20 字）")
+    context: dict | None = Field(
+        None, description="页⑤转入上下文：{favorite_id?, ald_smiles?, "
+        "amine_smiles?, suggestion_ids?}")
+
+
+class AssistantChatRequest(BaseModel):
+    session_id: str | None = Field(None, description="空则新建会话")
+    message: str = Field(..., description="用户消息")
+    context: dict | None = Field(
+        None, description="可选上下文（合并进会话 meta，结构同 sessions 创建）")
+    stream: bool = Field(True, description="固定 SSE 流式（保留字段）")

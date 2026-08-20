@@ -46,6 +46,8 @@ datas = [
     (str(ROOT / "minimax" / "experiment"), "minimax/experiment"),
     (str(ROOT / "minimax" / "bridge" / "knowledge_index.jsonl"),
      "minimax/bridge"),
+    # 科研助手人格文件（ming 身份卡 + 领域规则，数据文件）
+    (str(ROOT / "src" / "assistant" / "persona"), "src/assistant/persona"),
 ]
 datas += _files("minimax/adapters/*.py", "minimax/adapters")
 datas += _files("minimax/bridge/*.py", "minimax/bridge")
