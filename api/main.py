@@ -62,15 +62,36 @@ def health():
 
 
 class SPAStaticFiles(StaticFiles):
-    """静态托管 React 构建产物，未命中的非 /api 路径回退 index.html（SPA 路由）。"""
+    """静态托管 React 构建产物，未命中的非 /api 路径回退 index.html（SPA 路由）。
+
+    缓存策略（2026-08-20 事故修复）：Electron 内嵌 Chromium 对
+    http://localhost:<port>/ 做启发式磁盘缓存，版本升级后同 origin 会
+    直接吃旧缓存 → 用户看到上一版界面。因此：
+    - index.html（及 SPA 回退）：no-cache，每次启动必须回源校验；
+    - assets/ 下带内容哈希的 JS/CSS：immutable 长缓存（内容变哈希变）。
+    """
 
     async def get_response(self, path: str, scope):  # type: ignore[override]
         try:
-            return await super().get_response(path, scope)
+            resp = await super().get_response(path, scope)
+            self._apply_cache_headers(resp, path)
+            return resp
         except StarletteHTTPException as exc:
             if exc.status_code == 404:
-                return await super().get_response("index.html", scope)
+                resp = await super().get_response("index.html", scope)
+                resp.headers["Cache-Control"] = "no-cache"
+                return resp
             raise
+
+    @staticmethod
+    def _apply_cache_headers(resp, path: str) -> None:
+        # 不依赖 path 的具体形态（mount 点不同 path 取值不同），
+        # 按内容类型与哈希资源目录判断，保证各入口一致生效。
+        ctype = resp.headers.get("content-type", "")
+        if "text/html" in ctype:
+            resp.headers["Cache-Control"] = "no-cache"
+        elif "assets/" in path.replace("\\", "/"):
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
 
 
 # 挂载在路由注册之后：/api/* 由上方 router 优先匹配，其余路径走静态文件
