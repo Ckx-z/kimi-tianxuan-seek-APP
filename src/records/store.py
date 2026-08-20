@@ -380,7 +380,7 @@ _UPDATABLE_FIELDS = (
 
 
 def update_record(rec_id: str, fields: dict | None = None, **kwargs) -> dict:
-    """更新记录字段（草稿继续编辑 / 转正式；正式记录也可更新流程与时间线）。
+    """更新记录字段（草稿继续编辑 / 转正式；正式记录同样支持全字段整体修改）。
 
     fields（或关键字）可含：
     - status："draft" 继续暂存（宽松校验）；"final" 转正式（走与创建一致
@@ -448,7 +448,11 @@ def update_record(rec_id: str, fields: dict | None = None, **kwargs) -> dict:
                 )
         prefix = f"实验编号：{rec['experiment_no']}"
         notes = str(rec.get("notes") or "").strip()
-        if not notes.startswith("实验编号："):
+        if notes.startswith("实验编号："):
+            # 正式记录整体编辑时若修改了 experiment_no，刷新 notes 中残留的旧编号前缀
+            body = re.sub(r"^实验编号：[^；\n]*；?", "", notes).strip()
+            rec["notes"] = prefix if not body else f"{prefix}；{body}"
+        else:
             rec["notes"] = prefix if not notes else f"{prefix}；{notes}"
     else:
         outcome = str(rec.get("outcome") or "").strip()

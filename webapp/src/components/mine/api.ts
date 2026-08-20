@@ -85,14 +85,16 @@ export interface FavoriteItem {
   experiment_record_ids?: string[];
 }
 
-/** 实验记录条目（records/store.py 落盘结构） */
+/** 实验记录条目（records/store.py 落盘结构，仅「我的数据」计数/导出用；
+ *  详情展示统一使用 @/components/records/api 的完整 RecordItem） */
 export interface RecordItem {
   record_id: string;
   experiment_no?: string;
   date?: string;
+  status?: 'draft' | 'final';
   favorite_id?: string | null;
   conditions?: Record<string, unknown>;
-  outcome?: Record<string, unknown>;
+  outcome?: 'film' | 'partial' | 'failed' | '';
   strength?: string;
   notes?: string;
   operator?: string;
@@ -128,13 +130,6 @@ export interface SuggestionItem {
 export async function fetchFavorites(): Promise<FavoriteItem[]> {
   const data = await request<{ favorites?: FavoriteItem[] }>('/favorites');
   return Array.isArray(data?.favorites) ? data.favorites : [];
-}
-
-export async function fetchRecordsByFavorite(favoriteId: string): Promise<RecordItem[]> {
-  const data = await request<{ records?: RecordItem[] }>(
-    `/records?favorite_id=${encodeURIComponent(favoriteId)}`,
-  );
-  return Array.isArray(data?.records) ? data.records : [];
 }
 
 export async function fetchAllRecords(): Promise<RecordItem[]> {

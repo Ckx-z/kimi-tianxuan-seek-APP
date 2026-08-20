@@ -92,7 +92,7 @@ export default function ResultCard({ result, loading }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex flex-wrap items-center justify-between gap-2">
           <span>打分结果</span>
           {result.score_policy === 'max_tree_gnn' && (
             <span className="text-xs font-normal text-muted-foreground">
@@ -116,7 +116,7 @@ export default function ResultCard({ result, loading }: Props) {
           ) : (
             <>
               <div className="text-sm text-muted-foreground">成膜评分（越高越好）</div>
-              <div className="mt-1 text-5xl font-bold text-primary">{result.score!.toFixed(3)}</div>
+              <div className="mt-1 text-4xl font-bold text-primary sm:text-5xl">{result.score!.toFixed(3)}</div>
             </>
           )}
         </div>

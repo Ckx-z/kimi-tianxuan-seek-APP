@@ -1,11 +1,13 @@
 /**
  * 「我的收藏」卡片墙
  * - 卡片：醛名 × 胺名大字 + SMILES 小字 + 最新预测分徽章 + 创建时间 + 删除按钮
- * - 点击卡片弹出详情 Dialog：单体信息 / 预测快照 / 文献列表 / 该收藏的实验记录简表
+ * - 点击卡片弹出详情 Dialog：单体信息 / 预测快照 / 性质卡 / 方案卡 / 文献列表 /
+ *   该组实验记录列表（行可点击 → 嵌套放大记录详情，带「返回」回到收藏详情）
  * - 删除经 AlertDialog 确认后调用 DELETE /api/favorites/{id}
+ * - 响应式：Dialog 限高 + 固定头部 + 内部滚动；窄屏下结构图/性质卡/表格自动换行、横向滚动
  */
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { Trash2, BookOpen, FlaskConical } from 'lucide-react';
+import { Trash2, BookOpen, FlaskConical, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -38,12 +40,17 @@ import {
 } from '@/components/ui/table';
 import {
   deleteFavorite,
-  fetchRecordsByFavorite,
   type FavoriteItem,
   type PredictionSnapshot,
-  type RecordItem,
   type ReferenceItem,
 } from './api';
+// 实验记录类型/接口与详情对话框复用记录页组件（单一类型口径，嵌套放大共用）
+import {
+  listRecords,
+  type RecordItem,
+} from '@/components/records/api';
+import RecordDetailDialog from '@/components/records/RecordDetailDialog';
+import { OUTCOME_META } from '@/components/records/meta';
 // 只读复用查询打分页的结果组件与 API（不修改其文件），保证放大详情与查询打分页内容一致
 import ResultCard from '@/components/query/ResultCard';
 import MonomerPropsCard from '@/components/query/MonomerPropsCard';
@@ -96,10 +103,10 @@ function ReferenceList({ refs }: { refs?: ReferenceItem[] }) {
       {refs.map((r, i) => (
         <li
           key={`${r.title}-${i}`}
-          className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2"
+          className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2"
         >
           <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-foreground">{r.title || '未命名文献'}</div>
+            <div className="break-words text-sm font-medium text-foreground">{r.title || '未命名文献'}</div>
             <div className="mt-0.5 text-xs text-muted-foreground">
               {r.note || matchLabel(r.match_type)}
               {typeof r.count === 'number' ? ` · 出现 ${r.count} 次` : ''}
@@ -162,7 +169,10 @@ interface PropsState {
 }
 const emptyProps: PropsState = { loading: false, error: null, data: null };
 
-/** 收藏详情 Dialog（与查询打分页结果内容一致：分数/OOD/结构图/性质卡/方案卡） */
+/**
+ * 收藏详情 Dialog（与查询打分页结果内容一致：分数/OOD/结构图/性质卡/方案卡）
+ * 内嵌「该组实验记录」列表：点击记录行 → 嵌套放大记录详情（带返回）。
+ */
 function FavoriteDetailDialog({
   fav,
   open,
@@ -174,6 +184,8 @@ function FavoriteDetailDialog({
 }) {
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [recLoading, setRecLoading] = useState(false);
+  /** 嵌套放大的实验记录（非空时在最上层展示记录详情，「返回」回到本对话框） */
+  const [nestedRec, setNestedRec] = useState<RecordItem | null>(null);
   const [aldProps, setAldProps] = useState<PropsState>(emptyProps);
   const [amineProps, setAmineProps] = useState<PropsState>(emptyProps);
   const [planCard, setPlanCard] = useState<PlanCardData | null>(null);
@@ -187,8 +199,9 @@ function FavoriteDetailDialog({
   useEffect(() => {
     if (!open || !fav) return;
     let cancelled = false;
+    setNestedRec(null);
     setRecLoading(true);
-    fetchRecordsByFavorite(fav.id)
+    listRecords(fav.id)
       .then((list) => !cancelled && setRecords(list))
       .catch(() => !cancelled && setRecords([]))
       .finally(() => !cancelled && setRecLoading(false));
@@ -267,141 +280,190 @@ function FavoriteDetailDialog({
   const result = snapshotToResult(fav.latest_prediction);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-gradient-royal">
-            {fav.aldehyde?.name || '未知醛'} × {fav.amine?.name || '未知胺'}
-          </DialogTitle>
-          <DialogDescription>
-            收藏编号 {fav.id} · 创建于 {fav.created_at || '未知时间'}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+          <DialogHeader className="border-b border-border px-5 py-4">
+            <DialogTitle className="text-left text-lg leading-snug text-gradient-royal">
+              {fav.aldehyde?.name || '未知醛'} × {fav.amine?.name || '未知胺'}
+            </DialogTitle>
+            <DialogDescription className="text-left">
+              收藏编号 {fav.id} · 创建于 {fav.created_at || '未知时间'}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-5">
-          {/* 单体信息（含 2D 结构图） */}
-          <section>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">单体信息</h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(
-                [
-                  ['醛单体', fav.aldehyde],
-                  ['胺单体', fav.amine],
-                ] as const
-              ).map(([label, m]) => (
-                <div key={label} className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
-                  <div className="text-xs text-muted-foreground">{label}</div>
-                  <div className="mt-1 font-medium text-foreground">{m?.name || '—'}</div>
-                  <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
-                    {m?.smiles || '—'}
+          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4">
+            {/* 单体信息（含 2D 结构图） */}
+            <section>
+              <h3 className="mb-2 text-sm font-semibold text-foreground">单体信息</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    ['醛单体', fav.aldehyde],
+                    ['胺单体', fav.amine],
+                  ] as const
+                ).map(([label, m]) => (
+                  <div key={label} className="min-w-0 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                    <div className="text-xs text-muted-foreground">{label}</div>
+                    <div className="mt-1 break-words font-medium text-foreground">{m?.name || '—'}</div>
+                    <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
+                      {m?.smiles || '—'}
+                    </div>
+                    {m?.cas && <div className="mt-1 text-xs text-muted-foreground">CAS: {m.cas}</div>}
+                    <StructureImg smiles={m?.smiles} label={label} />
                   </div>
-                  {m?.cas && <div className="mt-1 text-xs text-muted-foreground">CAS: {m.cas}</div>}
-                  <StructureImg smiles={m?.smiles} label={label} />
+                ))}
+              </div>
+              {fav.notes && (
+                <p className="mt-2 break-words rounded-lg bg-gold-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  备注：{fav.notes}
+                </p>
+              )}
+            </section>
+
+            {/* 打分结果（复用查询页 ResultCard：主分数 + 树/GNN 分量 + OOD 横幅） */}
+            <section>
+              {result ? (
+                <ResultCard result={result} loading={false} />
+              ) : (
+                <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                  尚未打分，可在查询页对该组合进行预测；打分后此处显示与查询打分页一致的完整结果。
                 </div>
-              ))}
-            </div>
-            {fav.notes && (
-              <p className="mt-2 rounded-lg bg-gold-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                备注：{fav.notes}
-              </p>
-            )}
-          </section>
+              )}
+            </section>
 
-          {/* 打分结果（复用查询页 ResultCard：主分数 + 树/GNN 分量 + OOD 横幅） */}
-          <section>
-            {result ? (
-              <ResultCard result={result} loading={false} />
-            ) : (
-              <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                尚未打分，可在查询页对该组合进行预测；打分后此处显示与查询打分页一致的完整结果。
+            {/* 单体性质卡（复用查询页 MonomerPropsCard：RDKit facts + LLM 解读） */}
+            <section>
+              <h3 className="mb-2 text-sm font-semibold text-foreground">单体性质</h3>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <MonomerPropsCard
+                  title="醛单体性质"
+                  name={fav.aldehyde?.name || undefined}
+                  loading={aldProps.loading}
+                  error={aldProps.error}
+                  props={aldProps.data}
+                />
+                <MonomerPropsCard
+                  title="胺单体性质"
+                  name={fav.amine?.name || undefined}
+                  loading={amineProps.loading}
+                  error={amineProps.error}
+                  props={amineProps.data}
+                />
               </div>
-            )}
-          </section>
+            </section>
 
-          {/* 单体性质卡（复用查询页 MonomerPropsCard：RDKit facts + LLM 解读） */}
-          <section>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">单体性质</h3>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <MonomerPropsCard
-                title="醛单体性质"
-                name={fav.aldehyde?.name || undefined}
-                loading={aldProps.loading}
-                error={aldProps.error}
-                props={aldProps.data}
+            {/* 方案卡（复用查询页 PlanCardPanel，可切换模板） */}
+            <section className="min-w-0">
+              <PlanCardPanel
+                card={planCard}
+                loading={planLoading}
+                error={planError}
+                templates={templates}
+                templatesLoading={templatesLoading}
+                templateId={templateId}
+                onTemplateChange={handleTemplateChange}
+                onTemplateUploaded={handleTemplateUploaded}
+                disabled={!fav.aldehyde?.smiles || !fav.amine?.smiles}
               />
-              <MonomerPropsCard
-                title="胺单体性质"
-                name={fav.amine?.name || undefined}
-                loading={amineProps.loading}
-                error={amineProps.error}
-                props={amineProps.data}
-              />
-            </div>
-          </section>
+            </section>
 
-          {/* 方案卡（复用查询页 PlanCardPanel，可切换模板） */}
-          <section>
-            <PlanCardPanel
-              card={planCard}
-              loading={planLoading}
-              error={planError}
-              templates={templates}
-              templatesLoading={templatesLoading}
-              templateId={templateId}
-              onTemplateChange={handleTemplateChange}
-              onTemplateUploaded={handleTemplateUploaded}
-              disabled={!fav.aldehyde?.smiles || !fav.amine?.smiles}
-            />
-          </section>
+            {/* 文献列表 */}
+            <section>
+              <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <BookOpen className="h-4 w-4 text-gold" /> 参考文献
+              </h3>
+              <ReferenceList refs={fav.references} />
+            </section>
 
-          {/* 文献列表 */}
-          <section>
-            <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <BookOpen className="h-4 w-4 text-gold" /> 参考文献
-            </h3>
-            <ReferenceList refs={fav.references} />
-          </section>
-
-          {/* 实验记录简表 */}
-          <section>
-            <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <FlaskConical className="h-4 w-4 text-gold" /> 实验记录
-            </h3>
-            {recLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-            ) : records.length === 0 ? (
-              <p className="text-sm text-muted-foreground">该收藏下暂无实验记录</p>
-            ) : (
-              <div className="rounded-lg border border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>编号</TableHead>
-                      <TableHead>日期</TableHead>
-                      <TableHead>成膜强度</TableHead>
-                      <TableHead>操作人</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {records.map((r) => (
-                      <TableRow key={r.record_id}>
-                        <TableCell className="font-medium">{r.experiment_no || r.record_id}</TableCell>
-                        <TableCell>{r.date || '—'}</TableCell>
-                        <TableCell>{r.strength || '—'}</TableCell>
-                        <TableCell>{r.operator || '—'}</TableCell>
+            {/* 该组实验记录（行可点击 → 嵌套放大详情） */}
+            <section>
+              <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <FlaskConical className="h-4 w-4 text-gold" /> 该组实验记录
+                {records.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">{records.length}</Badge>
+                )}
+              </h3>
+              {recLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ) : records.length === 0 ? (
+                <p className="text-sm text-muted-foreground">该收藏下暂无实验记录</p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="whitespace-nowrap">编号</TableHead>
+                        <TableHead className="whitespace-nowrap">日期</TableHead>
+                        <TableHead className="whitespace-nowrap">结果</TableHead>
+                        <TableHead className="whitespace-nowrap">成膜强度</TableHead>
+                        <TableHead className="whitespace-nowrap">操作人</TableHead>
+                        <TableHead className="w-8" />
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </section>
-        </div>
-      </DialogContent>
-    </Dialog>
+                    </TableHeader>
+                    <TableBody>
+                      {records.map((r) => {
+                        const meta = OUTCOME_META[r.outcome ?? ''] ?? OUTCOME_META.failed;
+                        return (
+                          <TableRow
+                            key={r.record_id}
+                            className="cursor-pointer hover:bg-muted/60"
+                            title="点击放大查看该记录详情"
+                            onClick={() => setNestedRec(r)}
+                          >
+                            <TableCell className="whitespace-nowrap font-medium">
+                              {r.experiment_no || r.record_id}
+                              {r.status === 'draft' && (
+                                <Badge
+                                  variant="outline"
+                                  className="ml-1.5 border-gold/60 text-gold-foreground"
+                                >
+                                  草稿
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">{r.date || '—'}</TableCell>
+                            <TableCell>
+                              <Badge className={meta.className}>{meta.label}</Badge>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">{r.strength || '—'}</TableCell>
+                            <TableCell className="whitespace-nowrap">{r.operator || '—'}</TableCell>
+                            <TableCell>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {records.length > 0 && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  点击任意记录行可放大查看完整详情（含自我总结与失误）。
+                </p>
+              )}
+            </section>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 嵌套：实验记录放大详情（「返回」回到收藏详情，不关闭整个链路） */}
+      <RecordDetailDialog
+        rec={nestedRec}
+        onClose={() => setNestedRec(null)}
+        onBack={() => setNestedRec(null)}
+        onChanged={(updated) => {
+          setNestedRec(updated);
+          setRecords((prev) =>
+            prev.map((r) => (r.record_id === updated.record_id ? updated : r)),
+          );
+        }}
+      />
+    </>
   );
 }
 
@@ -464,7 +526,7 @@ export function FavoritesSection({
           >
             <CardContent className="space-y-2 p-4">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 text-base font-semibold leading-snug text-foreground">
+                <div className="min-w-0 break-words text-base font-semibold leading-snug text-foreground">
                   {fav.aldehyde?.name || '未知醛'}
                   <span className="mx-1 text-gold">×</span>
                   {fav.amine?.name || '未知胺'}

@@ -57,9 +57,26 @@ def _load_importance():
     return _IMPORTANCE
 
 
-def load_graph():
-    with open(GRAPH_DIR / 'graph.pkl', 'rb') as f:
-        return pickle.load(f)
+def load_graph(app_root=None):
+    """加载图谱：优先 graph_v2.pkl（v1 超集，含 importance/社区节点，
+    节点 ID 已实测与 graph.pkl 全类型对齐），缺省时回退 graph.pkl；
+    随后合并用户实验记录增量侧车图（user_graph，任何失败静默跳过，
+    包内图只读绝不被修改）。
+    """
+    v2_fp = GRAPH_DIR / 'graph_v2.pkl'
+    v1_fp = GRAPH_DIR / 'graph.pkl'
+    fp = v2_fp if v2_fp.exists() else v1_fp
+    with open(fp, 'rb') as f:
+        G = pickle.load(f)
+    try:
+        import user_graph
+        n = user_graph.merge_into(G, app_root=app_root)
+        if n:
+            print(f'[query_graphrag] 合并用户实验侧车图: {n} 条实验记录节点 '
+                  f'({user_graph.user_graph_path(app_root)})', file=sys.stderr)
+    except Exception:
+        pass  # 无侧车图 / networkx 版本不符等：只用包内图
+    return G
 
 
 def get_reactions(G):
@@ -99,6 +116,19 @@ REACTION_FIELD_MAP = {
     'modulator': ['aldehyde_name', 'amine_name', 'catalyst', 'solvent', 'stoichiometry'],
 }
 
+# reaction 节点参与关键词打分的字段；尾部为用户实验记录(EXP-)扩展字段，
+# 包内文献反应节点没有这些字段（get 缺省 ''），对既有检索零影响
+REACTION_SCAN_FIELDS = [
+    'aldehyde_name', 'amine_name', 'solvent', 'temperature', 'outcome',
+    'synthesis_mode', 'interface_type', 'catalyst',
+    # 用户实验扩展（user_graph 侧车图节点）
+    'record_id', 'experiment_no', 'failure_class', 'strength', 'notes',
+    'mistakes', 'self_summary', 'timeline',
+]
+
+# 用户实验记录节点（source='user_experiment'）命中时的排序加分
+USER_EXP_BONUS = 2.0
+
 
 def filter_bonus(filters, data, extra_text=''):
     """波次2: 结构化过滤条件软加权 (可解释, 不做硬过滤, 永不清空结果)
@@ -135,8 +165,11 @@ def filter_bonus(filters, data, extra_text=''):
     return bonus
 
 
-def query(query_text, verbose=False):
+def query(query_text, verbose=False, G=None):
     """GraphRAG 查询
+
+    G: 可选预加载图（调用方复用同一张图，避免重复 unpickle + 保证多跳与
+       检索同图）；缺省时 load_graph()（v2 优先 + 用户侧车图合并）。
 
     返回: {
         'query': str,
@@ -146,7 +179,8 @@ def query(query_text, verbose=False):
         'summary': {...}
     }
     """
-    G = load_graph()
+    if G is None:
+        G = load_graph()
 
     q = query_text.lower()
 
@@ -210,20 +244,16 @@ def query(query_text, verbose=False):
     # 扫 reaction 节点 (关键词打分 + 过滤条件软加权)
     reaction_hits = []
     for rid, r in get_reactions(G):
-        text = ' '.join([
-            str(r.get('aldehyde_name', '')),
-            str(r.get('amine_name', '')),
-            str(r.get('solvent', '')),
-            str(r.get('temperature', '')),
-            str(r.get('outcome', '')),
-            str(r.get('synthesis_mode', '')),
-            str(r.get('interface_type', '')),
-            str(r.get('catalyst', '')),
-        ]).lower()
+        text = ' '.join(str(r.get(c, '')) for c in REACTION_SCAN_FIELDS).lower()
         score = match_score(text, keywords)
         if filters:
             score += filter_bonus(filters, r)
         if score > 0:
+            # 用户自己的实验记录（侧车图 EXP- 节点）加权：迭代场景下
+            # 自己的失败/成功历史优先于文献反应，防止被 6000+ 文献
+            # 反应挤出 top-k
+            if r.get('source') == 'user_experiment':
+                score += USER_EXP_BONUS
             reaction_hits.append({'id': rid, 'score': score, 'data': dict(r)})
 
     # 扫 literature 节点
@@ -256,9 +286,7 @@ def query(query_text, verbose=False):
         for kw in keywords:
             kw_low = kw.lower()
             for rid, r in get_reactions(G):
-                text = ' '.join(str(r.get(c, '')) for c in
-                                ['aldehyde_name', 'amine_name', 'solvent', 'temperature',
-                                 'outcome', 'synthesis_mode', 'interface_type', 'catalyst']).lower()
+                text = ' '.join(str(r.get(c, '')) for c in REACTION_SCAN_FIELDS).lower()
                 if kw_low in text:
                     reaction_hits.append({'id': rid, 'score': 0.5, 'data': dict(r)})
             for lid, l in get_literatures(G):

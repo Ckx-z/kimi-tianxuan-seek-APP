@@ -116,16 +116,18 @@ WORKUP_DICT = {
 
 # 失败诊断词 → (outcome 过滤值列表, 补充关键词)
 # 失败/部分成膜反应 = outcome 为 powder / unknown 的反应, 做反面教材检索
+# ('failed'/'partial' 为用户实验记录(EXP-节点)的 outcome 取值, 纳入后
+#  失败诊断提问会让用户自己的失败记录获得 outcome 过滤加分排前)
 FAILURE_DICT = {
-    '失败': (['powder', 'unknown'], ['powder', '沉淀', '失败']),
-    '不连续': (['powder', 'unknown'], ['powder', 'film', '不连续']),
-    '不牢': (['powder', 'unknown'], ['powder', 'film', '脱落']),
-    '裂': (['powder', 'unknown'], ['powder', 'film', 'crack', '裂']),
-    '碎': (['powder', 'unknown'], ['powder', 'film', '裂']),
-    '粉': (['powder'], ['powder', '粉末', '沉淀']),
-    '沉淀': (['powder'], ['powder', '沉淀']),
-    '不成膜': (['powder', 'unknown'], ['powder', '沉淀']),
-    '脱落': (['powder', 'unknown'], ['powder', 'film', '脱落']),
+    '失败': (['powder', 'unknown', 'failed', 'partial'], ['powder', '沉淀', '失败']),
+    '不连续': (['powder', 'unknown', 'failed', 'partial'], ['powder', 'film', '不连续']),
+    '不牢': (['powder', 'unknown', 'failed', 'partial'], ['powder', 'film', '脱落']),
+    '裂': (['powder', 'unknown', 'failed', 'partial'], ['powder', 'film', 'crack', '裂']),
+    '碎': (['powder', 'unknown', 'failed', 'partial'], ['powder', 'film', '裂']),
+    '粉': (['powder', 'failed'], ['powder', '粉末', '沉淀']),
+    '沉淀': (['powder', 'failed'], ['powder', '沉淀']),
+    '不成膜': (['powder', 'unknown', 'failed', 'partial'], ['powder', '沉淀']),
+    '脱落': (['powder', 'unknown', 'failed', 'partial'], ['powder', 'film', '脱落']),
 }
 
 # 温度中文词 → (过滤 token 列表)

@@ -15,12 +15,15 @@ from collections import deque
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
-def multi_hop_paths(G, start_nodes, max_hops=3, max_paths=10):
+def multi_hop_paths(G, start_nodes, max_hops=3, max_paths=10, skip_edge_types=None):
     """从 start_nodes BFS, 收集所有路径
 
+    skip_edge_types: 可选集合，遍历时跳过这些 edge_type 的边
+      （如 {'belongs_to'}：社区归属边只指向 summary 死胡同，占用路径名额）
     返回: list of paths [[n1, n2, n3], ...]
     """
     paths = []
+    skip = skip_edge_types or set()
 
     def dfs(node, path, depth):
         if depth >= max_hops:
@@ -28,6 +31,8 @@ def multi_hop_paths(G, start_nodes, max_hops=3, max_paths=10):
         if len(paths) >= max_paths:
             return
         for _, next_node, edata in G.out_edges(node, data=True):
+            if skip and edata.get('edge_type') in skip:
+                continue
             if next_node in path:
                 continue
             new_path = path + [next_node]
@@ -55,7 +60,11 @@ def format_paths(G, paths, max_paths=5):
             data = G.nodes[nid]
             nt = data.get('node_type', '?')
             if nt == 'reaction':
-                desc = f'R({data.get("aldehyde_name", "?")[:20]} + {data.get("amine_name", "?")[:20]})'
+                if data.get('source') == 'user_experiment':
+                    desc = (f'EXP[{data.get("record_id", "?")} '
+                            f'outcome={data.get("outcome", "?")}]')
+                else:
+                    desc = f'R({data.get("aldehyde_name", "?")[:20]} + {data.get("amine_name", "?")[:20]})'
             elif nt == 'literature':
                 desc = f'L[{data.get("journal", "?")[:20]}]'
             elif nt == 'monomer':

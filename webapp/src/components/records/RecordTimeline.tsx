@@ -2,7 +2,8 @@
  * 实验记录时间线（右栏 3/5）
  * - 记录卡列表：日期/单体对/结果徽章（成膜紫/部分金/失败灰）/编号/条件摘要
  * - 预测快照 vs 实际结果对比（有 prediction_snapshot 时）
- * - 每卡操作：「放大」Dialog 大字号全字段详情；「删除」AlertDialog 确认后 DELETE
+ * - 每卡操作：草稿「继续编辑」；正式记录「编辑」（全字段整体修改）；
+ *   「放大」共享详情 Dialog（内含编辑入口）；「删除」AlertDialog 确认后 DELETE
  * - 顶部：刷新按钮 + 记录数 + 「只看选中收藏」过滤开关
  */
 import { useState } from 'react';
@@ -20,60 +21,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import DraftEditDialog from './DraftEditDialog';
-import ProcessPanel from './ProcessPanel';
+import RecordDetailDialog from './RecordDetailDialog';
+import RecordEditDialog from './RecordEditDialog';
+import { CONDITION_LABELS, OUTCOME_META, pairLabel } from './meta';
 import { deleteRecord, type RecordItem } from './api';
-
-/** conditions 九键中文名 */
-const CONDITION_LABELS: Record<string, string> = {
-  solvent_1: '溶剂一',
-  solvent_2: '溶剂二',
-  eluent: '洗脱剂',
-  modulator: '调制剂',
-  catalyst: '催化剂',
-  temperature_c: '温度（℃）',
-  time_days: '时间（天）',
-  vessel: '容器',
-  addition_order: '加料顺序',
-};
-
-/** 结果徽章配置：成膜紫 / 部分金 / 失败灰 / 未定（草稿留空） */
-const OUTCOME_META: Record<string, { label: string; className: string }> = {
-  film: { label: '成膜', className: 'bg-primary text-primary-foreground' },
-  partial: { label: '部分成膜', className: 'bg-gold text-gold-foreground' },
-  failed: { label: '失败', className: 'bg-muted text-muted-foreground' },
-  '': { label: '未定', className: 'bg-muted text-muted-foreground' },
-};
-
-export interface RecordTimelineProps {
-  records: RecordItem[];
-  loading: boolean;
-  /** 后端不可用（降级提示） */
-  backendDown: boolean;
-  /** 「只看选中收藏」开关状态（受控） */
-  onlySelected: boolean;
-  onOnlySelectedChange: (on: boolean) => void;
-  /** 当前选中收藏 id（仅用于提示文案） */
-  favoriteId: string;
-  /** 刷新列表 */
-  onRefresh: () => void;
-}
-
-/** 单体对显示名 */
-function pairLabel(rec: RecordItem): string {
-  const ald = rec.aldehyde?.name || rec.aldehyde?.smiles?.slice(0, 16) || '未知醛';
-  const amine = rec.amine?.name || rec.amine?.smiles?.slice(0, 16) || '未知胺';
-  return `${ald} + ${amine}`;
-}
 
 /** 条件摘要：拼接非空条件键值 */
 function conditionsSummary(rec: RecordItem): string {
@@ -108,6 +61,20 @@ function PredictionCompare({ rec }: { rec: RecordItem }) {
   );
 }
 
+export interface RecordTimelineProps {
+  records: RecordItem[];
+  loading: boolean;
+  /** 后端不可用（降级提示） */
+  backendDown: boolean;
+  /** 「只看选中收藏」开关状态（受控） */
+  onlySelected: boolean;
+  onOnlySelectedChange: (on: boolean) => void;
+  /** 当前选中收藏 id（仅用于提示文案） */
+  favoriteId: string;
+  /** 刷新列表 */
+  onRefresh: () => void;
+}
+
 export default function RecordTimeline({
   records,
   loading,
@@ -119,7 +86,7 @@ export default function RecordTimeline({
 }: RecordTimelineProps) {
   /** 放大详情的记录 */
   const [detailRec, setDetailRec] = useState<RecordItem | null>(null);
-  /** 继续编辑的草稿 */
+  /** 编辑中的记录（草稿继续编辑 / 正式记录整体修改共用 RecordEditDialog） */
   const [editingRec, setEditingRec] = useState<RecordItem | null>(null);
   /** 待删除确认的记录 */
   const [deletingRec, setDeletingRec] = useState<RecordItem | null>(null);
@@ -139,6 +106,12 @@ export default function RecordTimeline({
     } finally {
       setDeleting(false);
     }
+  };
+
+  /** 从详情对话框进入编辑：先关详情，编辑保存后统一刷新 */
+  const handleEditFromDetail = (rec: RecordItem) => {
+    setDetailRec(null);
+    setEditingRec(rec);
   };
 
   return (
@@ -215,9 +188,13 @@ export default function RecordTimeline({
                     编号 {rec.experiment_no || '（未填写）'}
                   </span>
                   <div className="ml-auto flex gap-1">
-                    {isDraft && (
+                    {isDraft ? (
                       <Button variant="ghost" size="sm" onClick={() => setEditingRec(rec)}>
                         <Pencil className="mr-1 h-3.5 w-3.5" /> 继续编辑
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => setEditingRec(rec)}>
+                        <Pencil className="mr-1 h-3.5 w-3.5" /> 编辑
                       </Button>
                     )}
                     <Button variant="ghost" size="sm" onClick={() => setDetailRec(rec)}>
@@ -241,104 +218,20 @@ export default function RecordTimeline({
         </div>
       )}
 
-      {/* 放大详情 Dialog：大字号全字段 */}
-      <Dialog open={detailRec !== null} onOpenChange={(open) => !open && setDetailRec(null)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          {detailRec && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="text-xl">
-                  实验记录 {detailRec.experiment_no || '（未填编号）'}
-                  {detailRec.status === 'draft' && (
-                    <Badge variant="outline" className="ml-2 border-gold/60 text-gold-foreground">
-                      草稿
-                    </Badge>
-                  )}
-                </DialogTitle>
-                <DialogDescription>
-                  {detailRec.date}｜{detailRec.record_id}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 text-base">
-                <div>
-                  <p className="text-sm text-muted-foreground">单体对</p>
-                  <p className="text-lg font-medium">{pairLabel(detailRec)}</p>
-                  <p className="mt-1 break-all text-sm text-muted-foreground">
-                    醛 SMILES：{detailRec.aldehyde?.smiles || '—'}
-                    <br />
-                    胺 SMILES：{detailRec.amine?.smiles || '—'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">结果</p>
-                  <Badge className={(OUTCOME_META[detailRec.outcome] ?? OUTCOME_META.failed).className}>
-                    {(OUTCOME_META[detailRec.outcome] ?? OUTCOME_META.failed).label}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">反应条件</p>
-                  <div className="mt-1 grid grid-cols-2 gap-x-6 gap-y-1.5">
-                    {Object.entries(CONDITION_LABELS).map(([key, label]) => {
-                      const v = detailRec.conditions?.[key];
-                      return (
-                        <p key={key} className="text-sm">
-                          <span className="text-muted-foreground">{label}：</span>
-                          {v !== '' && v != null ? String(v) : '—'}
-                        </p>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <p className="text-sm">
-                    <span className="text-muted-foreground">机械强度：</span>
-                    {detailRec.strength || '—'}
-                  </p>
-                  <p className="text-sm">
-                    <span className="text-muted-foreground">操作人：</span>
-                    {detailRec.operator || '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">备注</p>
-                  <p className="mt-1 whitespace-pre-wrap text-base">{detailRec.notes || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">自我总结</p>
-                  <p className="mt-1 whitespace-pre-wrap text-base">{detailRec.self_summary || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">我认为的失误</p>
-                  <p className="mt-1 whitespace-pre-wrap text-base">{detailRec.mistakes || '—'}</p>
-                </div>
-                {detailRec.prediction_snapshot && detailRec.prediction_snapshot.score != null && (
-                  <div className="rounded-lg border border-gold/50 bg-gold-muted px-3 py-2 text-sm">
-                    <span className="font-medium">预测快照：</span>
-                    评分 {Number(detailRec.prediction_snapshot.score).toFixed(3)}
-                    {detailRec.prediction_snapshot.std != null &&
-                      `（±${Number(detailRec.prediction_snapshot.std).toFixed(3)}）`}
-                    {detailRec.prediction_snapshot.ood
-                      ? `｜OOD：${detailRec.prediction_snapshot.ood}`
-                      : ''}
-                  </div>
-                )}
-                {/* 实验过程时间线：完整流程 + 时间点记录（可编辑） */}
-                <ProcessPanel
-                  rec={detailRec}
-                  onChanged={(updated) => {
-                    setDetailRec(updated);
-                    onRefresh();
-                  }}
-                />
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* 放大详情 Dialog（共享组件，内含「编辑」入口） */}
+      <RecordDetailDialog
+        rec={detailRec}
+        onClose={() => setDetailRec(null)}
+        onChanged={(updated) => {
+          setDetailRec(updated);
+          onRefresh();
+        }}
+        onEdit={handleEditFromDetail}
+      />
 
-      {/* 草稿继续编辑 Dialog */}
+      {/* 编辑 Dialog：草稿继续编辑 / 正式记录整体修改（按 rec.status 自动选模式） */}
       {editingRec && (
-        <DraftEditDialog
+        <RecordEditDialog
           rec={editingRec}
           onClose={() => setEditingRec(null)}
           onSaved={onRefresh}

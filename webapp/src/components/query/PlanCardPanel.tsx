@@ -73,7 +73,7 @@ export default function PlanCardPanel({
               onValueChange={(v) => onTemplateChange(v === 'default' ? '' : v)}
               disabled={disabled || templatesLoading}
             >
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-full min-w-0 sm:w-[200px]">
                 <SelectValue placeholder={templatesLoading ? '模板加载中…' : '选择模板'} />
               </SelectTrigger>
               <SelectContent>
@@ -137,9 +137,9 @@ export default function PlanCardPanel({
             {Object.keys(card.conditions ?? {}).length > 0 && (
               <div>
                 <h4 className="mb-1.5 text-sm font-semibold text-foreground">默认条件</h4>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border p-3 text-sm md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-x-4 gap-y-1 rounded-lg border p-3 text-sm sm:grid-cols-2 md:grid-cols-3">
                   {Object.entries(card.conditions).map(([k, v]) => (
-                    <div key={k}>
+                    <div key={k} className="min-w-0 break-words">
                       <span className="text-muted-foreground">{k}：</span>
                       <span className="font-medium text-foreground">{String(v)}</span>
                     </div>

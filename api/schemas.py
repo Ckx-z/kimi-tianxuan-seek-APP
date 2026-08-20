@@ -45,7 +45,7 @@ class RecordCreate(BaseModel):
 
 
 class RecordUpdate(BaseModel):
-    """草稿继续编辑 / 转正式 / 正式记录更新流程与时间线（全字段可选）。"""
+    """草稿继续编辑 / 转正式 / 正式记录全字段整体修改（全字段可选）。"""
     status: str | None = Field(None, description="draft | final（final 走完整校验）")
     experiment_no: str | None = None
     outcome: str | None = None

@@ -13,10 +13,13 @@ COF App (全新机器学习实验) rag_export 摄入适配器
   - 默认干跑 (dry-run), 只校验 + 打印摘要, 不写任何文件
   - --apply 也只写 bridge/cof_app_import/<带日期新文件>, 绝不覆盖现有文件
   - 绝不直写 experiment/feedback_db.csv
+  - --apply 同时把实验记录增量写入用户侧车图谱
+    (<app_root>/data/graphrag_user/graph_user.pkl, 幂等覆盖更新, 可用
+    --no-graph 关闭)；侧车图只写用户数据目录, 绝不改包内 graph.pkl
 
 用法:
   python adapters/cof_app_ingest.py                # 干跑
-  python adapters/cof_app_ingest.py --apply        # 写出转换结果
+  python adapters/cof_app_ingest.py --apply        # 写出转换结果 + 增量入图
   python adapters/cof_app_ingest.py --export-dir D:\\path\\to\\rag_export
 
 契约文档: docs/COF_APP_CONTRACT.md (schema 权威定义在 App 侧 rag_export/README.md)
@@ -33,6 +36,9 @@ from pathlib import Path
 # ---- 路径配置 ----
 HERE = Path(__file__).parent.resolve()
 PROJ = HERE.parent
+BRIDGE = PROJ / 'bridge'
+if str(BRIDGE) not in sys.path:
+    sys.path.insert(0, str(BRIDGE))  # user_graph 等 bridge 模块按裸名 import
 DEFAULT_EXPORT_DIR = Path(r'C:\Users\ckx\Desktop\全新机器学习实验') / 'data' / 'rag_export'
 IMPORT_DIR = PROJ / 'bridge' / 'cof_app_import'
 
@@ -199,6 +205,12 @@ def main():
     ap.add_argument('--export-dir', type=Path,
                     default=Path(os.environ.get('COF_APP_RAG_EXPORT', DEFAULT_EXPORT_DIR)),
                     help='rag_export 根目录 (默认: App 侧 data/rag_export)')
+    ap.add_argument('--app-root', type=Path, default=None,
+                    help='用户数据应用根（侧车图写入 <app_root>/data/graphrag_user/；'
+                         '缺省按 user_graph.default_app_root() 解析：COF_DATA_DIR > '
+                         'frozen %APPDATA%/COF-Film-Recommend > 项目根）')
+    ap.add_argument('--no-graph', action='store_true',
+                    help='--apply 时不做实验记录增量入图（默认入图）')
     args = ap.parse_args()
 
     export_dir: Path = args.export_dir
@@ -254,6 +266,8 @@ def main():
 
     if not args.apply:
         print('\n(dry-run, 未写任何文件; 加 --apply 写出转换结果)')
+        if recs and not args.no_graph:
+            print(f'(dry-run, 另有 {len(recs)} 条记录将在 --apply 时增量写入侧车图谱)')
         return 1 if errors else 0
 
     IMPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -281,6 +295,15 @@ def main():
                 for p in preds:
                     f.write(json.dumps(prediction_to_prior(p), ensure_ascii=False) + '\n')
             print(f'✓ 写出 {jsonl_path} ({len(preds)} 行)')
+
+    # 实验记录增量入图（侧车图谱，只写用户数据目录；失败不阻断摄入）
+    if recs and not args.no_graph:
+        try:
+            import user_graph
+            n, gfp = user_graph.append_records(recs, app_root=args.app_root)
+            print(f'\n✓ 侧车图谱增量入图: {n} 条实验记录 -> {gfp}')
+        except Exception as e:
+            print(f'\n!! 侧车图谱入图失败（不影响 CSV/JSONL 摄入结果）: {e}')
 
     return 1 if errors else 0
 

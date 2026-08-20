@@ -12,7 +12,9 @@ adapters/iterate_suggest.py
      + 失败 outcome 直接拼进 query）
   4. 检索取证（降级链）:
        - 优先 search_local_pdfs.search() + format_results_for_prompt()
-       - GraphRAG 图检索（query_graphrag）import/运行失败时静默跳过
+       - GraphRAG 图检索：v2（意图路由+多模态重排+同图多跳，统一走
+         graph_v2.pkl 并合并用户实验侧车图）优先，失败降级 v1 直查，
+         import/运行失败时静默跳过
   5. 拼 prompt，要求 LLM 输出严格 JSON 数组
      [{type: condition_adjust|new_candidate|literature, title, detail, evidence_refs}]
   6. llm_client.chat_completion(max_tokens=8000, timeout=120)
@@ -368,25 +370,78 @@ def retrieve_evidence(query_text: str, aldehyde: dict, amine: dict,
         print(f'[iterate_suggest] search_local_pdfs 检索失败（降级继续）: {e}',
               file=sys.stderr)
 
-    # 2. GraphRAG 图检索（可选，失败静默跳过）
+    # 2. GraphRAG 图检索（v2 优先：意图路由 + 多模态重排 + 同图多跳；
+    #    v2 任何失败降级 v1 直查；图缺失/缺 networkx 时静默跳过）
     try:
         import query_graphrag
         # rerank 点亮状态：HAS_EMBED 为 True 且文献有命中时 rerank 实际生效
         print(f'[iterate_suggest] GraphRAG rerank: HAS_EMBED='
               f'{getattr(query_graphrag, "HAS_EMBED", False)}', file=sys.stderr)
-        gres = query_graphrag.query(query_text)
-        print(f'[iterate_suggest] GraphRAG 图检索命中: '
-              f'reactions={len(gres.get("reactions") or [])} '
-              f'literatures={len(gres.get("literatures") or [])}',
-              file=sys.stderr)
+        # 统一走 v2 图（graph_v2.pkl 为 v1 超集，节点 ID 已实测全类型对齐），
+        # 并合并用户实验记录增量侧车图（%APPDATA%/COF-Film-Recommend 下）
+        G = query_graphrag.load_graph(app_root=app_root)
+        gres = None
+        try:
+            # --- v2 检索链：nl2graph 解析 → 意图路由 → 策略执行 → 多模态重排 ---
+            from graphrag_v2.nl2graph import nl_to_query
+            from graphrag_v2.router import route
+            from graphrag_v2.multimodal import multimodal_rerank
+            parsed = nl_to_query(query_text)
+            strategy = route(parsed)
+            gres = strategy.execute(
+                lambda q, verbose=False: query_graphrag.query(q, G=G), G=G)
+            # global/temporal 等策略不返回 reactions/literatures 时补一趟
+            # local 基线，保证证据不断档（社区摘要等 v2 产物一并保留）
+            if not isinstance(gres, dict) or 'reactions' not in gres:
+                base = query_graphrag.query(query_text, G=G)
+                if isinstance(gres, dict):
+                    for k, v in gres.items():
+                        base.setdefault(k, v)
+                gres = base
+            # 多模态 4 路融合重排文献候选（keyword+embedding+importance+community）
+            if gres.get('literatures'):
+                gres['literatures'] = multimodal_rerank(
+                    gres['literatures'][:30], query_text, G=G)[:10]
+            print(f'[iterate_suggest] GraphRAG v2 检索: '
+                  f'intent={parsed.get("intent")} '
+                  f'reactions={len(gres.get("reactions") or [])} '
+                  f'literatures={len(gres.get("literatures") or [])} '
+                  f'communities={len(gres.get("communities") or [])}',
+                  file=sys.stderr)
+        except Exception as e:
+            # v2 链路失败 → 降级 v1 直查（同一张合并图，ID 已统一）
+            print(f'[iterate_suggest] GraphRAG v2 检索失败，降级 v1: {e}',
+                  file=sys.stderr)
+            gres = query_graphrag.query(query_text, G=G)
+            print(f'[iterate_suggest] GraphRAG 图检索(v1)命中: '
+                  f'reactions={len(gres.get("reactions") or [])} '
+                  f'literatures={len(gres.get("literatures") or [])}',
+                  file=sys.stderr)
+
         lines = ['## GraphRAG 图检索']
         for h in (gres.get('reactions') or [])[:5]:
             d = h['data']
             graph_ref_ids.append(str(h['id']))
-            lines.append(
-                f"- [{h['score']}★] 醛 {d.get('aldehyde_name','?')} + 胺 {d.get('amine_name','?')} | "
-                f"溶剂 {d.get('solvent','?')} | 温度 {d.get('temperature','?')} | "
-                f"产物 {d.get('outcome','?')}")
+            if d.get('source') == 'user_experiment':
+                # 用户自己的实验记录节点（侧车图）：标注 record_id 便于引用
+                rid = str(d.get('record_id') or '')
+                if rid:
+                    graph_ref_ids.append(rid)
+                lines.append(
+                    f"- [{h['score']}★] 【我的实验记录 {rid}】"
+                    f"(图节点 {h['id']}, 实验编号 {d.get('experiment_no','?')}, "
+                    f"{d.get('date','?')}) "
+                    f"outcome={d.get('outcome','?')} "
+                    f"失败分类={d.get('failure_class') or '未知'} | "
+                    f"醛 {d.get('aldehyde_name','?')} + 胺 {d.get('amine_name','?')} | "
+                    f"溶剂 {d.get('solvent','?')} | 温度 {d.get('temperature','?')} | "
+                    f"失误 {str(d.get('mistakes',''))[:80]} | "
+                    f"自我总结 {str(d.get('self_summary',''))[:80]}")
+            else:
+                lines.append(
+                    f"- [{h['score']}★] 醛 {d.get('aldehyde_name','?')} + 胺 {d.get('amine_name','?')} | "
+                    f"溶剂 {d.get('solvent','?')} | 温度 {d.get('temperature','?')} | "
+                    f"产物 {d.get('outcome','?')}")
         for h in (gres.get('literatures') or [])[:5]:
             d = h['data']
             graph_ref_ids.append(str(h['id']))
@@ -398,21 +453,33 @@ def retrieve_evidence(query_text: str, aldehyde: dict, amine: dict,
         if len(lines) > 1:
             evidence_blocks.append('\n'.join(lines))
 
-        # 2b. 多跳 BFS：反应→溶剂/催化剂→同类成功反应→文献（import/运行失败静默跳过）
+        # 2a. 社区摘要（v2 global 路由产物，模板摘要非 LLM）
+        comms = gres.get('communities') or []
+        if comms:
+            clines = ['## GraphRAG 社区摘要（分层社区, global 检索）']
+            for c in comms[:5]:
+                clines.append(f"- [{c['id']}] size={c.get('size', 0)} | "
+                              f"{str(c.get('top_text', ''))[:150]}")
+            evidence_blocks.append('\n'.join(clines))
+
+        # 2b. 多跳推理：优先用 relational 路由已算好的路径，否则从命中反应
+        # 起步在同一张合并图上 BFS（跳过 belongs_to 社区死胡同边）
         try:
             from graphrag_v2.reasoning import multi_hop_paths, format_paths
-            # 注意：用 graph.pkl（v1 图）跑多跳，与 graph_v2.pkl 节点 ID 可能不一致
-            G = query_graphrag.load_graph()
-            start_ids = [str(h['id']) for h in (gres.get('reactions') or [])[:3]
-                         if str(h['id']) in G]
-            if start_ids:
-                paths = multi_hop_paths(G, start_ids, max_hops=3, max_paths=10)
-                print(f'[iterate_suggest] 多跳 BFS: 起点 {len(start_ids)} 个反应节点, '
-                      f'路径 {len(paths)} 条', file=sys.stderr)
-                if paths:
-                    evidence_blocks.append(
-                        '## GraphRAG 多跳推理路径（反应→溶剂/催化剂→同类反应→文献）\n'
-                        + format_paths(G, paths, max_paths=5))
+            paths = gres.get('multi_hop_paths')
+            if not paths:
+                start_ids = [str(h['id']) for h in (gres.get('reactions') or [])[:3]
+                             if str(h['id']) in G]
+                if start_ids:
+                    paths = multi_hop_paths(G, start_ids, max_hops=3,
+                                            max_paths=10,
+                                            skip_edge_types={'belongs_to'})
+            if paths:
+                print(f'[iterate_suggest] 多跳推理: 路径 {len(paths)} 条',
+                      file=sys.stderr)
+                evidence_blocks.append(
+                    '## GraphRAG 多跳推理路径（反应→溶剂/催化剂→同类反应→文献）\n'
+                    + format_paths(G, paths, max_paths=5))
         except Exception as e:
             # graphrag_v2 不可 import / 图结构不符等：静默跳过
             print(f'[iterate_suggest] 多跳 BFS 跳过（降级继续）: {e}',

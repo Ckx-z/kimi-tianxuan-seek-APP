@@ -25,6 +25,13 @@ class GraphRAGv2:
 
     def load_graph(self):
         import pickle
+        try:
+            # 与检索底座同一条加载路径（v2 优先 + 用户实验侧车图合并）
+            from query_graphrag import load_graph as _load
+            self.G = _load()
+            return self.G
+        except Exception:
+            pass
         v2_fp = Path(__file__).resolve().parent.parent / 'graphrag' / 'graph_v2.pkl'
         v1_fp = Path(__file__).resolve().parent.parent / 'graphrag' / 'graph.pkl'
         fp = v2_fp if v2_fp.exists() else v1_fp
@@ -43,10 +50,12 @@ class GraphRAGv2:
             print(f'\n>>> NL: "{nl_text}"')
             print(query_to_str(parsed))
 
-        # 2. 路由
+        # 2. 路由（统一在 self.G 上执行：v2 图 + 用户侧车图合并由
+        #    query_graphrag.load_graph 保证，避免 v1/v2 图 ID 不一致）
         from query_graphrag import query as v1_query
         strategy = route(parsed)
-        result = strategy.execute(v1_query, G=self.G)
+        result = strategy.execute(
+            lambda q, verbose=False: v1_query(q, G=self.G), G=self.G)
 
         # 3. 多模态重排 (literature 候选)
         if isinstance(result, dict) and 'literatures' in result:

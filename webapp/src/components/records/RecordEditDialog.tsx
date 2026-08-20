@@ -1,8 +1,9 @@
 /**
- * 草稿继续编辑对话框
- * - 核心字段：实验编号 / 结果三选（可留空）/ 反应条件九键 / 机械强度 / 操作人 / 备注
+ * 通用实验记录编辑对话框（草稿继续编辑 / 正式记录整体修改共用）
+ * - mode="draft"：底部两键「保存草稿」（宽松校验）/「转为正式记录」（编号必填 + 结果三选）
+ * - mode="final"：正式记录全字段修改（编号 / 结果 / 条件 / 备注 / 自我总结 / 失误 / 流程时间线），
+ *   底部一键「保存修改」，保持必填校验（experiment_no、outcome），后端走 final 完整校验
  * - 内嵌实验过程时间线面板（ProcessPanel）
- * - 底部两键：「保存草稿」（宽松校验）/「转为正式记录」（编号必填 + 结果三选，走后端完整校验）
  */
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -35,14 +36,17 @@ const CONDITION_FIELDS: { key: string; label: string }[] = [
   { key: 'addition_order', label: '加料顺序' },
 ];
 
-export interface DraftEditDialogProps {
+export interface RecordEditDialogProps {
   rec: RecordItem;
+  /** 编辑模式；缺省按 rec.status 推断（draft → 草稿编辑，否则正式记录整体修改） */
+  mode?: 'draft' | 'final';
   onClose: () => void;
-  /** 保存（草稿或转正式）成功后的回调 */
+  /** 保存成功后的回调 */
   onSaved: () => void;
 }
 
-export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDialogProps) {
+export default function RecordEditDialog({ rec, mode, onClose, onSaved }: RecordEditDialogProps) {
+  const isDraft = (mode ?? (rec.status === 'draft' ? 'draft' : 'final')) === 'draft';
   const [experimentNo, setExperimentNo] = useState(rec.experiment_no || '');
   const [outcome, setOutcome] = useState<string>(rec.outcome || '');
   const [conditions, setConditions] = useState<Record<string, string>>(() => {
@@ -59,20 +63,27 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
   const [selfSummary, setSelfSummary] = useState(rec.self_summary || '');
   const [mistakes, setMistakes] = useState(rec.mistakes || '');
   const [saving, setSaving] = useState<'draft' | 'final' | null>(null);
-  /** 编号为空的前端拦截提示（仅转正式时） */
+  /** 编号为空的前端拦截提示（转正式 / 正式保存时） */
   const [noError, setNoError] = useState(false);
-  /** 面板内流程/时间线变更后记录有更新，但草稿本体未变，关闭时也需提示父级 */
+  /** 面板内流程/时间线变更后记录有更新，但本体未变，关闭时也需提示父级 */
   const [currentRec, setCurrentRec] = useState(rec);
 
-  /** 提交：finalize=false 保存草稿；true 转正式 */
+  /**
+   * 提交：draft 模式下 finalize=false 保存草稿、true 转正式；
+   * final 模式下固定按正式记录完整校验保存（编号 + 结果必填）。
+   */
   const handleSubmit = async (finalize: boolean) => {
     if (finalize && !experimentNo.trim()) {
       setNoError(true);
-      toast.error('转为正式记录前请填写实验编号（必填）');
+      toast.error(isDraft ? '转为正式记录前请填写实验编号（必填）' : '实验编号为必填项');
       return;
     }
     if (finalize && !outcome) {
-      toast.error('转为正式记录前请选择实验结果（成膜 / 部分成膜 / 失败）');
+      toast.error(
+        isDraft
+          ? '转为正式记录前请选择实验结果（成膜 / 部分成膜 / 失败）'
+          : '请选择实验结果（成膜 / 部分成膜 / 失败）',
+      );
       return;
     }
     setSaving(finalize ? 'final' : 'draft');
@@ -89,9 +100,11 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
         conditions,
       });
       toast.success(
-        finalize
-          ? `已转为正式记录（编号 ${experimentNo.trim()}）`
-          : '草稿已保存',
+        isDraft
+          ? finalize
+            ? `已转为正式记录（编号 ${experimentNo.trim()}）`
+            : '草稿已保存'
+          : `记录 ${experimentNo.trim()} 已保存修改`,
       );
       onSaved();
       onClose();
@@ -102,21 +115,29 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
     }
   };
 
+  const requiredHint = isDraft ? '（转正式时必填）' : '（必填）';
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl">编辑草稿 {rec.experiment_no || `（${rec.record_id}）`}</DialogTitle>
+      <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="border-b border-border px-5 py-4">
+          <DialogTitle className="text-lg">
+            {isDraft
+              ? `编辑草稿 ${rec.experiment_no || `（${rec.record_id}）`}`
+              : `编辑实验记录 ${rec.experiment_no || `（${rec.record_id}）`}`}
+          </DialogTitle>
           <DialogDescription>
-            {rec.date}｜草稿暂存中，可继续编辑后保存草稿，或转为正式记录
+            {isDraft
+              ? `${rec.date}｜草稿暂存中，可继续编辑后保存草稿，或转为正式记录`
+              : `${rec.date}｜正式记录：全部字段均可修改，保存时保持编号与结果必填校验`}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* 实验编号（转正式必填） */}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          {/* 实验编号（必填） */}
           <div className="space-y-1.5">
             <Label>
-              实验编号 <span className="text-destructive">*（转正式时必填）</span>
+              实验编号 <span className="text-destructive">*{requiredHint}</span>
             </Label>
             <Input
               value={experimentNo}
@@ -127,24 +148,24 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
               placeholder="如 A5、G2-3"
               className={noError ? 'border-destructive' : ''}
             />
-            {noError && <p className="text-xs text-destructive">转为正式记录时实验编号为必填项</p>}
+            {noError && <p className="text-xs text-destructive">实验编号为必填项</p>}
           </div>
 
-          {/* 结果三选（草稿可留空） */}
+          {/* 结果三选（草稿可留空，正式必填） */}
           <div className="space-y-1.5">
-            <Label>实验结果（草稿可留空）</Label>
-            <RadioGroup value={outcome} onValueChange={setOutcome} className="flex gap-4">
+            <Label>实验结果{isDraft ? '（草稿可留空）' : ''}</Label>
+            <RadioGroup value={outcome} onValueChange={setOutcome} className="flex flex-wrap gap-4">
               <div className="flex items-center gap-1.5">
-                <RadioGroupItem value="film" id="draft-outcome-film" />
-                <Label htmlFor="draft-outcome-film" className="font-normal">成膜</Label>
+                <RadioGroupItem value="film" id="edit-outcome-film" />
+                <Label htmlFor="edit-outcome-film" className="font-normal">成膜</Label>
               </div>
               <div className="flex items-center gap-1.5">
-                <RadioGroupItem value="partial" id="draft-outcome-partial" />
-                <Label htmlFor="draft-outcome-partial" className="font-normal">部分成膜</Label>
+                <RadioGroupItem value="partial" id="edit-outcome-partial" />
+                <Label htmlFor="edit-outcome-partial" className="font-normal">部分成膜</Label>
               </div>
               <div className="flex items-center gap-1.5">
-                <RadioGroupItem value="failed" id="draft-outcome-failed" />
-                <Label htmlFor="draft-outcome-failed" className="font-normal">失败</Label>
+                <RadioGroupItem value="failed" id="edit-outcome-failed" />
+                <Label htmlFor="edit-outcome-failed" className="font-normal">失败</Label>
               </div>
             </RadioGroup>
           </div>
@@ -152,7 +173,7 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
           {/* 反应条件九键 */}
           <div className="space-y-2">
             <Label className="text-muted-foreground">反应条件</Label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {CONDITION_FIELDS.map((f) => (
                 <div key={f.key} className="space-y-1">
                   <Label className="text-xs text-muted-foreground">{f.label}</Label>
@@ -168,7 +189,7 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
           </div>
 
           {/* 机械强度 / 操作人 */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>机械强度</Label>
               <Input value={strength} onChange={(e) => setStrength(e.target.value)} />
@@ -185,7 +206,7 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
           </div>
 
-          {/* 自我总结（草稿也可填） */}
+          {/* 自我总结（可后补） */}
           <div className="space-y-1.5">
             <Label>自我总结</Label>
             <Textarea
@@ -196,7 +217,7 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
             />
           </div>
 
-          {/* 我认为的失误（草稿也可填） */}
+          {/* 我认为的失误（可后补） */}
           <div className="space-y-1.5">
             <Label>我认为的失误</Label>
             <Textarea
@@ -207,24 +228,41 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
             />
           </div>
 
-          {/* 实验过程时间线（草稿也可维护） */}
+          {/* 实验过程时间线 */}
           <ProcessPanel rec={currentRec} onChanged={setCurrentRec} />
+        </div>
 
-          {/* 底部操作 */}
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1"
-              disabled={saving !== null}
-              onClick={() => void handleSubmit(false)}
-            >
-              {saving === 'draft' ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              保存草稿
-            </Button>
+        {/* 底部操作（固定不随内容滚动） */}
+        <div className="flex gap-3 border-t border-border px-5 py-3">
+          {isDraft ? (
+            <>
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={saving !== null}
+                onClick={() => void handleSubmit(false)}
+              >
+                {saving === 'draft' ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                保存草稿
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={saving !== null}
+                onClick={() => void handleSubmit(true)}
+              >
+                {saving === 'final' ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                )}
+                转为正式记录
+              </Button>
+            </>
+          ) : (
             <Button
               className="flex-1"
               disabled={saving !== null}
@@ -233,11 +271,11 @@ export default function DraftEditDialog({ rec, onClose, onSaved }: DraftEditDial
               {saving === 'final' ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <CheckCircle2 className="mr-2 h-4 w-4" />
+                <Save className="mr-2 h-4 w-4" />
               )}
-              转为正式记录
+              保存修改
             </Button>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
