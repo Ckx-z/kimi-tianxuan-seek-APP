@@ -2,10 +2,10 @@
 
 > 输入两组单体（醛 / 胺）的 SMILES 或 CAS 号，预测 COF 成膜概率，输出打分理由、化学结构图与实验方案建议。面向课题组实验人员的桌面应用。
 
-- **最新版本**：**v0.2.0** → 📥 [GitHub Release 下载页](https://github.com/Ckx-z/kimi-tianxuan-seek-APP/releases/latest)
-- **分发形态**：Windows NSIS 安装包，开箱即用，无需安装 Python；支持自动更新（v0.2.0 起）
+- **最新版本**：**v0.3.0** → 📥 [GitHub Release 下载页](https://github.com/Ckx-z/kimi-tianxuan-seek-APP/releases/latest)
+- **分发形态**：Windows NSIS 安装包，开箱即用，无需安装 Python；支持自动更新（v0.2.5 起端到端可用）
 - **使用文档**：📖 [docs/用户手册.md](docs/用户手册.md)（实验人员）｜📦 [docs/分发说明.md](docs/分发说明.md)（负责转发的同学）
-- **核心能力**：成膜概率预测（tree 模型内置必可用，GNN 可选增强自动降级）+ 打分理由 + OOD 三级判定 + 批量排序 + 收藏夹 + 实验记录（草稿/时间线/附件）+ LLM 实验方案卡 + GraphRAG 方案迭代
+- **核心能力**：成膜概率预测（tree 模型内置必可用，GNN 可选增强自动降级）+ 打分理由 + OOD 三级判定 + 批量排序 + 收藏夹 + 实验记录（草稿/时间线/附件/复盘字段）+ LLM 实验方案卡 + GraphRAG 方案迭代（基于用户实验数据闭环）+ 科研助手 Agent（对话式，自动调预测/图谱/记录工具）
 
 ---
 
@@ -27,7 +27,7 @@
 
 **第 3 步：配置 LLM（可选，2 分钟）**
 
-> LLM 用于：单体性质中文解读（含毒性安全提示）、实验方案卡生成、方案迭代问答。**不配也能用全部核心功能**（打分、排序、收藏、记录）。
+> LLM 用于：单体性质中文解读（含毒性安全提示）、实验方案卡生成、方案迭代问答、科研助手对话。**不配也能用全部核心功能**（打分、排序、收藏、记录）。
 
 1. 准备一个 OpenAI 兼容的 API（课题组提供的 MiniMax / LongCat，或你自己的 OpenAI 等）
 2. 应用内「设置」页 → 填入三项：
@@ -42,6 +42,7 @@
 2. 点「收藏」保存这组单体（已收藏会显示状态，不会重复收藏）
 3. 做完实验到「实验记录」页回填结果：未完成可先**存草稿**；可写完整实验流程、按时间点记录过程并上传照片
 4. 「方案迭代」页用自然语言提问（如"这个组合成膜失败了怎么改"），AI 给出下一步建议，采纳后自动生成编号方案卡
+5. 「科研助手」页直接对话提问：它会自动调预测模型、查 GraphRAG 图谱、翻你的实验记录后综合回答
 
 **遇到问题**：先看 [docs/用户手册.md](docs/用户手册.md) 的 FAQ（打不开、GNN 不可用、数据在哪等）；解决不了联系课题组内分发负责人。
 
@@ -113,7 +114,7 @@
 |---|---|---|
 | `api/` | FastAPI 后端 | 六路由（打分 / 收藏 / 实验记录 / 单体 / 方案卡 / LLM），`uvicorn api.main:app --port 8000` |
 | `webapp/` | React 前端 + Electron 桌面壳 | Vite + React + TS + Tailwind；`electron/main.cjs` 为桌面入口；NSIS 打包产物即安装包 |
-| `src/` | 共享 Python 后端 | 预测层（双模型路由 + GNN subprocess）、条件推荐、Word 报告、SHAP 归因、分子渲染 |
+| `src/` | 共享 Python 后端 | 预测层（双模型路由 + GNN subprocess）、条件推荐、Word 报告、SHAP 归因、分子渲染、科研助手 Agent（`assistant/`，对话循环 + 工具调用） |
 | `minimax/` | GraphRAG 迭代模块 | 含 `bridge/`（GraphRAG 检索与方案生成）、`adapters/`（数据契约摄入）；经 `data/rag_export/` 契约与主模块对接 |
 | `app/gradio_app.py` | 旧版 Gradio 界面 | 保留维护，与 FastAPI 共用 `src/` |
 
@@ -147,7 +148,7 @@ npm run dev        # Vite dev server，代理到 8000 端口后端
 ### 测试
 
 ```bash
-E:\ANACONDA\python.exe -m pytest tests/ -v    # 基线 373 项
+E:\ANACONDA\python.exe -m pytest tests/ -v    # 基线 420 项
 ```
 
 ---
@@ -158,7 +159,7 @@ E:\ANACONDA\python.exe -m pytest tests/ -v    # 基线 373 项
 全新机器学习实验/
 ├── api/                     # FastAPI 后端（六路由）
 ├── webapp/                  # React 前端 + Electron 桌面壳（分发安装包来源）
-│   ├── src/pages|sections/  # 页面：查询打分/批量排序/收藏夹/实验记录/方案迭代/设置
+│   ├── src/pages|sections/  # 页面：查询打分/批量排序/收藏夹/实验记录/方案迭代/科研助手/设置
 │   └── electron/main.cjs    # Electron 主进程
 ├── app/gradio_app.py        # 旧版 Gradio 界面（保留维护）
 ├── src/

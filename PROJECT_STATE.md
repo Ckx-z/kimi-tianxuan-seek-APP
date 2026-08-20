@@ -1,7 +1,7 @@
 # PROJECT_STATE — 项目当前状态
 
 > ⭐ **这是每次会话的第一份必读文件**。会话开头读它进入状态，结尾更新它。
-> 最后更新：2026-07-22（阶段 21：P4a/b——实验记录四项修复 + LLM 基座（longcat 推理模型适配）+ 单体性质卡 + 方案卡模板系统；299 passed）
+> 最后更新：2026-08-20（阶段 26：GraphRAG P0 闭环 + 科研助手 Agent MVP + v0.3.0 发布——自动更新链路首次端到端武装 + Chromium 缓存事故根治；420 passed）
 
 ---
 
@@ -43,6 +43,10 @@
 | **阶段 21** | **P4a/b：实验记录四项修复（按收藏过滤/实验编号必填/切换刷新/双溶剂+洗脱剂）+ LLM 基座三级配置链 + longcat 推理模型适配 + 单体性质卡 + 方案卡模板系统（内置侯老师默认 + docx 上传 LLM 提取）；用户数据 gitignore（D30）；页⑤自然语言迭代暂缓** | ✅ **已完成** |
 | **阶段 22** | **页⑤ GraphRAG 迭代引擎全量对接：闭环打通（编排器+建议写回+采纳生成编号方案卡）→ 修复包（游离建议可采纳/采纳幂等/API 三修）→ 全量升级（failure 专家语料注入/evidence_refs 白名单/置信度字段/多跳 BFS/nl2graph 中文解析/monomer_pool RDKit 清洗 253 行/图谱重建/importance 加权）；6 问复测全部非零且 top5 相关性显著提升** | ✅ **已完成** |
 | **阶段 22b** | **FastAPI 地基（api/ 六路由，未来独立前端对接层）+ 页④记录删除/放大查看** | ✅ **已完成** |
+| **阶段 23** | **前端迁移收尾（新旧双版对照 13 用例：✅11/⚠️2，可切换）+ Phase 3 桌面分发全链路：runtime_config 运行时配置化、Electron 壳 + 静态托管、PyInstaller 后端 exe（927MB）、NSIS 安装包（357MB）真实安装烟测全过；v0.1.0 tag** | ✅ **已完成** |
+| **阶段 24** | **实测反馈 11 项改进（性质卡 max_tokens 修复 / 记录草稿+过程时间线+附件 / 结构图+dimer.svg / 打分理由 frozen 降级 / 收藏未打分回填 / 自动更新 electron-updater 接入 / 单实例锁 / 浅色对比度）+ v0.2.0 GitHub Release 三资产发布（PAT + Watt `-k` 通道）；373 passed** | ✅ **已完成** |
+| **阶段 25** | **CAS 解析修复（内置库→缓存→PubChem→LLM 双路一致性校验兜底 + 前端改走后端 `/api/monomers/resolve-cas`）+ 设置页手动检查更新（4 IPC + preload.cjs）+ v0.2.5 发布；⚠️ 错包事故（未重跑 PyInstaller）返工 → 发版自证清单建立；382 passed** | ✅ **已完成** |
+| **阶段 26** | **GraphRAG P0 闭环（v2 检索接入 iterate_suggest + 实验记录侧车入图，迭代建议基于用户真实实验数据）+ 实验记录全字段编辑/新增「自我总结/失误」复盘字段入 RAG + 收藏页嵌套记录视图 + 科研助手 Agent MVP（ming 人格 + function calling 双路径循环 + predict_film/query_graphrag/read_experiment_records 三工具 + SSE 对话页，真实 LLM 三轮工具调用验收）+ v0.3.0 发布 + Chromium 启发式缓存"旧界面"事故根治（SPA Cache-Control）；420 passed** | ✅ **已完成** |
 
 **阶段 16 要点（2026-07-21）**：
 - 前端全量重写（`app/gradio_app.py` 284→870 行）：`gr.themes.Soft` 深青/石墨学术主题、色彩语义（⛔/⚠️/✓）、五标签页骨架（③收藏夹 ④实验记录 ⑤RAG 迭代为占位，P2/P3 期做）
@@ -296,24 +300,37 @@
 
 **验证**：TFPT+H3 → out、TAPT+A2/Tp+Pa → none、虚构双未见大芳香 → warning；新增 `tests/test_ood_ensemble.py`（20 个）；**pytest 77 passed**（57+20）。
 
-### 下一步
+### 下一步（2026-08-20 阶段 26 收官刷新）
 
-**阶段 14 候选（2026-07-21 收官刷新）：**
+**产品/工程线（当前主线）：**
 
-1. **fold3 型"区域漂移大单体"专项切片（任务 2，第一优先）**：闭卷已证实 fold3 对树/GNN/embedding 全线坍缩（~0.36）——做 raw-feature 包络外样本的检测与单独计分（逐折标配已就位，切片挂在 fold_summary 最难折上），目标是"识别出这类单体并降级/提示"，比硬提表征更实际。
-2. **外部数据预训练表征（可选立项）**：与本数据无重叠的预训练模型（MolFormer/ChemBERTa 类），用阶段 B 同一闭卷管线直接对比（同源 GNN 对照组已就位）。成本与收益需先评估。
-3. **评估与产品化遗留观察点**：双未见 v4/noTE 两协议冲突（噪声量级，表征升级后再复测）；A 混合桶 MAE −0.0075（D23 复盘点，待 App 日志）；实验 D 条件泄漏 0.9112 诊断（一直挂着）。
-4. **工程增强（非阻塞）**：案例库自动提取、GNN 免 subprocess 直接导入、LightGBM 对比、仅二聚体 3D 消融（D19 复盘点）。
+1. **科研助手 V2 规划**：全工具集 + 记忆编译（MVP 已上线：ming 人格、function calling 双路径循环、三工具、SSE 对话页 /assistant、页⑤一键转入）
+2. **自动更新端到端验收收尾**：v0.2.5→v0.3.0 已下载安装，缓存事故已根治（v0.3.1 起 `Cache-Control: no-cache` 免疫），待用户最终确认新界面
+3. **Mac 版 CI**：GitHub Actions macOS runner 打包（待启动）
+4. **安全/仓库收尾**：用户删除 GitHub PAT（已多次提醒）；shiyandiedai 仓库手动归档（GitHub 网页操作）
 
-> 已关闭：GNN embedding 迁移（exp_010 闭卷证伪：mono_emb、pair_emb 同源均无效）、routed_strict 切换评审（D23）、双留出逐折报告标配化（D23）、Morgan/MACCS 指纹入模（exp_006）、概率校准（证伪）。
+**模型线遗留（积压，非阻塞）：**
+
+5. **fold3 型"区域漂移大单体"专项切片**：闭卷已证实 fold3 对树/GNN/embedding 全线坍缩（~0.36），目标是"识别出这类单体并降级/提示"（OOD 包络检测已落地，切片计分待做）
+6. **概率校准复测**（Platt/isotonic）与双未见 v4/noTE 两协议冲突复测（噪声量级）；A 混合桶 MAE −0.0075（D23 复盘点，待 App 日志积累）
+7. **外部数据预训练表征（可选立项）**：MolFormer/ChemBERTa 类，与本数据无重叠天然闭卷；阶段 B 管线可直接复用
+8. **工程增强（非阻塞）**：LightGBM 对比、仅二聚体 3D 消融（D19 复盘点）、实验 D 条件泄漏 0.9112 诊断（一直挂着）
+
+> 已关闭：GNN embedding 迁移（exp_010 闭卷证伪：mono_emb、pair_emb 同源均无效）、routed_strict 切换评审（D23）、双留出逐折报告标配化（D23）、Morgan/MACCS 指纹入模（exp_006）、概率校准（证伪）、GraphRAG 替代方案评估（LangChain 等，结论：GraphRAG 仍最适配，报告在 docs/）。
 > 待用户输入：H1–H4 全氟链酰肼结构确认（D26，确认后补 C/G5 回测——将自动走 OOD out 红牌路径，D27 闭环场景）。
-> 已完成：OOD/不确定性正式输出（D27，exp_012）。
+> 已完成：OOD/不确定性正式输出（D27，exp_012）；GraphRAG P0 闭环 + 科研助手 Agent MVP（阶段 26）。
 
 ---
 
 ## 六、阻塞点 / 待决策（BLOCKERS）
 
-暂无阻塞。待决策：
+暂无阻塞。待用户操作：
+- **删除 GitHub PAT**（v0.2.0 起用于 Release 上传，安全收尾，已多次提醒）
+- **shiyandiedai 仓库手动归档**（GitHub 网页操作）
+- **确认 v0.3.0 新界面**（自动更新端到端验收最后一步）
+- **H1–H4 全氟链酰肼结构确认**（D26）
+
+待决策：
 - ~~routed_strict 切换评审~~ **已复盘关闭（D23，2026-07-20）**：已切换为仅双未见走 noTE；遗留观察项：A 混合桶 MAE −0.0075、双未见真实占比与 noTE 臂 MAE 兑现
 - ~~双未见单体泛化的表征升级路线~~ **已证伪关闭（D25，2026-07-21）**：GNN embedding 迁移闭卷 −0.034（逐种子全负），阶段 A 增益为配对标签记忆；剩余方向：外部预训练 / 配对级手工表征 / fold3 切片（见下一步）
 - 双未见场景 v4 vs noTE 两协议方向冲突（双留出网格 noTE 胜、LOGO 胺未见桶 v4 胜，均在噪声量级）：表征升级后两协议同时复测（若无新表征则维持 noTE）
@@ -367,15 +384,26 @@
 
 ## 十、运行环境说明
 
-### 推荐运行方式
+### 分发形态（正式）
 
-- **树模型训练/脚本**：`.venv\Scripts\python.exe`（Python 3.12，已安装 numpy、pandas、scikit-learn、xgboost、rdkit、pyyaml、shap、joblib）
-- **App 前端**：base 环境 Python 3.13（已安装 gradio 6.20、python-docx、xgboost、**shap 0.52.0** — 2026-07-20 补装，打分理由可用）或 `.venv` 环境
-- **GNN 预测**：通过 subprocess 自动调用 dphuanjing 环境 Python 3.8（torch 2.3.1 + PyG 2.6.1）
+- **Electron 桌面应用**：当前版本 **v0.3.0**，NSIS 安装包（约 357MB），GitHub Release 分发（exe + zip + latest.yml），**自动更新链路 v0.2.5→v0.3.0 起端到端武装**
+- 打包构成：React 前端（`webapp/dist`）+ FastAPI 后端（PyInstaller onedir `dist-backend/cof-backend/`）+ Electron 壳（`webapp/electron/main.cjs`，自动选端口 18765 起）
+- 用户数据：`%APPDATA%\COF-Film-Recommend\`（收藏/实验记录/附件/LLM 配置），与 Chromium 缓存目录严格分离，卸载/更新不清除
+- 打包版能力分级：tree 模型内置必可用；GNN 不可分发（依赖 dphuanjing py3.8 环境）为可选增强，缺失自动降级；打分理由 frozen 环境降级为全局特征重要性并如实标注；GraphRAG 已并入主进程（networkx 3.5）
+- **发版纪律**（阶段 25/26 两次事故沉淀，详见 `DAILY_LOG/2026-08-20.md`）：前端 build → PyInstaller → electron-builder 三步全跑；自证清单（时间戳 + 包内 grep 新功能关键词 + 包内后端真实启动 curl 验证）；latest.yml 最后传；exe 资产名与 latest.yml url 逐字符一致
 
-### 启动 App
+### 开发态运行方式
 
-方式 1（推荐）：双击 `start_app.vbs` —— pythonw 静默启动，无黑色终端窗口，自动打开浏览器；失败弹 msgbox 提示，日志写入 `logs/`（由 `silent_launch.py` 实现）
+- **FastAPI 后端**：base 环境 `E:\ANACONDA\python.exe -m uvicorn api.main:app --port 8000`
+- **React 前端**：`cd webapp && npm run dev`（Vite dev server 代理 8000）
+- **树模型训练/脚本**：`.venv\Scripts\python.exe`（Python 3.12，numpy、pandas、scikit-learn、xgboost、rdkit、pyyaml、shap、joblib）
+- **GNN 预测**：通过 subprocess 自动调用 dphuanjing 环境 Python 3.8（torch 2.3.1 + PyG 2.6.1）；缺失时自动降级
+- **minimax GraphRAG**：已可主进程内 import（主环境 networkx 3.5）；独立解释器调用仍支持，路径经 `src/runtime_config.py` 配置链（环境变量 > `config/runtime.local.json` > 自动探测）
+- **测试**：base 环境 `pytest tests/`——基线 **420 passed**（阶段 26）
+
+### 旧版 Gradio 界面（保留维护，非分发形态）
+
+方式 1：双击 `start_app.vbs` —— pythonw 静默启动，自动打开浏览器；日志写入 `logs/`（`silent_launch.py` 单实例重启语义）
 
 方式 2：命令行
 ```bash
@@ -389,5 +417,5 @@ cd "C:\Users\ckx\Desktop\全新机器学习实验"
 
 ### 为什么不能直接用 dphuanjing 启动 App？
 
-dphuanjing 是 Python 3.8，gradio 6.20 不支持 Python 3.8（有 pydantic 兼容性问题）。
-因此 App 用 base 环境，GNN 用 dphuanjing 环境，通过 subprocess 隔离。
+dphuanjing 是 Python 3.8，新版 Web 栈不支持（pydantic 兼容性问题）。
+因此主后端用 base 环境，GNN 用 dphuanjing 环境，通过 subprocess 隔离。
