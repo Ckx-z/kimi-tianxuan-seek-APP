@@ -53,11 +53,12 @@ export interface RecordFormProps {
   onSaved: () => void;
 }
 
-/** 收藏下拉标签：醛名 + 胺名（缺名回退 SMILES 截断） */
+/** 收藏下拉标签：醛名 + 胺名（缺名回退 SMILES 截断）；带 DFT 快照的标注「含DFT数据」 */
 function favoriteLabel(fav: FavoriteItem): string {
   const ald = fav.aldehyde?.name || fav.aldehyde?.smiles?.slice(0, 18) || '未知醛';
   const amine = fav.amine?.name || fav.amine?.smiles?.slice(0, 18) || '未知胺';
-  return `${ald} + ${amine}`;
+  const base = `${ald} + ${amine}`;
+  return fav.dft_snapshot ? `${base}（含DFT数据）` : base;
 }
 
 export default function RecordForm({ favorites, folders = [], favoriteId, onFavoriteChange, onSaved }: RecordFormProps) {

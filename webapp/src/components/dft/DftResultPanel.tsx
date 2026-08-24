@@ -1,17 +1,28 @@
 /**
- * DFT 结果展示面板：结合能大数字卡 + 组分描述符表 + 结构图 + xyz 下载。
+ * DFT 结果展示面板：结合能大数字卡 + 组分描述符表 + 结构图 + xyz 下载
+ * + 量化软件输入文件导出（Gaussian .gjf / ORCA .inp，后端生成下载）。
  * 固定红线提示（学术诚信底线）常驻底部。
  */
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileDown } from 'lucide-react';
-import type { DftResult } from './api';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ChevronDown, FileDown, FileOutput } from 'lucide-react';
+import { toast } from 'sonner';
+import { exportDftInput, type DftExportFormat, type DftResult } from './api';
 
 interface Props {
   result: DftResult;
   smilesA: string;
   smilesB: string;
+  /** 当前任务 id（历史回显无任务时为 null，导出时自动借缓存命中任务） */
+  jobId?: string | null;
 }
 
 function fmt(v: number | null | undefined, digits = 2, unit = ''): string {
@@ -29,8 +40,29 @@ function downloadXyz(result: DftResult) {
   URL.revokeObjectURL(url);
 }
 
-export default function DftResultPanel({ result, smilesA, smilesB }: Props) {
+export default function DftResultPanel({ result, smilesA, smilesB, jobId }: Props) {
   const bound = result.e_bind_kcal < 0;
+  /** 导出进行中（按格式记，防重复点击） */
+  const [exporting, setExporting] = useState<DftExportFormat | null>(null);
+
+  /** 导出量化软件输入文件（无可用 xyz 时拦截） */
+  const handleExport = async (format: DftExportFormat) => {
+    if (!result.complex_xyz?.trim()) {
+      toast.warning('该结果不含复合物几何，无法导出输入文件');
+      return;
+    }
+    setExporting(format);
+    try {
+      await exportDftInput(result, format, jobId);
+      toast.success(format === 'gaussian'
+        ? '已导出 Gaussian 输入（.gjf），提交前请检查电荷与自旋多重度'
+        : '已导出 ORCA 输入（.inp），提交前请检查电荷与自旋多重度');
+    } catch {
+      // 错误提示已由 api 层弹出
+    } finally {
+      setExporting(null);
+    }
+  };
   const rows: { label: string; a: string; b: string; c: string }[] = [
     {
       label: '总能量 (Eh)',
@@ -145,13 +177,32 @@ export default function DftResultPanel({ result, smilesA, smilesB }: Props) {
               </figure>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => downloadXyz(result)}>
               <FileDown className="mr-1 h-4 w-4" />
               下载复合物优化后 3D 几何（.xyz）
             </Button>
+            {/* 导出量化软件输入文件（Gaussian / ORCA，后端生成） */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={exporting !== null}>
+                  <FileOutput className="mr-1 h-4 w-4" />
+                  {exporting ? '导出中…' : '导出量化输入文件'}
+                  <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => void handleExport('gaussian')}>
+                  Gaussian 输入（.gjf，b3lyp/6-31g(d) scrf=smd）
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void handleExport('orca')}>
+                  ORCA 输入（.inp，B3LYP def2-SVP OPT）
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <span className="text-xs text-muted-foreground">
-              可用 Avogadro / VMD / GaussView 打开查看，或作为高精度 DFT 复算的输入几何。
+              可用 Avogadro / VMD / GaussView 打开查看，或导出后作为高精度 DFT 复算的输入；
+              导出的输入文件默认电荷 0、自旋多重度 1，提交前请自行检查。
             </span>
           </div>
         </CardContent>

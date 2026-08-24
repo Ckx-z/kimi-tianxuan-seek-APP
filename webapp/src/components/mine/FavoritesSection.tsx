@@ -11,7 +11,8 @@
  * - 响应式：Dialog 限高 + 固定头部 + 内部滚动；窄屏下结构图/性质卡/表格自动换行、横向滚动
  */
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil, Atom } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -100,9 +101,29 @@ function ScoreBadge({ fav }: { fav: FavoriteItem }) {
   );
 }
 
-/** DFT 徽章（本期预留：无快照时显示灰色「DFT 未计算」） */
+/** DFT 方法档位中文标签 */
+function dftMethodLabel(method?: string): string {
+  if (method === 'gfn2') return 'GFN2-xTB（精确）';
+  if (method === 'gfnff') return 'GFN-FF 力场（快速）';
+  return method || '未知方法';
+}
+
+/** DFT 徽章：有快照且含结合能 → 金色「结合能 -x.xx kcal/mol」；否则灰色「DFT 未计算」 */
 function DftBadge({ fav }: { fav: FavoriteItem }) {
-  if (fav.dft_snapshot) {
+  const snap = fav.dft_snapshot;
+  const eBind = snap?.e_bind_kcal;
+  if (snap && typeof eBind === 'number') {
+    return (
+      <Badge
+        variant="outline"
+        className="cursor-pointer border-gold/60 bg-gold-muted text-gold-foreground"
+        title="点击查看 DFT 计算结果摘要"
+      >
+        结合能 {eBind.toFixed(2)} kcal/mol
+      </Badge>
+    );
+  }
+  if (snap) {
     return (
       <Badge variant="outline" className="border-primary/40 text-primary">
         DFT 已计算
@@ -196,6 +217,82 @@ interface PropsState {
   data: MonomerProps | null;
 }
 const emptyProps: PropsState = { loading: false, error: null, data: null };
+
+/**
+ * DFT 计算结果摘要（详情弹窗内）：方法/时间/结合能/能隙/偶极
+ * + 「重新计算」跳转 DFT 页（URL 预填两个单体）。
+ */
+function DftSummarySection({ fav, onRecalc }: { fav: FavoriteItem; onRecalc: () => void }) {
+  const navigate = useNavigate();
+  const snap = fav.dft_snapshot;
+  if (!snap) return null;
+  const eBind = snap.e_bind_kcal;
+  const gap = snap.gap_ev?.complex;
+  const dipole = snap.dipole_debye?.complex;
+
+  /** 「重新计算」：跳转 DFT 页并预填两个单体 SMILES/名称 */
+  const handleRecalc = () => {
+    const params = new URLSearchParams();
+    if (fav.aldehyde?.smiles) params.set('a', fav.aldehyde.smiles);
+    if (fav.amine?.smiles) params.set('b', fav.amine.smiles);
+    if (fav.aldehyde?.name) params.set('an', fav.aldehyde.name);
+    if (fav.amine?.name) params.set('bn', fav.amine.name);
+    onRecalc();
+    navigate(`/toolbox/dft?${params.toString()}`);
+  };
+
+  return (
+    <section>
+      <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+        <Atom className="h-4 w-4 text-gold" /> DFT 计算结果
+      </h3>
+      <div className="rounded-lg border border-gold/40 bg-gold-muted/40 p-3 text-sm">
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-1">
+          {typeof eBind === 'number' && (
+            <div>
+              <span className={`text-2xl font-bold tabular-nums ${eBind < 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                {eBind.toFixed(2)}
+              </span>
+              <span className="ml-1 text-xs text-muted-foreground">kcal/mol（结合能）</span>
+            </div>
+          )}
+          <div className="text-xs text-muted-foreground">
+            方法：{dftMethodLabel(snap.method)}
+            {snap.date ? ` · 计算时间：${String(snap.date).replace('T', ' ').slice(0, 19)}` : ''}
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            HOMO-LUMO 能隙（复合物）：
+            <span className="tabular-nums text-foreground">
+              {typeof gap === 'number' ? `${gap.toFixed(2)} eV` : '—'}
+            </span>
+          </span>
+          <span>
+            偶极矩（复合物）：
+            <span className="tabular-nums text-foreground">
+              {typeof dipole === 'number' ? `${dipole.toFixed(2)} Debye` : '—'}
+            </span>
+          </span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRecalc}
+            disabled={!fav.aldehyde?.smiles || !fav.amine?.smiles}
+            title="跳转 DFT 计算页并预填该组合单体"
+          >
+            重新计算
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            半经验结果仅供相对比较，精确能量请在 DFT 页导出输入文件复算。
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /**
  * 收藏详情 Dialog（与查询打分页结果内容一致：分数/OOD/结构图/性质卡/方案卡）
@@ -389,6 +486,9 @@ function FavoriteDetailDialog({
                 </div>
               )}
             </section>
+
+            {/* DFT 计算结果摘要（有 dft_snapshot 时展示；「重新计算」跳 DFT 页预填单体） */}
+            <DftSummarySection fav={fav} onRecalc={() => onOpenChange(false)} />
 
             {/* 单体性质卡（复用查询页 MonomerPropsCard：RDKit facts + LLM 解读） */}
             <section>

@@ -5,6 +5,7 @@
  * 异步任务轮询（1.5s），全程中文进度提示与失败原因。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -79,6 +80,8 @@ export default function Dft() {
   const [monoA, setMonoA] = useState<MonomerValue>({ smiles: '', name: '' });
   const [monoB, setMonoB] = useState<MonomerValue>({ smiles: '', name: '' });
   const [method, setMethod] = useState<DftMethod>('gfn2');
+  /** URL 预填（收藏详情「重新计算」跳转）：?a=<smiles>&b=<smiles>&an=<名>&bn=<名> */
+  const [searchParams] = useSearchParams();
 
   // ---------- 后端状态 ----------
   const [backendDown, setBackendDown] = useState(false);
@@ -91,6 +94,8 @@ export default function Dft() {
   const [result, setResult] = useState<DftResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** 当前结果对应的任务 id（导出输入文件用；历史回显时为 null） */
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
   // ---------- 联动 ----------
   const [aProps, setAProps] = useState<PropsState>(emptyProps);
@@ -106,6 +111,11 @@ export default function Dft() {
   }, []);
 
   useEffect(() => {
+    // URL 预填单体（来自收藏详情「重新计算」跳转）
+    const preA = searchParams.get('a');
+    const preB = searchParams.get('b');
+    if (preA) setMonoA({ smiles: preA, name: searchParams.get('an') ?? '' });
+    if (preB) setMonoB({ smiles: preB, name: searchParams.get('bn') ?? '' });
     fetchMonomers()
       .then((lib) => { setLibrary(lib); setBackendDown(false); })
       .catch(() => { setLibrary({ aldehydes: [], amines: [] }); setBackendDown(true); })
@@ -160,6 +170,7 @@ export default function Dft() {
     setProgressHint('正在提交计算任务…');
     try {
       const job = await createDftJob(monoA.smiles, monoB.smiles, method);
+      setCurrentJobId(job.job_id);
       if (job.status === 'done' && job.result) {
         // 缓存命中：无需轮询
         setRunning(false);
@@ -239,13 +250,14 @@ export default function Dft() {
     }
   };
 
-  /** 历史点击：回显输入与结果 */
+  /** 历史点击：回显输入与结果（无任务 id，导出时会借缓存命中任务） */
   const handleHistoryClick = (h: DftHistoryEntry) => {
     setMonoA({ smiles: h.smiles_a, name: '' });
     setMonoB({ smiles: h.smiles_b, name: '' });
     setMethod(h.method);
     setError(h.status === 'failed' ? (h.error || '计算失败') : null);
     setResult(h.status === 'done' ? resultFromHistory(h) : null);
+    setCurrentJobId(null);
     setRunning(false);
   };
 
@@ -396,7 +408,7 @@ export default function Dft() {
           {/* 结果 */}
           {result && !running && (
             <>
-              <DftResultPanel result={result} smilesA={result.smiles_a} smilesB={result.smiles_b} />
+              <DftResultPanel result={result} smilesA={result.smiles_a} smilesB={result.smiles_b} jobId={currentJobId} />
 
               {/* 收藏联动 */}
               <div className="flex flex-wrap items-center gap-2">

@@ -113,6 +113,75 @@ export const fetchDftHistory = async (limit = 50): Promise<DftHistoryEntry[]> =>
   return data.history ?? [];
 };
 
+// ---------- 导出量化软件输入文件（GET /jobs/{id}/export） ----------
+
+export type DftExportFormat = 'gaussian' | 'orca';
+
+/** 从 content-disposition 解析下载文件名（优先 RFC 5987 filename*，中文名） */
+function parseDownloadFilename(disposition: string | null, fallback: string): string {
+  if (disposition) {
+    const star = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+    if (star) {
+      try {
+        return decodeURIComponent(star[1]);
+      } catch {
+        // 解码失败则用兜底名
+      }
+    }
+    const plain = /filename="?([^";]+)"?/i.exec(disposition);
+    if (plain) return plain[1];
+  }
+  return fallback;
+}
+
+/**
+ * 导出 Gaussian(.gjf) / ORCA(.inp) 输入文件并触发浏览器下载。
+ * jobId 缺省（历史回显等无任务场景）时先建任务——缓存命中会立即 done，
+ * 仅借其 job_id 调后端导出端点，保证导出格式单一来源（后端生成）。
+ */
+export async function exportDftInput(
+  result: DftResult,
+  format: DftExportFormat,
+  jobId?: string | null,
+): Promise<void> {
+  let id = jobId || null;
+  if (!id) {
+    const job = await createDftJob(result.smiles_a, result.smiles_b, result.method);
+    id = job.job_id;
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/jobs/${encodeURIComponent(id)}/export?format=${format}`);
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (!res.ok) {
+    let message = `导出失败（${res.status}）`;
+    try {
+      const data = await res.json();
+      if (typeof data?.detail === 'string') message = data.detail;
+    } catch {
+      // 保留默认提示
+    }
+    toast.error(message);
+    throw new Error(message);
+  }
+  const text = await res.text();
+  const filename = parseDownloadFilename(
+    res.headers.get('Content-Disposition'),
+    format === 'gaussian' ? 'dft_input.gjf' : 'dft_input.inp',
+  );
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /** 把 DFT 结果快照合并写入已有收藏（PATCH dft_snapshot） */
 export function mergeDftToFavorite(favoriteId: string, result: DftResult) {
   return requestFavorite(favoriteId, buildDftSnapshot(result));

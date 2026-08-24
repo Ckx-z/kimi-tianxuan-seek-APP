@@ -73,8 +73,16 @@ export interface PredictionSnapshot {
   [key: string]: unknown;
 }
 
-/** DFT 快照（预留结构：本期仅字段透传，DFT 计算后续批次接入） */
-export type DftSnapshot = Record<string, unknown>;
+/** DFT 快照（P3 起由 DFT 页写入：方法/结合能/能隙/偶极/计算时间） */
+export interface DftSnapshot {
+  method?: string;
+  e_bind_kcal?: number;
+  e_bind_kj?: number;
+  gap_ev?: { a?: number | null; b?: number | null; complex?: number | null };
+  dipole_debye?: { a?: number | null; b?: number | null; complex?: number | null };
+  date?: string;
+  [key: string]: unknown;
+}
 
 /** 收藏条目（favorites/store.py 落盘结构） */
 export interface FavoriteItem {

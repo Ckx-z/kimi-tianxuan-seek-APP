@@ -502,6 +502,89 @@ def retrieve_evidence(query_text: str, aldehyde: dict, amine: dict,
     return text or '(本次检索无匹配证据)', lit_refs, graph_ref_ids
 
 
+# ---------------------------------------------------------------- DFT 数据上下文
+
+_DFT_METHOD_LABELS = {
+    'gfn2': 'GFN2-xTB（精确）',
+    'gfnff': 'GFN-FF 力场（快速）',
+}
+
+
+def _dft_context_text(method, e_kcal, e_kj, gap, dipole, when, source):
+    """拼 DFT 数据注入文本，返回 (文本, 引用标记)。数值缺失的字段跳过。"""
+    label = _DFT_METHOD_LABELS.get(method, method)
+    lines = [
+        f'- 方法：{label}（数据来源：{source}）',
+        f'- 结合能：{e_kcal:.2f} kcal/mol'
+        + (f'（{e_kj:.2f} kJ/mol）' if isinstance(e_kj, (int, float)) else ''),
+    ]
+    if isinstance(gap, (int, float)):
+        lines.append(f'- HOMO-LUMO 能隙（复合物）：{gap:.2f} eV')
+    if isinstance(dipole, (int, float)):
+        lines.append(f'- 偶极矩（复合物）：{dipole:.2f} Debye')
+    if when:
+        lines.append(f'- 计算时间：{when}')
+    ref = f'dft:{method}'
+    lines.append(f'- 引用标记：evidence_refs 中 kind="dft_data"，ref="{ref}"')
+    text = ('该单体组合已有半经验量子化学计算数据'
+            '（仅供相对比较，精确能量需更高精度 DFT 复算）：\n'
+            + '\n'.join(lines))
+    return text, ref
+
+
+def lookup_dft_context(aldehyde=None, amine=None, favorite=None):
+    """查找当前单体组合的 DFT 计算数据（注入迭代上下文用）。
+
+    查找顺序：收藏的 dft_snapshot 快照 → dft_cache 缓存（gfn2 优先）。
+    返回 (注入文本, 引用标记)；无数据或任何失败静默降级为 (None, None)，
+    绝不影响既有迭代流程。
+    """
+    # 1. 收藏快照（P2 起 PATCH /api/favorites 可写 dft_snapshot）
+    try:
+        snap = (favorite or {}).get('dft_snapshot')
+        if (isinstance(snap, dict)
+                and isinstance(snap.get('e_bind_kcal'), (int, float))):
+            method = str(snap.get('method') or 'gfn2')
+            gap = (snap.get('gap_ev') or {}).get('complex')
+            dip = (snap.get('dipole_debye') or {}).get('complex')
+            return _dft_context_text(
+                method, snap['e_bind_kcal'], snap.get('e_bind_kj'),
+                gap, dip, str(snap.get('date') or ''), '收藏 DFT 快照')
+    except Exception as e:
+        print(f'[iterate_suggest] DFT 快照读取失败（降级继续）: {e}',
+              file=sys.stderr)
+
+    # 2. DFT 缓存（按规范化单体对查缓存 key，与 src/dft 口径一致）
+    try:
+        smiles_a = ((aldehyde or {}).get('smiles') or '').strip()
+        smiles_b = ((amine or {}).get('smiles') or '').strip()
+        if not smiles_a or not smiles_b:
+            return None, None
+        proj_root = HERE.parent.parent  # 项目根（src/ 所在）
+        if str(proj_root) not in sys.path:
+            sys.path.insert(0, str(proj_root))
+        from src.dft import cache as _dft_cache
+        from src.dft import engine as _dft_engine
+        canon_a = _dft_engine.canonicalize_smiles(smiles_a)
+        canon_b = _dft_engine.canonicalize_smiles(smiles_b)
+        if not canon_a or not canon_b:
+            return None, None
+        for method in ('gfn2', 'gfnff'):
+            key = _dft_cache.cache_key(canon_a, canon_b, method)
+            hit = _dft_cache.load_cache(key)
+            if (isinstance(hit, dict)
+                    and isinstance(hit.get('e_bind_kcal'), (int, float))):
+                gap = (hit.get('gap_ev') or {}).get('complex')
+                dip = (hit.get('dipole_debye') or {}).get('complex')
+                return _dft_context_text(
+                    method, hit['e_bind_kcal'], hit.get('e_bind_kj'),
+                    gap, dip, '', 'DFT 计算缓存')
+    except Exception as e:
+        print(f'[iterate_suggest] DFT 缓存查找失败（降级继续）: {e}',
+              file=sys.stderr)
+    return None, None
+
+
 # ---------------------------------------------------------------- 状态去重
 
 def load_rejected_directions(sug_dir: Path, fav_id):
@@ -576,12 +659,14 @@ def _record_prompt_line(r: dict) -> str:
 
 
 def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
-                   max_n=2, anchor=None):
+                   max_n=2, anchor=None, dft_context=None):
     """拼 prompt：证据文本 + 实验记录 + 严格 JSON 输出要求（最多 max_n 条）
 
     有锚定记录（anchor）时：锚定记录作为「本次迭代基线」单独突出
     （基于以下这次实验迭代），同收藏其他记录降级为「历史参考」次要段落；
     无锚定时保持原有单一「相关实验记录」段落，行为完全不变。
+    有 DFT 计算数据（dft_context）时：注入「DFT 计算数据」段落，
+    并允许 evidence_refs 以 kind=dft_data 引用该数据。
     """
     sys_prompt = (
         '你是 COF（共价有机框架）成膜实验的迭代顾问。'
@@ -593,8 +678,9 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
         '"title": "一句话标题", '
         '"detail": "具体可操作的建议内容（条件调整需写明 字段/原值/改为/理由；'
         '新候选需写明醛胺 CAS 或名称及理由）", '
-        '"evidence_refs": [{"kind": "experiment_record|literature|prediction", '
-        '"ref": "rec_xxx 或文献名或 DOI", "note": "一句话说明"}], '
+        '"evidence_refs": [{"kind": "experiment_record|literature|prediction'
+        '|dft_data", '
+        '"ref": "rec_xxx 或文献名或 DOI 或 dft:方法名", "note": "一句话说明"}], '
         '"confidence": {"level": "high|medium|low", '
         '"reason": "一句话自评理由（依据证据充分程度）"}}'
         '注意：kind=experiment_record 时 ref 必须原样使用下方'
@@ -602,6 +688,10 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
         '不要写 "1★"、"实验1" 之类的自然语言标记。'
         'kind=literature 时 ref 必须来自下方检索证据中真实出现的文献名/节点 ID，'
         '严禁编造引用；每条建议必须给出 confidence 自评。'
+        + ('kind=dft_data 仅在下方提供「DFT 计算数据」段落时可用，'
+           'ref 必须原样使用该段落给出的引用标记（形如 dft:gfn2）；'
+           'DFT 数据为半经验结果，引用时须注明仅供相对比较。'
+           if dft_context else '')
     )
 
     if anchor is not None:
@@ -628,6 +718,9 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
     rec_ids = [r.get('record_id') for r in records if r.get('record_id')]
     rec_ids_text = ('\n'.join(f'- {rid}' for rid in rec_ids)
                     if rec_ids else '(无)')
+    dft_section = (
+        f'## DFT 计算数据（本单体组合的半经验计算结果，可以 kind=dft_data 引用）\n'
+        f'{dft_context}\n\n' if dft_context else '')
     user_prompt = f"""## 用户问题
 {question}
 
@@ -635,7 +728,7 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
 醛: {json.dumps(aldehyde or {}, ensure_ascii=False)}
 胺: {json.dumps(amine or {}, ensure_ascii=False)}
 
-{records_section}
+{dft_section}{records_section}
 
 ## 可引用的实验记录 ID（evidence_refs 中 kind=experiment_record 的 ref 必须从中原样选择）
 {rec_ids_text}
@@ -744,13 +837,16 @@ def _correct_lit_ref(ref: str, whitelist):
     return None
 
 
-def normalize_evidence(item: dict, records, lit_refs, graph_ref_ids=None):
+def normalize_evidence(item: dict, records, lit_refs, graph_ref_ids=None,
+                       dft_ref=None):
     """规整 evidence_refs（波次 2 白名单校验）。
 
-    白名单 = 可引用实验记录 ID + retrieve_evidence 返回的文献引用 + 图节点 ID。
+    白名单 = 可引用实验记录 ID + retrieve_evidence 返回的文献引用 + 图节点 ID
+    + （注入了 DFT 数据时）DFT 引用标记。
     - experiment_record：按白名单模糊纠正；匹配不上整条剔除进 unverified_refs
     - literature：大小写/空白/子串模糊纠正；匹配不上整条剔除进 unverified_refs
       （绝不让编造引用静默通过）
+    - dft_data：仅在注入了 DFT 数据（dft_ref 非空）时合法，ref 归一为 dft_ref
     返回 (refs, unverified_refs, n_valid)
       n_valid = 落在白名单内的有效证据条数（用于 confidence 规则校验）
     """
@@ -765,7 +861,8 @@ def normalize_evidence(item: dict, records, lit_refs, graph_ref_ids=None):
         if not isinstance(e, dict):
             continue
         kind = e.get('kind')
-        if kind not in ('experiment_record', 'literature', 'prediction'):
+        if kind not in ('experiment_record', 'literature', 'prediction',
+                        'dft_data'):
             continue
         ref = str(e.get('ref', ''))
         note = str(e.get('note', ''))
@@ -798,6 +895,17 @@ def normalize_evidence(item: dict, records, lit_refs, graph_ref_ids=None):
                         continue
             # 无任何文献白名单（检索全失败）时文献引用一律不可信，剔除
             else:
+                unverified.append({'kind': kind, 'ref': ref, 'note': note})
+                continue
+        elif kind == 'dft_data':
+            if dft_ref:
+                # DFT 引用合法：ref 归一为注入时给出的标记，计为有效证据
+                if ref != dft_ref:
+                    note = (note + f'（原引用「{ref}」已自动纠正）').strip()
+                ref = dft_ref
+                n_valid += 1
+            else:
+                # 未注入 DFT 数据时的 dft_data 引用不可信，剔除
                 unverified.append({'kind': kind, 'ref': ref, 'note': note})
                 continue
         refs.append({'kind': kind, 'ref': ref, 'note': note})
@@ -868,7 +976,7 @@ def _inject_monomers(payload: dict, aldehyde, amine):
 
 def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
                       batch, max_n=2, aldehyde=None, amine=None, graph_ref_ids=None,
-                      anchor_record_id=None):
+                      anchor_record_id=None, dft_ref=None):
     """状态去重后按 Schema 3 落盘，返回写出的 suggestion_id 列表
 
     batch: 本次运行批次号，写入每条建议的 "batch" 字段（Schema 3 可选字段）
@@ -902,7 +1010,7 @@ def write_suggestions(sug_dir: Path, items, fav_id, records, lit_refs, rejected,
             # 锚定语义：建议 payload 记录本次迭代基线记录 ID
             payload['anchor_record_id'] = anchor_record_id
         refs, unverified, n_valid = normalize_evidence(
-            item, records, lit_refs, graph_ref_ids)
+            item, records, lit_refs, graph_ref_ids, dft_ref=dft_ref)
         # 置信度自评 + 规则校验（0 条有效证据强制 low）
         payload['confidence'] = normalize_confidence(item, n_valid)
         if unverified:
@@ -1024,6 +1132,12 @@ def main():
     query_text = build_query_text(args.question, aldehyde, amine, records,
                                   anchor=anchor)
 
+    # 2a. DFT 数据上下文（收藏快照/计算缓存；查找失败静默降级不注入）
+    dft_context, dft_ref = lookup_dft_context(aldehyde, amine, favorite)
+    if dft_context:
+        print('[iterate_suggest] 注入 DFT 计算数据上下文（可 kind=dft_data 引用）',
+              file=sys.stderr)
+
     # 3. 检索取证（降级链，含 failure 专家语料与多跳 BFS）
     evidence_text, lit_refs, graph_ref_ids = retrieve_evidence(
         query_text, aldehyde, amine,
@@ -1038,7 +1152,7 @@ def main():
         from llm_client import chat_completion
         messages = build_messages(args.question, aldehyde, amine, records,
                                   evidence_text, rejected, max_n=max_n,
-                                  anchor=anchor)
+                                  anchor=anchor, dft_context=dft_context)
         content, provider = chat_completion(messages, max_tokens=8000, timeout=120)
         print(f'[iterate_suggest] LLM 端点: {provider}', file=sys.stderr)
         items = parse_llm_json(content)
@@ -1067,7 +1181,8 @@ def main():
                                     batch=batch, max_n=max_n,
                                     aldehyde=aldehyde, amine=amine,
                                     graph_ref_ids=graph_ref_ids,
-                                    anchor_record_id=anchor_record_id)
+                                    anchor_record_id=anchor_record_id,
+                                    dft_ref=dft_ref)
         if not written:  # 全部被去重
             written = write_fallback_suggestion(
                 sug_dir, fav_id, args.question, evidence_text,

@@ -3,10 +3,13 @@
 - POST /api/dft/jobs            建任务（202，缓存命中立即 done）
 - GET  /api/dft/jobs/{id}       轮询任务状态/结果
 - GET  /api/dft/jobs/{id}/geometry  复合物优化后 xyz（纯文本，供 3D 查看/下载）
+- GET  /api/dft/jobs/{id}/export?format=gaussian|orca  量化软件输入文件下载
 - GET  /api/dft/history         计算历史（dft_log.jsonl，新→旧分页）
 """
 
 from __future__ import annotations
+
+import urllib.parse
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -15,9 +18,11 @@ from ..schemas import DftJobCreate
 
 try:
     from src.dft import engine, jobs
+    from src.dft import export as dft_export
     from src.dft import log as dft_log
 except ImportError:  # pragma: no cover - src 直接在 sys.path 时
     from dft import engine, jobs  # type: ignore
+    from dft import export as dft_export  # type: ignore
     from dft import log as dft_log  # type: ignore
 
 router = APIRouter(prefix="/api/dft", tags=["dft"])
@@ -70,6 +75,36 @@ def get_dft_geometry(job_id: str):
     if not xyz:
         raise HTTPException(404, "该任务暂无可用几何（未完成或已失败）")
     return PlainTextResponse(xyz, media_type="chemical/x-xyz")
+
+
+@router.get("/jobs/{job_id}/export")
+def export_dft_input(job_id: str, format: str = "gaussian"):
+    """导出量化软件输入文件（Gaussian .gjf / ORCA .inp，text/plain 下载）。
+
+    中文文件名走 RFC 5987 filename* 编码，同时给 ASCII 兜底名。
+    """
+    job = jobs.get_job(job_id)
+    if job is None:
+        raise HTTPException(404, f"计算任务 {job_id} 不存在")
+    result = job.get("result") or {}
+    xyz = result.get("complex_xyz")
+    if not xyz:
+        raise HTTPException(404, "该任务暂无可用几何（未完成或已失败）")
+    method = result.get("method") or job.get("method") or ""
+    try:
+        content = dft_export.build_export(format, xyz, source=method)
+    except dft_export.DftExportError as exc:
+        raise HTTPException(400, str(exc))
+    filename = dft_export.export_filename(format, method)
+    quoted = urllib.parse.quote(filename, encoding="utf-8")
+    fallback = f"dft_export.{filename.rsplit('.', 1)[-1]}"
+    headers = {
+        "Content-Disposition": (
+            f"attachment; filename=\"{fallback}\"; "
+            f"filename*=UTF-8''{quoted}"),
+    }
+    return PlainTextResponse(
+        content, media_type="text/plain; charset=utf-8", headers=headers)
 
 
 @router.get("/history")

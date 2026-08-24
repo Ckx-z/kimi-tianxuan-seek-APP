@@ -85,6 +85,8 @@ export interface FavoriteItem {
   aldehyde: MonomerObj;
   amine: MonomerObj;
   latest_prediction?: { score?: number; std?: number; ood?: string } | null;
+  /** DFT 结果快照（P3 起由 DFT 页写入；关联选择器据此标注「含DFT数据」） */
+  dft_snapshot?: { e_bind_kcal?: number; method?: string; [key: string]: unknown } | null;
   notes?: string;
   experiment_record_ids?: string[];
 }
