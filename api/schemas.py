@@ -148,6 +148,14 @@ class AssistantConfirmRequest(BaseModel):
         None, description="可选参数回显；与服务端存档摘要不符即拒绝（防篡改）")
 
 
+class AssistantMemoryUpdate(BaseModel):
+    """助手记忆更新：开关切换 / 内容整体覆写，二选一或同时。"""
+    enabled: bool | None = Field(
+        None, description="记忆编译与注入开关（None 表示不修改）")
+    content: str | None = Field(
+        None, description="memory.md 整体覆写内容（None 表示不修改）")
+
+
 class DftJobCreate(BaseModel):
     """DFT 计算任务创建：两个单体 SMILES + 方法档位。"""
     smiles_a: str = Field(..., description="单体 A SMILES")

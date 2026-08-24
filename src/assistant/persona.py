@@ -50,11 +50,13 @@ def _render_identity(raw: str, agent_name: str = "ming",
                .replace("{{userName}}", user_name))
 
 
-def build_system_prompt(context_block: str = "") -> str:
+def build_system_prompt(context_block: str = "", memory_block: str = "") -> str:
     """拼装完整 system prompt。
 
-    层序：ming 身份卡 → ming 人格定义 → 领域规则 →（可选）当前上下文块。
-    任一资源缺失跳过该层；人格与规则同时缺失时启用内置兜底规则。
+    层序：ming 身份卡 → ming 人格定义 → 领域规则 →（可选）用户记忆 →
+    （可选）当前上下文块。记忆层在领域纪律之后、工具说明（路径 B 的
+    计划提示 / 路径 A 的 tools 参数）之前。任一资源缺失跳过该层；
+    人格与规则同时缺失时启用内置兜底规则。
     """
     identity = _render_identity(_load("ming_identity.md"))
     ishiki = _load("ming_ishiki.md")
@@ -63,6 +65,8 @@ def build_system_prompt(context_block: str = "") -> str:
     parts = [p for p in (identity, ishiki, rules) if p]
     if not rules:
         parts.append(_FALLBACK_RULES)
+    if memory_block.strip():
+        parts.append(memory_block.strip())
     if context_block.strip():
         parts.append("# 当前上下文\n\n" + context_block.strip())
     return "\n\n".join(parts)

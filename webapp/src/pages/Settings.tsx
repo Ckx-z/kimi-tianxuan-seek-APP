@@ -6,7 +6,7 @@
  * - 后端未连接时优雅降级，不白屏
  */
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, Loader2, PlugZap } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, PlugZap, Brain, Eye, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,14 +15,38 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { BackendUnavailableError } from '@/lib/api';
 import {
   fetchLlmSettings,
   saveLlmSettings,
   testLlmConnection,
   fetchHealth,
+  fetchAssistantMemory,
+  updateAssistantMemory,
+  clearAssistantMemory,
   type LlmSettings,
   type HealthInfo,
+  type AssistantMemoryInfo,
 } from '@/components/settings/api';
 
 /** 配置来源中文标签 */
@@ -230,6 +254,195 @@ function LlmSettingsCard({ offline }: { offline: boolean }) {
           </>
         )}
       </CardContent>
+    </Card>
+  );
+}
+
+/** 助手记忆卡：编译/注入开关 + 查看编辑 + 清空 */
+function AssistantMemoryCard({ offline }: { offline: boolean }) {
+  const [info, setInfo] = useState<AssistantMemoryInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [savingContent, setSavingContent] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setInfo(await fetchAssistantMemory());
+    } catch {
+      /* 离线或失败：api 层已处理 */
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!offline) void load();
+    else setLoading(false);
+  }, [offline, load]);
+
+  async function handleToggle(enabled: boolean) {
+    setToggling(true);
+    try {
+      setInfo(await updateAssistantMemory({ enabled }));
+      toast.success(enabled ? '助手记忆已启用' : '助手记忆已停用');
+    } catch {
+      /* 已 toast */
+    } finally {
+      setToggling(false);
+    }
+  }
+
+  async function handleSaveContent() {
+    setSavingContent(true);
+    try {
+      setInfo(await updateAssistantMemory({ content: draft }));
+      toast.success('记忆已保存');
+      setViewOpen(false);
+    } catch {
+      /* 已 toast */
+    } finally {
+      setSavingContent(false);
+    }
+  }
+
+  async function handleClear() {
+    setClearing(true);
+    try {
+      setInfo(await clearAssistantMemory());
+      toast.success('助手记忆已清空');
+      setClearOpen(false);
+    } catch {
+      /* 已 toast */
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Brain className="h-4 w-4 text-gold" />
+          助手记忆
+          {info && (
+            <Badge
+              variant="outline"
+              className={
+                info.enabled
+                  ? 'border-gold/60 bg-gold-muted text-gold-foreground'
+                  : 'border-border bg-muted text-muted-foreground'
+              }
+            >
+              {info.enabled ? '已启用' : '已停用'}
+            </Badge>
+          )}
+        </CardTitle>
+        <CardDescription>
+          会话结束时提炼「值得长期记住的事」存入本机 memory.md，新会话开局自动注入。
+          数据仅存本机，可随时查看与清空。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+        ) : offline ? (
+          <p className="text-sm text-muted-foreground">后端未连接，暂无法管理助手记忆。</p>
+        ) : (
+          <>
+            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+              <div className="text-sm">
+                <div className="font-medium text-foreground">记忆编译与注入</div>
+                <div className="text-xs text-muted-foreground">
+                  {info ? `当前共 ${info.entries} 条记忆` : '读取中…'}
+                </div>
+              </div>
+              <Switch
+                checked={info?.enabled ?? true}
+                disabled={toggling || !info}
+                onCheckedChange={handleToggle}
+                aria-label="记忆编译与注入开关"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDraft(info?.content ?? '');
+                  setViewOpen(true);
+                }}
+              >
+                <Eye className="mr-1.5 h-4 w-4" />
+                查看记忆
+              </Button>
+              <Button
+                variant="outline"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setClearOpen(true)}
+                disabled={!info || info.entries === 0}
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                清空记忆
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+
+      {/* 查看 / 编辑记忆 */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>助手记忆（memory.md）</DialogTitle>
+            <DialogDescription>
+              每行一条，格式「- [日期] 内容」。可直接编辑后保存；清空请用设置页的「清空记忆」。
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={14}
+            className="font-mono text-xs"
+            placeholder="暂无记忆"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleSaveContent} disabled={savingContent}>
+              {savingContent && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 清空确认 */}
+      <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>清空助手记忆？</AlertDialogTitle>
+            <AlertDialogDescription>
+              将删除本机 memory.md 中的全部 {info?.entries ?? 0} 条记忆，且不可恢复。
+              助手之后的对话将无法引用这些历史偏好与教训。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClear} disabled={clearing}>
+              {clearing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              确认清空
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
@@ -505,7 +718,10 @@ export default function Settings() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <LlmSettingsCard offline={offline} />
+        <div className="space-y-6">
+          <LlmSettingsCard offline={offline} />
+          <AssistantMemoryCard offline={offline} />
+        </div>
         <div className="space-y-6">
           <BackendStatusCard health={health} offline={offline} loading={healthLoading} />
           <SoftwareUpdateCard />

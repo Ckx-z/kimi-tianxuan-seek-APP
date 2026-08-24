@@ -138,13 +138,18 @@ def get_settings() -> dict:
 
 
 def save_settings(base_url: str, api_key: str, model: str) -> None:
-    """写入 config/llm_settings.local.json（gitignored，密钥只落这里）。"""
+    """写入 config/llm_settings.local.json（gitignored，密钥只落这里）。
+
+    读-改-写：保留同文件其他字段（如 assistant_memory_enabled，
+    由 src/assistant/memory.py 的开关读写维护），互不覆盖。
+    """
     LOCAL_SETTINGS.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
+    payload = _read_json(LOCAL_SETTINGS)
+    payload.update({
         "base_url": (base_url or "").strip(),
         "api_key": (api_key or "").strip(),
         "model": (model or "").strip(),
-    }
+    })
     LOCAL_SETTINGS.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )

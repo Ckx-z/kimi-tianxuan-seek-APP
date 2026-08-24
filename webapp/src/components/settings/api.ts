@@ -63,3 +63,21 @@ export const testLlmConnection = () =>
 
 /** 静默健康检查（不弹 toast，离线时抛 BackendUnavailableError） */
 export const fetchHealth = () => request<HealthInfo>('/health', undefined, true);
+
+/** 助手记忆（GET /api/assistant/memory 响应） */
+export interface AssistantMemoryInfo {
+  enabled: boolean;
+  content: string;
+  entries: number;
+}
+
+export const fetchAssistantMemory = () => request<AssistantMemoryInfo>('/assistant/memory');
+
+export const updateAssistantMemory = (body: { enabled?: boolean; content?: string }) =>
+  request<AssistantMemoryInfo>('/assistant/memory', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
+export const clearAssistantMemory = () =>
+  request<{ cleared: boolean } & AssistantMemoryInfo>('/assistant/memory', { method: 'DELETE' });

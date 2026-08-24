@@ -34,7 +34,7 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from ..schemas import (AssistantChatRequest, AssistantConfirmRequest,
-                       AssistantSessionCreate)
+                       AssistantMemoryUpdate, AssistantSessionCreate)
 
 logger = logging.getLogger(__name__)
 
@@ -46,17 +46,34 @@ def _imports():
     from .. import deps  # noqa: F401  # 确保 src/ 已入 sys.path
     try:
         from src.assistant import (attachments, confirm, llm_bridge, loop,
-                                   registry, sessions)
+                                   memory, registry, sessions)
     except ImportError:  # pragma: no cover
         from assistant import (attachments, confirm, llm_bridge, loop,  # type: ignore
-                               registry, sessions)
-    return attachments, confirm, llm_bridge, loop, registry, sessions
+                               memory, registry, sessions)
+    return attachments, confirm, llm_bridge, loop, memory, registry, sessions
+
+
+def _finalize_previous_session(sessions, memory) -> None:
+    """新会话创建前对上一会话收尾：提炼长期记忆（V2.1 记忆编译）。
+
+    单用户本机应用，「上一会话」= updated_at 最新的既有会话。
+    开关关闭 / 无历史会话 / LLM 未配置或失败 → 静默跳过，绝不阻塞建档。
+    """
+    try:
+        latest = sessions.list_sessions()
+        if not latest:
+            return
+        prev = sessions.load_session(latest[0]["session_id"])
+        if prev:
+            memory.compile_session(prev)
+    except Exception as exc:
+        logger.warning("上一会话记忆收尾失败（已跳过）: %s", exc)
 
 
 @router.get("/status")
 def status():
     """助手可用性：LLM 未配置时 enabled=false 并给出引导文案。"""
-    _attachments, _confirm, llm_bridge, _loop, _registry, _sessions = _imports()
+    _a, _c, llm_bridge, _l, _m, _r, _s = _imports()
     enabled = llm_bridge.is_configured()
     return {
         "enabled": enabled,
@@ -72,7 +89,7 @@ async def upload_attachment(file: UploadFile):
     类型/大小校验失败返回 400 中文原因；文件本体存
     user_data_root/assistant/uploads/（打包版不写安装目录）。
     """
-    attachments, _confirm, _llm_bridge, _loop, _registry, _sessions = _imports()
+    attachments, _confirm, _llm_bridge, _loop, _memory, _registry, _sessions = _imports()
     data = await file.read()
     try:
         return attachments.save_upload(file.filename or "attachment", data)
@@ -82,22 +99,27 @@ async def upload_attachment(file: UploadFile):
 
 @router.post("/sessions")
 def create_session(req: AssistantSessionCreate):
-    """创建会话；带 context 时存入 meta（首轮对话注入 system prompt）。"""
-    _attachments, _confirm, _llm_bridge, _loop, _registry, sessions = _imports()
+    """创建会话；带 context 时存入 meta（首轮对话注入 system prompt）。
+
+    建档前对上一会话做记忆收尾（V2.1）：LLM 提炼"值得长期记住的事"
+    追加到 memory.md；开关关闭 / LLM 失败静默跳过。
+    """
+    _a, _c, _l, _loop, memory, _r, sessions = _imports()
+    _finalize_previous_session(sessions, memory)
     return sessions.create_session(title=req.title, context=req.context)
 
 
 @router.get("/sessions")
 def list_sessions():
     """会话列表（updated_at 倒序，含 message_count）。"""
-    _attachments, _confirm, _llm_bridge, _loop, _registry, sessions = _imports()
+    _a, _c, _l, _loop, _m, _r, sessions = _imports()
     return {"sessions": sessions.list_sessions()}
 
 
 @router.get("/sessions/{session_id}")
 def get_session(session_id: str):
     """完整会话（含 context 与 messages；消息可带 tool_events / attachments）。"""
-    _attachments, _confirm, _llm_bridge, _loop, _registry, sessions = _imports()
+    _a, _c, _l, _loop, _m, _r, sessions = _imports()
     sess = sessions.load_session(session_id)
     if sess is None:
         raise HTTPException(404, f"会话不存在: {session_id}")
@@ -120,7 +142,7 @@ def chat(req: AssistantChatRequest):
     message = (req.message or "").strip()
 
     def gen():
-        attachments, _confirm, llm_bridge, loop, _registry, sessions = _imports()
+        attachments, _confirm, llm_bridge, loop, memory, _registry, sessions = _imports()
         try:
             # 解析附件元信息（无效 id 跳过，不阻塞对话）
             att_metas: list[dict] = []
@@ -152,6 +174,7 @@ def chat(req: AssistantChatRequest):
                     sess = sessions.update_meta(sess["session_id"],
                                                 context=req.context)
             else:
+                _finalize_previous_session(sessions, memory)
                 created = sessions.create_session(
                     title=effective_message[:20], context=req.context)
                 sess = sessions.load_session(created["session_id"])
@@ -200,7 +223,7 @@ def chat_confirm(req: AssistantConfirmRequest):
     操作"续跑。续跑中再命中写工具会再次发 tool_confirm 挂起。
     """
     def gen():
-        _attachments, confirm, llm_bridge, loop, registry, sessions = _imports()
+        _attachments, confirm, llm_bridge, loop, _memory, registry, sessions = _imports()
         try:
             if not llm_bridge.is_configured():
                 yield _sse({"type": "error",
@@ -266,6 +289,59 @@ def chat_confirm(req: AssistantConfirmRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ---------------------------------------------------------------------------
+# 助手记忆（V2.1）：查看 / 编辑 / 清空 + 开关 + 显式收尾钩子
+# ---------------------------------------------------------------------------
+
+def _memory_payload(memory) -> dict:
+    return {
+        "enabled": memory.is_enabled(),
+        "content": memory.read_text(),
+        "entries": len(memory.load_entries()),
+    }
+
+
+@router.get("/memory")
+def get_memory():
+    """记忆状态：开关 + memory.md 原文 + 条目数。"""
+    _a, _c, _l, _loop, memory, _r, _s = _imports()
+    return _memory_payload(memory)
+
+
+@router.put("/memory")
+def put_memory(req: AssistantMemoryUpdate):
+    """更新记忆：enabled 切换开关；content 整体覆写 memory.md。"""
+    _a, _c, _l, _loop, memory, _r, _s = _imports()
+    if req.enabled is not None:
+        memory.set_enabled(req.enabled)
+    if req.content is not None:
+        memory.write_text(req.content)
+    return _memory_payload(memory)
+
+
+@router.delete("/memory")
+def delete_memory():
+    """清空 memory.md（设置页 AlertDialog 确认后调用）。"""
+    _a, _c, _l, _loop, memory, _r, _s = _imports()
+    memory.clear()
+    return {"cleared": True} | _memory_payload(memory)
+
+
+@router.post("/sessions/{session_id}/compile-memory")
+def compile_session_memory(session_id: str):
+    """显式收尾钩子：对指定会话立即做一次记忆编译（忽略开关，强制执行）。
+
+    正常路径无需调用——新会话创建时已自动对上一会话收尾；此端点供
+    「现在就记住这次讨论」类显式操作与调试用。
+    """
+    _a, _c, _l, _loop, memory, _r, sessions = _imports()
+    sess = sessions.load_session(session_id)
+    if sess is None:
+        raise HTTPException(404, f"会话不存在: {session_id}")
+    appended = memory.compile_session(sess, force=True)
+    return {"appended": appended}
 
 
 def _sse(event: dict) -> str:

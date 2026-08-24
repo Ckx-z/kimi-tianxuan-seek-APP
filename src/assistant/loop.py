@@ -10,6 +10,11 @@ token / tool_call / tool_result / error；done 由路由层在持久化后补发
 - 路径 B（两段式计划-执行）：提示词要求模型输出 JSON 指令
   {"tool": "...", "args": {...}} 或 {"reply": "..."}，解析（正则提取 +
   失败重问一次容错）后循环执行，结果以 user 角色回填。
+
+会话级记忆压缩：历史消息（user+assistant 计）超 20 条时，早期轮次经 LLM
+压缩成「对话纪要」（保留工具结果要点：分数、结论、用户决定），上下文 =
+纪要 + 最近 10 条；LLM 不可用时降级硬截断。用户级长期记忆注入见
+memory.py（system prompt 的「用户记忆」段，可在设置页关闭）。
 """
 
 from __future__ import annotations
@@ -21,13 +26,15 @@ from typing import Iterator
 
 from . import confirm as confirm_module
 from . import context as context_module
-from . import llm_bridge, persona, registry
+from . import llm_bridge, memory as memory_module, persona, registry
 from .llm_bridge import FunctionCallingUnsupported, LLMCallError
 
 logger = logging.getLogger(__name__)
 
 MAX_TOOL_ROUNDS = 5       # 工具调用轮次上限（防死循环）
-_HISTORY_LIMIT = 20       # 带入的历史消息条数上限（MVP 简单截断）
+_COMPRESS_THRESHOLD = 20  # 历史消息（user+assistant 计）超过即触发会话级压缩
+_RECENT_KEEP = 10         # 压缩后保留的最近消息条数（早期轮次进纪要）
+_SUMMARY_MAX_TOKENS = 800
 _HISTORY_MAX_CHARS = 2000  # 单条历史消息限长
 _TOKEN_CHUNK = 16         # 伪流式吐字粒度（HTTP 非流式，切片推送）
 
@@ -107,24 +114,80 @@ def attachments_max() -> int:
 
 def build_messages(session: dict, user_message: str,
                    attachments: list | None = None) -> list[dict]:
-    """组装 messages = [system(人格+领域规则+上下文), ...历史（截断）, user]。"""
+    """组装 messages = [system(人格+领域规则+记忆+上下文), ...历史, user]。
+
+    历史超 _COMPRESS_THRESHOLD 条时压缩为「纪要 + 最近 N 条」；
+    LLM 不可用时降级硬截断（只留最近 N 条），不报错。
+    """
     context_block = context_module.build_context_block(session.get("context"))
     messages = [{"role": "system",
-                 "content": persona.build_system_prompt(context_block)}]
-    history = (session.get("messages") or [])[-_HISTORY_LIMIT:]
-    for m in history:
-        if m.get("role") not in ("user", "assistant"):
-            continue
-        content = str(m.get("content") or "")[:_HISTORY_MAX_CHARS]
-        messages.append({
-            "role": m["role"],
-            "content": content + _history_attachment_note(m),
-        })
+                 "content": persona.build_system_prompt(
+                     context_block,
+                     memory_block=memory_module.injection_block())}]
+    messages.extend(_history_block(session))
     messages.append({
         "role": "user",
         "content": build_user_content(user_message, attachments),
     })
     return messages
+
+
+_SUMMARY_PROMPT = (
+    "你是会话摘要助手。把以下早期对话压缩成一段「对话纪要」：保留工具结果要点"
+    "（打分分数、查询结论、用户做出的决定与偏好），丢弃寒暄与重复内容。"
+    "200 字以内，直接输出纪要文本，不要标题与前后缀。"
+)
+
+# 纪要缓存：session_id -> {"covered": 已压缩的早期消息条数, "text": 纪要}
+# 进程内即可——重启后重算一次，无副作用。
+_SUMMARY_CACHE: dict[str, dict] = {}
+
+
+def _session_summary(session_id: str, early: list[dict]) -> str | None:
+    """早期轮次 → 对话纪要（缓存：覆盖条数一致时复用，不重复调 LLM）。
+
+    LLM 未配置 / 调用失败返回 None，调用方降级为硬截断。
+    """
+    if not early:
+        return None
+    cache = _SUMMARY_CACHE.get(session_id)
+    if cache and cache.get("covered") == len(early):
+        return cache.get("text")
+    lines = []
+    for m in early:
+        role = "用户" if m.get("role") == "user" else "助手"
+        lines.append(f"{role}：{str(m.get('content') or '')[:_HISTORY_MAX_CHARS]}")
+    text = llm_bridge.chat_text(
+        [{"role": "system", "content": _SUMMARY_PROMPT},
+         {"role": "user", "content": "\n".join(lines)}],
+        max_tokens=_SUMMARY_MAX_TOKENS)
+    if not text or not text.strip():
+        return None
+    summary = text.strip()
+    _SUMMARY_CACHE[session_id] = {"covered": len(early), "text": summary}
+    return summary
+
+
+def _history_block(session: dict) -> list[dict]:
+    """历史消息块：超阈值时「纪要（system）+ 最近 N 条」，否则全量。"""
+    raw = [m for m in (session.get("messages") or [])
+           if m.get("role") in ("user", "assistant")]
+    summary = None
+    if len(raw) > _COMPRESS_THRESHOLD:
+        early, raw = raw[:-_RECENT_KEEP], raw[-_RECENT_KEEP:]
+        summary = _session_summary(str(session.get("session_id") or ""), early)
+        # summary 为 None → 早期轮次直接丢弃（硬截断降级）
+    out: list[dict] = []
+    if summary:
+        out.append({"role": "system",
+                    "content": "# 本会话早期对话纪要（早期轮次已压缩）\n" + summary})
+    for m in raw:
+        content = str(m.get("content") or "")[:_HISTORY_MAX_CHARS]
+        out.append({
+            "role": m["role"],
+            "content": content + _history_attachment_note(m),
+        })
+    return out
 
 
 def _tool_event_pair(name: str, args: dict, result: dict) -> Iterator[dict]:
@@ -356,16 +419,10 @@ def _resume_messages(session: dict, name: str, args: dict,
     """
     context_block = context_module.build_context_block(session.get("context"))
     messages = [{"role": "system",
-                 "content": persona.build_system_prompt(context_block)}]
-    history = (session.get("messages") or [])[-_HISTORY_LIMIT:]
-    for m in history:
-        if m.get("role") not in ("user", "assistant"):
-            continue
-        content = str(m.get("content") or "")[:_HISTORY_MAX_CHARS]
-        messages.append({
-            "role": m["role"],
-            "content": content + _history_attachment_note(m),
-        })
+                 "content": persona.build_system_prompt(
+                     context_block,
+                     memory_block=memory_module.injection_block())}]
+    messages.extend(_history_block(session))
     if rejected:
         brief = json.dumps(args or {}, ensure_ascii=False, default=str)[:300]
         messages.append({
