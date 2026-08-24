@@ -1,12 +1,15 @@
 /**
  * 应用整体布局：左侧固定导航栏（紫金主题）+ 右侧内容区
  * 所有路由页面通过 <Outlet /> 渲染在内容区
+ * v1.0.0：新增「工具箱」父级分组（查询打分 / 批量排序 / DFT 计算），可展开收起
  */
-import { NavLink, Outlet } from 'react-router';
+import { useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import {
   Home,
   Search,
   BarChart3,
+  Atom,
   FlaskConical,
   Lightbulb,
   Bot,
@@ -14,19 +17,26 @@ import {
   Settings,
   Moon,
   Sun,
+  Toolbox,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
 
-// 主导航项（设置单独放在侧栏底部）
+// 主导航项（首页与工具箱分组单独渲染；设置单独放在侧栏底部）
 const NAV_ITEMS = [
-  { to: '/', label: '首页', icon: Home, end: true },
-  { to: '/query', label: '查询打分', icon: Search },
-  { to: '/batch', label: '批量排序', icon: BarChart3 },
   { to: '/records', label: '实验记录', icon: FlaskConical },
   { to: '/iterate', label: '方案迭代', icon: Lightbulb },
   { to: '/assistant', label: '科研助手', icon: Bot },
   { to: '/mine', label: '我的', icon: Star },
+];
+
+// 「工具箱」子菜单（原 /query /batch 迁入；旧路径由路由层重定向兼容）
+const TOOLBOX_ITEMS = [
+  { to: '/toolbox/query', label: '查询打分', icon: Search },
+  { to: '/toolbox/batch', label: '批量排序', icon: BarChart3 },
+  { to: '/toolbox/dft', label: 'DFT 计算', icon: Atom, badge: '即将上线' },
 ];
 
 /** 导航链接通用样式（激活态紫金高亮） */
@@ -41,6 +51,13 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
 
 export default function AppLayout() {
   const { theme, toggleTheme } = useTheme();
+  const location = useLocation();
+  // 子路由激活时父分组保持高亮；旧路径（/query /batch）重定向前也兜底算入
+  const toolboxActive =
+    location.pathname.startsWith('/toolbox') ||
+    location.pathname === '/query' ||
+    location.pathname === '/batch';
+  const [toolboxOpen, setToolboxOpen] = useState(true);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -53,7 +70,7 @@ export default function AppLayout() {
               C
             </div>
             <div>
-              <div className="text-base font-semibold tracking-wide">COF 成膜推荐</div>
+              <div className="text-base font-semibold tracking-wide">COF 科研助手</div>
               <div className="text-[11px] text-sidebar-foreground/50">机器学习实验平台</div>
             </div>
           </div>
@@ -63,8 +80,57 @@ export default function AppLayout() {
 
         {/* 主导航 */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} className={navLinkClass}>
+          {/* 首页固定在分组之上 */}
+          <NavLink to="/" end className={navLinkClass}>
+            <Home className="h-4 w-4 shrink-0" />
+            <span>首页</span>
+          </NavLink>
+
+          {/* 工具箱：可展开/收起的父级分组 */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setToolboxOpen((v) => !v)}
+              aria-expanded={toolboxOpen}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                toolboxActive
+                  ? 'text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+              )}
+            >
+              <Toolbox className="h-4 w-4 shrink-0" />
+              <span className="flex-1 text-left">工具箱</span>
+              {toolboxOpen ? (
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" />
+              )}
+            </button>
+            {toolboxOpen && (
+              <div className="mt-1 space-y-1">
+                {TOOLBOX_ITEMS.map(({ to, label, icon: Icon, badge }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={(state) => cn(navLinkClass(state), 'pl-10')}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="flex-1">{label}</span>
+                    {badge && (
+                      <span className="rounded-full border border-gold/50 bg-gold-muted px-1.5 py-0.5 text-[10px] leading-none text-gold-foreground">
+                        {badge}
+                      </span>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 其余主导航 */}
+          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+            <NavLink key={to} to={to} className={navLinkClass}>
               <Icon className="h-4 w-4 shrink-0" />
               <span>{label}</span>
             </NavLink>

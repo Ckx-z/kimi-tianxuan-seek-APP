@@ -14,7 +14,7 @@
   },
   "build": {
     "appId": "com.cof.film-recommend",
-    "productName": "COF成膜推荐系统",
+    "productName": "COF科研助手",
     "directories": {
       "output": "release"
     },

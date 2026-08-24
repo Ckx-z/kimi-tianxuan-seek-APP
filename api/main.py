@@ -1,4 +1,4 @@
-"""FastAPI 入口：COF 成膜推荐系统 REST API。
+"""FastAPI 入口：COF 科研系统 REST API。
 
 启动（开发）：
     E:\\ANACONDA\\python.exe -m uvicorn api.main:app --reload --port 8000
@@ -29,7 +29,7 @@ else:
 WEBAPP_DIST = PROJECT_ROOT / "webapp" / "dist"
 
 app = FastAPI(
-    title="COF 成膜推荐系统 API",
+    title="COF 科研系统 API",
     version="0.1.0",
     description="src/ 后端的 REST 封装：打分 / 收藏 / 实验记录 / 方案卡 / LLM。",
 )

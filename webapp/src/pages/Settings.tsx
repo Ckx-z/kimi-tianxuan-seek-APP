@@ -517,7 +517,7 @@ export default function Settings() {
             </CardHeader>
             <CardContent className="space-y-1.5 text-sm text-muted-foreground">
               <div>
-                项目：<span className="font-medium text-foreground">COF 成膜推荐系统</span>
+                项目：<span className="font-medium text-foreground">COF 科研系统</span>
               </div>
               <div>
                 后端版本：<span className="font-medium text-foreground">0.1.0</span>

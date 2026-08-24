@@ -1,5 +1,5 @@
 /**
- * COF 成膜推荐系统 — Electron preload
+ * COF 科研助手 — Electron preload
  *
  * 通过 contextBridge 向渲染进程暴露最小化 API（保持 contextIsolation 开启，
  * 不启用 nodeIntegration）：

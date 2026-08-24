@@ -13,7 +13,6 @@
  * Mock 开关：VITE_ASSISTANT_MOCK=1（或 true）时走本地 mock（见 ./mock.ts），
  * 用于后端未就绪前的自测与日后联调，默认关闭。
  */
-import { toast } from 'sonner';
 import { mockApi } from './mock';
 
 const BASE_URL = '/api/assistant';

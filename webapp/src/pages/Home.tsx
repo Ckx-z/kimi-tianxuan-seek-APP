@@ -102,7 +102,7 @@ export default function Home() {
       {/* 页头：标题 + 后端状态 */}
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gradient-royal">COF 成膜推荐系统</h1>
+          <h1 className="text-2xl font-semibold text-gradient-royal">COF 科研系统</h1>
           <p className="mt-1 text-sm text-muted-foreground">机器学习辅助的 COF 成膜条件推荐与实验管理</p>
         </div>
         {/* 后端健康状态指示 */}

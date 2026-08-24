@@ -1,5 +1,5 @@
 /**
- * COF 成膜推荐系统 — Electron 主进程（桌面壳）
+ * COF 科研助手 — Electron 主进程（桌面壳）
  *
  * 启动流程：
  *   1. 选一个空闲端口（默认尝试 18765，被占则随机空闲端口；绝不使用 8000）
@@ -301,7 +301,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: 'COF 成膜推荐系统',
+    title: 'COF 科研助手',
     icon: fs.existsSync(ICON_PATH) ? ICON_PATH : undefined,
     autoHideMenuBar: true,
     webPreferences: {
