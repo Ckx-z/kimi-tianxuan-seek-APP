@@ -126,3 +126,7 @@ data/assistant/
 # 收藏夹存储（运行时用户数据）
 data/favorite_folders.json
 data/favorites/
+
+# xtb 二进制（约58MB，scripts/fetch_xtb.py 下载重建，不入库）
+vendor/xtb/
+.tmp_xtb/
