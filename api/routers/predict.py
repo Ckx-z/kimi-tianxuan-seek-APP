@@ -162,6 +162,10 @@ def predict_history(limit: int = 50, offset: int = 0):
                 except Exception:
                     continue
                 if isinstance(rec, dict) and rec.get("type") == "prediction":
+                    # 早期残桩记录（仅 type/score/timestamp，无 SMILES）无法
+                    # 展示与回显，过滤掉（2026-08-24 白屏事故：前端 slice 崩）
+                    if not rec.get("ald_smiles") or not rec.get("amine_smiles"):
+                        continue
                     entries.append(rec)
     except Exception:
         entries = []

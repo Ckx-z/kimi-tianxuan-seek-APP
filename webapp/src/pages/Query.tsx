@@ -259,6 +259,8 @@ export default function Query() {
 
   /** 点击历史记录：完整回显当时输入与全部结果 */
   const handleHistoryClick = (h: PredictHistoryEntry) => {
+    // 防御：历史条目字段可能残缺（旧 schema），后端已过滤，前端兜底不崩
+    if (!h.ald_smiles || !h.amine_smiles) return;
     setAld({ smiles: h.ald_smiles, name: '' });
     setAmine({ smiles: h.amine_smiles, name: '' });
     setResult({
@@ -340,7 +342,7 @@ export default function Query() {
                         {(h.timestamp ?? '').replace('T', ' ').slice(0, 19)}
                       </span>
                       <span className="font-mono text-xs">
-                        {h.ald_smiles.slice(0, 14)}… + {h.amine_smiles.slice(0, 14)}…
+                        {(h.ald_smiles ?? '').slice(0, 14)}… + {(h.amine_smiles ?? '').slice(0, 14)}…
                       </span>
                       <span className="float-right font-medium">
                         {h.score != null ? h.score.toFixed(3) : '⛔'}

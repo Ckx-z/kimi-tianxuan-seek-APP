@@ -36,7 +36,7 @@ const NAV_ITEMS = [
 const TOOLBOX_ITEMS = [
   { to: '/toolbox/query', label: '查询打分', icon: Search },
   { to: '/toolbox/batch', label: '批量排序', icon: BarChart3 },
-  { to: '/toolbox/dft', label: 'DFT 计算', icon: Atom, badge: '即将上线' },
+  { to: '/toolbox/dft', label: 'DFT 计算', icon: Atom },
 ];
 
 /** 导航链接通用样式（激活态紫金高亮） */
@@ -109,7 +109,7 @@ export default function AppLayout() {
             </button>
             {toolboxOpen && (
               <div className="mt-1 space-y-1">
-                {TOOLBOX_ITEMS.map(({ to, label, icon: Icon, badge }) => (
+                {TOOLBOX_ITEMS.map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}
                     to={to}
@@ -117,11 +117,6 @@ export default function AppLayout() {
                   >
                     <Icon className="h-4 w-4 shrink-0" />
                     <span className="flex-1">{label}</span>
-                    {badge && (
-                      <span className="rounded-full border border-gold/50 bg-gold-muted px-1.5 py-0.5 text-[10px] leading-none text-gold-foreground">
-                        {badge}
-                      </span>
-                    )}
                   </NavLink>
                 ))}
               </div>

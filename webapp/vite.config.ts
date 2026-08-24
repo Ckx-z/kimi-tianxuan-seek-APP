@@ -5,7 +5,11 @@ import { inspectAttr } from 'kimi-plugin-inspect-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
+  // 必须用绝对路径 '/'：本应用经 FastAPI 以 http://localhost:<port>/ 提供，
+  // 多级路由（如 /toolbox/query）下相对 base './' 会把 ./assets 解析成
+  // /toolbox/assets → 命中 SPA 回退返回 HTML → module script MIME 报错白屏。
+  // （2026-08-24 查询打分无法打开事故根因）
+  base: '/',
   plugins: [inspectAttr(), react()],
   server: {
     port: 3000,

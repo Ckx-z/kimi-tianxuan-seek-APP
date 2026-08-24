@@ -78,6 +78,11 @@ class SPAStaticFiles(StaticFiles):
             return resp
         except StarletteHTTPException as exc:
             if exc.status_code == 404:
+                # 带扩展名的路径（.js/.css/.png 等静态资源）缺失必须回真 404
+                # ——若回退成 index.html，module script 会因 MIME 是 text/html
+                # 而白屏且极难排查；SPA 前端路由不含扩展名，不受影响
+                if "." in path.replace("\\", "/").rsplit("/", 1)[-1]:
+                    raise
                 resp = await super().get_response("index.html", scope)
                 resp.headers["Cache-Control"] = "no-cache"
                 return resp
