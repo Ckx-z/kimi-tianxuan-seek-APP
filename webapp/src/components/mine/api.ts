@@ -125,6 +125,14 @@ export interface SuggestionItem {
   [key: string]: unknown;
 }
 
+/** 方案卡模板（plan_templates.py 契约） */
+export interface PlanTemplateItem {
+  id: string;
+  name: string;
+  source?: string;
+  builtin?: boolean;
+}
+
 // ---------- 接口 ----------
 
 export async function fetchFavorites(): Promise<FavoriteItem[]> {
@@ -141,6 +149,11 @@ export async function deleteFavorite(id: string): Promise<void> {
   await request(`/favorites/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
+/** 单条收藏（一键打分后局部刷新用） */
+export async function fetchFavorite(id: string): Promise<FavoriteItem> {
+  return request<FavoriteItem>(`/favorites/${encodeURIComponent(id)}`);
+}
+
 export async function fetchPlans(): Promise<PlanItem[]> {
   const data = await request<{ plans?: PlanItem[] }>('/iterate/plans');
   return Array.isArray(data?.plans) ? data.plans : [];
@@ -149,4 +162,43 @@ export async function fetchPlans(): Promise<PlanItem[]> {
 export async function fetchSuggestions(): Promise<SuggestionItem[]> {
   const data = await request<{ suggestions?: SuggestionItem[] }>('/iterate/suggestions');
   return Array.isArray(data?.suggestions) ? data.suggestions : [];
+}
+
+// ---------- 方案模板管理（「我的方案库」区块用） ----------
+
+export async function fetchPlanTemplates(): Promise<PlanTemplateItem[]> {
+  const data = await request<{ templates?: PlanTemplateItem[] }>('/plan-templates');
+  return Array.isArray(data?.templates) ? data.templates : [];
+}
+
+/** 上传 docx 文献 → LLM 提取为方案模板（multipart；name 走 query 参数） */
+export async function uploadPlanTemplate(file: File, name = ''): Promise<PlanTemplateItem> {
+  const form = new FormData();
+  form.append('file', file);
+  const qs = name.trim() ? `?name=${encodeURIComponent(name.trim())}` : '';
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/plan-templates/upload${qs}`, { method: 'POST', body: form });
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (!res.ok) {
+    let message = `上传失败（${res.status}）`;
+    try {
+      const data = await res.json();
+      if (typeof data?.detail === 'string') message = data.detail;
+    } catch {
+      /* 非 JSON 响应 */
+    }
+    toast.error(message);
+    throw new Error(message);
+  }
+  return (await res.json()) as PlanTemplateItem;
+}
+
+/** 删除自定义方案模板（内置模板后端禁止删除） */
+export async function deletePlanTemplate(id: string): Promise<void> {
+  await request(`/plan-templates/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }

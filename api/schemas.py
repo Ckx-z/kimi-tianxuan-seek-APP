@@ -25,6 +25,13 @@ class FavoriteCreate(BaseModel):
     ald_name: str = ""
     amine_name: str = ""
     notes: str = ""
+    # 收藏时一并写入的当前打分快照（可选；缺省则由存储层从预测日志回填）
+    score: float | None = None
+    std: float | None = None
+    ood: str | None = None
+    score_policy: str | None = None
+    tree_score: float | None = None
+    gnn_score: float | None = None
 
 
 class RecordCreate(BaseModel):
@@ -108,7 +115,9 @@ class AssistantSessionCreate(BaseModel):
 
 class AssistantChatRequest(BaseModel):
     session_id: str | None = Field(None, description="空则新建会话")
-    message: str = Field(..., description="用户消息")
+    message: str = Field(..., description="用户消息（有附件时可为空串）")
     context: dict | None = Field(
         None, description="可选上下文（合并进会话 meta，结构同 sessions 创建）")
+    attachments: list[str] | None = Field(
+        None, description="附件 upload_id 列表（POST /uploads 返回，最多 3 个）")
     stream: bool = Field(True, description="固定 SSE 流式（保留字段）")

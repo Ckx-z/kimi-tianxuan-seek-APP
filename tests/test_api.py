@@ -218,6 +218,27 @@ def test_plan_templates_builtin():
     assert any("hou" in str(i) or "builtin" in str(i) for i in ids)
 
 
+def test_plan_template_delete_endpoint(tmp_path, monkeypatch):
+    """DELETE /api/plan-templates/{id}：用户模板可删，内置禁止，不存在 404。"""
+    import recommend.plan_templates as plan_templates
+
+    monkeypatch.setattr(plan_templates, "TEMPLATES_DIR", tmp_path / "tpls")
+    plan_templates.save_template({
+        "id": "user_api_delete", "name": "n", "source": "s",
+        "conditions": {}, "steps": ["s"],
+        "checklist": [{"item": "i"}], "hints_rules": [{"hint": "h"}],
+    })
+    r = client.delete("/api/plan-templates/user_api_delete")
+    assert r.status_code == 200 and r.json()["deleted"] == "user_api_delete"
+
+    r = client.delete("/api/plan-templates/builtin_hou_v3_9")
+    assert r.status_code == 403
+    assert "不可删除" in r.json()["detail"]
+
+    r = client.delete("/api/plan-templates/user_no_such")
+    assert r.status_code == 404
+
+
 def test_plan_card_default_template():
     r = client.post("/api/plan-card", json={
         "aldehyde_smiles": "O=Cc1ccccc1", "amine_smiles": "Nc1ccccc1"})

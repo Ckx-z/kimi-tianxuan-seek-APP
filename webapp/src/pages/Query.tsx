@@ -184,11 +184,18 @@ export default function Query() {
         await deleteFavorite(matchedFavorite.id);
         toast.success('已取消收藏');
       } else {
+        // 收藏时把当前打分结果一并写入收藏记录，「我的」页直接展示分数
         await createFavorite({
           aldehyde_smiles: ald.smiles,
           amine_smiles: amine.smiles,
           ald_name: ald.name,
           amine_name: amine.name,
+          score: result?.score ?? undefined,
+          std: result?.tree_std ?? undefined,
+          ood: result?.ood?.level,
+          score_policy: result?.score_policy,
+          tree_score: result?.tree_score ?? undefined,
+          gnn_score: result?.gnn_score ?? undefined,
         });
         toast.success('已收藏这组单体');
       }

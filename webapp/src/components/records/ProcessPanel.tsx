@@ -3,7 +3,12 @@
  * - 「完整实验流程」长文本区
  * - 时间点记录条目：时间标注（日期时间或第几天/第几小时）+ 过程描述 + 照片/附件
  * - 附件：图片缩略图预览、点击放大（Dialog lightbox）、非图片显示下载链接、可删除
- * - 「保存流程与时间线」统一 PUT /api/records/{id}
+ * - 两种用法：
+ *   1) 非受控（默认，记录详情内嵌）：自带「保存流程与时间线」按钮，
+ *      统一 PUT /api/records/{id}
+ *   2) 受控（RecordEditDialog）：传 value/onValueChange/hideSaveButton/ensureSaved，
+ *      流程文本与时间线由父组件持有，随父级「保存修改」一次提交；
+ *      ensureSaved 供上传附件前把当前时间线先落盘（保证 entry_id 在服务端登记）
  */
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -24,10 +29,23 @@ import {
   type TimelineEntry,
 } from './api';
 
+/** 受控模式下面板持有的值（流程文本 + 时间线条目） */
+export interface ProcessPanelValue {
+  processNotes: string;
+  entries: TimelineEntry[];
+}
+
 export interface ProcessPanelProps {
   rec: RecordItem;
   /** 记录发生变更（保存/上传/删除附件）后的回调，参数为最新记录 */
   onChanged: (rec: RecordItem) => void;
+  /** 受控值；不传则面板内部自管状态并自带保存按钮 */
+  value?: ProcessPanelValue;
+  onValueChange?: (v: ProcessPanelValue) => void;
+  /** 受控模式下隐藏内置「保存流程与时间线」按钮 */
+  hideSaveButton?: boolean;
+  /** 受控模式：上传附件前确保当前流程/时间线已落盘，返回最新记录（失败返回 null） */
+  ensureSaved?: () => Promise<RecordItem | null>;
 }
 
 /** 客户端生成条目 id（服务端保留非空 entry_id，保证跨保存稳定） */
@@ -41,19 +59,43 @@ function sizeLabel(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))}KB`;
 }
 
-export default function ProcessPanel({ rec, onChanged }: ProcessPanelProps) {
-  const [processNotes, setProcessNotes] = useState(rec.process_notes || '');
-  const [entries, setEntries] = useState<TimelineEntry[]>(
+export default function ProcessPanel({
+  rec,
+  onChanged,
+  value,
+  onValueChange,
+  hideSaveButton,
+  ensureSaved,
+}: ProcessPanelProps) {
+  const controlled = value !== undefined;
+  const [localNotes, setLocalNotes] = useState(rec.process_notes || '');
+  const [localEntries, setLocalEntries] = useState<TimelineEntry[]>(
     (rec.timeline || []).map((e) => ({ ...e, attachments: [...(e.attachments || [])] })),
   );
+  const processNotes = controlled ? value.processNotes : localNotes;
+  const entries = controlled ? value.entries : localEntries;
+  const setProcessNotes = (v: string) => {
+    if (controlled) onValueChange?.({ processNotes: v, entries });
+    else setLocalNotes(v);
+  };
+  const setEntries = (next: TimelineEntry[]) => {
+    if (controlled) onValueChange?.({ processNotes, entries: next });
+    else setLocalEntries(next);
+  };
   const [saving, setSaving] = useState(false);
   const [uploadingEntry, setUploadingEntry] = useState<string | null>(null);
   /** 点击图片放大预览 */
   const [preview, setPreview] = useState<AttachmentMeta | null>(null);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  /** 保存流程文本 + 时间线条目，返回最新记录 */
+  /** 保存流程文本 + 时间线条目，返回最新记录；受控模式委托给父组件 ensureSaved */
   const save = async (silent = false): Promise<RecordItem | null> => {
+    if (controlled) {
+      if (!ensureSaved) return null;
+      const updated = await ensureSaved();
+      if (updated && !silent) toast.success('实验流程与时间线已保存');
+      return updated;
+    }
     setSaving(true);
     try {
       const updated = await updateRecord(rec.record_id, {
@@ -71,16 +113,16 @@ export default function ProcessPanel({ rec, onChanged }: ProcessPanelProps) {
   };
 
   const addEntry = () =>
-    setEntries((prev) => [
-      ...prev,
+    setEntries([
+      ...entries,
       { entry_id: newEntryId(), time_label: '', description: '', attachments: [] },
     ]);
 
   const removeEntry = (entryId: string) =>
-    setEntries((prev) => prev.filter((e) => e.entry_id !== entryId));
+    setEntries(entries.filter((e) => e.entry_id !== entryId));
 
   const patchEntry = (entryId: string, patch: Partial<TimelineEntry>) =>
-    setEntries((prev) => prev.map((e) => (e.entry_id === entryId ? { ...e, ...patch } : e)));
+    setEntries(entries.map((e) => (e.entry_id === entryId ? { ...e, ...patch } : e)));
 
   /** 上传附件：先确保时间线已落盘（条目在服务端存在），再上传 */
   const handleUpload = async (entryId: string, file: File) => {
@@ -250,10 +292,16 @@ export default function ProcessPanel({ rec, onChanged }: ProcessPanelProps) {
         </Button>
       </div>
 
-      <Button onClick={() => void save()} disabled={saving} size="sm">
-        {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-        保存流程与时间线
-      </Button>
+      {hideSaveButton ? (
+        <p className="text-xs text-muted-foreground">
+          流程与时间线将随下方「保存」一并提交；上传附件时会自动先保存一次。
+        </p>
+      ) : (
+        <Button onClick={() => void save()} disabled={saving} size="sm">
+          {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+          保存流程与时间线
+        </Button>
+      )}
 
       {/* 图片放大预览 */}
       <Dialog open={preview !== null} onOpenChange={(open) => !open && setPreview(null)}>

@@ -4,14 +4,16 @@
  */
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Bot, User } from 'lucide-react';
+import { Bot, FileText, Image as ImageIcon, User } from 'lucide-react';
 import { ToolEventCard } from './ToolEventCard';
-import type { ToolEvent } from './api';
+import type { AssistantAttachmentMeta, ToolEvent } from './api';
 
 export interface ChatMessageView {
   role: 'user' | 'assistant';
   content: string;
   toolEvents?: ToolEvent[];
+  /** 用户消息携带的附件（元信息，展示为 chip） */
+  attachments?: Pick<AssistantAttachmentMeta, 'filename' | 'kind' | 'size'>[];
   /** 流式输出中（显示光标） */
   streaming?: boolean;
   /** 本条消息出错（温和提示；重试入口由父级渲染） */
@@ -96,6 +98,25 @@ export function MessageBubble({ message }: { message: ChatMessageView }) {
     return (
       <div className="flex justify-end gap-2.5">
         <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-sm">
+          {/* 附件 chip（图片/文档图标 + 文件名） */}
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mb-1.5 flex flex-wrap gap-1.5">
+              {message.attachments.map((a, i) => (
+                <span
+                  key={`${a.filename}-${i}`}
+                  className="inline-flex max-w-56 items-center gap-1 rounded-md bg-white/15 px-2 py-0.5 text-xs"
+                  title={a.filename}
+                >
+                  {a.kind === 'image' ? (
+                    <ImageIcon className="h-3 w-3 shrink-0" />
+                  ) : (
+                    <FileText className="h-3 w-3 shrink-0" />
+                  )}
+                  <span className="truncate">{a.filename}</span>
+                </span>
+              ))}
+            </div>
+          )}
           <p className="whitespace-pre-wrap">{message.content}</p>
         </div>
         <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold text-gold-foreground">

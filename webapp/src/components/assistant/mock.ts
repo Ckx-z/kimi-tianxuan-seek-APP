@@ -102,6 +102,19 @@ export function buildMockEvents(sessionId: string): unknown[] {
 
 // ---------- Mock API（与 assistantApi 同签名） ----------
 export const mockApi = {
+  async uploadAttachment(file: File): Promise<import('./api').AssistantAttachmentMeta> {
+    // mock：不落盘，只造一份元信息让 UI 流程可演示
+    const ext = `.${(file.name.split('.').pop() || '').toLowerCase()}`;
+    return {
+      upload_id: `u_mock${Date.now().toString(16)}`,
+      filename: file.name,
+      ext,
+      kind: ['.png', '.jpg', '.jpeg', '.webp'].includes(ext) ? 'image' : 'document',
+      size: file.size,
+      created_at: nowIso(),
+    };
+  },
+
   async status(): Promise<AssistantStatus> {
     return { enabled: true, reason: 'mock 模式' };
   },

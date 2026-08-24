@@ -1,4 +1,4 @@
-"""「科研助手」Agent 路由（MVP）：状态探针 / 会话 CRUD / SSE 流式对话。
+"""「科研助手」Agent 路由（MVP）：状态探针 / 会话 CRUD / SSE 流式对话 / 附件上传。
 
 SSE 事件契约（data 行为 JSON，钉死，前端按此消费）：
 - {"type": "token", "text": "..."}                          流式文本
@@ -8,6 +8,11 @@ SSE 事件契约（data 行为 JSON，钉死，前端按此消费）：
 - {"type": "done", "session_id": "..."}                     结束
 - {"type": "error", "message": "..."}                       出错（LLM 未配置 /
   超时等一律走此事件，HTTP 恒 200，绝不裸 500）
+
+附件：POST /uploads 上传（multipart，图片 png/jpg/jpeg/webp，
+文档 txt/md/json/csv/docx/pdf，单文件 ≤10MB）→ 返回 upload_id；
+chat 请求 attachments 字段携带 upload_id 列表（≤3 个），
+文档提取文本注入消息上下文，图片以 vision 格式发给 LLM（不支持时自动降级）。
 """
 
 from __future__ import annotations
@@ -15,7 +20,7 @@ from __future__ import annotations
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from ..schemas import AssistantChatRequest, AssistantSessionCreate
@@ -29,16 +34,16 @@ def _imports():
     """延迟 import（src 路径引导依赖 api.deps；frozen/源码双兼容）。"""
     from .. import deps  # noqa: F401  # 确保 src/ 已入 sys.path
     try:
-        from src.assistant import llm_bridge, loop, sessions
+        from src.assistant import attachments, llm_bridge, loop, sessions
     except ImportError:  # pragma: no cover
-        from assistant import llm_bridge, loop, sessions  # type: ignore
-    return llm_bridge, loop, sessions
+        from assistant import attachments, llm_bridge, loop, sessions  # type: ignore
+    return attachments, llm_bridge, loop, sessions
 
 
 @router.get("/status")
 def status():
     """助手可用性：LLM 未配置时 enabled=false 并给出引导文案。"""
-    llm_bridge, _loop, _sessions = _imports()
+    _attachments, llm_bridge, _loop, _sessions = _imports()
     enabled = llm_bridge.is_configured()
     return {
         "enabled": enabled,
@@ -47,24 +52,39 @@ def status():
     }
 
 
+@router.post("/uploads", status_code=201)
+async def upload_attachment(file: UploadFile):
+    """上传附件（图片/文档），返回元信息（含 upload_id）。
+
+    类型/大小校验失败返回 400 中文原因；文件本体存
+    user_data_root/assistant/uploads/（打包版不写安装目录）。
+    """
+    attachments, _llm_bridge, _loop, _sessions = _imports()
+    data = await file.read()
+    try:
+        return attachments.save_upload(file.filename or "attachment", data)
+    except attachments.AttachmentError as exc:
+        raise HTTPException(400, str(exc))
+
+
 @router.post("/sessions")
 def create_session(req: AssistantSessionCreate):
     """创建会话；带 context 时存入 meta（首轮对话注入 system prompt）。"""
-    _llm_bridge, _loop, sessions = _imports()
+    _attachments, _llm_bridge, _loop, sessions = _imports()
     return sessions.create_session(title=req.title, context=req.context)
 
 
 @router.get("/sessions")
 def list_sessions():
     """会话列表（updated_at 倒序，含 message_count）。"""
-    _llm_bridge, _loop, sessions = _imports()
+    _attachments, _llm_bridge, _loop, sessions = _imports()
     return {"sessions": sessions.list_sessions()}
 
 
 @router.get("/sessions/{session_id}")
 def get_session(session_id: str):
-    """完整会话（含 context 与 messages；消息可带 tool_events）。"""
-    _llm_bridge, _loop, sessions = _imports()
+    """完整会话（含 context 与 messages；消息可带 tool_events / attachments）。"""
+    _attachments, _llm_bridge, _loop, sessions = _imports()
     sess = sessions.load_session(session_id)
     if sess is None:
         raise HTTPException(404, f"会话不存在: {session_id}")
@@ -78,15 +98,30 @@ def get_session(session_id: str):
 
 @router.post("/chat")
 def chat(req: AssistantChatRequest):
-    """SSE 流式对话。任何失败（含 LLM 未配置）都以 error 事件收尾。"""
+    """SSE 流式对话。任何失败（含 LLM 未配置）都以 error 事件收尾。
+
+    attachments 为 upload_id 列表（≤3 个）：文档提取文本注入消息上下文，
+    图片以 vision 格式发出（端点/模型不支持时 loop 自动降级为文字提示）。
+    消息文本可为空（有附件时用兜底文案）。
+    """
     message = (req.message or "").strip()
 
     def gen():
-        llm_bridge, loop, sessions = _imports()
+        attachments, llm_bridge, loop, sessions = _imports()
         try:
-            if not message:
-                yield _sse({"type": "error", "message": "message 不能为空"})
-                return
+            # 解析附件元信息（无效 id 跳过，不阻塞对话）
+            att_metas: list[dict] = []
+            for uid in (req.attachments or [])[:attachments.MAX_ATTACHMENTS_PER_MESSAGE]:
+                meta = attachments.get_meta(uid)
+                if meta is not None:
+                    att_metas.append(meta)
+
+            effective_message = message
+            if not effective_message:
+                if not att_metas:
+                    yield _sse({"type": "error", "message": "message 不能为空"})
+                    return
+                effective_message = "请查看我上传的附件并给出分析。"
             if not llm_bridge.is_configured():
                 yield _sse({"type": "error",
                             "message": "LLM 未配置：请到设置页填写 base_url / "
@@ -105,14 +140,14 @@ def chat(req: AssistantChatRequest):
                                                 context=req.context)
             else:
                 created = sessions.create_session(
-                    title=message[:20], context=req.context)
+                    title=effective_message[:20], context=req.context)
                 sess = sessions.load_session(created["session_id"])
             session_id = sess["session_id"]
 
             reply_parts: list[str] = []
             tool_events: list[dict] = []
             errored = False
-            for ev in loop.run(sess, message):
+            for ev in loop.run(sess, effective_message, attachments=att_metas):
                 if ev.get("type") == "token":
                     reply_parts.append(ev.get("text") or "")
                 elif ev.get("type") in ("tool_call", "tool_result"):
@@ -121,8 +156,10 @@ def chat(req: AssistantChatRequest):
                     errored = True
                 yield _sse(ev)
 
-            # 会话落盘（user + assistant 各一条；工具过程挂在 assistant 上）
-            sessions.append_message(session_id, "user", message)
+            # 会话落盘（user + assistant 各一条；工具过程挂在 assistant 上，
+            # 附件元信息随 user 消息持久化）
+            sessions.append_message(session_id, "user", effective_message,
+                                    attachments=att_metas)
             sessions.append_message(session_id, "assistant",
                                     "".join(reply_parts), tool_events)
             if not errored:

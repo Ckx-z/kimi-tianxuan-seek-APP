@@ -6,11 +6,14 @@
  * - POST /api/assistant/sessions         → { session_id, title }
  * - GET  /api/assistant/sessions         → { sessions: [...] }
  * - GET  /api/assistant/sessions/{id}    → { session_id, title, context, messages }
+ * - POST /api/assistant/uploads          → 附件元信息（multipart，单文件 ≤10MB）
  * - POST /api/assistant/chat (stream)    → SSE，每行 data 为 JSON 事件
+ *   （attachments 字段携带 upload_id 列表，≤3 个）
  *
  * Mock 开关：VITE_ASSISTANT_MOCK=1（或 true）时走本地 mock（见 ./mock.ts），
  * 用于后端未就绪前的自测与日后联调，默认关闭。
  */
+import { toast } from 'sonner';
 import { mockApi } from './mock';
 
 const BASE_URL = '/api/assistant';
@@ -42,10 +45,21 @@ export interface ToolEvent {
   is_error?: boolean;
 }
 
+/** 附件元信息（与后端 src/assistant/attachments.py 契约一致） */
+export interface AssistantAttachmentMeta {
+  upload_id: string;
+  filename: string;
+  ext: string;
+  kind: 'image' | 'document';
+  size: number;
+  created_at?: string;
+}
+
 export interface AssistantMessage {
   role: 'user' | 'assistant' | string;
   content: string;
   tool_events?: ToolEvent[];
+  attachments?: AssistantAttachmentMeta[];
   created_at?: string;
 }
 
@@ -157,6 +171,53 @@ export async function* parseSseStream(
   }
 }
 
+// ---------- 附件上传（multipart，不在共享 request 封装内） ----------
+
+/** 附件大小上限（与后端一致：10MB） */
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+/** 单条消息附件数上限（与后端一致） */
+export const ATTACHMENT_MAX_COUNT = 3;
+/** 允许的文件类型（图片 + 文档，与后端白名单一致） */
+export const ATTACHMENT_ACCEPT = '.png,.jpg,.jpeg,.webp,.txt,.md,.json,.csv,.docx,.pdf';
+
+/** 客户端预校验附件（类型/大小）；返回错误文案，合法返回 null */
+export function validateAttachmentFile(file: File): string | null {
+  const ext = `.${(file.name.split('.').pop() || '').toLowerCase()}`;
+  if (!ATTACHMENT_ACCEPT.split(',').includes(ext)) {
+    return `不支持的附件类型「${ext}」：图片仅支持 png/jpg/jpeg/webp，文档仅支持 txt/md/json/csv/docx/pdf`;
+  }
+  if (file.size > ATTACHMENT_MAX_BYTES) {
+    return `附件「${file.name}」超过大小限制（10MB）`;
+  }
+  if (file.size === 0) return `附件「${file.name}」内容为空`;
+  return null;
+}
+
+/** 上传附件，返回元信息（含 upload_id） */
+export async function uploadAttachment(file: File): Promise<AssistantAttachmentMeta> {
+  if (ASSISTANT_MOCK) return mockApi.uploadAttachment(file);
+  const form = new FormData();
+  form.append('file', file);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/uploads`, { method: 'POST', body: form });
+  } catch {
+    throw new AssistantUnavailableError();
+  }
+  if (!res.ok) {
+    let message = `上传失败（${res.status}）`;
+    try {
+      const data = await res.json();
+      if (typeof data?.detail === 'string') message = data.detail;
+      else if (typeof data?.message === 'string') message = data.message;
+    } catch {
+      /* 保留默认提示 */
+    }
+    throw new Error(message);
+  }
+  return (await res.json()) as AssistantAttachmentMeta;
+}
+
 // ---------- 契约 API ----------
 export const assistantApi = {
   /** 助手开关状态（静默，不弹 toast） */
@@ -192,6 +253,7 @@ export const assistantApi = {
     session_id?: string;
     message: string;
     context?: AssistantContext;
+    attachments?: string[];
     stream: true;
   }): Promise<ReadableStream<Uint8Array>> {
     if (ASSISTANT_MOCK) return mockApi.chatStream(body);

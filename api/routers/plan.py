@@ -47,6 +47,20 @@ async def upload_template(file: UploadFile, name: str = ""):
         tmp.unlink(missing_ok=True)
 
 
+@router.delete("/plan-templates/{tpl_id}")
+def delete_template(tpl_id: str):
+    """删除用户上传的模板；内置模板（builtin_ 前缀）禁止删除。"""
+    from recommend import plan_templates
+    try:
+        plan_templates.delete_template(tpl_id)
+        return {"deleted": tpl_id}
+    except plan_templates.TemplateError as exc:
+        msg = str(exc)
+        if "不存在" in msg:
+            raise HTTPException(404, msg)
+        raise HTTPException(403, msg)
+
+
 @router.post("/plan-card")
 def plan_card(req: PlanCardRequest):
     from recommend import plan_card, plan_templates

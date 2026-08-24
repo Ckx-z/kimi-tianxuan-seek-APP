@@ -160,6 +160,38 @@ class TestTemplateCRUD:
         assert not (tpl_dir.parent / "evil.json").exists()
 
 
+# ---------------------------------------------------------------- 模板删除
+
+class TestTemplateDelete:
+    def _user_tpl(self):
+        return {
+            "id": "user_to_delete",
+            "name": "待删模板",
+            "source": "测试",
+            "conditions": {},
+            "steps": ["s"],
+            "checklist": [{"item": "i"}],
+            "hints_rules": [{"hint": "h"}],
+        }
+
+    def test_delete_user_template(self, tpl_dir):
+        plan_templates.save_template(self._user_tpl())
+        assert plan_templates.get_template("user_to_delete")["name"] == "待删模板"
+        plan_templates.delete_template("user_to_delete")
+        with pytest.raises(plan_templates.TemplateError, match="不存在"):
+            plan_templates.get_template("user_to_delete")
+
+    def test_delete_builtin_forbidden(self, tpl_dir):
+        with pytest.raises(plan_templates.TemplateError, match="不可删除"):
+            plan_templates.delete_template(plan_templates.BUILTIN_ID)
+        # 内置模板仍在
+        assert plan_templates.get_template(plan_templates.BUILTIN_ID)
+
+    def test_delete_missing_raises(self, tpl_dir):
+        with pytest.raises(plan_templates.TemplateError, match="不存在"):
+            plan_templates.delete_template("user_no_such")
+
+
 # ---------------------------------------------------------------- docx 提取
 
 class TestDocxExtract:

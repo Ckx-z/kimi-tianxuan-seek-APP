@@ -136,10 +136,11 @@ def _build_explanation(pred, ald: str, amine: str, payload: dict) -> dict:
 
 
 @router.get("/predict/history")
-def predict_history(limit: int = 50):
+def predict_history(limit: int = 50, offset: int = 0):
     """查询历史：读 data/prediction_log.jsonl 的 prediction 记录，新→旧。
 
     记录含当时输入（ald/amine SMILES）与全部结果分量，供前端完整回显。
+    limit/offset 分页；count 为总条数（供前端分页器）；文件不存在返回空列表。
     """
     try:
         from utils.predict_log import LOG_PATH
@@ -147,6 +148,7 @@ def predict_history(limit: int = 50):
         from pathlib import Path
         LOG_PATH = Path("data/prediction_log.jsonl")
     limit = max(1, min(int(limit), 500))
+    offset = max(0, int(offset))
     entries: list[dict] = []
     try:
         if LOG_PATH.is_file():
@@ -164,7 +166,7 @@ def predict_history(limit: int = 50):
     except Exception:
         entries = []
     entries.reverse()
-    return {"history": entries[:limit], "count": len(entries)}
+    return {"history": entries[offset:offset + limit], "count": len(entries)}
 
 
 @router.post("/predict")

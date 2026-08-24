@@ -5,7 +5,10 @@
 
 行格式：
 - 首行 {"kind": "meta", "session_id", "title", "context", "created_at"}
-- 消息行 {"kind": "message", "role", "content", "tool_events", "created_at"}
+- 消息行 {"kind": "message", "role", "content", "tool_events",
+         "attachments", "created_at"}
+  （attachments 为附件元信息列表 {upload_id, filename, ext, kind, size}，
+   文件本体存 user_data_root/assistant/uploads/）
 
 meta 更新（标题 / context）采用整体重写（文件小，读改写即可）；
 消息一律 append。损坏行跳过不崩。
@@ -81,6 +84,8 @@ def _parse(lines: list[dict], session_id: str) -> dict | None:
         }
         if l.get("tool_events"):
             msg["tool_events"] = l["tool_events"]
+        if l.get("attachments"):
+            msg["attachments"] = l["attachments"]
         messages.append(msg)
     last_at = messages[-1]["created_at"] if messages else meta.get("created_at", "")
     return {
@@ -141,8 +146,13 @@ def list_sessions() -> list[dict]:
 
 
 def append_message(session_id: str, role: str, content: str,
-                   tool_events: list | None = None) -> dict | None:
-    """追加一条消息，返回该消息 dict；会话不存在返回 None。"""
+                   tool_events: list | None = None,
+                   attachments: list | None = None) -> dict | None:
+    """追加一条消息，返回该消息 dict；会话不存在返回 None。
+
+    attachments：附件元信息列表（{upload_id, filename, ext, kind, size}），
+    随消息持久化；文件本体在 uploads/ 目录，不进 jsonl。
+    """
     if load_session(session_id) is None:
         return None
     msg = {
@@ -150,6 +160,7 @@ def append_message(session_id: str, role: str, content: str,
         "role": role,
         "content": content or "",
         "tool_events": list(tool_events or []),
+        "attachments": list(attachments or []),
         "created_at": _now(),
     }
     with _path(session_id).open("a", encoding="utf-8") as f:
@@ -181,6 +192,7 @@ def update_meta(session_id: str, title: str | None = None,
             "role": m["role"],
             "content": m["content"],
             "tool_events": m.get("tool_events") or [],
+            "attachments": m.get("attachments") or [],
             "created_at": m.get("created_at") or "",
         }
         lines.append(json.dumps(row, ensure_ascii=False))

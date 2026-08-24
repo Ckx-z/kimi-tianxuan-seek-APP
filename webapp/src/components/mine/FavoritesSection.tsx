@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/table';
 import {
   deleteFavorite,
+  fetchFavorite,
   type FavoriteItem,
   type PredictionSnapshot,
   type ReferenceItem,
@@ -59,6 +60,7 @@ import {
   fetchMonomerProps,
   fetchPlanCard,
   fetchPlanTemplates,
+  predictPair,
   type MonomerProps,
   type PlanCardData,
   type PlanTemplateItem,
@@ -177,10 +179,13 @@ function FavoriteDetailDialog({
   fav,
   open,
   onOpenChange,
+  onFavUpdated,
 }: {
   fav: FavoriteItem | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** 一键打分后收藏快照已更新（父级同步详情与列表） */
+  onFavUpdated?: (fav: FavoriteItem) => void;
 }) {
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [recLoading, setRecLoading] = useState(false);
@@ -276,6 +281,23 @@ function FavoriteDetailDialog({
     handleTemplateChange(tpl.id);
   };
 
+  /** 一键打分：调 /api/predict，后端自动回写该单体对所有收藏的快照 */
+  const [quickScoring, setQuickScoring] = useState(false);
+  const handleQuickScore = async () => {
+    if (!fav?.aldehyde?.smiles || !fav?.amine?.smiles) return;
+    setQuickScoring(true);
+    try {
+      await predictPair(fav.aldehyde.smiles, fav.amine.smiles);
+      const updated = await fetchFavorite(fav.id);
+      toast.success('打分完成，收藏分数已更新');
+      onFavUpdated?.(updated);
+    } catch {
+      /* 错误提示已由 api 层弹出 */
+    } finally {
+      setQuickScoring(false);
+    }
+  };
+
   if (!fav) return null;
   const result = snapshotToResult(fav.latest_prediction);
 
@@ -326,8 +348,18 @@ function FavoriteDetailDialog({
               {result ? (
                 <ResultCard result={result} loading={false} />
               ) : (
-                <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                  尚未打分，可在查询页对该组合进行预测；打分后此处显示与查询打分页一致的完整结果。
+                <div className="space-y-3 rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                  <p>
+                    尚未打分：可在查询页对该组合进行预测；打分后此处显示与查询打分页一致的完整结果。
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={quickScoring || !fav.aldehyde?.smiles || !fav.amine?.smiles}
+                    onClick={() => void handleQuickScore()}
+                  >
+                    {quickScoring ? '打分中…' : '一键打分'}
+                  </Button>
                 </div>
               )}
             </section>
@@ -481,6 +513,26 @@ export function FavoritesSection({
   const [detail, setDetail] = useState<FavoriteItem | null>(null);
   const [toDelete, setToDelete] = useState<FavoriteItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  /** 一键打分进行中（按收藏 id 记） */
+  const [scoringId, setScoringId] = useState<string | null>(null);
+
+  /** 旧收藏无分数字段时的一键打分：打分后快照由后端回写，随后刷新 */
+  async function quickScore(fav: FavoriteItem) {
+    if (!fav.aldehyde?.smiles || !fav.amine?.smiles) {
+      toast.error('该收藏缺少单体 SMILES，无法打分');
+      return;
+    }
+    setScoringId(fav.id);
+    try {
+      await predictPair(fav.aldehyde.smiles, fav.amine.smiles);
+      toast.success('打分完成，收藏分数已更新');
+      onChanged();
+    } catch {
+      /* 错误提示已由 api 层弹出 */
+    } finally {
+      setScoringId(null);
+    }
+  }
 
   async function confirmDelete() {
     if (!toDelete) return;
@@ -550,9 +602,24 @@ export function FavoritesSection({
               <div className="break-all font-mono text-xs text-muted-foreground">
                 {shortSmiles(fav.amine?.smiles)}
               </div>
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center justify-between gap-2 pt-1">
                 <ScoreBadge fav={fav} />
-                <span className="text-xs text-muted-foreground">{fav.created_at || ''}</span>
+                {typeof fav.latest_prediction?.score !== 'number' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 shrink-0 px-2 text-xs text-primary hover:text-primary"
+                    disabled={scoringId === fav.id}
+                    title="对该组合立即打分并回写收藏"
+                    onClick={(e) => {
+                      e.stopPropagation(); // 阻止触发卡片点击
+                      void quickScore(fav);
+                    }}
+                  >
+                    {scoringId === fav.id ? '打分中…' : '一键打分'}
+                  </Button>
+                )}
+                <span className="truncate text-xs text-muted-foreground">{fav.created_at || ''}</span>
               </div>
             </CardContent>
           </Card>
@@ -564,6 +631,10 @@ export function FavoritesSection({
         fav={detail}
         open={detail !== null}
         onOpenChange={(v) => !v && setDetail(null)}
+        onFavUpdated={(updated) => {
+          setDetail(updated);
+          onChanged();
+        }}
       />
 
       {/* 删除确认 */}

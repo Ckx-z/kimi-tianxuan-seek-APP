@@ -9,7 +9,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Bot, MessageSquarePlus, RefreshCw, Send, Settings as SettingsIcon } from 'lucide-react';
+import { Bot, FileText, Image as ImageIcon, MessageSquarePlus, Paperclip, RefreshCw, Send, Settings as SettingsIcon, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,8 +18,13 @@ import { cn } from '@/lib/utils';
 import {
   assistantApi,
   parseSseStream,
+  uploadAttachment,
+  validateAttachmentFile,
   AssistantUnavailableError,
   ASSISTANT_MOCK,
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_MAX_COUNT,
+  type AssistantAttachmentMeta,
   type AssistantContext,
   type AssistantSessionMeta,
   type AssistantStatus,
@@ -53,8 +59,12 @@ export default function Assistant() {
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [loadingSession, setLoadingSession] = useState(false);
-  /** 最近一次发送（供网络中断后重试） */
-  const lastSentRef = useRef<{ message: string } | null>(null);
+  /** 待发送附件（未上传；发送时先上传再带 upload_id 发消息） */
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  /** 最近一次发送（供网络中断后重试；attachments 为已上传的元信息） */
+  const lastSentRef = useRef<{ message: string; attachments?: AssistantAttachmentMeta[] } | null>(null);
   const [canRetry, setCanRetry] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -114,6 +124,7 @@ export default function Assistant() {
             role: m.role as 'user' | 'assistant',
             content: m.content,
             toolEvents: m.tool_events,
+            attachments: m.attachments,
           })),
       );
     } catch {
@@ -125,7 +136,12 @@ export default function Assistant() {
 
   // ---------- 流式发送 ----------
   const runStream = useCallback(
-    async (sessionId: string, message: string, context?: AssistantContext) => {
+    async (
+      sessionId: string,
+      message: string,
+      context?: AssistantContext,
+      attachments?: AssistantAttachmentMeta[],
+    ) => {
       const asstId = nextId();
       setMessages((ms) => [
         ...ms,
@@ -140,6 +156,7 @@ export default function Assistant() {
           session_id: sessionId,
           message,
           context,
+          attachments: attachments?.length ? attachments.map((a) => a.upload_id) : undefined,
           stream: true,
         });
         for await (const ev of parseSseStream(stream)) {
@@ -179,18 +196,83 @@ export default function Assistant() {
     [refreshSessions],
   );
 
+  // ---------- 附件 ----------
+  const addFiles = useCallback(
+    (files: FileList | File[]) => {
+      const incoming = [...files];
+      if (incoming.length === 0) return;
+      setPendingFiles((prev) => {
+        const room = ATTACHMENT_MAX_COUNT - prev.length;
+        if (room <= 0) {
+          toast.warning(`一次最多附带 ${ATTACHMENT_MAX_COUNT} 个附件`);
+          return prev;
+        }
+        const accepted: File[] = [];
+        for (const f of incoming.slice(0, room)) {
+          const err = validateAttachmentFile(f);
+          if (err) toast.error(err);
+          else accepted.push(f);
+        }
+        if (incoming.length > room) {
+          toast.warning(`一次最多附带 ${ATTACHMENT_MAX_COUNT} 个附件，超出的已忽略`);
+        }
+        return [...prev, ...accepted];
+      });
+    },
+    [],
+  );
+
+  const removePendingFile = useCallback((idx: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
+
   const sendMessage = useCallback(
     async (raw: string) => {
       const message = raw.trim();
-      if (!message || streaming) return;
-      lastSentRef.current = { message };
+      const files = pendingFiles;
+      if ((!message && files.length === 0) || streaming || uploading) return;
       setInput('');
-      setMessages((ms) => [...ms, { id: nextId(), role: 'user', content: message }]);
+
+      // 先上传附件（失败则中止本次发送，输入与附件保留在输入区）
+      let metas: AssistantAttachmentMeta[] = [];
+      if (files.length > 0) {
+        setUploading(true);
+        try {
+          for (const f of files) {
+            metas.push(await uploadAttachment(f));
+          }
+          setPendingFiles([]);
+        } catch (e) {
+          toast.error(
+            `附件上传失败：${e instanceof AssistantUnavailableError
+              ? '无法连接后端服务，请确认服务已启动'
+              : e instanceof Error
+                ? e.message
+                : '未知错误'}，消息未发送`,
+          );
+          setInput(raw); // 恢复输入，避免丢失
+          return;
+        } finally {
+          setUploading(false);
+        }
+      }
+
+      const effective = message || '请查看我上传的附件并给出分析。';
+      lastSentRef.current = { message: effective, attachments: metas };
+      setMessages((ms) => [
+        ...ms,
+        {
+          id: nextId(),
+          role: 'user',
+          content: effective,
+          attachments: metas.length ? metas : undefined,
+        },
+      ]);
       let sid = activeId;
       if (!sid) {
         try {
           const created = await assistantApi.createSession({
-            title: message.slice(0, 16),
+            title: effective.slice(0, 16),
             context: activeContext,
           });
           sid = created.session_id;
@@ -212,12 +294,12 @@ export default function Assistant() {
           return;
         }
       }
-      await runStream(sid, message, activeContext);
+      await runStream(sid, effective, activeContext, metas);
     },
-    [activeId, activeContext, runStream, streaming],
+    [activeId, activeContext, pendingFiles, runStream, streaming, uploading],
   );
 
-  // 网络中断重试：复用上一条用户消息，直接重发流
+  // 网络中断重试：复用上一条用户消息（含已上传附件的 upload_id），直接重发流
   const retryLast = useCallback(async () => {
     const last = lastSentRef.current;
     if (!last || streaming) return;
@@ -229,7 +311,7 @@ export default function Assistant() {
       await sendMessage(last.message);
       return;
     }
-    await runStream(sid, last.message, activeContext);
+    await runStream(sid, last.message, activeContext, last.attachments);
   }, [activeId, activeContext, runStream, sendMessage, streaming]);
 
   // ---------- 方案迭代转入：自动建会话 + 开场消息 ----------
@@ -434,7 +516,59 @@ export default function Assistant() {
 
           {/* 输入区 */}
           <div className="border-t border-border p-3">
+            {/* 待发送附件 chips（可删除重传） */}
+            {pendingFiles.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {pendingFiles.map((f, i) => {
+                  const isImage = /\.(png|jpe?g|webp)$/i.test(f.name);
+                  return (
+                    <span
+                      key={`${f.name}-${i}`}
+                      className="inline-flex max-w-56 items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2 py-1 text-xs text-foreground"
+                      title={`${f.name}（${(f.size / 1024).toFixed(0)}KB）`}
+                    >
+                      {isImage ? (
+                        <ImageIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      ) : (
+                        <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      )}
+                      <span className="truncate">{f.name}</span>
+                      <button
+                        type="button"
+                        title="移除附件"
+                        disabled={streaming || uploading}
+                        onClick={() => removePendingFile(i)}
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             <div className="flex items-end gap-2">
+              {/* 附件选择（隐藏 input） */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={ATTACHMENT_ACCEPT}
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) addFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={streaming || uploading || pendingFiles.length >= ATTACHMENT_MAX_COUNT}
+                className="h-9 w-9 shrink-0 p-0"
+                title={`添加附件（图片/文档，单个 ≤10MB，最多 ${ATTACHMENT_MAX_COUNT} 个）`}
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -444,19 +578,22 @@ export default function Assistant() {
                     sendMessage(input);
                   }
                 }}
-                placeholder="输入问题，Enter 发送，Shift+Enter 换行"
+                placeholder="输入问题，Enter 发送，Shift+Enter 换行；可点击左侧回形针附带图片/文档"
                 rows={2}
-                disabled={streaming}
+                disabled={streaming || uploading}
                 className="max-h-32 resize-none"
               />
               <Button
                 onClick={() => sendMessage(input)}
-                disabled={streaming || !input.trim()}
+                disabled={streaming || uploading || (!input.trim() && pendingFiles.length === 0)}
                 className="h-9 w-9 shrink-0 bg-primary p-0 text-primary-foreground"
               >
                 <Send className="h-4 w-4" />
               </Button>
             </div>
+            {uploading && (
+              <p className="mt-1.5 text-xs text-muted-foreground">附件上传中…</p>
+            )}
           </div>
         </section>
       </div>

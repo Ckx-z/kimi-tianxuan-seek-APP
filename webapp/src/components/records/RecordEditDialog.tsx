@@ -3,7 +3,9 @@
  * - mode="draft"：底部两键「保存草稿」（宽松校验）/「转为正式记录」（编号必填 + 结果三选）
  * - mode="final"：正式记录全字段修改（编号 / 结果 / 条件 / 备注 / 自我总结 / 失误 / 流程时间线），
  *   底部一键「保存修改」，保持必填校验（experiment_no、outcome），后端走 final 完整校验
- * - 内嵌实验过程时间线面板（ProcessPanel）
+ * - 内嵌实验过程时间线面板（ProcessPanel，受控模式）：流程文本与时间线随
+ *   「保存草稿 / 保存修改 / 转为正式记录」一次提交，不再要求先点面板内的单独保存；
+ *   保存失败时对话框保持打开、已填内容不丢（错误提示由 api 层弹出）
  */
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -21,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import ProcessPanel from './ProcessPanel';
-import { updateRecord, type RecordItem } from './api';
+import { updateRecord, type RecordItem, type TimelineEntry } from './api';
 
 /** conditions 九键（与后端契约一致） */
 const CONDITION_FIELDS: { key: string; label: string }[] = [
@@ -67,6 +69,26 @@ export default function RecordEditDialog({ rec, mode, onClose, onSaved }: Record
   const [noError, setNoError] = useState(false);
   /** 面板内流程/时间线变更后记录有更新，但本体未变，关闭时也需提示父级 */
   const [currentRec, setCurrentRec] = useState(rec);
+  /** 流程文本与时间线（受控持有，随保存一并提交） */
+  const [processNotes, setProcessNotes] = useState(rec.process_notes || '');
+  const [timeline, setTimeline] = useState<TimelineEntry[]>(
+    (rec.timeline || []).map((e) => ({ ...e, attachments: [...(e.attachments || [])] })),
+  );
+
+  /** 上传附件前由 ProcessPanel 调用：先把当前流程/时间线静默落盘 */
+  const ensureTimelineSaved = async (): Promise<RecordItem | null> => {
+    try {
+      const updated = await updateRecord(rec.record_id, {
+        process_notes: processNotes,
+        timeline,
+      });
+      setCurrentRec(updated);
+      return updated;
+    } catch {
+      // 错误提示已由 api 层弹出
+      return null;
+    }
+  };
 
   /**
    * 提交：draft 模式下 finalize=false 保存草稿、true 转正式；
@@ -98,6 +120,9 @@ export default function RecordEditDialog({ rec, mode, onClose, onSaved }: Record
         self_summary: selfSummary.trim(),
         mistakes: mistakes.trim(),
         conditions,
+        // 流程文本与时间线随主保存一次提交（合并原面板内的单独保存动作）
+        process_notes: processNotes,
+        timeline,
       });
       toast.success(
         isDraft
@@ -228,8 +253,18 @@ export default function RecordEditDialog({ rec, mode, onClose, onSaved }: Record
             />
           </div>
 
-          {/* 实验过程时间线 */}
-          <ProcessPanel rec={currentRec} onChanged={setCurrentRec} />
+          {/* 实验过程时间线（受控：随底部「保存」一次提交） */}
+          <ProcessPanel
+            rec={currentRec}
+            onChanged={setCurrentRec}
+            value={{ processNotes, entries: timeline }}
+            onValueChange={(v) => {
+              setProcessNotes(v.processNotes);
+              setTimeline(v.entries);
+            }}
+            hideSaveButton
+            ensureSaved={ensureTimelineSaved}
+          />
         </div>
 
         {/* 底部操作（固定不随内容滚动） */}

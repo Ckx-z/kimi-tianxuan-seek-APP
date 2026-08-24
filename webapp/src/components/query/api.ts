@@ -170,12 +170,18 @@ export async function uploadPlanTemplate(file: File): Promise<PlanTemplateItem> 
   return (await res.json()) as PlanTemplateItem;
 }
 
-/** 收藏一组单体 */
+/** 收藏一组单体（可携带当前打分快照，写入 latest_prediction） */
 export const createFavorite = (payload: {
   aldehyde_smiles: string;
   amine_smiles: string;
   ald_name?: string;
   amine_name?: string;
+  score?: number | null;
+  std?: number | null;
+  ood?: string;
+  score_policy?: string;
+  tree_score?: number | null;
+  gnn_score?: number | null;
 }) => request('/favorites', { method: 'POST', body: payload, silent: true });
 
 // ---------- 收藏状态 / 取消收藏 / 查询历史 ----------

@@ -3,12 +3,17 @@
 模板 schema：
     {id, name, source, conditions{}, steps[], checklist[], hints_rules[]}
 
-- 内置模板：data/plan_templates/builtin_hou.json（侯老师界面法 v3.9，入库）
-- 用户模板：data/plan_templates/*.json（gitignored，builtin_ 前缀保留给内置）
+- 内置模板：data/plan_templates/builtin_hou.json（侯老师界面法 v3.9，入库，
+  只读；frozen 打包后在 _MEIPASS 内，用户不可改、不可删）
+- 用户模板：runtime_config.user_data_root()/plan_templates/*.json
+  （开发模式等同仓库 data/plan_templates；打包版落
+  %APPDATA%/COF-Film-Recommend/data/plan_templates，绝不写安装目录）
+- list/get 读两侧合并（同 id 用户模板覆盖内置）；builtin_ 前缀保留给内置，
+  内置模板禁止删除
 - extract_template_from_docx：python-docx 读全文 → LLM 提取为 schema JSON
   → 解析校验后返回预览 dict，**不落盘**；确认后由 save_template 落盘。
 - LLM 未配置时提取优雅降级为 None 语义（抛 TemplateError 由上层捕获提示），
-  list/get/save 不依赖 LLM。
+  list/get/save/delete 不依赖 LLM。
 """
 
 from __future__ import annotations
@@ -26,7 +31,10 @@ except ImportError:
     import runtime_config  # type: ignore
 
 PROJECT_ROOT = runtime_config.resource_root()
-TEMPLATES_DIR = PROJECT_ROOT / "data" / "plan_templates"
+# 内置模板（只读资源，随包分发）
+BUILTIN_TEMPLATES_DIR = PROJECT_ROOT / "data" / "plan_templates"
+# 用户模板（可写；frozen 时落 %APPDATA%/COF-Film-Recommend/data/plan_templates）
+TEMPLATES_DIR = runtime_config.user_data_root() / "plan_templates"
 BUILTIN_ID = "builtin_hou_v3_9"
 
 _REQUIRED_KEYS = ("id", "name", "source", "conditions", "steps", "checklist", "hints_rules")
@@ -70,44 +78,68 @@ def _template_path(tpl_id: str) -> Path:
     return TEMPLATES_DIR / f"{safe}.json"
 
 
-def list_templates() -> list[dict]:
-    """列出全部模板（内置 + data/plan_templates/ 下用户模板）。"""
-    templates: list[dict] = []
-    if not TEMPLATES_DIR.exists():
-        return templates
-    for p in sorted(TEMPLATES_DIR.glob("*.json")):
+def _builtin_path(tpl_id: str) -> Path:
+    safe = re.sub(r"[^A-Za-z0-9_\-]", "_", tpl_id)
+    return BUILTIN_TEMPLATES_DIR / f"{safe}.json"
+
+
+def _read_dir_templates(directory: Path) -> dict[str, dict]:
+    """读一个模板目录 → {id: 模板}；非法文件跳过。"""
+    out: dict[str, dict] = {}
+    if not directory.exists():
+        return out
+    for p in sorted(directory.glob("*.json")):
         try:
             tpl = json.loads(p.read_text(encoding="utf-8"))
             validate_template(tpl)
             tpl["builtin"] = tpl["id"].startswith("builtin_")
-            templates.append(tpl)
+            out[tpl["id"]] = tpl
         except Exception as exc:
             logger.warning("跳过非法模板 %s: %s", p.name, exc)
-    return templates
+    return out
+
+
+def list_templates() -> list[dict]:
+    """列出全部模板（内置 + 用户模板；同 id 用户模板覆盖内置）。"""
+    merged = _read_dir_templates(BUILTIN_TEMPLATES_DIR)
+    if TEMPLATES_DIR != BUILTIN_TEMPLATES_DIR:
+        merged.update(_read_dir_templates(TEMPLATES_DIR))
+    return list(merged.values())
 
 
 def get_template(tpl_id: str) -> dict:
-    """按 id 取模板；不存在抛 TemplateError。"""
-    p = _template_path(tpl_id)
-    if not p.exists():
-        raise TemplateError(f"模板不存在: {tpl_id}")
-    try:
-        tpl = json.loads(p.read_text(encoding="utf-8"))
-        return validate_template(tpl)
-    except TemplateError:
-        raise
-    except Exception as exc:
-        raise TemplateError(f"模板读取失败: {tpl_id}: {exc}")
+    """按 id 取模板（用户目录优先，其次内置目录）；不存在抛 TemplateError。"""
+    for p in (_template_path(tpl_id), _builtin_path(tpl_id)):
+        if p.exists():
+            try:
+                tpl = json.loads(p.read_text(encoding="utf-8"))
+                return validate_template(tpl)
+            except TemplateError:
+                raise
+            except Exception as exc:
+                raise TemplateError(f"模板读取失败: {tpl_id}: {exc}")
+    raise TemplateError(f"模板不存在: {tpl_id}")
 
 
 def save_template(tpl: dict) -> dict:
-    """校验后落盘 data/plan_templates/<id>.json，返回规范化模板。"""
+    """校验后落盘用户模板目录 <id>.json，返回规范化模板。"""
     tpl = validate_template(tpl)
     TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     _template_path(tpl["id"]).write_text(
         json.dumps(tpl, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return tpl
+
+
+def delete_template(tpl_id: str) -> None:
+    """删除用户模板；内置模板（builtin_ 前缀）禁止删除，不存在抛 TemplateError。"""
+    tpl_id = (tpl_id or "").strip()
+    if tpl_id.startswith("builtin_"):
+        raise TemplateError(f"内置模板「{tpl_id}」不可删除")
+    p = _template_path(tpl_id)
+    if not p.exists():
+        raise TemplateError(f"模板不存在: {tpl_id}")
+    p.unlink()
 
 
 # ---------------------------------------------------------------- docx 提取

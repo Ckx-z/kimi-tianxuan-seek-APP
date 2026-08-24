@@ -52,7 +52,59 @@ def _stream_text(text: str) -> Iterator[dict]:
         yield {"type": "token", "text": text[i:i + _TOKEN_CHUNK]}
 
 
-def build_messages(session: dict, user_message: str) -> list[dict]:
+def _history_attachment_note(m: dict) -> str:
+    """历史消息的附件提示（附件内容不重复注入，只保留存在性说明）。"""
+    names = [str(a.get("filename") or "附件")
+             for a in (m.get("attachments") or []) if isinstance(a, dict)]
+    return f"\n[附件：{'、'.join(names)}]" if names else ""
+
+
+def build_user_content(user_message: str,
+                       attachments: list | None = None) -> str | list:
+    """组装本轮用户消息 content。
+
+    - 无附件：纯文本原样返回；
+    - 文档类附件：提取文本追加到文本尾部（注入上下文）；
+    - 图片附件：转 OpenAI vision 格式（content 为 text + image_url 分片列表，
+      base64 data URL）；路径 A 直接发出，端点/模型不支持时由 loop 降级
+      路径 B，_sanitize_for_plain 会把图片分片替换为「不支持看图」提示。
+    附件文本提取失败（损坏/无文本）不阻塞对话：以一条说明代替。
+    """
+    from . import attachments as att_module  # 延迟 import，避免循环依赖
+
+    metas = [m for m in (attachments or []) if isinstance(m, dict)]
+    if not metas:
+        return user_message
+    text = user_message
+    images: list[dict] = []
+    for meta in metas[:attachments_max()]:
+        filename = str(meta.get("filename") or "附件")
+        if meta.get("kind") == "image":
+            try:
+                url = att_module.image_data_url(meta)
+            except Exception as exc:
+                text += f"\n\n[图片附件 {filename} 读取失败：{exc}]"
+                continue
+            text += f"\n\n[用户上传了图片：{filename}]"
+            images.append({"type": "image_url", "image_url": {"url": url}})
+        else:
+            try:
+                doc_text = att_module.extract_text(meta)
+                text += (f"\n\n【附件 {filename} 内容】\n{doc_text}")
+            except Exception as exc:
+                text += f"\n\n[附件 {filename} 无法提取文本：{exc}]"
+    if not images:
+        return text
+    return [{"type": "text", "text": text}] + images
+
+
+def attachments_max() -> int:
+    from . import attachments as att_module
+    return att_module.MAX_ATTACHMENTS_PER_MESSAGE
+
+
+def build_messages(session: dict, user_message: str,
+                   attachments: list | None = None) -> list[dict]:
     """组装 messages = [system(人格+领域规则+上下文), ...历史（截断）, user]。"""
     context_block = context_module.build_context_block(session.get("context"))
     messages = [{"role": "system",
@@ -61,11 +113,15 @@ def build_messages(session: dict, user_message: str) -> list[dict]:
     for m in history:
         if m.get("role") not in ("user", "assistant"):
             continue
+        content = str(m.get("content") or "")[:_HISTORY_MAX_CHARS]
         messages.append({
             "role": m["role"],
-            "content": str(m.get("content") or "")[:_HISTORY_MAX_CHARS],
+            "content": content + _history_attachment_note(m),
         })
-    messages.append({"role": "user", "content": user_message})
+    messages.append({
+        "role": "user",
+        "content": build_user_content(user_message, attachments),
+    })
     return messages
 
 
@@ -150,9 +206,33 @@ def _parse_directive(text: str) -> dict | None:
     return None
 
 
+def _plain_content(content) -> str:
+    """把可能为 vision 分片列表的 content 摊平成纯文本。
+
+    图片分片（image_url）无法走纯文本端点，替换为「不支持看图」提示；
+    文件名说明已在 build_user_content 里并入 text 分片。
+    """
+    if isinstance(content, list):
+        texts: list[str] = []
+        has_image = False
+        for part in content:
+            if not isinstance(part, dict):
+                texts.append(str(part))
+            elif part.get("type") == "text":
+                texts.append(str(part.get("text") or ""))
+            elif part.get("type") == "image_url":
+                has_image = True
+        out = "".join(texts)
+        if has_image:
+            out += "\n[用户上传了图片，当前模型不支持看图，请基于已有文字信息回答]"
+        return out
+    return str(content or "")
+
+
 def _sanitize_for_plain(messages: list[dict]) -> list[dict]:
     """降级路径 B 前清洗：tool 角色与 tool_calls 字段不是纯文本端点都认，
-    转成 user 角色文本，assistant 的 tool_calls 字段剥掉。"""
+    转成 user 角色文本，assistant 的 tool_calls 字段剥掉；
+    vision 分片列表 content 摊平为纯文本（图片替换为提示）。"""
     out: list[dict] = []
     for m in messages:
         role = m.get("role")
@@ -161,9 +241,9 @@ def _sanitize_for_plain(messages: list[dict]) -> list[dict]:
                         "content": "工具返回：\n" + str(m.get("content") or "")})
         elif role == "assistant":
             out.append({"role": "assistant",
-                        "content": str(m.get("content") or "")})
+                        "content": _plain_content(m.get("content"))})
         else:
-            out.append({"role": role, "content": str(m.get("content") or "")})
+            out.append({"role": role, "content": _plain_content(m.get("content"))})
     return out
 
 
@@ -206,10 +286,13 @@ def _run_plan_execute(messages: list[dict]) -> Iterator[dict]:
     yield from _final_answer(work)
 
 
-def run(session: dict, user_message: str) -> Iterator[dict]:
+def run(session: dict, user_message: str,
+        attachments: list | None = None) -> Iterator[dict]:
     """agent 主入口。session 为 sessions.load_session 的返回（不含本轮
-    用户消息，由本函数拼入）。LLM 未配置 / 调用失败一律走 error 事件。"""
-    messages = build_messages(session, user_message)
+    用户消息，由本函数拼入）。attachments 为附件元信息列表（文档提取文本
+    注入上下文，图片走 vision 格式、报错自动降级纯文本提示）。
+    LLM 未配置 / 调用失败一律走 error 事件。"""
+    messages = build_messages(session, user_message, attachments)
     try:
         yield from _run_function_calling(messages)
         return

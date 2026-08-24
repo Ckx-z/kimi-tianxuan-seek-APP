@@ -301,19 +301,35 @@ def add_favorite(
     ald_name: str = "",
     amine_name: str = "",
     notes: str = "",
+    prediction: dict | None = None,
 ) -> dict:
     """新建收藏条目并落盘，返回完整条目 dict。
 
     CAS/name 自动从内置库反查；创建时自动匹配训练文献挂为 references。
     同一对单体重复收藏会创建多条（去重由 UI 层提示，不在此处强制）。
+    prediction 为可选的当前打分快照（{score, std, ood, score_policy,
+    tree_score, gnn_score}），提供且 score 非空时直接写入 latest_prediction，
+    避免「查询打分后立即收藏，我的页显示未打分」。
     """
+    latest_prediction = None
+    if isinstance(prediction, dict) and prediction.get("score") is not None:
+        latest_prediction = {
+            "score": prediction.get("score"),
+            "std": prediction.get("std"),
+            "arm": prediction.get("arm", "") or "",
+            "ood": prediction.get("ood", "none") or "none",
+            "date": _now_iso(),
+        }
+        for k in ("score_policy", "tree_score", "gnn_score"):
+            if prediction.get(k) is not None:
+                latest_prediction[k] = prediction[k]
     fav = {
         "id": _next_id(),
         "aldehyde": _monomer_obj(aldehyde_smiles, ald_name),
         "amine": _monomer_obj(amine_smiles, amine_name),
         "created_at": _now_iso(),
         "notes": notes or "",
-        "latest_prediction": None,
+        "latest_prediction": latest_prediction,
         "references": auto_match_references(aldehyde_smiles, amine_smiles),
         "experiment_record_ids": [],
     }

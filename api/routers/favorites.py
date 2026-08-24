@@ -23,11 +23,23 @@ def list_favorites():
 def create_favorite(req: FavoriteCreate):
     if not req.aldehyde_smiles.strip() or not req.amine_smiles.strip():
         raise HTTPException(400, "醛/胺 SMILES 不能为空")
+    # 前端收藏时带上当前打分结果 → 一并落进 latest_prediction，
+    # 「我的」页直接展示已存分数，不再误显「未打分」
+    snapshot = None
+    if req.score is not None:
+        snapshot = {
+            "score": req.score,
+            "std": req.std,
+            "ood": req.ood or "none",
+            "score_policy": req.score_policy,
+            "tree_score": req.tree_score,
+            "gnn_score": req.gnn_score,
+        }
     try:
         return _store().add_favorite(
             req.aldehyde_smiles.strip(), req.amine_smiles.strip(),
             ald_name=req.ald_name.strip(), amine_name=req.amine_name.strip(),
-            notes=req.notes.strip())
+            notes=req.notes.strip(), prediction=snapshot)
     except Exception as exc:
         raise HTTPException(500, f"收藏保存失败：{type(exc).__name__}: {exc}")
 

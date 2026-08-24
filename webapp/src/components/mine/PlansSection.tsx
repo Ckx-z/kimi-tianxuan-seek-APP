@@ -1,13 +1,41 @@
 /**
  * 「我的方案库」区块
+ * - 方案模板管理：上传 docx 提取模板（可填名称）、自定义模板可删除（内置不可删）
  * - 方案卡列表：方案 vN + 模板名 + 时间
  * - 点击展开查看完整方案（单体 / 条件 / 步骤 简洁渲染）
  */
-import { useState } from 'react';
-import { ChevronDown, ClipboardList } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, ClipboardList, FileUp, Loader2, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { PlanItem } from './api';
+import {
+  deletePlanTemplate,
+  fetchPlanTemplates,
+  uploadPlanTemplate,
+  type PlanItem,
+  type PlanTemplateItem,
+} from './api';
 
 /** 条件键名中文映射（未知键原样显示） */
 const CONDITION_LABELS: Record<string, string> = {
@@ -18,6 +46,205 @@ const CONDITION_LABELS: Record<string, string> = {
   time_days: '时间 (天)',
   vessel: '容器',
 };
+
+/** 方案模板管理：列表 + 上传 docx 提取 + 删除自定义模板（内置不可删） */
+function TemplatesManager() {
+  const [templates, setTemplates] = useState<PlanTemplateItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [tplName, setTplName] = useState('');
+  const [tplFile, setTplFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [toDelete, setToDelete] = useState<PlanTemplateItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    fetchPlanTemplates()
+      .then(setTemplates)
+      .catch(() => setTemplates([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  /** 上传 docx → LLM 提取模板 → 列表即时刷新 */
+  const handleUpload = async () => {
+    if (!tplFile) {
+      toast.warning('请先选择 .docx 文件');
+      return;
+    }
+    if (!tplFile.name.toLowerCase().endsWith('.docx')) {
+      toast.error('仅支持 .docx 文件');
+      return;
+    }
+    setUploading(true);
+    try {
+      const tpl = await uploadPlanTemplate(tplFile, tplName);
+      toast.success(`模板「${tpl.name}」提取成功，已加入模板库`);
+      setDialogOpen(false);
+      setTplName('');
+      setTplFile(null);
+      if (fileRef.current) fileRef.current.value = '';
+      refresh();
+    } catch {
+      /* 错误提示已由 api 层弹出；对话框保持打开，已选文件不丢 */
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await deletePlanTemplate(toDelete.id);
+      toast.success(`模板「${toDelete.name}」已删除`);
+      setToDelete(null);
+      refresh();
+    } catch {
+      /* 错误提示已由 api 层弹出 */
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-foreground">方案模板</h3>
+        <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
+          <FileUp className="mr-1.5 h-3.5 w-3.5" />
+          添加方案模板
+        </Button>
+      </div>
+
+      {loading ? (
+        <Skeleton className="h-8 w-full" />
+      ) : (
+        <ul className="space-y-1.5">
+          {templates.map((t) => (
+            <li
+              key={t.id}
+              className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2 text-sm"
+            >
+              <div className="min-w-0">
+                <span className="break-words font-medium text-foreground">{t.name}</span>
+                {t.builtin ? (
+                  <Badge variant="secondary" className="ml-2 shrink-0">内置</Badge>
+                ) : (
+                  <Badge variant="outline" className="ml-2 shrink-0 border-primary/40 text-primary">
+                    自定义
+                  </Badge>
+                )}
+                {t.source && (
+                  <span className="ml-2 break-words text-xs text-muted-foreground">{t.source}</span>
+                )}
+              </div>
+              {!t.builtin && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                  title="删除该模板"
+                  onClick={() => setToDelete(t)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </li>
+          ))}
+          {templates.length === 0 && (
+            <li className="text-sm text-muted-foreground">暂无模板（内置模板加载失败时显示此提示）。</li>
+          )}
+        </ul>
+      )}
+
+      {/* 上传对话框 */}
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(v) => {
+          if (!uploading) setDialogOpen(v);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>添加方案模板</DialogTitle>
+            <DialogDescription>
+              上传文献/实验方案的 .docx 文件，将由 LLM 自动提取为方案卡模板（条件 / 步骤 / 检查清单）。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>模板名称（可选，缺省取文件名）</Label>
+              <Input
+                value={tplName}
+                onChange={(e) => setTplName(e.target.value)}
+                placeholder="如：界面法-低温变体"
+                disabled={uploading}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>docx 文件</Label>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".docx"
+                disabled={uploading}
+                onChange={(e) => setTplFile(e.target.files?.[0] ?? null)}
+                className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-background file:px-3 file:py-1.5 file:text-sm file:text-foreground hover:file:bg-accent"
+              />
+              {tplFile && (
+                <p className="text-xs text-muted-foreground">
+                  已选：{tplFile.name}（{(tplFile.size / 1024).toFixed(0)}KB）
+                </p>
+              )}
+            </div>
+            <Button
+              className="w-full"
+              disabled={uploading || !tplFile}
+              onClick={() => void handleUpload()}
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  LLM 提取中（可能需要几十秒）…
+                </>
+              ) : (
+                '上传并提取模板'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认 */}
+      <AlertDialog open={toDelete !== null} onOpenChange={(v) => !v && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除该模板？</AlertDialogTitle>
+            <AlertDialogDescription>
+              将删除自定义模板「{toDelete?.name}」。已生成的方案卡不受影响。此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? '删除中…' : '确认删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
 
 /** 单个方案卡（可展开） */
 function PlanRow({ plan }: { plan: PlanItem }) {
@@ -109,9 +336,12 @@ function PlanRow({ plan }: { plan: PlanItem }) {
 }
 
 export function PlansSection({ plans, loading }: { plans: PlanItem[]; loading: boolean }) {
+  const manager = <TemplatesManager />;
+
   if (loading) {
     return (
       <div className="space-y-3">
+        {manager}
         {[0, 1].map((i) => (
           <Skeleton key={i} className="h-14 w-full rounded-xl" />
         ))}
@@ -121,15 +351,19 @@ export function PlansSection({ plans, loading }: { plans: PlanItem[]; loading: b
 
   if (plans.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
-        <ClipboardList className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-        暂无方案：在迭代页采纳建议后，方案会保存在这里。
+      <div className="space-y-3">
+        {manager}
+        <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
+          <ClipboardList className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+          暂无方案：在迭代页采纳建议后，方案会保存在这里。
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
+      {manager}
       {plans.map((p) => (
         <PlanRow key={p.plan_id} plan={p} />
       ))}
