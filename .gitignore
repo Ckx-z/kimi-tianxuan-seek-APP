@@ -122,3 +122,7 @@ cof-clean-test/
 
 # 科研助手会话记录（运行时用户数据，每台机器独立）
 data/assistant/
+
+# 收藏夹存储（运行时用户数据）
+data/favorite_folders.json
+data/favorites/
