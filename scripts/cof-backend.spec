@@ -52,6 +52,10 @@ datas = [
 datas += _files("minimax/adapters/*.py", "minimax/adapters")
 datas += _files("minimax/bridge/*.py", "minimax/bridge")
 datas += _files("minimax/bridge/graphrag_v2/*.py", "minimax/bridge/graphrag_v2")
+# xTB 计算引擎（DFT 模块）：目录存在才打包；frozen 下引擎路径解析到
+# _MEIPASS/vendor/xtb（见 src/dft/engine.py 的 xtb_binary/xtb_share_dir）
+if (ROOT / "vendor" / "xtb" / "bin" / "xtb.exe").is_file():
+    datas.append((str(ROOT / "vendor" / "xtb"), "vendor/xtb"))
 # GraphRAG 图资产（graph.pkl / graph_v2.pkl / 文献 embedding）
 for name in ("graph.pkl", "graph_v2.pkl", "lit_embeddings.jsonl",
              "meta.json", "embedding_meta.json"):
@@ -79,6 +83,13 @@ hiddenimports = [
     # 此处显式补齐 src.* 命名空间变体。
     "recommend.monomer_props",
     "src.recommend.monomer_props",
+    # DFT 模块：路由静态链可及 src.dft.*，但 jobs 内惰性 import
+    # favorites.store（双序查配对）与 dft.* 顶层命名空间变体一并补齐
+    "dft.engine", "src.dft.engine",
+    "dft.jobs", "src.dft.jobs",
+    "dft.cache", "src.dft.cache",
+    "dft.log", "src.dft.log",
+    "favorites.store", "src.favorites.store",
 ]
 
 a = Analysis(

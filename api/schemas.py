@@ -137,3 +137,10 @@ class AssistantChatRequest(BaseModel):
     attachments: list[str] | None = Field(
         None, description="附件 upload_id 列表（POST /uploads 返回，最多 3 个）")
     stream: bool = Field(True, description="固定 SSE 流式（保留字段）")
+
+
+class DftJobCreate(BaseModel):
+    """DFT 计算任务创建：两个单体 SMILES + 方法档位。"""
+    smiles_a: str = Field(..., description="单体 A SMILES")
+    smiles_b: str = Field(..., description="单体 B SMILES")
+    method: str = Field("gfn2", description="gfnff（快速）| gfn2（精确，默认）")
