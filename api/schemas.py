@@ -139,6 +139,15 @@ class AssistantChatRequest(BaseModel):
     stream: bool = Field(True, description="固定 SSE 流式（保留字段）")
 
 
+class AssistantConfirmRequest(BaseModel):
+    """写操作二次确认：确认令牌一次性、绑定会话 + 参数摘要、5 分钟过期。"""
+    session_id: str = Field(..., description="会话 ID（令牌绑定校验）")
+    confirm_token: str = Field(..., description="tool_confirm 事件下发的令牌")
+    decision: str = Field("confirm", description="confirm 执行 / cancel 取消")
+    args: dict | None = Field(
+        None, description="可选参数回显；与服务端存档摘要不符即拒绝（防篡改）")
+
+
 class DftJobCreate(BaseModel):
     """DFT 计算任务创建：两个单体 SMILES + 方法档位。"""
     smiles_a: str = Field(..., description="单体 A SMILES")

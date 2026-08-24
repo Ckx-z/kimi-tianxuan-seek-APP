@@ -37,11 +37,23 @@ export interface AssistantSessionMeta {
 
 /** SSE / 历史消息中的工具事件 */
 export interface ToolEvent {
-  type: 'tool_call' | 'tool_result';
+  type: 'tool_call' | 'tool_result' | 'tool_confirm';
   name: string;
   args?: Record<string, unknown>;
   summary?: string;
   is_error?: boolean;
+  /** tool_confirm：二次确认令牌（一次性、5 分钟过期） */
+  confirm_token?: string;
+  /** tool_confirm：影响说明 */
+  impact?: string;
+  /** tool_confirm：参数摘要 */
+  args_summary?: string;
+  /** tool_confirm：有效期秒数 */
+  expires_in?: number;
+  /** tool_result：用户取消的写操作标记 */
+  cancelled?: boolean;
+  /** 前端本地状态：确认卡已处理（confirmed/cancelled）或来自历史回放（history） */
+  resolved?: 'confirmed' | 'cancelled' | 'history';
 }
 
 /** 附件元信息（与后端 src/assistant/attachments.py 契约一致） */
@@ -82,7 +94,16 @@ export interface AssistantContext {
 export type AssistantSseEvent =
   | { type: 'token'; text: string }
   | { type: 'tool_call'; name: string; args?: Record<string, unknown> }
-  | { type: 'tool_result'; name: string; summary?: string; is_error?: boolean }
+  | { type: 'tool_result'; name: string; summary?: string; is_error?: boolean; cancelled?: boolean }
+  | {
+      type: 'tool_confirm';
+      confirm_token: string;
+      name: string;
+      args?: Record<string, unknown>;
+      args_summary?: string;
+      impact?: string;
+      expires_in?: number;
+    }
   | { type: 'done'; session_id?: string }
   | { type: 'error'; message: string };
 
@@ -259,6 +280,42 @@ export const assistantApi = {
     let res: Response;
     try {
       res = await fetch(`${BASE_URL}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new AssistantUnavailableError();
+    }
+    if (!res.ok) {
+      let message = `请求失败（${res.status}）`;
+      try {
+        const data = await res.json();
+        if (typeof data?.detail === 'string') message = data.detail;
+        else if (typeof data?.message === 'string') message = data.message;
+      } catch {
+        /* 保留默认 */
+      }
+      throw new Error(message);
+    }
+    if (!res.body) throw new AssistantUnavailableError('响应不含数据流');
+    return res.body;
+  },
+
+  /**
+   * 写操作二次确认：确认 / 取消后服务端执行（或注入拒绝）并 SSE 续跑对话。
+   * 返回解析后的事件流；网络层失败抛 AssistantUnavailableError。
+   */
+  async confirmTool(body: {
+    session_id: string;
+    confirm_token: string;
+    decision: 'confirm' | 'cancel';
+    args?: Record<string, unknown>;
+  }): Promise<ReadableStream<Uint8Array>> {
+    if (ASSISTANT_MOCK) return mockApi.confirmTool(body);
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/chat/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

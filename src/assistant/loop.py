@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from typing import Iterator
 
+from . import confirm as confirm_module
 from . import context as context_module
 from . import llm_bridge, persona, registry
 from .llm_bridge import FunctionCallingUnsupported, LLMCallError
@@ -133,6 +135,25 @@ def _tool_event_pair(name: str, args: dict, result: dict) -> Iterator[dict]:
            "is_error": bool(result.get("is_error"))}
 
 
+def _confirm_gate(session_id: str, name: str, args: dict) -> dict | None:
+    """写操作确认门：需要确认时生成令牌并返回 tool_confirm 事件，否则 None。
+
+    命中确认时调用方应：先发 tool_call 事件（卡片可见），再发本事件，
+    然后终止本轮循环（工具未执行，等 /chat/confirm 续跑）。
+    """
+    impact = registry.confirm_impact(name, args)
+    if impact is None:
+        return None
+    args_summary = json.dumps(args or {}, ensure_ascii=False, default=str)
+    if len(args_summary) > 200:
+        args_summary = args_summary[:200] + "…"
+    rec = confirm_module.create(session_id, name, args or {}, impact,
+                                args_summary=args_summary)
+    return {"type": "tool_confirm", "confirm_token": rec["token"],
+            "name": name, "args": args or {}, "args_summary": args_summary,
+            "impact": impact, "expires_in": confirm_module.TTL_SECONDS}
+
+
 def _final_answer(messages: list[dict]) -> Iterator[dict]:
     """工具轮次用尽后的收尾：逼模型基于已获取信息直接作答。"""
     closing = list(messages) + [{
@@ -149,7 +170,8 @@ def _final_answer(messages: list[dict]) -> Iterator[dict]:
             "已获取的工具结果见上方过程记录，可换个问法继续。")
 
 
-def _run_function_calling(messages: list[dict]) -> Iterator[dict]:
+def _run_function_calling(messages: list[dict],
+                          session_id: str = "") -> Iterator[dict]:
     """路径 A：OpenAI function calling。"""
     for _ in range(MAX_TOOL_ROUNDS):
         resp = llm_bridge.chat_completion_with_tools(
@@ -173,6 +195,12 @@ def _run_function_calling(messages: list[dict]) -> Iterator[dict]:
             } for tc in calls],
         })
         for tc in calls:
+            gate = _confirm_gate(session_id, tc["name"], tc["args"])
+            if gate is not None:
+                yield {"type": "tool_call", "name": tc["name"],
+                       "args": tc["args"]}
+                yield gate
+                return  # 挂起等确认，工具未执行
             result = registry.execute(tc["name"], tc["args"])
             yield from _tool_event_pair(tc["name"], tc["args"], result)
             messages.append({"role": "tool", "tool_call_id": tc["id"],
@@ -247,7 +275,8 @@ def _sanitize_for_plain(messages: list[dict]) -> list[dict]:
     return out
 
 
-def _run_plan_execute(messages: list[dict]) -> Iterator[dict]:
+def _run_plan_execute(messages: list[dict],
+                      session_id: str = "") -> Iterator[dict]:
     """路径 B（降级）：两段式计划-执行。"""
     work = _sanitize_for_plain(messages) + [
         {"role": "system", "content": _PLAN_PROMPT}]
@@ -276,6 +305,11 @@ def _run_plan_execute(messages: list[dict]) -> Iterator[dict]:
         name = str(directive.get("tool") or "").strip()
         args = directive.get("args")
         args = args if isinstance(args, dict) else {}
+        gate = _confirm_gate(session_id, name, args)
+        if gate is not None:
+            yield {"type": "tool_call", "name": name, "args": args}
+            yield gate
+            return  # 挂起等确认，工具未执行
         result = registry.execute(name, args)
         yield from _tool_event_pair(name, args, result)
         work.append({"role": "assistant", "content": text})
@@ -291,10 +325,13 @@ def run(session: dict, user_message: str,
     """agent 主入口。session 为 sessions.load_session 的返回（不含本轮
     用户消息，由本函数拼入）。attachments 为附件元信息列表（文档提取文本
     注入上下文，图片走 vision 格式、报错自动降级纯文本提示）。
-    LLM 未配置 / 调用失败一律走 error 事件。"""
+    LLM 未配置 / 调用失败一律走 error 事件。
+    命中写类工具时发 tool_confirm 事件并挂起（工具未执行），等前端
+    /chat/confirm 确认后经 run_resume 续跑。"""
+    session_id = str(session.get("session_id") or "")
     messages = build_messages(session, user_message, attachments)
     try:
-        yield from _run_function_calling(messages)
+        yield from _run_function_calling(messages, session_id)
         return
     except FunctionCallingUnsupported as exc:
         logger.info("function calling 不可用，降级两段式: %s", exc)
@@ -306,4 +343,75 @@ def run(session: dict, user_message: str,
         yield {"type": "error",
                "message": f"助手内部错误：{type(exc).__name__}: {exc}"}
         return
-    yield from _run_plan_execute(messages)
+    yield from _run_plan_execute(messages, session_id)
+
+
+def _resume_messages(session: dict, name: str, args: dict,
+                     result: dict | None, rejected: bool) -> list[dict]:
+    """确认续跑的消息重建：system + 历史 + 工具结果（或用户拒绝说明）。
+
+    历史只含持久化的 user/assistant 文本；被确认的工具调用以合成的
+    assistant(tool_calls) + tool 消息对拼在末尾（路径 A 原生消费；
+    路径 B 经 _sanitize_for_plain 转成 user 文本）。
+    """
+    context_block = context_module.build_context_block(session.get("context"))
+    messages = [{"role": "system",
+                 "content": persona.build_system_prompt(context_block)}]
+    history = (session.get("messages") or [])[-_HISTORY_LIMIT:]
+    for m in history:
+        if m.get("role") not in ("user", "assistant"):
+            continue
+        content = str(m.get("content") or "")[:_HISTORY_MAX_CHARS]
+        messages.append({
+            "role": m["role"],
+            "content": content + _history_attachment_note(m),
+        })
+    if rejected:
+        brief = json.dumps(args or {}, ensure_ascii=False, default=str)[:300]
+        messages.append({
+            "role": "user",
+            "content": f"用户拒绝了写操作 {name}（参数：{brief}），该操作"
+                       "未执行。请如实告知用户操作已取消（不要假装已执行），"
+                       "并询问接下来想怎么做。"})
+        return messages
+    call_id = f"call_cfm_{uuid.uuid4().hex[:10]}"
+    messages.append({
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [{
+            "id": call_id,
+            "type": "function",
+            "function": {"name": name,
+                         "arguments": json.dumps(args or {},
+                                                 ensure_ascii=False)},
+        }],
+    })
+    messages.append({"role": "tool", "tool_call_id": call_id,
+                     "content": str((result or {}).get("text") or "")})
+    return messages
+
+
+def run_resume(session: dict, name: str, args: dict,
+               result: dict | None = None,
+               rejected: bool = False) -> Iterator[dict]:
+    """二次确认后的续跑入口（由 /chat/confirm 调用）。
+
+    rejected=True 时注入"用户拒绝了该操作"让助手继续对话；否则把已执行
+    的 tool result 回注对话继续。续跑中再次命中写工具会再次发
+    tool_confirm 并挂起（多次确认串联）。"""
+    session_id = str(session.get("session_id") or "")
+    messages = _resume_messages(session, name, args, result, rejected)
+    try:
+        yield from _run_function_calling(messages, session_id)
+        return
+    except FunctionCallingUnsupported as exc:
+        logger.info("续跑 function calling 不可用，降级两段式: %s", exc)
+    except LLMCallError as exc:
+        yield {"type": "error", "message": f"LLM 调用失败：{exc}"}
+        return
+    except Exception as exc:
+        logger.exception("agent 续跑异常")
+        yield {"type": "error",
+               "message": f"助手内部错误：{type(exc).__name__}: {exc}"}
+        return
+    yield from _run_plan_execute(messages, session_id)

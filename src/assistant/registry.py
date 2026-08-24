@@ -1,16 +1,28 @@
-"""工具注册表：name → {schema(OpenAI function), handler}。
+"""工具注册表：name → {schema(OpenAI function), handler, confirm?}。
 
 加工具 = 在 TOOLS 加一行（handler 遵守 {text, details, is_error} 契约）。
 execute 统一兜底：未知工具 / handler 抛异常都转 is_error 结果，绝不抛出。
+
+写操作二次确认：条目可选 "confirm" 键 —— 字符串（固定影响说明）或
+callable(args) -> str | None（动态判定，返回 None 表示本次调用是纯读、
+无需确认，如 query_dft 缓存命中）。loop 在执行前调 confirm_impact()，
+非 None 则挂起并发 tool_confirm SSE 事件，等用户确认后才真正 execute。
 """
 
 from __future__ import annotations
 
 import logging
 
+from .tools.dft import confirm_impact as _dft_impact
+from .tools.dft import query_dft
+from .tools.favorites import list_favorites_tool, manage_favorite, manage_favorite_impact
 from .tools.graphrag import query_graphrag_tool
+from .tools.history import list_prediction_history
+from .tools.plan import generate_plan_card_impact, generate_plan_card_tool
 from .tools.predict import predict_film
-from .tools.records import read_experiment_records
+from .tools.records import (draft_experiment_record,
+                            draft_experiment_record_impact,
+                            read_experiment_records)
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +92,193 @@ TOOLS: dict = {
             },
         },
     },
+    "list_favorites": {
+        "handler": lambda args: list_favorites_tool(
+            args.get("folder_id") or None, args.get("limit") or 20),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "list_favorites",
+                "description": "列出收藏夹与收藏条目（可按 folder_id 过滤），"
+                               "含最新打分快照与 DFT 快照摘要。涉及“我的收藏"
+                               "里有什么”的问题先调它。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "folder_id": {"type": "string",
+                                      "description": "收藏夹 ID（可选，只看某夹）"},
+                        "limit": {"type": "integer",
+                                  "description": "最多返回条数（默认 20，上限 30）"},
+                    },
+                    "required": [],
+                },
+            },
+        },
+    },
+    "list_prediction_history": {
+        "handler": lambda args: list_prediction_history(
+            args.get("limit") or 10),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "list_prediction_history",
+                "description": "查询成膜打分历史记录（新→旧），含当时输入单体与"
+                               "分数、OOD 标记。涉及“最近打过哪些分”的问题先调它。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "limit": {"type": "integer",
+                                  "description": "最多返回条数（默认 10，上限 50）"},
+                    },
+                    "required": [],
+                },
+            },
+        },
+    },
+    "manage_favorite": {
+        "handler": manage_favorite,
+        "confirm": manage_favorite_impact,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "manage_favorite",
+                "description": "【写操作，需用户二次确认】收藏管理：add 把醛/胺"
+                               "组合收藏到指定收藏夹（自动附当前打分快照，同组合"
+                               "不重复收藏）；move 移动收藏到其他夹；delete 删除"
+                               "收藏。调用后系统会向用户弹确认卡，确认后才执行。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string", "enum": ["add", "move", "delete"],
+                                   "description": "add=收藏 / move=移夹 / delete=删除"},
+                        "ald_smiles": {"type": "string",
+                                       "description": "醛单体 SMILES（add 必填）"},
+                        "amine_smiles": {"type": "string",
+                                         "description": "胺单体 SMILES（add 必填）"},
+                        "ald_name": {"type": "string",
+                                     "description": "醛单体名称（可选）"},
+                        "amine_name": {"type": "string",
+                                       "description": "胺单体名称（可选）"},
+                        "favorite_id": {"type": "string",
+                                        "description": "收藏条目 ID（move/delete 必填）"},
+                        "folder_id": {"type": "string",
+                                      "description": "目标收藏夹 ID（可选）"},
+                        "folder_name": {"type": "string",
+                                        "description": "目标收藏夹名称（可选，"
+                                                       "不存在时自动新建）"},
+                        "notes": {"type": "string",
+                                  "description": "收藏备注（add 可选）"},
+                    },
+                    "required": ["action"],
+                },
+            },
+        },
+    },
+    "generate_plan_card": {
+        "handler": lambda args: generate_plan_card_tool(
+            args.get("ald_smiles", ""), args.get("amine_smiles", ""),
+            ald_name=args.get("ald_name") or "",
+            amine_name=args.get("amine_name") or "",
+            template_id=args.get("template_id") or ""),
+        "confirm": generate_plan_card_impact,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "generate_plan_card",
+                "description": "【写操作，需用户二次确认】按模板为一对醛/胺单体"
+                               "生成实验方案卡（条件、步骤、防错清单、单体提示）"
+                               "并保存到方案库。可指定 template_id，缺省用内置"
+                               "侯老师法 v3.9。同单体组同模板不重复生成。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ald_smiles": {"type": "string",
+                                       "description": "醛单体 SMILES"},
+                        "amine_smiles": {"type": "string",
+                                         "description": "胺单体 SMILES"},
+                        "ald_name": {"type": "string",
+                                     "description": "醛单体名称（可选）"},
+                        "amine_name": {"type": "string",
+                                       "description": "胺单体名称（可选）"},
+                        "template_id": {"type": "string",
+                                        "description": "方案卡模板 ID（可选）"},
+                    },
+                    "required": ["ald_smiles", "amine_smiles"],
+                },
+            },
+        },
+    },
+    "draft_experiment_record": {
+        "handler": draft_experiment_record,
+        "confirm": draft_experiment_record_impact,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "draft_experiment_record",
+                "description": "【写操作，需用户二次确认】根据对话内容起草实验"
+                               "记录，以草稿状态保存（不影响正式统计，用户稍后"
+                               "在实验记录页编辑转正）。需要 favorite_id 或醛/胺"
+                               "SMILES 至少其一。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "favorite_id": {"type": "string",
+                                        "description": "关联的收藏条目 ID（可选）"},
+                        "aldehyde_smiles": {"type": "string",
+                                            "description": "醛单体 SMILES（游离记录用）"},
+                        "amine_smiles": {"type": "string",
+                                         "description": "胺单体 SMILES（游离记录用）"},
+                        "outcome": {"type": "string",
+                                    "enum": ["film", "partial", "failed", ""],
+                                    "description": "结果：film 成膜 / partial 部分"
+                                                   " / failed 失败，可留空"},
+                        "notes": {"type": "string",
+                                  "description": "备注 / 现象描述"},
+                        "operator": {"type": "string", "description": "操作人"},
+                        "experiment_no": {"type": "string",
+                                          "description": "实验编号（可留空）"},
+                        "conditions": {"type": "object",
+                                       "description": "实验条件（solvent_1/"
+                                                      "temperature_c 等，可选）"},
+                        "self_summary": {"type": "string",
+                                         "description": "自我总结（可选）"},
+                        "mistakes": {"type": "string",
+                                     "description": "本人认为的失误（可选）"},
+                    },
+                    "required": [],
+                },
+            },
+        },
+    },
+    "query_dft": {
+        "handler": lambda args: query_dft(
+            args.get("smiles_a", ""), args.get("smiles_b", ""),
+            args.get("method") or "gfn2"),
+        "confirm": _dft_impact,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "query_dft",
+                "description": "查询两个单体的 DFT 结合能（GFN-FF / GFN2-xTB "
+                               "半经验方法，仅供相对比较）。缓存或历史有结果时"
+                               "直接返回；否则【写操作，需用户二次确认】提交计算"
+                               "任务并等待（gfnff 秒级，gfn2 最长约 60 秒，超时"
+                               "转后台并返回任务 ID）。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "smiles_a": {"type": "string",
+                                     "description": "单体 A SMILES"},
+                        "smiles_b": {"type": "string",
+                                     "description": "单体 B SMILES"},
+                        "method": {"type": "string", "enum": ["gfnff", "gfn2"],
+                                   "description": "gfnff 快速 / gfn2 精确（默认 gfn2）"},
+                    },
+                    "required": ["smiles_a", "smiles_b"],
+                },
+            },
+        },
+    },
 }
 
 
@@ -132,3 +331,25 @@ def summary_of(result: dict) -> str:
     """SSE tool_result 事件的摘要（限长）。"""
     text = str(result.get("text") or "")
     return text if len(text) <= _MAX_SUMMARY else text[:_MAX_SUMMARY] + "…"
+
+
+def confirm_impact(name: str, args: dict | None) -> str | None:
+    """该次工具调用是否需要二次确认；需要时返回影响说明，否则 None。
+
+    "confirm" 键为字符串 → 固定确认；为 callable(args) -> str | None →
+    动态判定（None = 本次是纯读路径，不确认）。无 "confirm" 键 → 读工具。
+    """
+    tool = TOOLS.get(name)
+    if tool is None:
+        return None
+    spec = tool.get("confirm")
+    if spec is None:
+        return None
+    if callable(spec):
+        try:
+            impact = spec(args if isinstance(args, dict) else {})
+        except Exception as exc:
+            logger.warning("工具 %s 确认判定异常（按需要确认处理）: %s", name, exc)
+            impact = "执行写操作"
+        return impact or None
+    return str(spec)

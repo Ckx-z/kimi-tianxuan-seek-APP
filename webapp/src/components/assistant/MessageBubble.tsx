@@ -5,7 +5,7 @@
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Bot, FileText, Image as ImageIcon, User } from 'lucide-react';
-import { ToolEventCard } from './ToolEventCard';
+import { ToolEventCard, type ConfirmDecision } from './ToolEventCard';
 import type { AssistantAttachmentMeta, ToolEvent } from './api';
 
 export interface ChatMessageView {
@@ -91,7 +91,16 @@ function isPendingCall(events: ToolEvent[], index: number, streaming?: boolean):
   return !events.slice(index + 1).some((x) => x.type === 'tool_result' && x.name === e.name);
 }
 
-export function MessageBubble({ message }: { message: ChatMessageView }) {
+export function MessageBubble({
+  message,
+  onConfirmDecision,
+  confirmBusy = false,
+}: {
+  message: ChatMessageView;
+  /** 写操作确认卡按钮回调（仅实时流中的 tool_confirm 可用） */
+  onConfirmDecision?: (event: ToolEvent, decision: ConfirmDecision) => void;
+  confirmBusy?: boolean;
+}) {
   const isUser = message.role === 'user';
 
   if (isUser) {
@@ -141,6 +150,8 @@ export function MessageBubble({ message }: { message: ChatMessageView }) {
                 key={i}
                 event={e}
                 pending={isPendingCall(events, i, message.streaming)}
+                onConfirmDecision={onConfirmDecision}
+                confirmBusy={confirmBusy}
               />
             ))}
           </div>

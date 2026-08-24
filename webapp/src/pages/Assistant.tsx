@@ -28,6 +28,7 @@ import {
   type AssistantContext,
   type AssistantSessionMeta,
   type AssistantStatus,
+  type ToolEvent,
 } from '@/components/assistant/api';
 import { MessageBubble, type ChatMessageView } from '@/components/assistant/MessageBubble';
 
@@ -59,6 +60,8 @@ export default function Assistant() {
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [loadingSession, setLoadingSession] = useState(false);
+  /** 写操作确认请求进行中（确认卡按钮防重复点击） */
+  const [confirmBusy, setConfirmBusy] = useState(false);
   /** 待发送附件（未上传；发送时先上传再带 upload_id 发消息） */
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -123,7 +126,10 @@ export default function Assistant() {
             id: nextId(),
             role: m.role as 'user' | 'assistant',
             content: m.content,
-            toolEvents: m.tool_events,
+            // 历史回放中的确认卡只读（令牌早已过期/已用），标记为 history
+            toolEvents: m.tool_events?.map((e) =>
+              e.type === 'tool_confirm' && !e.resolved ? { ...e, resolved: 'history' as const } : e,
+            ),
             attachments: m.attachments,
           })),
       );
@@ -164,7 +170,7 @@ export default function Assistant() {
             setMessages((ms) =>
               ms.map((m) => (m.id === asstId ? { ...m, content: m.content + ev.text } : m)),
             );
-          } else if (ev.type === 'tool_call' || ev.type === 'tool_result') {
+          } else if (ev.type === 'tool_call' || ev.type === 'tool_result' || ev.type === 'tool_confirm') {
             setMessages((ms) =>
               ms.map((m) =>
                 m.id === asstId ? { ...m, toolEvents: [...(m.toolEvents ?? []), ev] } : m,
@@ -194,6 +200,76 @@ export default function Assistant() {
       }
     },
     [refreshSessions],
+  );
+
+  // ---------- 写操作二次确认 ----------
+  /** 确认卡按钮：确认/取消 → POST /chat/confirm → SSE 续跑（新助手消息接续） */
+  const handleConfirmDecision = useCallback(
+    async (ev: ToolEvent, decision: 'confirm' | 'cancel') => {
+      const token = ev.confirm_token;
+      const sid = activeId;
+      if (!token || !sid || confirmBusy || ev.resolved) return;
+      setConfirmBusy(true);
+      // 乐观标记确认卡状态（失败时回滚，允许重试）
+      const markResolved = (value?: 'confirmed' | 'cancelled') =>
+        setMessages((ms) =>
+          ms.map((m) => ({
+            ...m,
+            toolEvents: m.toolEvents?.map((e) =>
+              e.type === 'tool_confirm' && e.confirm_token === token
+                ? { ...e, resolved: value }
+                : e,
+            ),
+          })),
+        );
+      markResolved(decision === 'confirm' ? 'confirmed' : 'cancelled');
+
+      const asstId = nextId();
+      setMessages((ms) => [
+        ...ms,
+        { id: asstId, role: 'assistant', content: '', toolEvents: [], streaming: true },
+      ]);
+      setStreaming(true);
+      const patch = (p: Partial<LocalMessage>) =>
+        setMessages((ms) => ms.map((m) => (m.id === asstId ? { ...m, ...p } : m)));
+      try {
+        const stream = await assistantApi.confirmTool({
+          session_id: sid,
+          confirm_token: token,
+          decision,
+        });
+        for await (const sev of parseSseStream(stream)) {
+          if (sev.type === 'token') {
+            setMessages((ms) =>
+              ms.map((m) => (m.id === asstId ? { ...m, content: m.content + sev.text } : m)),
+            );
+          } else if (sev.type === 'tool_call' || sev.type === 'tool_result' || sev.type === 'tool_confirm') {
+            setMessages((ms) =>
+              ms.map((m) =>
+                m.id === asstId ? { ...m, toolEvents: [...(m.toolEvents ?? []), sev] } : m,
+              ),
+            );
+          } else if (sev.type === 'error') {
+            patch({ error: `操作处理失败：${sev.message}`, streaming: false });
+          }
+        }
+        patch({ streaming: false });
+        refreshSessions();
+      } catch (e) {
+        // 网络层失败：确认可能未送达，回滚确认卡允许重试
+        markResolved(undefined);
+        setMessages((ms) => ms.filter((m) => m.id !== asstId));
+        toast.error(
+          e instanceof AssistantUnavailableError
+            ? '连接中断，确认未送达，请重试。'
+            : `确认请求失败：${e instanceof Error ? e.message : '未知错误'}`,
+        );
+      } finally {
+        setConfirmBusy(false);
+        setStreaming(false);
+      }
+    },
+    [activeId, confirmBusy, refreshSessions],
   );
 
   // ---------- 附件 ----------
@@ -500,7 +576,14 @@ export default function Assistant() {
                 </p>
               </div>
             ) : (
-              messages.map((m) => <MessageBubble key={m.id} message={m} />)
+              messages.map((m) => (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  onConfirmDecision={handleConfirmDecision}
+                  confirmBusy={confirmBusy}
+                />
+              ))
             )}
 
             {/* 网络中断重试入口 */}

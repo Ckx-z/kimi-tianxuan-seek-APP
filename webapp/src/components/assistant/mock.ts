@@ -14,6 +14,8 @@ import type {
   AssistantStatus,
 } from './api';
 
+const MOCK_CONFIRM_TOKEN = 'mock-cfm-0001';
+
 // ---------- 内存会话库 ----------
 interface MockSession extends AssistantSession {
   updated_at: string;
@@ -100,6 +102,32 @@ export function buildMockEvents(sessionId: string): unknown[] {
   return events;
 }
 
+const MOCK_CONFIRM_REPLY = '好的，已确认执行：该组合已收藏到「收藏夹1」（条目 fav-demo-001），并附上了当前打分快照（0.650）。还要我做别的吗？';
+const MOCK_CANCEL_REPLY = '好的，该操作已取消，没有写入任何数据。需要我换个方式处理吗？';
+
+/** 写操作演示：消息含「收藏」时发 tool_confirm 并挂起（无 tool_result） */
+export function buildMockConfirmEvents(sessionId: string): unknown[] {
+  const events: unknown[] = [];
+  for (const t of chunkText('我准备把这组单体收藏到「收藏夹1」，会写入收藏数据并附当前打分快照，请你确认。\n\n'))
+    events.push({ type: 'token', text: t });
+  events.push({
+    type: 'tool_call',
+    name: 'manage_favorite',
+    args: { action: 'add', ald_smiles: 'O=Cc1ccccc1', amine_smiles: 'Nc1ccccc1', folder_name: '收藏夹1' },
+  });
+  events.push({
+    type: 'tool_confirm',
+    confirm_token: MOCK_CONFIRM_TOKEN,
+    name: 'manage_favorite',
+    args: { action: 'add', ald_smiles: 'O=Cc1ccccc1', amine_smiles: 'Nc1ccccc1', folder_name: '收藏夹1' },
+    args_summary: '{"action":"add","ald_smiles":"O=Cc1ccccc1","amine_smiles":"Nc1ccccc1","folder_name":"收藏夹1"}',
+    impact: '将把该醛/胺组合收藏到「收藏夹1」，并尝试附带当前打分快照；同组合已收藏时不会重复添加。',
+    expires_in: 300,
+  });
+  events.push({ type: 'done', session_id: sessionId });
+  return events;
+}
+
 // ---------- Mock API（与 assistantApi 同签名） ----------
 export const mockApi = {
   async uploadAttachment(file: File): Promise<import('./api').AssistantAttachmentMeta> {
@@ -167,6 +195,25 @@ export const mockApi = {
     }
     const session = sessions.get(sid)!;
 
+    // 写操作演示分支：消息含「收藏」→ 发确认卡并挂起（不入库 tool_result）
+    if (body.message.includes('收藏')) {
+      const confirmEvents = buildMockConfirmEvents(sid);
+      const toolEvts = confirmEvents.filter(
+        (e) => (e as { type?: string }).type === 'tool_call' || (e as { type?: string }).type === 'tool_confirm',
+      ) as AssistantMessage['tool_events'];
+      session.messages.push(
+        { role: 'user', content: body.message, created_at: nowIso() },
+        {
+          role: 'assistant',
+          content: '我准备把这组单体收藏到「收藏夹1」，会写入收藏数据并附当前打分快照，请你确认。\n\n',
+          tool_events: toolEvts,
+          created_at: nowIso(),
+        },
+      );
+      session.updated_at = nowIso();
+      return streamEvents(confirmEvents);
+    }
+
     // 记录用户消息与（稍后的）助手消息，便于历史回放演示
     const userMsg: AssistantMessage = { role: 'user', content: body.message, created_at: nowIso() };
     const replyText = MOCK_REPLY_PRE + MOCK_REPLY_POST;
@@ -195,16 +242,49 @@ export const mockApi = {
     session.updated_at = nowIso();
 
     const events = buildMockEvents(sid);
-    const enc = new TextEncoder();
-    // 逐事件吐出，模拟真实网络流（每个事件间隔 ~30ms，token 流可见逐字效果）
-    return new ReadableStream<Uint8Array>({
-      async start(controller) {
-        for (const e of events) {
-          controller.enqueue(enc.encode(`data: ${JSON.stringify(e)}\n\n`));
-          await new Promise((r) => setTimeout(r, 30));
-        }
-        controller.close();
-      },
+    return streamEvents(events);
+  },
+
+  /** 写操作确认（mock）：确认 → tool_result + 完成回复；取消 → 取消说明 */
+  async confirmTool(body: {
+    session_id: string;
+    confirm_token: string;
+    decision: 'confirm' | 'cancel';
+  }): Promise<ReadableStream<Uint8Array>> {
+    const session = sessions.get(body.session_id);
+    if (body.confirm_token !== MOCK_CONFIRM_TOKEN || !session) {
+      return streamEvents([{ type: 'error', message: '确认令牌不存在或已被使用（每次确认仅生效一次）' }]);
+    }
+    const confirmed = body.decision === 'confirm';
+    const events: unknown[] = [
+      confirmed
+        ? { type: 'tool_result', name: 'manage_favorite', summary: '已收藏到「收藏夹1」（条目 fav-demo-001），已附当前打分快照（分数 0.650）。', is_error: false }
+        : { type: 'tool_result', name: 'manage_favorite', summary: '用户取消了该操作，未执行。', is_error: false, cancelled: true },
+    ];
+    const reply = confirmed ? MOCK_CONFIRM_REPLY : MOCK_CANCEL_REPLY;
+    for (const t of chunkText(reply)) events.push({ type: 'token', text: t });
+    events.push({ type: 'done', session_id: body.session_id });
+    session.messages.push({
+      role: 'assistant',
+      content: reply,
+      tool_events: [events[0] as NonNullable<AssistantMessage['tool_events']>[number]],
+      created_at: nowIso(),
     });
+    session.updated_at = nowIso();
+    return streamEvents(events);
   },
 };
+
+/** 逐事件吐出为 SSE 流（每个事件间隔 ~30ms，token 流可见逐字效果） */
+function streamEvents(events: unknown[]): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      for (const e of events) {
+        controller.enqueue(enc.encode(`data: ${JSON.stringify(e)}\n\n`));
+        await new Promise((r) => setTimeout(r, 30));
+      }
+      controller.close();
+    },
+  });
+}
