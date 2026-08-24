@@ -29,6 +29,29 @@ let backendProc = null;
 let backendPort = null;
 let mainWindow = null;
 
+// ── 版本变更自清缓存（2026-08-24 二次缓存事故根治）─────────────
+// 背景：旧版后端无 Cache-Control 时 Chromium 启发式缓存会缓存旧页面；
+// 仅靠服务端 no-cache 头无法救"已被旧版污染的缓存"（v0.3.0→v1.0.0 即复发）。
+// 因此每次检测到应用版本变化，主动清空磁盘缓存——旧版本留下的毒缓存
+// 也能在新版首次启动时自愈。
+async function clearCacheOnVersionChange() {
+  try {
+    const marker = path.join(app.getPath('userData'), '.app-version');
+    const current = app.getVersion();
+    let previous = null;
+    try { previous = fs.readFileSync(marker, 'utf-8').trim(); } catch (e) { /* 首次运行 */ }
+    if (previous !== current) {
+      const { session } = require('electron');
+      await session.defaultSession.clearCache();
+      await session.defaultSession.clearCodeCaches({});
+      fs.writeFileSync(marker, current, 'utf-8');
+      console.log(`[electron] 版本变更 ${previous || '(首次)'} -> ${current}，已清空页面缓存`);
+    }
+  } catch (e) {
+    console.warn('[electron] 版本变更清缓存失败（不影响启动）:', e.message);
+  }
+}
+
 // ── 防多开：单实例锁 ─────────────────────────────────────────
 // 连续双击桌面图标时，第二个实例直接退出；已有实例收到
 // second-instance 事件后 restore + focus 主窗口。
@@ -318,6 +341,7 @@ app.whenReady().then(async () => {
   // 未拿到单实例锁的第二实例已在 app.quit() 路径上，不再启动后端
   if (!gotSingleInstanceLock) return;
   try {
+    await clearCacheOnVersionChange();
     await startBackend();
     createWindow();
     setupAutoUpdater();
