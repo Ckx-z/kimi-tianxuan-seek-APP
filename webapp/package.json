@@ -1,7 +1,7 @@
 {
   "name": "cof-film-recommend",
   "private": true,
-  "version": "0.3.0",
+  "version": "1.0.0",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -37,7 +37,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "cof-film-recommend-setup-${version}.${ext}"
     },
     "publish": [
       {
