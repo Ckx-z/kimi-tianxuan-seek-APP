@@ -130,3 +130,8 @@ data/favorites/
 # xtb 二进制（约58MB，scripts/fetch_xtb.py 下载重建，不入库）
 vendor/xtb/
 .tmp_xtb/
+
+# DFT 计算日志/缓存（运行时用户数据）
+data/dft_log.jsonl
+data/dft_cache/
+data/dft_jobs/
