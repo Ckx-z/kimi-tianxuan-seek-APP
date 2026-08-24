@@ -25,6 +25,10 @@ class FavoriteCreate(BaseModel):
     ald_name: str = ""
     amine_name: str = ""
     notes: str = ""
+    # 归属收藏夹（缺省归兜底夹「收藏夹1」）
+    folder_id: str | None = None
+    # 预留 DFT 快照（本期仅透传落盘，DFT 计算后续批次接入）
+    dft_snapshot: dict | None = None
     # 收藏时一并写入的当前打分快照（可选；缺省则由存储层从预测日志回填）
     score: float | None = None
     std: float | None = None
@@ -32,6 +36,18 @@ class FavoriteCreate(BaseModel):
     score_policy: str | None = None
     tree_score: float | None = None
     gnn_score: float | None = None
+
+class FavoriteUpdate(BaseModel):
+    """收藏条目局部更新：移夹 / 改备注 / 写入 DFT 快照（全可选）。"""
+    folder_id: str | None = None
+    notes: str | None = None
+    dft_snapshot: dict | None = None
+
+class FolderCreate(BaseModel):
+    name: str = Field(..., description="收藏夹名称（重名拒绝）")
+
+class FolderRename(BaseModel):
+    name: str = Field(..., description="新名称（重名拒绝）")
 
 
 class RecordCreate(BaseModel):

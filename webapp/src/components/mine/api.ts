@@ -73,16 +73,30 @@ export interface PredictionSnapshot {
   [key: string]: unknown;
 }
 
+/** DFT 快照（预留结构：本期仅字段透传，DFT 计算后续批次接入） */
+export type DftSnapshot = Record<string, unknown>;
+
 /** 收藏条目（favorites/store.py 落盘结构） */
 export interface FavoriteItem {
   id: string;
+  /** 归属收藏夹 id（旧数据经后端迁移归「收藏夹1」） */
+  folder_id?: string;
   aldehyde?: MonomerInfo;
   amine?: MonomerInfo;
   created_at?: string;
   notes?: string;
   latest_prediction?: PredictionSnapshot | null;
+  dft_snapshot?: DftSnapshot | null;
   references?: ReferenceItem[];
   experiment_record_ids?: string[];
+}
+
+/** 收藏夹（favorite_folders.json 结构，列表接口附带收藏数） */
+export interface FolderItem {
+  id: string;
+  name: string;
+  created_at?: string;
+  favorite_count?: number;
 }
 
 /** 实验记录条目（records/store.py 落盘结构，仅「我的数据」计数/导出用；
@@ -152,6 +166,47 @@ export async function deleteFavorite(id: string): Promise<void> {
 /** 单条收藏（一键打分后局部刷新用） */
 export async function fetchFavorite(id: string): Promise<FavoriteItem> {
   return request<FavoriteItem>(`/favorites/${encodeURIComponent(id)}`);
+}
+
+// ---------- 收藏夹 Folder（P2 收藏夹体系） ----------
+
+export async function fetchFolders(): Promise<FolderItem[]> {
+  const data = await request<{ folders?: FolderItem[] }>('/favorite-folders');
+  return Array.isArray(data?.folders) ? data.folders : [];
+}
+
+export async function createFolder(name: string): Promise<FolderItem> {
+  return request<FolderItem>('/favorite-folders', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function renameFolder(id: string, name: string): Promise<FolderItem> {
+  return request<FolderItem>(`/favorite-folders/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+}
+
+/** 删夹连带删内收藏，返回删除的收藏条数 */
+export async function deleteFolder(id: string): Promise<number> {
+  const data = await request<{ deleted_favorites?: number }>(
+    `/favorite-folders/${encodeURIComponent(id)}`,
+    { method: 'DELETE' },
+  );
+  return data?.deleted_favorites ?? 0;
+}
+
+/** 收藏局部更新：移夹 / 改备注 / 写入 DFT 快照 */
+export async function updateFavorite(
+  id: string,
+  fields: { folder_id?: string; notes?: string; dft_snapshot?: DftSnapshot },
+): Promise<FavoriteItem> {
+  return request<FavoriteItem>(`/favorites/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(fields),
+  });
 }
 
 export async function fetchPlans(): Promise<PlanItem[]> {

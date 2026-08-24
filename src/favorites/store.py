@@ -33,6 +33,13 @@ BUILTIN_PATH = PROJECT_ROOT / "data" / "builtin_monomers.json"
 TRAIN_CSV = PROJECT_ROOT / "data" / "interim" / "v5_train_stage1_cond_filled.csv"
 
 _ID_RE = re.compile(r"^fav_(\d{8})_(\d{3})$")
+_FOLDER_ID_RE = re.compile(r"^folder_[\w-]{1,32}$")
+
+# 收藏夹 Folder 存储文件（与 favorites/ 目录同级，测试 monkeypatch
+# FAVORITES_DIR 时随之隔离，与 prediction_log 同口径）
+FOLDERS_FILENAME = "favorite_folders.json"
+DEFAULT_FOLDER_ID = "folder_default"
+DEFAULT_FOLDER_NAME = "收藏夹1"
 
 # 文献匹配类型 → 中文说明
 _MATCH_NOTES = {
@@ -215,6 +222,174 @@ def _ensure_snapshot(fav: dict) -> dict:
     return fav
 
 
+# ---------------------------------------------------------------- 收藏夹 Folder（P2）
+#
+# Folder {id, name, created_at} 集中存于 favorite_folders.json；
+# 收藏条目新增 folder_id（归入某夹）与预留字段 dft_snapshot（可空，
+# DFT 计算后续批次接入，本期仅字段与 API 透传）。
+
+def _folders_path() -> Path:
+    """收藏夹文件路径：由 FAVORITES_DIR 推导（同 prediction_log 口径）。"""
+    return FAVORITES_DIR.parent / FOLDERS_FILENAME
+
+
+def _load_folders() -> list[dict]:
+    """读取全部收藏夹；文件缺失/损坏返回 []。"""
+    path = _folders_path()
+    if not path.exists():
+        return []
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8"))
+        folders = obj.get("folders") if isinstance(obj, dict) else None
+        if not isinstance(folders, list):
+            return []
+        return [f for f in folders
+                if isinstance(f, dict) and isinstance(f.get("id"), str)]
+    except Exception as exc:
+        logger.warning("收藏夹文件读取失败 %s: %s", path.name, exc)
+        return []
+
+
+def _save_folders(folders: list[dict]) -> None:
+    path = _folders_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"folders": folders}, ensure_ascii=False, indent=1) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _ensure_default_folder() -> dict:
+    """兜底夹：无任何收藏夹时自动创建默认「收藏夹1」。
+
+    幂等：已存在任意收藏夹则直接返回第一个，不重复创建。
+    """
+    folders = _load_folders()
+    if folders:
+        return folders[0]
+    default = {
+        "id": DEFAULT_FOLDER_ID,
+        "name": DEFAULT_FOLDER_NAME,
+        "created_at": _now_iso(),
+    }
+    _save_folders([default])
+    return default
+
+
+def get_folder(folder_id: str) -> dict | None:
+    for f in _load_folders():
+        if f.get("id") == folder_id:
+            return f
+    return None
+
+
+def list_folders() -> list[dict]:
+    """全部收藏夹（按创建时间升序），每项附带 favorite_count。"""
+    folders = _load_folders()
+    counts: dict[str, int] = {}
+    if FAVORITES_DIR.exists():
+        for p in sorted(FAVORITES_DIR.glob("fav_*.json")):
+            fav = _read_file(p)
+            if fav and _ID_RE.match(str(fav.get("id", ""))):
+                fid = str(fav.get("folder_id") or "")
+                counts[fid] = counts.get(fid, 0) + 1
+    return [{**f, "favorite_count": counts.get(str(f.get("id")), 0)}
+            for f in folders]
+
+
+def create_folder(name: str) -> dict:
+    """新建收藏夹；名称为空或重名抛 ValueError（中文提示，路由转 400）。"""
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("收藏夹名称不能为空")
+    folders = _load_folders()
+    if any(str(f.get("name")) == name for f in folders):
+        raise ValueError(f"已存在同名收藏夹：{name}")
+    import uuid
+
+    folder = {
+        "id": f"folder_{uuid.uuid4().hex[:8]}",
+        "name": name,
+        "created_at": _now_iso(),
+    }
+    folders.append(folder)
+    _save_folders(folders)
+    return folder
+
+
+def rename_folder(folder_id: str, name: str) -> dict:
+    """收藏夹改名；不存在抛 KeyError，空名/重名抛 ValueError。"""
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("收藏夹名称不能为空")
+    folders = _load_folders()
+    target = next((f for f in folders if f.get("id") == folder_id), None)
+    if target is None:
+        raise KeyError(f"收藏夹不存在: {folder_id}")
+    if any(f.get("id") != folder_id and str(f.get("name")) == name
+           for f in folders):
+        raise ValueError(f"已存在同名收藏夹：{name}")
+    target["name"] = name
+    _save_folders(folders)
+    return target
+
+
+def delete_folder(folder_id: str) -> int:
+    """删除收藏夹并连带删除夹内全部收藏，返回删除的收藏条数。
+
+    不存在抛 KeyError；禁止删除最后一个收藏夹（兜底夹保护，ValueError）。
+    """
+    folders = _load_folders()
+    target = next((f for f in folders if f.get("id") == folder_id), None)
+    if target is None:
+        raise KeyError(f"收藏夹不存在: {folder_id}")
+    if len(folders) <= 1:
+        raise ValueError("至少需保留一个收藏夹，不能删除最后一个收藏夹")
+    deleted = 0
+    for fav in list_favorites():
+        if str(fav.get("folder_id") or "") == folder_id:
+            if delete_favorite(str(fav.get("id"))):
+                deleted += 1
+    _save_folders([f for f in folders if f.get("id") != folder_id])
+    return deleted
+
+
+def _ensure_folder_fields(fav: dict) -> dict:
+    """旧格式迁移（幂等）：补 folder_id（归兜底夹）与 dft_snapshot（None）。
+
+    仅在有变更时落盘；重复启动不会重复建夹或重复改写。
+    """
+    changed = False
+    if "dft_snapshot" not in fav:
+        fav["dft_snapshot"] = None
+        changed = True
+    fid = fav.get("folder_id")
+    if not isinstance(fid, str) or not fid or get_folder(fid) is None:
+        fav["folder_id"] = _ensure_default_folder()["id"]
+        changed = True
+    if changed:
+        try:
+            _write(fav)
+        except Exception as exc:  # 迁移落盘失败不影响读取
+            logger.warning("收藏迁移落盘失败 %s: %s", fav.get("id"), exc)
+    return fav
+
+
+def find_favorite_by_pair(aldehyde_smiles: str, amine_smiles: str) -> dict | None:
+    """按规范化 SMILES 找同单体对的既有收藏（交叉合并去重用）。
+
+    无法规范化（非法 SMILES）时返回 None —— 不做去重拦截。
+    """
+    ca, cm = _canonical(aldehyde_smiles), _canonical(amine_smiles)
+    if not ca or not cm:
+        return None
+    for fav in list_favorites():
+        if _canonical(str((fav.get("aldehyde") or {}).get("smiles") or "")) == ca \
+                and _canonical(str((fav.get("amine") or {}).get("smiles") or "")) == cm:
+            return fav
+    return None
+
+
 # ---------------------------------------------------------------- 文献自动匹配
 
 def auto_match_references(
@@ -302,15 +477,25 @@ def add_favorite(
     amine_name: str = "",
     notes: str = "",
     prediction: dict | None = None,
+    folder_id: str | None = None,
+    dft_snapshot: dict | None = None,
 ) -> dict:
     """新建收藏条目并落盘，返回完整条目 dict。
 
     CAS/name 自动从内置库反查；创建时自动匹配训练文献挂为 references。
-    同一对单体重复收藏会创建多条（去重由 UI 层提示，不在此处强制）。
+    folder_id 指定归属收藏夹，缺省归兜底夹（收藏夹1）；指定的收藏夹
+    不存在时抛 ValueError。dft_snapshot 为预留字段（本期仅透传落盘，
+    默认 None）。同单体对去重由路由层 409 拦截，本函数不强制。
     prediction 为可选的当前打分快照（{score, std, ood, score_policy,
     tree_score, gnn_score}），提供且 score 非空时直接写入 latest_prediction，
     避免「查询打分后立即收藏，我的页显示未打分」。
     """
+    if folder_id:
+        folder = get_folder(folder_id)
+        if folder is None:
+            raise ValueError(f"收藏夹不存在: {folder_id}")
+    else:
+        folder = _ensure_default_folder()
     latest_prediction = None
     if isinstance(prediction, dict) and prediction.get("score") is not None:
         latest_prediction = {
@@ -325,11 +510,13 @@ def add_favorite(
                 latest_prediction[k] = prediction[k]
     fav = {
         "id": _next_id(),
+        "folder_id": folder["id"],
         "aldehyde": _monomer_obj(aldehyde_smiles, ald_name),
         "amine": _monomer_obj(amine_smiles, amine_name),
         "created_at": _now_iso(),
         "notes": notes or "",
         "latest_prediction": latest_prediction,
+        "dft_snapshot": dft_snapshot if isinstance(dft_snapshot, dict) else None,
         "references": auto_match_references(aldehyde_smiles, amine_smiles),
         "experiment_record_ids": [],
     }
@@ -346,25 +533,29 @@ def list_favorites() -> list[dict]:
         if fav and _ID_RE.match(str(fav.get("id", ""))):
             favs.append(fav)
     favs.sort(key=lambda f: str(f.get("created_at", "")), reverse=True)
-    return [_ensure_snapshot(f) for f in favs]
+    return [_ensure_snapshot(_ensure_folder_fields(f)) for f in favs]
 
 
 def get_favorite(fav_id: str) -> dict | None:
     """按 id 取收藏条目；不存在/损坏返回 None。"""
     path = _path_of(fav_id)
     fav = _read_file(path) if path else None
-    return _ensure_snapshot(fav) if fav else None
+    return _ensure_snapshot(_ensure_folder_fields(fav)) if fav else None
 
 
 def update_favorite(fav_id: str, **fields) -> dict:
     """更新收藏条目任意字段（id 不可改），返回更新后的完整条目。
 
+    指定 folder_id（移夹）时校验目标收藏夹存在，否则抛 ValueError；
     条目不存在时抛 KeyError。
     """
     fav = get_favorite(fav_id)
     if fav is None:
         raise KeyError(f"收藏条目不存在: {fav_id}")
     fields.pop("id", None)
+    fid = fields.get("folder_id")
+    if isinstance(fid, str) and fid and get_folder(fid) is None:
+        raise ValueError(f"收藏夹不存在: {fid}")
     fav.update(fields)
     return _write(fav)
 

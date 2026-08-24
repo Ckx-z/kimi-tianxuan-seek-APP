@@ -14,13 +14,15 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { createRecord, type FavoriteItem } from './api';
+import { createRecord, type FavoriteItem, type FolderItem } from './api';
 
 /** conditions 九键（与后端契约一致） */
 const CONDITION_FIELDS: { key: string; label: string; placeholder: string }[] = [
@@ -42,6 +44,8 @@ const EMPTY_CONDITIONS: Record<string, string> = Object.fromEntries(
 
 export interface RecordFormProps {
   favorites: FavoriteItem[];
+  /** 收藏夹列表（关联选择器按夹分组展示；空数组则不分组） */
+  folders?: FolderItem[];
   /** 当前选中的收藏 id（受控，切换收藏需清空表单） */
   favoriteId: string;
   onFavoriteChange: (id: string) => void;
@@ -56,7 +60,7 @@ function favoriteLabel(fav: FavoriteItem): string {
   return `${ald} + ${amine}`;
 }
 
-export default function RecordForm({ favorites, favoriteId, onFavoriteChange, onSaved }: RecordFormProps) {
+export default function RecordForm({ favorites, folders = [], favoriteId, onFavoriteChange, onSaved }: RecordFormProps) {
   // 游离记录开关：开后不关联收藏，需手填醛/胺 SMILES
   const [freeMode, setFreeMode] = useState(false);
   const [aldehydeSmiles, setAldehydeSmiles] = useState('');
@@ -179,11 +183,41 @@ export default function RecordForm({ favorites, favoriteId, onFavoriteChange, on
               {favorites.length === 0 && (
                 <div className="px-3 py-2 text-sm text-muted-foreground">暂无收藏，可开启游离记录</div>
               )}
-              {favorites.map((fav) => (
-                <SelectItem key={fav.id} value={fav.id}>
-                  {favoriteLabel(fav)}
-                </SelectItem>
-              ))}
+              {(() => {
+                // 按收藏夹分组展示（folder_id 无效/缺失的归入「未分组」兜底）
+                const knownIds = new Set(folders.map((f) => f.id));
+                const grouped = new Map<string, FavoriteItem[]>();
+                for (const fav of favorites) {
+                  const key = fav.folder_id && knownIds.has(fav.folder_id) ? fav.folder_id : '__other__';
+                  grouped.set(key, [...(grouped.get(key) ?? []), fav]);
+                }
+                const renderItems = (items: FavoriteItem[]) =>
+                  items.map((fav) => (
+                    <SelectItem key={fav.id} value={fav.id}>
+                      {favoriteLabel(fav)}
+                    </SelectItem>
+                  ));
+                return (
+                  <>
+                    {folders.map((folder) => {
+                      const items = grouped.get(folder.id) ?? [];
+                      if (items.length === 0) return null;
+                      return (
+                        <SelectGroup key={folder.id}>
+                          <SelectLabel>{folder.name}</SelectLabel>
+                          {renderItems(items)}
+                        </SelectGroup>
+                      );
+                    })}
+                    {(grouped.get('__other__') ?? []).length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>未分组</SelectLabel>
+                        {renderItems(grouped.get('__other__') ?? [])}
+                      </SelectGroup>
+                    )}
+                  </>
+                );
+              })()}
             </SelectContent>
           </Select>
         </div>

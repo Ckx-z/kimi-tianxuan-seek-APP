@@ -9,23 +9,31 @@ import RecordTimeline from '@/components/records/RecordTimeline';
 import {
   BackendUnavailableError,
   listFavorites,
+  listFolders,
   listRecords,
   type FavoriteItem,
+  type FolderItem,
   type RecordItem,
 } from '@/components/records/api';
 
 export default function Records() {
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
+  const [folders, setFolders] = useState<FolderItem[]>([]);
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [favoriteId, setFavoriteId] = useState('');
   const [onlySelected, setOnlySelected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [backendDown, setBackendDown] = useState(false);
 
-  /** 加载收藏列表（表单下拉用）；失败静默降级（时间线区统一提示） */
+  /** 加载收藏列表（表单下拉用）与收藏夹（下拉分组用）；失败静默降级 */
   const loadFavorites = useCallback(async () => {
     try {
-      setFavorites(await listFavorites());
+      const [favs, folds] = await Promise.all([
+        listFavorites(),
+        listFolders().catch(() => [] as FolderItem[]),
+      ]);
+      setFavorites(favs);
+      setFolders(folds);
       return true;
     } catch {
       return false;
@@ -81,6 +89,7 @@ export default function Records() {
         <div className="lg:col-span-2">
           <RecordForm
             favorites={favorites}
+            folders={folders}
             favoriteId={favoriteId}
             onFavoriteChange={handleFavoriteChange}
             onSaved={handleRefresh}

@@ -170,27 +170,105 @@ export async function uploadPlanTemplate(file: File): Promise<PlanTemplateItem> 
   return (await res.json()) as PlanTemplateItem;
 }
 
-/** 收藏一组单体（可携带当前打分快照，写入 latest_prediction） */
-export const createFavorite = (payload: {
+/** 收藏一组单体（可携带当前打分快照，写入 latest_prediction）。
+ *  同单体对已收藏时后端返回 409，抛 DuplicateFavoriteError（携带已存在摘要）。 */
+export const createFavorite = async (payload: {
   aldehyde_smiles: string;
   amine_smiles: string;
   ald_name?: string;
   amine_name?: string;
+  folder_id?: string;
   score?: number | null;
   std?: number | null;
   ood?: string;
   score_policy?: string;
   tree_score?: number | null;
   gnn_score?: number | null;
-}) => request('/favorites', { method: 'POST', body: payload, silent: true });
+}): Promise<unknown> => {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/favorites`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new BackendUnavailableError();
+  }
+  if (res.status === 409) {
+    let existing: ExistingFavoriteSummary = { id: '' };
+    try {
+      const data = await res.json();
+      if (data?.detail?.existing) existing = data.detail.existing as ExistingFavoriteSummary;
+    } catch {
+      /* 保留默认摘要 */
+    }
+    throw new DuplicateFavoriteError(existing);
+  }
+  if (!res.ok) {
+    let message = `请求失败（${res.status}）`;
+    try {
+      const data = await res.json();
+      if (typeof data?.detail === 'string') message = data.detail;
+    } catch {
+      /* 保留默认提示 */
+    }
+    toast.error(message);
+    throw new Error(message);
+  }
+  return res.json();
+};
+
+/** 409 已存在收藏摘要（后端 detail.existing 结构） */
+export interface ExistingFavoriteSummary {
+  id: string;
+  folder_id?: string;
+  folder_name?: string;
+  aldehyde_name?: string;
+  amine_name?: string;
+  has_prediction?: boolean;
+  has_dft?: boolean;
+  created_at?: string;
+}
+
+/** 同单体对已收藏（409）专用错误：携带已存在收藏摘要 */
+export class DuplicateFavoriteError extends Error {
+  existing: ExistingFavoriteSummary;
+  constructor(existing: ExistingFavoriteSummary) {
+    super('已收藏过该单体组合');
+    this.name = 'DuplicateFavoriteError';
+    this.existing = existing;
+  }
+}
+
+/** 收藏夹条目（移动收藏目标选择用） */
+export interface FolderItem {
+  id: string;
+  name: string;
+  favorite_count?: number;
+}
+
+/** 收藏夹列表（静默） */
+export const fetchFavoriteFolders = async (): Promise<FolderItem[]> => {
+  const data = await request<{ folders: FolderItem[] }>('/favorite-folders', { silent: true });
+  return data.folders ?? [];
+};
+
+/** 把已存在收藏移动到指定收藏夹 */
+export const moveFavoriteToFolder = (favoriteId: string, folderId: string) =>
+  request(`/favorites/${encodeURIComponent(favoriteId)}`, {
+    method: 'PATCH',
+    body: { folder_id: folderId },
+  });
 
 // ---------- 收藏状态 / 取消收藏 / 查询历史 ----------
 
-/** 收藏条目（仅取查询页所需字段） */
+/** 收藏条目（仅取查询页所需字段；后端为嵌套单体结构） */
 export interface FavoriteItem {
   id: string;
-  aldehyde_smiles: string;
-  amine_smiles: string;
+  folder_id?: string;
+  aldehyde?: { smiles?: string; name?: string };
+  amine?: { smiles?: string; name?: string };
 }
 
 /** 收藏列表（静默，失败时调用方自行降级） */

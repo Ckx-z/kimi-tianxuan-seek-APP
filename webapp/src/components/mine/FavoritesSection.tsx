@@ -1,17 +1,22 @@
 /**
- * 「我的收藏」卡片墙
- * - 卡片：醛名 × 胺名大字 + SMILES 小字 + 最新预测分徽章 + 创建时间 + 删除按钮
+ * 「我的收藏」收藏夹视图
+ * - 左侧收藏夹列表（名称+数量；窄屏横向滚动不溢出），右侧当前夹收藏卡片网格
+ * - 收藏夹操作：新建（对话框输名称，重名 400 中文提示）、改名、
+ *   删除两步确认（第一次说明将删 N 条收藏，第二次输入夹名/再次确认，不可恢复）
+ * - 卡片：醛名 × 胺名大字 + SMILES 小字 + 打分徽章 + DFT 徽章（本期预留「DFT 未计算」）
+ *   + 创建时间 + 删除按钮
  * - 点击卡片弹出详情 Dialog：单体信息 / 预测快照 / 性质卡 / 方案卡 / 文献列表 /
  *   该组实验记录列表（行可点击 → 嵌套放大记录详情，带「返回」回到收藏详情）
- * - 删除经 AlertDialog 确认后调用 DELETE /api/favorites/{id}
+ * - 删除收藏经 AlertDialog 确认后调用 DELETE /api/favorites/{id}
  * - 响应式：Dialog 限高 + 固定头部 + 内部滚动；窄屏下结构图/性质卡/表格自动换行、横向滚动
  */
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { Trash2, BookOpen, FlaskConical, ChevronRight } from 'lucide-react';
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -41,7 +46,12 @@ import {
 import {
   deleteFavorite,
   fetchFavorite,
+  fetchFolders,
+  createFolder,
+  renameFolder,
+  deleteFolder,
   type FavoriteItem,
+  type FolderItem,
   type PredictionSnapshot,
   type ReferenceItem,
 } from './api';
@@ -86,6 +96,22 @@ function ScoreBadge({ fav }: { fav: FavoriteItem }) {
   return (
     <Badge variant="outline" className="border-gold/60 bg-gold-muted text-gold-foreground">
       {score.toFixed(2)} 分
+    </Badge>
+  );
+}
+
+/** DFT 徽章（本期预留：无快照时显示灰色「DFT 未计算」） */
+function DftBadge({ fav }: { fav: FavoriteItem }) {
+  if (fav.dft_snapshot) {
+    return (
+      <Badge variant="outline" className="border-primary/40 text-primary">
+        DFT 已计算
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
+      DFT 未计算
     </Badge>
   );
 }
@@ -499,7 +525,7 @@ function FavoriteDetailDialog({
   );
 }
 
-/** 收藏卡片墙主组件 */
+/** 收藏夹视图主组件：左侧收藏夹列表（窄屏横向滚动）+ 右侧当前夹卡片网格 */
 export function FavoritesSection({
   favorites,
   loading,
@@ -507,7 +533,7 @@ export function FavoritesSection({
 }: {
   favorites: FavoriteItem[];
   loading: boolean;
-  /** 删除成功后通知父组件刷新 */
+  /** 删除/移夹成功后通知父组件刷新 */
   onChanged: () => void;
 }) {
   const [detail, setDetail] = useState<FavoriteItem | null>(null);
@@ -515,6 +541,52 @@ export function FavoritesSection({
   const [deleting, setDeleting] = useState(false);
   /** 一键打分进行中（按收藏 id 记） */
   const [scoringId, setScoringId] = useState<string | null>(null);
+
+  // ---------- 收藏夹状态 ----------
+  const [folders, setFolders] = useState<FolderItem[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(true);
+  const [currentFolderId, setCurrentFolderId] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<FolderItem | null>(null);
+  const [renameName, setRenameName] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  /** 删除收藏夹两步确认：step 1 说明将删 N 条；step 2 输入名称/再次确认 */
+  const [folderDelete, setFolderDelete] = useState<FolderItem | null>(null);
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingFolder, setDeletingFolder] = useState(false);
+
+  /** 加载收藏夹列表；保持当前选中（已被删除则回退到第一个夹） */
+  const loadFolders = useCallback(async () => {
+    try {
+      const list = await fetchFolders();
+      setFolders(list);
+      setCurrentFolderId((prev) =>
+        prev && list.some((f) => f.id === prev) ? prev : (list[0]?.id ?? ''),
+      );
+    } catch {
+      /* 错误提示已由 api 层弹出 */
+    } finally {
+      setFoldersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadFolders();
+  }, [loadFolders]);
+
+  // 收藏增删（父级 onChanged 刷新 favorites）→ 同步夹内计数
+  useEffect(() => {
+    if (!foldersLoading) void loadFolders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [favorites.length]);
+
+  /** 当前夹的收藏（夹列表未加载完成时显示全部，避免闪烁空态） */
+  const visibleFavorites = currentFolderId
+    ? favorites.filter((f) => f.folder_id === currentFolderId)
+    : favorites;
 
   /** 旧收藏无分数字段时的一键打分：打分后快照由后端回写，随后刷新 */
   async function quickScore(fav: FavoriteItem) {
@@ -549,6 +621,73 @@ export function FavoritesSection({
     }
   }
 
+  // ---------- 收藏夹操作 ----------
+
+  async function handleCreateFolder() {
+    const name = newFolderName.trim();
+    if (!name) {
+      toast.error('请输入收藏夹名称');
+      return;
+    }
+    setCreatingFolder(true);
+    try {
+      const folder = await createFolder(name);
+      toast.success(`已创建收藏夹「${folder.name}」`);
+      setCreateOpen(false);
+      setNewFolderName('');
+      await loadFolders();
+      setCurrentFolderId(folder.id);
+    } catch {
+      /* 错误已由 api 层 toast（含重名 400 中文提示） */
+    } finally {
+      setCreatingFolder(false);
+    }
+  }
+
+  async function handleRenameFolder() {
+    if (!renameTarget) return;
+    const name = renameName.trim();
+    if (!name) {
+      toast.error('请输入收藏夹名称');
+      return;
+    }
+    setRenaming(true);
+    try {
+      await renameFolder(renameTarget.id, name);
+      toast.success(`已改名为「${name}」`);
+      setRenameTarget(null);
+      await loadFolders();
+    } catch {
+      /* 错误已由 api 层 toast（含重名 400 中文提示） */
+    } finally {
+      setRenaming(false);
+    }
+  }
+
+  async function handleDeleteFolder() {
+    if (!folderDelete) return;
+    const count = folderDelete.favorite_count ?? 0;
+    if (count > 0 && deleteConfirmText.trim() !== folderDelete.name) return;
+    setDeletingFolder(true);
+    try {
+      const n = await deleteFolder(folderDelete.id);
+      toast.success(
+        n > 0
+          ? `已删除收藏夹「${folderDelete.name}」及其中 ${n} 条收藏`
+          : `已删除收藏夹「${folderDelete.name}」`,
+      );
+      setFolderDelete(null);
+      setDeleteStep(1);
+      setDeleteConfirmText('');
+      await loadFolders();
+      onChanged();
+    } catch {
+      /* 错误已由 api 层 toast（如最后一个夹 400 保护） */
+    } finally {
+      setDeletingFolder(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -559,71 +698,167 @@ export function FavoritesSection({
     );
   }
 
-  if (favorites.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
-        暂无收藏：在查询页预测后可点击「收藏」将组合加入这里。
-      </div>
-    );
-  }
+  const deleteCount = folderDelete?.favorite_count ?? 0;
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {favorites.map((fav) => (
-          <Card
-            key={fav.id}
-            className="cursor-pointer transition-shadow hover:shadow-md hover:shadow-primary/10"
-            onClick={() => setDetail(fav)}
-          >
-            <CardContent className="space-y-2 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 break-words text-base font-semibold leading-snug text-foreground">
-                  {fav.aldehyde?.name || '未知醛'}
-                  <span className="mx-1 text-gold">×</span>
-                  {fav.amine?.name || '未知胺'}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                  title="删除收藏"
-                  onClick={(e) => {
-                    e.stopPropagation(); // 阻止触发卡片点击
-                    setToDelete(fav);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="break-all font-mono text-xs text-muted-foreground">
-                {shortSmiles(fav.aldehyde?.smiles)}
-              </div>
-              <div className="break-all font-mono text-xs text-muted-foreground">
-                {shortSmiles(fav.amine?.smiles)}
-              </div>
-              <div className="flex items-center justify-between gap-2 pt-1">
-                <ScoreBadge fav={fav} />
-                {typeof fav.latest_prediction?.score !== 'number' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 shrink-0 px-2 text-xs text-primary hover:text-primary"
-                    disabled={scoringId === fav.id}
-                    title="对该组合立即打分并回写收藏"
-                    onClick={(e) => {
-                      e.stopPropagation(); // 阻止触发卡片点击
-                      void quickScore(fav);
-                    }}
+      <div className="flex flex-col gap-4 md:flex-row">
+        {/* 收藏夹列表：窄屏横向滚动条，md+ 固定侧栏 */}
+        <aside className="shrink-0 md:w-52">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-muted-foreground">收藏夹</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2 text-xs"
+              onClick={() => {
+                setNewFolderName('');
+                setCreateOpen(true);
+              }}
+            >
+              <FolderPlus className="mr-1 h-3.5 w-3.5" /> 新建
+            </Button>
+          </div>
+          {foldersLoading ? (
+            <div className="flex gap-2 md:flex-col">
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-9 w-full" />
+            </div>
+          ) : folders.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              暂无收藏夹，点击「新建」创建；旧收藏会在加载时自动归入「收藏夹1」。
+            </p>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
+              {folders.map((folder) => {
+                const active = folder.id === currentFolderId;
+                return (
+                  <div
+                    key={folder.id}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      active
+                        ? 'border-primary/50 bg-primary/5 text-foreground'
+                        : 'border-border bg-card text-muted-foreground hover:bg-muted/60'
+                    }`}
                   >
-                    {scoringId === fav.id ? '打分中…' : '一键打分'}
-                  </Button>
-                )}
-                <span className="truncate text-xs text-muted-foreground">{fav.created_at || ''}</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => setCurrentFolderId(folder.id)}
+                    >
+                      <span className="block truncate">{folder.name}</span>
+                    </button>
+                    <Badge variant="secondary" className="shrink-0 px-1.5 text-xs">
+                      {folder.favorite_count ?? 0}
+                    </Badge>
+                    {active && (
+                      <>
+                        <button
+                          type="button"
+                          title="改名"
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            setRenameTarget(folder);
+                            setRenameName(folder.name);
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="删除收藏夹"
+                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => {
+                            setFolderDelete(folder);
+                            setDeleteStep(1);
+                            setDeleteConfirmText('');
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </aside>
+
+        {/* 当前夹的收藏卡片网格 */}
+        <div className="min-w-0 flex-1">
+          {favorites.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
+              暂无收藏：在查询页预测后可点击「收藏」将组合加入这里。
+            </div>
+          ) : visibleFavorites.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
+              该收藏夹暂无收藏。
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {visibleFavorites.map((fav) => (
+                <Card
+                  key={fav.id}
+                  className="cursor-pointer transition-shadow hover:shadow-md hover:shadow-primary/10"
+                  onClick={() => setDetail(fav)}
+                >
+                  <CardContent className="space-y-2 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 break-words text-base font-semibold leading-snug text-foreground">
+                        {fav.aldehyde?.name || '未知醛'}
+                        <span className="mx-1 text-gold">×</span>
+                        {fav.amine?.name || '未知胺'}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                        title="删除收藏"
+                        onClick={(e) => {
+                          e.stopPropagation(); // 阻止触发卡片点击
+                          setToDelete(fav);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="break-all font-mono text-xs text-muted-foreground">
+                      {shortSmiles(fav.aldehyde?.smiles)}
+                    </div>
+                    <div className="break-all font-mono text-xs text-muted-foreground">
+                      {shortSmiles(fav.amine?.smiles)}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <ScoreBadge fav={fav} />
+                        <DftBadge fav={fav} />
+                      </div>
+                      {typeof fav.latest_prediction?.score !== 'number' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 shrink-0 px-2 text-xs text-primary hover:text-primary"
+                          disabled={scoringId === fav.id}
+                          title="对该组合立即打分并回写收藏"
+                          onClick={(e) => {
+                            e.stopPropagation(); // 阻止触发卡片点击
+                            void quickScore(fav);
+                          }}
+                        >
+                          {scoringId === fav.id ? '打分中…' : '一键打分'}
+                        </Button>
+                      )}
+                      <span className="truncate text-xs text-muted-foreground">
+                        {fav.created_at || ''}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 详情 Dialog */}
@@ -637,7 +872,7 @@ export function FavoritesSection({
         }}
       />
 
-      {/* 删除确认 */}
+      {/* 删除收藏确认 */}
       <AlertDialog open={toDelete !== null} onOpenChange={(v) => !v && setToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -656,6 +891,134 @@ export function FavoritesSection({
             >
               {deleting ? '删除中…' : '确认删除'}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 新建收藏夹 */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>新建收藏夹</DialogTitle>
+            <DialogDescription>收藏夹名称不可与现有收藏夹重复。</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            placeholder="如 高分候选"
+            maxLength={30}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleCreateFolder();
+            }}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creatingFolder}>
+              取消
+            </Button>
+            <Button
+              onClick={() => void handleCreateFolder()}
+              disabled={creatingFolder || !newFolderName.trim()}
+            >
+              {creatingFolder ? '创建中…' : '创建'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 收藏夹改名 */}
+      <Dialog open={renameTarget !== null} onOpenChange={(v) => !v && setRenameTarget(null)}>
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>收藏夹改名</DialogTitle>
+            <DialogDescription>
+              当前名称「{renameTarget?.name}」，新名称不可与其他收藏夹重复。
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameName}
+            onChange={(e) => setRenameName(e.target.value)}
+            maxLength={30}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleRenameFolder();
+            }}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setRenameTarget(null)} disabled={renaming}>
+              取消
+            </Button>
+            <Button
+              onClick={() => void handleRenameFolder()}
+              disabled={renaming || !renameName.trim()}
+            >
+              {renaming ? '保存中…' : '保存'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除收藏夹：第一次确认（说明将删 N 条收藏） */}
+      <AlertDialog
+        open={folderDelete !== null && deleteStep === 1}
+        onOpenChange={(v) => !v && setFolderDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除收藏夹「{folderDelete?.name}」？</AlertDialogTitle>
+            <AlertDialogDescription>
+              将删除该收藏夹及其中 {deleteCount} 条收藏（含打分/DFT 快照），删除后不可恢复。
+              收藏关联的实验记录本身不会被删除。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            {/* 用普通 Button 避免 AlertDialogAction 自动关闭打断两步流程 */}
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteStep(2)}
+            >
+              继续
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 删除收藏夹：第二次确认（非空夹须输入名称；空夹再次点确认） */}
+      <AlertDialog
+        open={folderDelete !== null && deleteStep === 2}
+        onOpenChange={(v) => {
+          if (!v) {
+            setDeleteStep(1);
+            setDeleteConfirmText('');
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>再次确认：此操作不可恢复</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteCount > 0
+                ? `请输入收藏夹名称「${folderDelete?.name}」以确认删除其中 ${deleteCount} 条收藏。`
+                : '该收藏夹为空，再次确认后将立即删除，不可恢复。'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteCount > 0 && (
+            <Input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={folderDelete?.name}
+            />
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingFolder}>取消</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={() => void handleDeleteFolder()}
+              disabled={
+                deletingFolder || (deleteCount > 0 && deleteConfirmText.trim() !== folderDelete?.name)
+              }
+            >
+              {deletingFolder ? '删除中…' : '确认删除'}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

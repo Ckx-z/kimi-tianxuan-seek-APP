@@ -80,11 +80,21 @@ export interface MonomerObj {
 /** 收藏条目 */
 export interface FavoriteItem {
   id: string;
+  /** 归属收藏夹 id（P2 收藏夹体系；旧数据由后端迁移补齐） */
+  folder_id?: string;
   aldehyde: MonomerObj;
   amine: MonomerObj;
   latest_prediction?: { score?: number; std?: number; ood?: string } | null;
   notes?: string;
   experiment_record_ids?: string[];
+}
+
+/** 收藏夹（列表接口附带收藏数） */
+export interface FolderItem {
+  id: string;
+  name: string;
+  created_at?: string;
+  favorite_count?: number;
 }
 
 /** 时间点条目附件元数据 */
@@ -175,6 +185,12 @@ export interface RecordUpdateBody {
 export async function listFavorites(): Promise<FavoriteItem[]> {
   const data = await request<{ favorites: FavoriteItem[] }>('/favorites');
   return data.favorites ?? [];
+}
+
+/** 收藏夹列表（关联选择器分组用） */
+export async function listFolders(): Promise<FolderItem[]> {
+  const data = await request<{ folders: FolderItem[] }>('/favorite-folders');
+  return data.folders ?? [];
 }
 
 /** 实验记录列表（可选按收藏过滤） */

@@ -5,9 +5,24 @@
  * 后端未连接时显示降级提示，不白屏。
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import MonomerInput, { type MonomerValue } from '@/components/query/MonomerInput';
 import ResultCard from '@/components/query/ResultCard';
 import MonomerPropsCard from '@/components/query/MonomerPropsCard';
@@ -16,14 +31,19 @@ import {
   checkHealth,
   createFavorite,
   deleteFavorite,
+  DuplicateFavoriteError,
+  fetchFavoriteFolders,
   fetchFavorites,
   fetchMonomerProps,
   fetchMonomers,
   fetchPlanCard,
   fetchPlanTemplates,
   fetchPredictHistory,
+  moveFavoriteToFolder,
   predictPair,
+  type ExistingFavoriteSummary,
   type FavoriteItem,
+  type FolderItem,
   type MonomerLibrary,
   type MonomerProps,
   type PlanCardData,
@@ -66,12 +86,18 @@ export default function Query() {
   const [favoriting, setFavoriting] = useState(false);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [history, setHistory] = useState<PredictHistoryEntry[]>([]);
+  /** 409 重复收藏：已存在收藏摘要 + 移动目标夹选择 */
+  const [dupExisting, setDupExisting] = useState<ExistingFavoriteSummary | null>(null);
+  const [dupFolders, setDupFolders] = useState<FolderItem[]>([]);
+  const [moveFolderId, setMoveFolderId] = useState('');
+  const [moving, setMoving] = useState(false);
+  const navigate = useNavigate();
 
-  /** 当前输入组合是否已收藏（返回收藏条目，未收藏为 null） */
+  /** 当前输入组合是否已收藏（返回收藏条目，未收藏为 null；后端为嵌套单体结构） */
   const matchedFavorite = (() => {
     if (!ald.smiles || !amine.smiles) return null;
     return favorites.find(
-      (f) => f.aldehyde_smiles === ald.smiles && f.amine_smiles === amine.smiles
+      (f) => f.aldehyde?.smiles === ald.smiles && f.amine?.smiles === amine.smiles
     ) ?? null;
   })();
 
@@ -201,9 +227,33 @@ export default function Query() {
       }
       refreshFavorites();
     } catch (e) {
-      toast.error(`操作失败：${e instanceof Error ? e.message : '未知错误'}`);
+      if (e instanceof DuplicateFavoriteError) {
+        // 409：已收藏过该组合 → 弹提示（查看 / 移动到指定收藏夹），不静默重复收藏
+        setDupExisting(e.existing);
+        setMoveFolderId('');
+        fetchFavoriteFolders().then(setDupFolders).catch(() => setDupFolders([]));
+      } else {
+        toast.error(`操作失败：${e instanceof Error ? e.message : '未知错误'}`);
+      }
     } finally {
       setFavoriting(false);
+    }
+  };
+
+  /** 409 对话框：把已存在收藏移动到所选收藏夹 */
+  const handleMoveExisting = async () => {
+    if (!dupExisting?.id || !moveFolderId) return;
+    setMoving(true);
+    try {
+      await moveFavoriteToFolder(dupExisting.id, moveFolderId);
+      const name = dupFolders.find((f) => f.id === moveFolderId)?.name ?? '';
+      toast.success(`已移动到收藏夹「${name}」`);
+      setDupExisting(null);
+      refreshFavorites();
+    } catch (e) {
+      toast.error(`移动失败：${e instanceof Error ? e.message : '未知错误'}`);
+    } finally {
+      setMoving(false);
     }
   };
 
@@ -410,6 +460,63 @@ export default function Query() {
           />
         </div>
       </div>
+
+      {/* 409 重复收藏提示：已收藏过该组合 → 查看 / 移动到指定收藏夹 */}
+      <Dialog open={dupExisting !== null} onOpenChange={(v) => !v && setDupExisting(null)}>
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>已收藏过该组合</DialogTitle>
+            <DialogDescription className="space-y-1 text-left">
+              <span className="block">
+                「{dupExisting?.aldehyde_name || '未知醛'} × {dupExisting?.amine_name || '未知胺'}」
+                已在收藏夹「{dupExisting?.folder_name || '收藏夹1'}」中，未重复创建。
+              </span>
+              <span className="block text-xs">
+                打分快照：{dupExisting?.has_prediction ? '已有' : '未打分'} · DFT：
+                {dupExisting?.has_dft ? '已计算' : '未计算'}
+                {dupExisting?.created_at ? ` · 收藏于 ${dupExisting.created_at}` : ''}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          {dupFolders.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">移动到收藏夹：</p>
+              <Select value={moveFolderId} onValueChange={setMoveFolderId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="选择目标收藏夹" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dupFolders.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                      {typeof f.favorite_count === 'number' ? `（${f.favorite_count}）` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" onClick={() => setDupExisting(null)}>
+              关闭
+            </Button>
+            {dupFolders.length > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => void handleMoveExisting()}
+                disabled={moving || !moveFolderId || moveFolderId === dupExisting?.folder_id}
+              >
+                {moving ? '移动中…' : '移动到所选收藏夹'}
+              </Button>
+            )}
+            <Button onClick={() => { setDupExisting(null); navigate('/mine'); }}>
+              前往「我的」查看
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
