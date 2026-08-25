@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/dialog';
 import { CircleHelp } from 'lucide-react';
 import MonomerInput, { type MonomerValue } from '@/components/query/MonomerInput';
+import StructureSketcher from '@/components/common/StructureSketcher';
 import MonomerPropsCard from '@/components/query/MonomerPropsCard';
 import {
   DuplicateFavoriteError,
@@ -485,12 +486,21 @@ export default function Dft() {
             {xType === 'custom' && (
               <div className="space-y-1.5 pl-6 pt-1">
                 <Label>自定义分子 SMILES</Label>
-                <Input
-                  placeholder="如 CCO（乙醇）"
-                  value={customSmiles}
-                  disabled={running}
-                  onChange={(e) => setCustomSmiles(e.target.value)}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="如 CCO（乙醇）"
+                    value={customSmiles}
+                    disabled={running}
+                    onChange={(e) => setCustomSmiles(e.target.value)}
+                  />
+                  {/* 画结构：无 CAS/不熟悉 SMILES 时用画板绘制，确定后回填 */}
+                  <StructureSketcher
+                    value={customSmiles}
+                    disabled={running}
+                    title="绘制自定义分子（X）结构"
+                    onChange={setCustomSmiles}
+                  />
+                </div>
               </div>
             )}
           </div>

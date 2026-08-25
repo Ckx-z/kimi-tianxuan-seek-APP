@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { BuiltinMonomer } from './api';
+import StructureSketcher from '@/components/common/StructureSketcher';
 
 export interface MonomerValue {
   smiles: string;
@@ -122,12 +123,21 @@ export default function MonomerInput({ title, value, onChange, library, libraryL
         {/* 通道①：SMILES 直输 */}
         <TabsContent value="smiles" className="space-y-2 pt-2">
           <Label>SMILES</Label>
-          <Input
-            placeholder="如 O=Cc1ccccc1"
-            value={value.smiles}
-            disabled={disabled}
-            onChange={(e) => onChange({ smiles: e.target.value.trim(), name: value.name })}
-          />
+          <div className="flex gap-2">
+            <Input
+              placeholder="如 O=Cc1ccccc1"
+              value={value.smiles}
+              disabled={disabled}
+              onChange={(e) => onChange({ smiles: e.target.value.trim(), name: value.name })}
+            />
+            {/* 通道④：画结构（Ketcher 画板，懒加载），回填本通道 SMILES */}
+            <StructureSketcher
+              value={value.smiles}
+              disabled={disabled}
+              title={`绘制${title}结构`}
+              onChange={(smiles) => onChange({ smiles, name: value.name })}
+            />
+          </div>
           <Label>名称（选填，用于性质卡与方案卡展示）</Label>
           <Input
             placeholder="如 苯甲醛"

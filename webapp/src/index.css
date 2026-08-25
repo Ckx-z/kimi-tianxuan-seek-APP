@@ -103,3 +103,10 @@
     color: transparent;
   }
 }
+
+/* Ketcher 画板容器：编辑器根节点需撑满 Dialog 内容区（ketcher-react 未给根节点设高度） */
+.ketcher-sketcher-host,
+.ketcher-sketcher-host > div {
+  height: 100%;
+  width: 100%;
+}
