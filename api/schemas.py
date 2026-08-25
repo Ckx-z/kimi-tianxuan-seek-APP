@@ -43,6 +43,14 @@ class FavoriteUpdate(BaseModel):
     notes: str | None = None
     dft_snapshot: dict | None = None
 
+class FavoriteCopy(BaseModel):
+    """复制收藏到目标收藏夹。"""
+    folder_id: str = Field(..., description="目标收藏夹 id（必须已存在）")
+
+class RecordsBundleExport(BaseModel):
+    """按收藏分组导出实验记录为一份 Word。"""
+    favorite_ids: list[str] = Field(..., description="收藏 id 列表（至少 1 个）")
+
 class FolderCreate(BaseModel):
     name: str = Field(..., description="收藏夹名称（重名拒绝）")
 

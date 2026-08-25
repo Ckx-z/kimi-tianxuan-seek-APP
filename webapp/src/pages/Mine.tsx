@@ -7,16 +7,18 @@
  * - 后端未连接时优雅降级提示，不白屏
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Star, ClipboardList, FlaskConical, Download, RefreshCw } from 'lucide-react';
+import { Star, ClipboardList, FlaskConical, Download, RefreshCw, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { healthApi, BackendUnavailableError } from '@/lib/api';
 import {
   fetchFavorites,
   fetchAllRecords,
   fetchPlans,
   fetchSuggestions,
+  exportRecordsBundle,
   type FavoriteItem,
   type PlanItem,
   type RecordItem,
@@ -61,6 +63,9 @@ export default function Mine() {
   const [online, setOnline] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  /** 导出实验记录：勾选的收藏组 id 集合 */
+  const [exportSelected, setExportSelected] = useState<Set<string>>(new Set());
+  const [exportingRecords, setExportingRecords] = useState(false);
 
   /** 加载全部数据（先静默探活，离线则降级） */
   const load = useCallback(async () => {
@@ -135,6 +140,80 @@ export default function Mine() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">我的方案库</h2>
         <PlansSection plans={plans} loading={loading} />
+      </section>
+
+      {/* 导出实验记录：勾选收藏组 → 分组导出 docx */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">导出实验记录</h2>
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <div className="text-sm text-muted-foreground">
+              勾选要导出的收藏组，导出为一份按组分组的实验记录文档（docx）；
+              无记录的组会在文档中标注「暂无实验记录」。
+            </div>
+            {favorites.length === 0 ? (
+              <p className="text-sm text-muted-foreground">暂无收藏组可导出。</p>
+            ) : (
+              <>
+                <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Checkbox
+                    checked={exportSelected.size === favorites.length && favorites.length > 0}
+                    onCheckedChange={(v) => {
+                      setExportSelected(v === true ? new Set(favorites.map((f) => f.id)) : new Set());
+                    }}
+                  />
+                  全选（{exportSelected.size}/{favorites.length}）
+                </label>
+                <ul className="grid max-h-56 gap-1 overflow-y-auto rounded-lg border border-border p-2 sm:grid-cols-2">
+                  {favorites.map((f) => (
+                    <li key={f.id}>
+                      <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/60">
+                        <Checkbox
+                          checked={exportSelected.has(f.id)}
+                          onCheckedChange={(v) => {
+                            setExportSelected((prev) => {
+                              const next = new Set(prev);
+                              if (v === true) next.add(f.id);
+                              else next.delete(f.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        <span className="min-w-0 flex-1 truncate">
+                          {f.aldehyde?.name || '未知醛'} × {f.amine?.name || '未知胺'}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {(f.experiment_record_ids?.length ?? 0) > 0
+                            ? `${f.experiment_record_ids!.length} 条`
+                            : '无记录'}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex justify-end">
+                  <Button
+                    disabled={exportSelected.size === 0 || exportingRecords || online === false}
+                    onClick={async () => {
+                      setExportingRecords(true);
+                      try {
+                        await exportRecordsBundle([...exportSelected]);
+                        toast.success('实验记录文档已开始下载');
+                      } catch {
+                        /* 错误已由 api 层 toast */
+                      } finally {
+                        setExportingRecords(false);
+                      }
+                    }}
+                  >
+                    <FileDown className="mr-1.5 h-4 w-4" />
+                    {exportingRecords ? '导出中…' : `导出选中组的实验记录（${exportSelected.size}）`}
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </section>
 
       {/* 我的数据：导出备份 */}

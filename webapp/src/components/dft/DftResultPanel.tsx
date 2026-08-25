@@ -113,14 +113,15 @@ export default function DftResultPanel({ result, jobId }: Props) {
         <CardContent>
           <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
             <div>
+              {/* kJ/mol 主显示，kcal/mol 次要显示 */}
               <span className={`text-4xl font-bold tabular-nums ${bound ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                {result.e_bind_kcal.toFixed(2)}
+                {result.e_bind_kj.toFixed(2)}
               </span>
-              <span className="ml-1 text-sm text-muted-foreground">kcal/mol</span>
+              <span className="ml-1 text-sm text-muted-foreground">kJ/mol</span>
             </div>
             <div className="text-lg tabular-nums text-muted-foreground">
-              {result.e_bind_kj.toFixed(2)}
-              <span className="ml-1 text-sm">kJ/mol</span>
+              （{result.e_bind_kcal.toFixed(2)}
+              <span className="ml-1 text-sm">kcal/mol）</span>
             </div>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">

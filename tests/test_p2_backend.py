@@ -60,13 +60,15 @@ class TestAddFavorite:
             "notes",
             "latest_prediction",
             "dft_snapshot",
+            "dft_entries",
             "references",
             "experiment_record_ids",
         }
         assert fav["id"].startswith("fav_")
-        # 未指定收藏夹 → 自动归兜底夹；DFT 快照预留字段默认 None
+        # 未指定收藏夹 → 自动归兜底夹；DFT 快照预留字段默认 None、条目空列表
         assert fav["folder_id"] == fav_store.DEFAULT_FOLDER_ID
         assert fav["dft_snapshot"] is None
+        assert fav["dft_entries"] == []
         assert fav["aldehyde"]["smiles"] and fav["amine"]["smiles"]
         assert set(fav["aldehyde"]) == {"smiles", "cas", "name"}
         assert fav["latest_prediction"] is None

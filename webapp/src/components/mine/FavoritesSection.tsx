@@ -12,13 +12,14 @@
  */
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useNavigate } from 'react-router';
-import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil, Atom, Copy } from 'lucide-react';
+import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil, Atom, FolderInput, CopyPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import FavoriteFolderDialog from '@/components/common/FavoriteFolderDialog';
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,9 @@ import {
   createFolder,
   renameFolder,
   deleteFolder,
+  updateFavorite,
+  copyFavorite,
+  type DftEntryItem,
   type FavoriteItem,
   type FolderItem,
   type PredictionSnapshot,
@@ -84,6 +88,42 @@ function shortSmiles(s?: string, n = 42): string {
   return s.length > n ? `${s.slice(0, n)}…` : s;
 }
 
+/** 结合能 kJ/mol 主口径：e_bind_kj 缺失时用 kcal×4.184 换算兜底 */
+function eBindKj(entry: { e_bind_kj?: number | null; e_bind_kcal?: number | null }): number | null {
+  if (typeof entry.e_bind_kj === 'number') return entry.e_bind_kj;
+  if (typeof entry.e_bind_kcal === 'number') return entry.e_bind_kcal * 4.184;
+  return null;
+}
+
+/** 结合能主+次显示（kJ/mol 大字 + kcal/mol 小字灰色），digits 控制小数位 */
+function EBindText({
+  entry,
+  mainClass = 'text-lg',
+}: {
+  entry: { e_bind_kj?: number | null; e_bind_kcal?: number | null };
+  mainClass?: string;
+}) {
+  const kj = eBindKj(entry);
+  if (kj === null) return null;
+  const bound = kj < 0;
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
+      <span
+        className={`font-bold tabular-nums ${mainClass} ${
+          bound ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
+        }`}
+      >
+        {kj.toFixed(1)} kJ/mol
+      </span>
+      {typeof entry.e_bind_kcal === 'number' && (
+        <span className="text-xs tabular-nums text-muted-foreground">
+          （{entry.e_bind_kcal.toFixed(2)} kcal/mol）
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** 预测分徽章（金色系） */
 function ScoreBadge({ fav }: { fav: FavoriteItem }) {
   const score = fav.latest_prediction?.score;
@@ -108,25 +148,27 @@ function dftMethodLabel(method?: string): string {
   return method || '未知方法';
 }
 
-/** DFT 徽章：有快照且含结合能 → 金色「结合能 -x.xx kcal/mol」；否则灰色「DFT 未计算」 */
+/** DFT 徽章：以 dft_entries 最新一条为准（dft_snapshot 兜底）；结合能 kJ/mol 主显示 */
 function DftBadge({ fav }: { fav: FavoriteItem }) {
-  const snap = fav.dft_snapshot;
-  const eBind = snap?.e_bind_kcal;
-  if (snap && typeof eBind === 'number') {
+  const entries = fav.dft_entries ?? [];
+  const latest = entries.length > 0 ? entries[entries.length - 1] : fav.dft_snapshot;
+  const kj = latest ? eBindKj(latest) : null;
+  if (latest && kj !== null) {
     return (
       <Badge
         variant="outline"
         className="cursor-pointer border-gold/60 bg-gold-muted text-gold-foreground"
-        title="点击查看 DFT 计算结果摘要"
+        title="点击查看 DFT 计算结果"
       >
-        结合能 {eBind.toFixed(2)} kcal/mol
+        结合能 {kj.toFixed(1)} kJ/mol
+        {entries.length > 1 ? `（${entries.length} 条）` : ''}
       </Badge>
     );
   }
-  if (snap) {
+  if (latest) {
     return (
       <Badge variant="outline" className="border-primary/40 text-primary">
-        DFT 已计算
+        DFT 已计算{entries.length > 1 ? `（${entries.length} 条）` : ''}
       </Badge>
     );
   }
@@ -218,39 +260,88 @@ interface PropsState {
 }
 const emptyProps: PropsState = { loading: false, error: null, data: null };
 
+/** 二聚体结构图：优先后端预渲染 dimer_svg，否则按 SMILES 走 structure.svg，再兜底文本 */
+function DimerFigure({ entry }: { entry: DftEntryItem }) {
+  const [svgFailed, setSvgFailed] = useState(false);
+  if (entry.dimer_svg && !svgFailed) {
+    return (
+      <div
+        className="mt-1 max-h-32 overflow-hidden rounded-md border border-border bg-white p-1 dark:bg-white/95 [&>svg]:mx-auto [&>svg]:max-h-28"
+        // 后端预渲染的可信 SVG
+        dangerouslySetInnerHTML={{ __html: entry.dimer_svg }}
+      />
+    );
+  }
+  if (entry.dimer_smiles) {
+    return (
+      <>
+        <StructureImg smiles={entry.dimer_smiles} label="缩合二聚体" />
+        <code className="mt-1 block break-all rounded border bg-muted/50 px-2 py-1 font-mono text-[11px] text-muted-foreground">
+          {entry.dimer_smiles}
+        </code>
+      </>
+    );
+  }
+  return <p className="mt-1 text-xs text-muted-foreground">（未保存二聚体信息）</p>;
+}
+
+/** 单条 DFT 记录卡片（dft_entries 条目） */
+function DftEntryCard({ entry, index }: { entry: DftEntryItem; index: number }) {
+  const time = entry.created_at ? String(entry.created_at).replace('T', ' ').slice(0, 19) : '';
+  return (
+    <div className="rounded-lg border border-gold/40 bg-gold-muted/40 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-medium text-muted-foreground">
+          第 {index + 1} 条 · {dftMethodLabel(entry.method)}
+          {time ? ` · ${time}` : ''}
+        </span>
+        <EBindText entry={entry} />
+      </div>
+      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        <div className="min-w-0">
+          <div className="text-xs text-muted-foreground">缩合二聚体</div>
+          <DimerFigure entry={entry} />
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs text-muted-foreground">
+            X 物质{entry.x_description ? `（${entry.x_description}）` : ''}
+          </div>
+          {entry.x_smiles ? (
+            <>
+              <StructureImg smiles={entry.x_smiles} label="X 物质" />
+              <code className="mt-1 block break-all rounded border bg-muted/50 px-2 py-1 font-mono text-[11px] text-muted-foreground">
+                {entry.x_smiles}
+              </code>
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">（未保存 X SMILES）</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
- * DFT 计算结果摘要（详情弹窗内）：方法/时间/结合能/能隙/偶极
- * + 二聚体口径（2.0）：二聚体 SMILES（可复制）+ X 中文描述 + 二聚体结构图
- * + 「重新计算」跳转 DFT 页（URL 预填两个单体）。
- * 旧版 v1.0.0 快照（无 dimer_smiles）降级显示「旧版计算口径」提示。
+ * DFT 计算记录（详情弹窗内）：分条展示 dft_entries（二聚体结构图 / X 物质 /
+ * 结合能 kJ/mol 主显示 / 方法 / 时间）。
+ * 旧收藏只有 dft_snapshot 的按单条显示并标「旧版口径」徽章。
+ * 底部按钮：「继续计算其他物质」「重新计算」均跳转 DFT 页并预填该组单体。
  */
 function DftSummarySection({ fav, onRecalc }: { fav: FavoriteItem; onRecalc: () => void }) {
   const navigate = useNavigate();
+  const entries = fav.dft_entries ?? [];
   const snap = fav.dft_snapshot;
-  if (!snap) return null;
-  const eBind = snap.e_bind_kcal;
-  const gap = snap.gap_ev?.complex;
-  const dipole = snap.dipole_debye?.complex;
-  const dimerSmiles = typeof snap.dimer_smiles === 'string' ? snap.dimer_smiles : '';
-  const xDesc = typeof snap.x_description === 'string' ? snap.x_description : '';
+  if (entries.length === 0 && !snap) return null;
 
-  /** 复制二聚体 SMILES */
-  const copyDimer = async () => {
-    try {
-      await navigator.clipboard.writeText(dimerSmiles);
-      toast.success('二聚体 SMILES 已复制');
-    } catch {
-      toast.warning('复制失败，请手动选择文本复制');
-    }
-  };
-
-  /** 「重新计算」：跳转 DFT 页并预填两个单体 SMILES/名称 */
-  const handleRecalc = () => {
+  /** 跳转 DFT 页并预填两个单体 SMILES/名称（from=favorite 标记来源） */
+  const handleJump = () => {
     const params = new URLSearchParams();
     if (fav.aldehyde?.smiles) params.set('a', fav.aldehyde.smiles);
     if (fav.amine?.smiles) params.set('b', fav.amine.smiles);
     if (fav.aldehyde?.name) params.set('an', fav.aldehyde.name);
     if (fav.amine?.name) params.set('bn', fav.amine.name);
+    params.set('from', 'favorite');
     onRecalc();
     navigate(`/toolbox/dft?${params.toString()}`);
   };
@@ -258,81 +349,96 @@ function DftSummarySection({ fav, onRecalc }: { fav: FavoriteItem; onRecalc: () 
   return (
     <section>
       <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <Atom className="h-4 w-4 text-gold" /> DFT 计算结果
-      </h3>
-      <div className="rounded-lg border border-gold/40 bg-gold-muted/40 p-3 text-sm">
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-1">
-          {typeof eBind === 'number' && (
-            <div>
-              <span className={`text-2xl font-bold tabular-nums ${eBind < 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                {eBind.toFixed(2)}
-              </span>
-              <span className="ml-1 text-xs text-muted-foreground">kcal/mol（结合能）</span>
-            </div>
-          )}
-          <div className="text-xs text-muted-foreground">
-            方法：{dftMethodLabel(snap.method)}
-            {snap.date ? ` · 计算时间：${String(snap.date).replace('T', ' ').slice(0, 19)}` : ''}
-          </div>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-          <span>
-            HOMO-LUMO 能隙（复合物）：
-            <span className="tabular-nums text-foreground">
-              {typeof gap === 'number' ? `${gap.toFixed(2)} eV` : '—'}
-            </span>
-          </span>
-          <span>
-            偶极矩（复合物）：
-            <span className="tabular-nums text-foreground">
-              {typeof dipole === 'number' ? `${dipole.toFixed(2)} Debye` : '—'}
-            </span>
-          </span>
-        </div>
-        {dimerSmiles ? (
-          /* DFT 2.0 口径：缩合二聚体 + X */
-          <div className="mt-2 space-y-1.5">
-            <div className="text-xs text-muted-foreground">
-              计算对象：缩合二聚体{xDesc ? ` 与 X（${xDesc}）` : ''}
-            </div>
-            <div className="flex items-start gap-2">
-              <code className="min-w-0 flex-1 break-all rounded border bg-muted/50 px-2 py-1 font-mono text-[11px]">
-                {dimerSmiles}
-              </code>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => void copyDimer()}
-                title="复制二聚体 SMILES"
-              >
-                <Copy className="mr-1 h-3.5 w-3.5" />
-                复制
-              </Button>
-            </div>
-            <StructureImg smiles={dimerSmiles} label="缩合二聚体" />
-          </div>
-        ) : (
-          /* 旧版 v1.0.0 快照：两单体结合能口径，无二聚体/X 字段 */
-          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-            旧版计算口径（两单体结合能）：DFT 2.0 起计算对象为缩合二聚体与 X，
-            可点下方「重新计算」获取新口径结果。
-          </p>
+        <Atom className="h-4 w-4 text-gold" /> DFT 计算记录
+        {entries.length > 1 && (
+          <Badge variant="secondary" className="ml-1">{entries.length} 条</Badge>
         )}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRecalc}
-            disabled={!fav.aldehyde?.smiles || !fav.amine?.smiles}
-            title="跳转 DFT 计算页并预填该组合单体"
-          >
-            重新计算
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            半经验结果仅供相对比较，精确能量请在 DFT 页导出输入文件复算。
-          </span>
+      </h3>
+
+      {entries.length > 0 ? (
+        /* 新口径：分条列表 */
+        <div className="space-y-3">
+          {entries.map((entry, i) => (
+            <DftEntryCard key={entry.job_id ?? i} entry={entry} index={i} />
+          ))}
         </div>
+      ) : snap ? (
+        /* 旧收藏：仅 dft_snapshot，按单条显示并标「旧版口径」 */
+        <div className="rounded-lg border border-gold/40 bg-gold-muted/40 p-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              {dftMethodLabel(snap.method)}
+              {snap.date ? ` · ${String(snap.date).replace('T', ' ').slice(0, 19)}` : ''}
+            </span>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className="border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                title="该收藏保存于 DFT 分条记录上线前，仅有一条快照"
+              >
+                旧版口径
+              </Badge>
+              <EBindText entry={snap} />
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              HOMO-LUMO 能隙（复合物）：
+              <span className="tabular-nums text-foreground">
+                {typeof snap.gap_ev?.complex === 'number' ? `${snap.gap_ev.complex.toFixed(2)} eV` : '—'}
+              </span>
+            </span>
+            <span>
+              偶极矩（复合物）：
+              <span className="tabular-nums text-foreground">
+                {typeof snap.dipole_debye?.complex === 'number'
+                  ? `${snap.dipole_debye.complex.toFixed(2)} Debye`
+                  : '—'}
+              </span>
+            </span>
+          </div>
+          {snap.dimer_smiles ? (
+            <div className="mt-2 space-y-1.5">
+              <div className="text-xs text-muted-foreground">
+                计算对象：缩合二聚体
+                {snap.x_description ? ` 与 X（${snap.x_description}）` : ''}
+              </div>
+              <code className="block break-all rounded border bg-muted/50 px-2 py-1 font-mono text-[11px]">
+                {snap.dimer_smiles}
+              </code>
+              <StructureImg smiles={snap.dimer_smiles} label="缩合二聚体" />
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+              旧版计算口径（两单体结合能）：DFT 2.0 起计算对象为缩合二聚体与 X，
+              可点下方「重新计算」获取新口径结果。
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleJump}
+          disabled={!fav.aldehyde?.smiles || !fav.amine?.smiles}
+          title="跳转 DFT 计算页并预填该组合单体，可选择其他 X 物质继续计算"
+        >
+          继续计算其他物质
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleJump}
+          disabled={!fav.aldehyde?.smiles || !fav.amine?.smiles}
+          title="跳转 DFT 计算页并预填该组合单体"
+        >
+          重新计算
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          半经验结果仅供相对比较，精确能量请在 DFT 页导出输入文件复算。
+        </span>
       </div>
     </section>
   );
@@ -685,6 +791,9 @@ export function FavoritesSection({
   const [deleting, setDeleting] = useState(false);
   /** 一键打分进行中（按收藏 id 记） */
   const [scoringId, setScoringId] = useState<string | null>(null);
+  /** 移动 / 复制目标收藏（非空时弹出收藏夹选择对话框） */
+  const [moveCopyTarget, setMoveCopyTarget] = useState<{ fav: FavoriteItem; mode: 'move' | 'copy' } | null>(null);
+  const [moveCopying, setMoveCopying] = useState(false);
 
   // ---------- 收藏夹状态 ----------
   const [folders, setFolders] = useState<FolderItem[]>([]);
@@ -762,6 +871,28 @@ export function FavoritesSection({
       /* 错误已由 api 层 toast */
     } finally {
       setDeleting(false);
+    }
+  }
+
+  /** 移动 / 复制确认：移动走 PATCH folder_id，复制走 copy 端点（实验记录不随复制转移） */
+  async function handleMoveCopy(folderId: string, folderName: string) {
+    const target = moveCopyTarget;
+    if (!target) return;
+    setMoveCopying(true);
+    try {
+      if (target.mode === 'move') {
+        await updateFavorite(target.fav.id, { folder_id: folderId });
+        toast.success(`已移动到收藏夹「${folderName}」`);
+      } else {
+        await copyFavorite(target.fav.id, folderId);
+        toast.success(`已复制到收藏夹「${folderName}」（实验记录不随复制转移）`);
+      }
+      setMoveCopyTarget(null);
+      onChanged();
+    } catch {
+      /* 错误已由 api 层 toast */
+    } finally {
+      setMoveCopying(false);
     }
   }
 
@@ -954,18 +1085,44 @@ export function FavoritesSection({
                         <span className="mx-1 text-gold">×</span>
                         {fav.amine?.name || '未知胺'}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                        title="删除收藏"
-                        onClick={(e) => {
-                          e.stopPropagation(); // 阻止触发卡片点击
-                          setToDelete(fav);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex shrink-0 items-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-primary"
+                          title="移动到其他收藏夹"
+                          onClick={(e) => {
+                            e.stopPropagation(); // 阻止触发卡片点击
+                            setMoveCopyTarget({ fav, mode: 'move' });
+                          }}
+                        >
+                          <FolderInput className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-primary"
+                          title="复制到其他收藏夹"
+                          onClick={(e) => {
+                            e.stopPropagation(); // 阻止触发卡片点击
+                            setMoveCopyTarget({ fav, mode: 'copy' });
+                          }}
+                        >
+                          <CopyPlus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          title="删除收藏"
+                          onClick={(e) => {
+                            e.stopPropagation(); // 阻止触发卡片点击
+                            setToDelete(fav);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="break-all font-mono text-xs text-muted-foreground">
                       {shortSmiles(fav.aldehyde?.smiles)}
@@ -1014,6 +1171,24 @@ export function FavoritesSection({
           setDetail(updated);
           onChanged();
         }}
+      />
+
+      {/* 移动 / 复制收藏：选择目标收藏夹（排除当前所在夹） */}
+      <FavoriteFolderDialog
+        open={moveCopyTarget !== null}
+        onOpenChange={(v) => !v && setMoveCopyTarget(null)}
+        title={moveCopyTarget?.mode === 'copy' ? '复制收藏到…' : '移动收藏到…'}
+        description={
+          moveCopyTarget
+            ? moveCopyTarget.mode === 'copy'
+              ? `将「${moveCopyTarget.fav.aldehyde?.name || '未知醛'} × ${moveCopyTarget.fav.amine?.name || '未知胺'}」复制一份到所选收藏夹；实验记录归属不随复制转移。`
+              : `将「${moveCopyTarget.fav.aldehyde?.name || '未知醛'} × ${moveCopyTarget.fav.amine?.name || '未知胺'}」移动到所选收藏夹。`
+            : undefined
+        }
+        excludeFolderId={moveCopyTarget?.fav.folder_id}
+        confirmLabel={moveCopyTarget?.mode === 'copy' ? '复制' : '移动'}
+        submitting={moveCopying}
+        onConfirm={handleMoveCopy}
       />
 
       {/* 删除收藏确认 */}

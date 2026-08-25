@@ -92,6 +92,22 @@ export interface DftSnapshot {
   [key: string]: unknown;
 }
 
+/** DFT 分条记录（dft_entries 数组条目；POST /favorites/{id}/dft-entries 追加） */
+export interface DftEntryItem {
+  job_id?: string;
+  x_type?: string;
+  x_smiles?: string;
+  x_description?: string;
+  dimer_smiles?: string;
+  /** 后端预渲染的二聚体 SVG（缺失时前端按 dimer_smiles 走 structure.svg 兜底） */
+  dimer_svg?: string;
+  method?: string;
+  e_bind_kcal?: number;
+  e_bind_kj?: number;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
 /** 收藏条目（favorites/store.py 落盘结构） */
 export interface FavoriteItem {
   id: string;
@@ -102,6 +118,9 @@ export interface FavoriteItem {
   created_at?: string;
   notes?: string;
   latest_prediction?: PredictionSnapshot | null;
+  /** DFT 分条记录（新口径，读取一律以此为准） */
+  dft_entries?: DftEntryItem[];
+  /** 旧兼容字段：响应中回填为最新一条 dft_entries；仅作兜底 */
   dft_snapshot?: DftSnapshot | null;
   references?: ReferenceItem[];
   experiment_record_ids?: string[];
@@ -223,6 +242,77 @@ export async function updateFavorite(
     method: 'PATCH',
     body: JSON.stringify(fields),
   });
+}
+
+/** 复制收藏到指定收藏夹（201 返回完整新收藏；实验记录归属不随复制转移） */
+export async function copyFavorite(id: string, folderId: string): Promise<FavoriteItem> {
+  return request<FavoriteItem>(`/favorites/${encodeURIComponent(id)}/copy`, {
+    method: 'POST',
+    body: JSON.stringify({ folder_id: folderId }),
+  });
+}
+
+/** 追加 DFT 条目到收藏（返回完整收藏） */
+export async function appendDftEntry(id: string, entry: DftEntryItem): Promise<FavoriteItem> {
+  return request<FavoriteItem>(`/favorites/${encodeURIComponent(id)}/dft-entries`, {
+    method: 'POST',
+    body: JSON.stringify(entry),
+  });
+}
+
+/** 从 content-disposition 解析下载文件名（优先 RFC 5987 filename*，中文名） */
+function parseDownloadFilename(disposition: string | null, fallback: string): string {
+  if (disposition) {
+    const star = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+    if (star) {
+      try {
+        return decodeURIComponent(star[1]);
+      } catch {
+        /* 解码失败则用兜底名 */
+      }
+    }
+    const plain = /filename="?([^";]+)"?/i.exec(disposition);
+    if (plain) return plain[1];
+  }
+  return fallback;
+}
+
+/** 分组导出收藏实验记录（docx 字节流，触发浏览器下载） */
+export async function exportRecordsBundle(favoriteIds: string[]): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/records/export-bundle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ favorite_ids: favoriteIds }),
+    });
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (!res.ok) {
+    let message = `导出失败（${res.status}）`;
+    try {
+      const data = await res.json();
+      if (typeof data?.detail === 'string') message = data.detail;
+    } catch {
+      /* 非 JSON 响应 */
+    }
+    toast.error(message);
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  const filename = parseDownloadFilename(
+    res.headers.get('Content-Disposition'),
+    `实验记录导出_${new Date().toISOString().slice(0, 10).replaceAll('-', '')}.docx`,
+  );
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export async function fetchPlans(): Promise<PlanItem[]> {

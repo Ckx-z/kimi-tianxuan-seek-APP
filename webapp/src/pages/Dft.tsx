@@ -38,13 +38,17 @@ import { CircleHelp } from 'lucide-react';
 import MonomerInput, { type MonomerValue } from '@/components/query/MonomerInput';
 import StructureSketcher from '@/components/common/StructureSketcher';
 import MonomerPropsCard from '@/components/query/MonomerPropsCard';
+import FavoriteFolderDialog from '@/components/common/FavoriteFolderDialog';
 import {
   DuplicateFavoriteError,
+  fetchFavorites,
   fetchMonomerProps,
   fetchMonomers,
+  type FavoriteItem,
   type MonomerLibrary,
   type MonomerProps,
 } from '@/components/query/api';
+import { appendDftEntry } from '@/components/mine/api';
 import DftResultPanel from '@/components/dft/DftResultPanel';
 import {
   buildDftSnapshot,
@@ -143,6 +147,12 @@ export default function Dft() {
   const [bProps, setBProps] = useState<PropsState>(emptyProps);
   const [history, setHistory] = useState<DftHistoryEntry[]>([]);
   const [favoriting, setFavoriting] = useState(false);
+  /** 收藏前选择目标收藏夹的对话框 */
+  const [favDialogOpen, setFavDialogOpen] = useState(false);
+  /** 当前结果双序匹配的已收藏组合（前端查 favorites 兜底 result.favorite） */
+  const [pairFavorite, setPairFavorite] = useState<FavoriteItem | null>(null);
+  /** 追加 DFT 条目进行中 */
+  const [appending, setAppending] = useState(false);
   /** 409 冲突时待合并的已有收藏摘要 */
   const [mergeTarget, setMergeTarget] = useState<{ id: string; folder_name?: string; aldehyde_name?: string; amine_name?: string; has_dft?: boolean } | null>(null);
   const [merging, setMerging] = useState(false);
@@ -152,11 +162,15 @@ export default function Dft() {
   }, []);
 
   useEffect(() => {
-    // URL 预填单体（来自收藏详情「重新计算」跳转）
+    // URL 预填单体（收藏详情「重新计算 / 继续计算其他物质」跳转）
     const preA = searchParams.get('a');
     const preB = searchParams.get('b');
     if (preA) setMonoA({ smiles: preA, name: searchParams.get('an') ?? '' });
     if (preB) setMonoB({ smiles: preB, name: searchParams.get('bn') ?? '' });
+    // 从收藏跳转时提示已预填（X 类型保持默认「自身堆积」，可切换自定义）
+    if (searchParams.get('from') === 'favorite' && (preA || preB)) {
+      toast.info('已预填该收藏组合的醛/胺单体，可在第二步选择其他 X 物质继续计算');
+    }
     fetchMonomers()
       .then((lib) => { setLibrary(lib); setBackendDown(false); })
       .catch(() => { setLibrary({ aldehydes: [], amines: [] }); setBackendDown(true); })
@@ -291,8 +305,14 @@ export default function Dft() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);
 
-  /** 收藏（无已有收藏时直接带 DFT 快照收藏；409 时弹合并对话框） */
-  const handleFavorite = async () => {
+  /** 收藏：先弹收藏夹选择对话框，确认后带 folder_id 创建（含 DFT 快照；409 时弹合并对话框） */
+  const handleFavorite = () => {
+    if (!result) return;
+    setFavDialogOpen(true);
+  };
+
+  /** 确认目标收藏夹后创建收藏 */
+  const handleConfirmFavorite = async (folderId: string, folderName: string) => {
     if (!result) return;
     setFavoriting(true);
     try {
@@ -301,11 +321,14 @@ export default function Dft() {
         amine_smiles: result.smiles_b,
         ald_name: monoA.name,
         amine_name: monoB.name,
+        folder_id: folderId,
         dft_snapshot: buildDftSnapshot(result),
       });
-      toast.success('已收藏这组单体（含 DFT 结果）');
+      toast.success(`已收藏到「${folderName || '收藏夹1'}」（含 DFT 结果）`);
+      setFavDialogOpen(false);
       setResult({ ...result, favorite: { id: '', has_dft: true } });
     } catch (e) {
+      setFavDialogOpen(false);
       if (e instanceof DuplicateFavoriteError) {
         setMergeTarget(e.existing);
       } else {
@@ -313,6 +336,63 @@ export default function Dft() {
       }
     } finally {
       setFavoriting(false);
+    }
+  };
+
+  // 结果就绪后：双序查配对（前端查 favorites 找匹配，兜底 result.favorite）
+  useEffect(() => {
+    if (!result?.smiles_a || !result?.smiles_b) {
+      setPairFavorite(null);
+      return;
+    }
+    if (result.favorite?.id) {
+      setPairFavorite(null);
+      return;
+    }
+    let cancelled = false;
+    fetchFavorites()
+      .then((list) => {
+        if (cancelled) return;
+        const hit = list.find(
+          (f) =>
+            (f.aldehyde?.smiles === result.smiles_a && f.amine?.smiles === result.smiles_b) ||
+            (f.aldehyde?.smiles === result.smiles_b && f.amine?.smiles === result.smiles_a),
+        );
+        setPairFavorite(hit ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [result]);
+
+  /** 追加本次 DFT 结果到已收藏组合的 dft_entries */
+  const handleAppendDftEntry = async () => {
+    if (!result) return;
+    const targetId = result.favorite?.id || pairFavorite?.id;
+    if (!targetId) {
+      toast.warning('未找到该组合对应的收藏');
+      return;
+    }
+    setAppending(true);
+    try {
+      await appendDftEntry(targetId, {
+        job_id: currentJobId ?? undefined,
+        x_type: result.x_type,
+        x_smiles: result.x_smiles,
+        x_description: result.x_description,
+        dimer_smiles: result.dimer_smiles,
+        method: result.method,
+        e_bind_kcal: result.e_bind_kcal,
+        e_bind_kj: result.e_bind_kj,
+        created_at: new Date().toISOString(),
+      });
+      toast.success('已追加到收藏的 DFT 记录');
+      setResult({ ...result, favorite: { ...(result.favorite ?? { id: targetId }), id: targetId, has_dft: true } });
+    } catch {
+      /* 错误提示已由 api 层弹出 */
+    } finally {
+      setAppending(false);
     }
   };
 
@@ -353,6 +433,8 @@ export default function Dft() {
   };
 
   const fav = result?.favorite;
+  /** 追加 DFT 记录的目标收藏 id（后端联动 result.favorite 或前端双序匹配） */
+  const appendTargetId = fav?.id || pairFavorite?.id;
 
   return (
     <div className="space-y-4">
@@ -581,7 +663,7 @@ export default function Dft() {
                       )}
                       <span className="float-right font-medium tabular-nums">
                         {h.status === 'done' && h.e_bind_kcal != null
-                          ? `${h.e_bind_kcal.toFixed(1)} kcal`
+                          ? `${(typeof h.e_bind_kj === 'number' ? h.e_bind_kj : h.e_bind_kcal * 4.184).toFixed(1)} kJ/mol`
                           : '失败'}
                       </span>
                     </button>
@@ -643,9 +725,25 @@ export default function Dft() {
                       </span>
                     )}
                   </>
+                ) : pairFavorite ? (
+                  <span className="text-xs text-muted-foreground">
+                    该组合已收藏（{pairFavorite.aldehyde?.name || '未知醛'} ×{' '}
+                    {pairFavorite.amine?.name || '未知胺'}）
+                  </span>
                 ) : (
                   <Button variant="outline" onClick={handleFavorite} disabled={favoriting}>
                     {favoriting ? '处理中…' : '☆ 收藏这组单体（含 DFT 结果）'}
+                  </Button>
+                )}
+                {/* 已收藏组合：追加本次结果到收藏的 DFT 分条记录 */}
+                {appendTargetId && (
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleAppendDftEntry()}
+                    disabled={appending}
+                    title="将本次计算结果追加为该收藏的一条 DFT 记录"
+                  >
+                    {appending ? '追加中…' : '追加到收藏的 DFT 记录'}
                   </Button>
                 )}
               </div>
@@ -671,6 +769,17 @@ export default function Dft() {
           )}
         </div>
       </div>
+
+      {/* 收藏前：选择目标收藏夹（可新建） */}
+      <FavoriteFolderDialog
+        open={favDialogOpen}
+        onOpenChange={setFavDialogOpen}
+        title="收藏这组单体"
+        description="将当前醛/胺组合收藏到所选收藏夹，并携带本次 DFT 计算结果。"
+        confirmLabel="收藏"
+        submitting={favoriting}
+        onConfirm={handleConfirmFavorite}
+      />
 
       {/* 409 冲突：合并 DFT 结果到已有收藏 */}
       <Dialog open={mergeTarget !== null} onOpenChange={(v) => !v && setMergeTarget(null)}>

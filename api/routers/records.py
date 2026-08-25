@@ -8,7 +8,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 
 from .. import __version__
-from ..schemas import RecordCreate, RecordUpdate
+from ..schemas import RecordCreate, RecordsBundleExport, RecordUpdate
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 
@@ -127,6 +127,50 @@ def export_record_docx(rec_id: str):
     headers = {
         "Content-Disposition": (
             f"attachment; filename=\"{fallback}\"; "
+            f"filename*=UTF-8''{quoted}"),
+    }
+    return Response(content=data, media_type=_DOCX_MEDIA, headers=headers)
+
+
+@router.post("/export-bundle")
+def export_records_bundle(req: RecordsBundleExport):
+    """按收藏分组导出实验记录为一份 Word（.docx 下载）。
+
+    封面含标题/导出时间/软件版本；按 favorite_ids 顺序分组，每组标题为
+    单体组名称（醛+胺），组内按时间序列出该收藏关联的所有实验记录，
+    内容与单条导出一致；favorite 无记录时标注「暂无实验记录」。
+    favorite_ids 至少 1 个（空 → 400），任一收藏不存在 → 404。
+    """
+    favorite_ids = [str(fid).strip() for fid in req.favorite_ids if str(fid).strip()]
+    if not favorite_ids:
+        raise HTTPException(400, "favorite_ids 至少提供 1 个收藏 id")
+    try:
+        from favorites import store as fav_store
+    except ImportError:  # pragma: no cover - src 直接在 sys.path 时
+        from src.favorites import store as fav_store  # type: ignore
+    try:
+        from records import export_docx
+    except ImportError:  # pragma: no cover - src 直接在 sys.path 时
+        from src.records import export_docx  # type: ignore
+    groups = []
+    seen = set()
+    for fid in favorite_ids:
+        if fid in seen:  # 重复 id 去重，避免同一组出现两遍
+            continue
+        seen.add(fid)
+        fav = fav_store.get_favorite(fid)
+        if fav is None:
+            raise HTTPException(404, f"收藏 {fid} 不存在")
+        groups.append({
+            "favorite": fav,
+            "records": _store().list_records(favorite_id=fid),
+        })
+    data = export_docx.build_bundle_docx(groups, version=__version__)
+    filename = export_docx.bundle_export_filename()
+    quoted = urllib.parse.quote(filename, encoding="utf-8")
+    headers = {
+        "Content-Disposition": (
+            f"attachment; filename=\"records_bundle.docx\"; "
             f"filename*=UTF-8''{quoted}"),
     }
     return Response(content=data, media_type=_DOCX_MEDIA, headers=headers)

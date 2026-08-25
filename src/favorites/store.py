@@ -354,14 +354,52 @@ def delete_folder(folder_id: str) -> int:
     return deleted
 
 
+def _migrate_dft_entries(fav: dict) -> bool:
+    """dft_entries 迁移（幂等）：旧单条 dft_snapshot 包成列表首条。
+
+    - dft_entries 缺失/非 list → 初始化为 []；
+    - 旧 dft_snapshot 是非空 dict 且 dft_entries 为空 → 包成 [snapshot]，
+      落盘的 dft_snapshot 置 None（GET 响应层再回填最新一条，见
+      _dft_response_view）；
+    返回是否有变更。
+    """
+    changed = False
+    entries = fav.get("dft_entries")
+    if not isinstance(entries, list):
+        entries = []
+        changed = True
+    snap = fav.get("dft_snapshot")
+    if isinstance(snap, dict) and snap and not entries:
+        entries = [snap]
+        fav["dft_snapshot"] = None
+        changed = True
+    fav["dft_entries"] = entries
+    return changed
+
+
+def _dft_response_view(fav: dict) -> dict:
+    """GET 响应兼容旧前端：dft_snapshot 回填为 dft_entries 最新一条。
+
+    仅改内存视图不落盘——磁盘上 dft_snapshot 保持迁移后的 None，
+    旧前端读 dft_snapshot 拿到的就是最近一次 DFT 计算，不会炸。
+    """
+    entries = fav.get("dft_entries")
+    if isinstance(entries, list) and entries:
+        fav["dft_snapshot"] = entries[-1]
+    return fav
+
+
 def _ensure_folder_fields(fav: dict) -> dict:
-    """旧格式迁移（幂等）：补 folder_id（归兜底夹）与 dft_snapshot（None）。
+    """旧格式迁移（幂等）：补 folder_id（归兜底夹）、dft_snapshot（None）
+    与 dft_entries（旧快照包成列表）。
 
     仅在有变更时落盘；重复启动不会重复建夹或重复改写。
     """
     changed = False
     if "dft_snapshot" not in fav:
         fav["dft_snapshot"] = None
+        changed = True
+    if _migrate_dft_entries(fav):
         changed = True
     fid = fav.get("folder_id")
     if not isinstance(fid, str) or not fid or get_folder(fid) is None:
@@ -516,11 +554,15 @@ def add_favorite(
         "created_at": _now_iso(),
         "notes": notes or "",
         "latest_prediction": latest_prediction,
-        "dft_snapshot": dft_snapshot if isinstance(dft_snapshot, dict) else None,
+        "dft_snapshot": None,
+        "dft_entries": ([dft_snapshot]
+                        if isinstance(dft_snapshot, dict) and dft_snapshot
+                        else []),
         "references": auto_match_references(aldehyde_smiles, amine_smiles),
         "experiment_record_ids": [],
     }
-    return _write(fav)
+    _write(fav)
+    return _dft_response_view(fav)
 
 
 def list_favorites() -> list[dict]:
@@ -533,14 +575,67 @@ def list_favorites() -> list[dict]:
         if fav and _ID_RE.match(str(fav.get("id", ""))):
             favs.append(fav)
     favs.sort(key=lambda f: str(f.get("created_at", "")), reverse=True)
-    return [_ensure_snapshot(_ensure_folder_fields(f)) for f in favs]
+    return [_dft_response_view(_ensure_snapshot(_ensure_folder_fields(f)))
+            for f in favs]
 
 
 def get_favorite(fav_id: str) -> dict | None:
     """按 id 取收藏条目；不存在/损坏返回 None。"""
     path = _path_of(fav_id)
     fav = _read_file(path) if path else None
-    return _ensure_snapshot(_ensure_folder_fields(fav)) if fav else None
+    if not fav:
+        return None
+    return _dft_response_view(_ensure_snapshot(_ensure_folder_fields(fav)))
+
+
+def copy_favorite(fav_id: str, folder_id: str) -> dict:
+    """把收藏复制到目标收藏夹，返回新收藏条目。
+
+    单体信息、latest_prediction 打分快照、dft_entries/dft_snapshot、notes、
+    references 全量深拷贝；id 新生成、created_at 取当前时间。
+    experiment_record_ids 不随复制（实验记录归属原收藏，避免同一条记录
+    出现在两个组里）。原收藏不存在抛 KeyError；目标收藏夹不存在抛
+    ValueError。
+    """
+    src = get_favorite(fav_id)
+    if src is None:
+        raise KeyError(f"收藏条目不存在: {fav_id}")
+    folder = get_folder(folder_id)
+    if folder is None:
+        raise ValueError(f"收藏夹不存在: {folder_id}")
+    fav = json.loads(json.dumps(src, ensure_ascii=False))  # 深拷贝，断别名
+    fav["id"] = _next_id()
+    fav["folder_id"] = folder["id"]
+    fav["created_at"] = _now_iso()
+    fav["experiment_record_ids"] = []
+    _write(fav)
+    return _dft_response_view(fav)
+
+
+def add_dft_entry(fav_id: str, entry: dict) -> dict:
+    """追加一条 DFT 计算条目到 dft_entries，返回完整收藏（响应视图）。
+
+    条目内容透传前端快照（job_id/x_type/x_smiles/e_bind_kcal 等），后端
+    不强校验；缺 created_at 时补当前时间。落盘的 dft_snapshot 保持 None，
+    GET 响应由 _dft_response_view 回填最新一条。收藏不存在抛 KeyError，
+    条目非非空 dict 抛 ValueError。
+    """
+    if not isinstance(entry, dict) or not entry:
+        raise ValueError("DFT 条目必须是非空 JSON 对象")
+    fav = get_favorite(fav_id)
+    if fav is None:
+        raise KeyError(f"收藏条目不存在: {fav_id}")
+    entry = dict(entry)
+    if not str(entry.get("created_at") or "").strip():
+        entry["created_at"] = _now_iso()
+    entries = fav.get("dft_entries")
+    if not isinstance(entries, list):
+        entries = []
+    entries.append(entry)
+    fav["dft_entries"] = entries
+    fav["dft_snapshot"] = None
+    _write(fav)
+    return _dft_response_view(fav)
 
 
 def update_favorite(fav_id: str, **fields) -> dict:
@@ -556,8 +651,17 @@ def update_favorite(fav_id: str, **fields) -> dict:
     fid = fields.get("folder_id")
     if isinstance(fid, str) and fid and get_folder(fid) is None:
         raise ValueError(f"收藏夹不存在: {fid}")
+    # 旧前端路径兼容：显式传 dft_snapshot 且 dft_entries 为空时，
+    # 同时包进 dft_entries（新结构以 dft_entries 为准）
+    snap = fields.get("dft_snapshot")
+    if isinstance(snap, dict) and snap:
+        entries = fav.get("dft_entries")
+        if isinstance(entries, list) and not entries:
+            fields = dict(fields)
+            fields["dft_entries"] = [snap]
     fav.update(fields)
-    return _write(fav)
+    _write(fav)
+    return _dft_response_view(fav)
 
 
 def delete_favorite(fav_id: str) -> bool:

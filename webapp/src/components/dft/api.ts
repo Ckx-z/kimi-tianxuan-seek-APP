@@ -314,6 +314,8 @@ export async function createFavoriteWithDft(payload: {
   amine_smiles: string;
   ald_name?: string;
   amine_name?: string;
+  /** 目标收藏夹 id（可选，缺省归入默认夹） */
+  folder_id?: string;
   dft_snapshot: unknown;
 }): Promise<unknown> {
   let res: Response;

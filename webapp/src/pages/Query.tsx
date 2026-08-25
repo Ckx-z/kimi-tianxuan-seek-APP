@@ -27,6 +27,7 @@ import MonomerInput, { type MonomerValue } from '@/components/query/MonomerInput
 import ResultCard from '@/components/query/ResultCard';
 import MonomerPropsCard from '@/components/query/MonomerPropsCard';
 import PlanCardPanel from '@/components/query/PlanCardPanel';
+import FavoriteFolderDialog from '@/components/common/FavoriteFolderDialog';
 import {
   checkHealth,
   createFavorite,
@@ -84,6 +85,8 @@ export default function Query() {
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [templateId, setTemplateId] = useState(''); // '' = 内置默认模板
   const [favoriting, setFavoriting] = useState(false);
+  /** 收藏前选择目标收藏夹的对话框 */
+  const [favDialogOpen, setFavDialogOpen] = useState(false);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [history, setHistory] = useState<PredictHistoryEntry[]>([]);
   /** 409 重复收藏：已存在收藏摘要 + 移动目标夹选择 */
@@ -202,38 +205,53 @@ export default function Query() {
     handleTemplateChange(tpl.id);
   };
 
-  /** 收藏 / 取消收藏这组单体 */
+  /** 收藏 / 取消收藏这组单体；未收藏时先弹收藏夹选择对话框 */
   const handleFavorite = async () => {
-    setFavoriting(true);
-    try {
-      if (matchedFavorite) {
+    if (matchedFavorite) {
+      setFavoriting(true);
+      try {
         await deleteFavorite(matchedFavorite.id);
         toast.success('已取消收藏');
-      } else {
-        // 收藏时把当前打分结果一并写入收藏记录，「我的」页直接展示分数
-        await createFavorite({
-          aldehyde_smiles: ald.smiles,
-          amine_smiles: amine.smiles,
-          ald_name: ald.name,
-          amine_name: amine.name,
-          score: result?.score ?? undefined,
-          std: result?.tree_std ?? undefined,
-          ood: result?.ood?.level,
-          score_policy: result?.score_policy,
-          tree_score: result?.tree_score ?? undefined,
-          gnn_score: result?.gnn_score ?? undefined,
-        });
-        toast.success('已收藏这组单体');
+        refreshFavorites();
+      } catch (e) {
+        toast.error(`操作失败：${e instanceof Error ? e.message : '未知错误'}`);
+      } finally {
+        setFavoriting(false);
       }
+      return;
+    }
+    setFavDialogOpen(true);
+  };
+
+  /** 确认目标收藏夹后创建收藏（携带当前打分快照与 folder_id） */
+  const handleConfirmFavorite = async (folderId: string, folderName: string) => {
+    setFavoriting(true);
+    try {
+      await createFavorite({
+        aldehyde_smiles: ald.smiles,
+        amine_smiles: amine.smiles,
+        ald_name: ald.name,
+        amine_name: amine.name,
+        folder_id: folderId,
+        score: result?.score ?? undefined,
+        std: result?.tree_std ?? undefined,
+        ood: result?.ood?.level,
+        score_policy: result?.score_policy,
+        tree_score: result?.tree_score ?? undefined,
+        gnn_score: result?.gnn_score ?? undefined,
+      });
+      toast.success(`已收藏到「${folderName || '收藏夹1'}」`);
+      setFavDialogOpen(false);
       refreshFavorites();
     } catch (e) {
+      setFavDialogOpen(false);
       if (e instanceof DuplicateFavoriteError) {
         // 409：已收藏过该组合 → 弹提示（查看 / 移动到指定收藏夹），不静默重复收藏
         setDupExisting(e.existing);
         setMoveFolderId('');
         fetchFavoriteFolders().then(setDupFolders).catch(() => setDupFolders([]));
       } else {
-        toast.error(`操作失败：${e instanceof Error ? e.message : '未知错误'}`);
+        toast.error(`收藏失败：${e instanceof Error ? e.message : '未知错误'}`);
       }
     } finally {
       setFavoriting(false);
@@ -462,6 +480,17 @@ export default function Query() {
           />
         </div>
       </div>
+
+      {/* 收藏前：选择目标收藏夹（可新建） */}
+      <FavoriteFolderDialog
+        open={favDialogOpen}
+        onOpenChange={setFavDialogOpen}
+        title="收藏这组单体"
+        description={`将「${ald.name || '该醛'} × ${amine.name || '该胺'}」收藏到所选收藏夹（含当前打分快照）。`}
+        confirmLabel="收藏"
+        submitting={favoriting}
+        onConfirm={handleConfirmFavorite}
+      />
 
       {/* 409 重复收藏提示：已收藏过该组合 → 查看 / 移动到指定收藏夹 */}
       <Dialog open={dupExisting !== null} onOpenChange={(v) => !v && setDupExisting(null)}>

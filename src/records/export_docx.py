@@ -76,7 +76,8 @@ _CN_FONT = "宋体"
 
 def _set_style_cn_fonts(doc: Document) -> None:
     """Normal 与标题样式设置宋体（ascii 名 + eastAsia），表格单元格继承生效。"""
-    for name in ("Normal", "Title", "Heading 1", "Heading 2", "Heading 3"):
+    for name in ("Normal", "Title", "Heading 1", "Heading 2", "Heading 3",
+                 "Heading 4"):
         try:
             style = doc.styles[name]
         except KeyError:
@@ -139,12 +140,13 @@ def _prediction_snapshot(rec: dict) -> dict | None:
     return snap
 
 
-def _monomer_props_section(doc: Document, label: str, monomer: dict) -> None:
+def _monomer_props_section(doc: Document, label: str, monomer: dict,
+                           level: int = 2) -> None:
     """单体性质小节：RDKit 事实行 + LLM 中文解读；任何失败降级为占位说明。"""
     monomer = monomer if isinstance(monomer, dict) else {}
     smiles = str(monomer.get("smiles") or "").strip()
     name = str(monomer.get("name") or "").strip()
-    doc.add_heading(f"{label}性质解读", level=2)
+    doc.add_heading(f"{label}性质解读", level=level)
     if not smiles:
         doc.add_paragraph("（未填写 SMILES，本节略）")
         return
@@ -193,19 +195,40 @@ def _sorted_timeline(timeline: list) -> list[dict]:
 
 
 def build_record_docx(rec: dict, version: str = "") -> bytes:
-    """生成实验记录 Word 报告，返回 docx 字节串。"""
-    rec = rec if isinstance(rec, dict) else {}
+    """生成单条实验记录 Word 报告，返回 docx 字节串。"""
     doc = Document()
     _set_style_cn_fonts(doc)
 
+    doc.add_heading("实验记录", 0)
+    _build_record_body(doc, rec, base_level=1)
+
+    # 页脚：导出方 + 版本号
+    footer_text = "由 COF 科研助手导出"
+    if version:
+        footer_text += f" · 版本 v{version}"
+    for section in doc.sections:
+        p = section.footer.paragraphs[0] if section.footer.paragraphs else section.footer.add_paragraph()
+        _cn_run(p.add_run(footer_text))
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _build_record_body(doc: Document, rec: dict, base_level: int = 1) -> None:
+    """向 doc 追加一条实验记录的完整正文（不含标题与页脚）。
+
+    单条导出与汇总导出共用此函数；base_level 为各小节标题层级
+    （单条导出用 1，汇总导出在组标题/记录标题之下用 3）。
+    """
+    rec = rec if isinstance(rec, dict) else {}
     record_id = str(rec.get("record_id") or "")
     experiment_no = str(rec.get("experiment_no") or "").strip()
     status = _STATUS_LABELS.get(str(rec.get("status") or ""), str(rec.get("status") or ""))
     today = datetime.now().astimezone().date().isoformat()
 
-    # 标题 + 基本信息
-    doc.add_heading("实验记录", 0)
-    doc.add_heading("基本信息", level=1)
+    # 基本信息
+    doc.add_heading("基本信息", level=base_level)
     _kv_table(doc, [
         ("实验编号", experiment_no or "（未填写）"),
         ("记录 ID", record_id),
@@ -222,7 +245,7 @@ def build_record_docx(rec: dict, version: str = "") -> bytes:
         _cn_run(p.add_run(f"备注：{notes}"))
 
     # 单体信息表
-    doc.add_heading("单体信息", level=1)
+    doc.add_heading("单体信息", level=base_level)
     table = doc.add_table(rows=4, cols=3)
     table.style = "Table Grid"
     for j, head in enumerate(("单体", "醛单体", "胺单体")):
@@ -236,7 +259,7 @@ def build_record_docx(rec: dict, version: str = "") -> bytes:
         table.rows[i].cells[2].text = str(amine.get(field) or "—")
 
     # 模型打分（关联收藏 latest_prediction / 记录快照 / 未打分）
-    doc.add_heading("模型打分", level=1)
+    doc.add_heading("模型打分", level=base_level)
     snap = _prediction_snapshot(rec)
     if snap is None:
         doc.add_paragraph("未打分（无关联收藏的打分快照）。")
@@ -259,12 +282,12 @@ def build_record_docx(rec: dict, version: str = "") -> bytes:
         _kv_table(doc, rows)
 
     # 单体性质（LLM 解读；未配置/失败保留小节占位）
-    doc.add_heading("单体性质", level=1)
-    _monomer_props_section(doc, "醛单体", ald)
-    _monomer_props_section(doc, "胺单体", amine)
+    doc.add_heading("单体性质", level=base_level)
+    _monomer_props_section(doc, "醛单体", ald, level=base_level + 1)
+    _monomer_props_section(doc, "胺单体", amine, level=base_level + 1)
 
     # 实验条件（所有已填字段；九键用中文名，额外键原样保留）
-    doc.add_heading("实验条件", level=1)
+    doc.add_heading("实验条件", level=base_level)
     cond = rec.get("conditions") if isinstance(rec.get("conditions"), dict) else {}
     filled = [
         (_CONDITION_LABELS.get(str(k), str(k)), str(v))
@@ -277,7 +300,7 @@ def build_record_docx(rec: dict, version: str = "") -> bytes:
         doc.add_paragraph("（未填写实验条件）")
 
     # 完整实验流程（全文）
-    doc.add_heading("完整实验流程", level=1)
+    doc.add_heading("完整实验流程", level=base_level)
     process_notes = str(rec.get("process_notes") or "").strip()
     if process_notes:
         _add_text(doc, process_notes)
@@ -285,7 +308,7 @@ def build_record_docx(rec: dict, version: str = "") -> bytes:
         doc.add_paragraph("（未填写）")
 
     # 时间线（按时间排序：时间 | 过程记录 | 附件名）
-    doc.add_heading("时间线", level=1)
+    doc.add_heading("时间线", level=base_level)
     timeline = _sorted_timeline(rec.get("timeline") or [])
     if timeline:
         table = doc.add_table(rows=len(timeline) + 1, cols=3)
@@ -307,12 +330,59 @@ def build_record_docx(rec: dict, version: str = "") -> bytes:
     # 自我总结 / 我认为的失误（有则）
     self_summary = str(rec.get("self_summary") or "").strip()
     if self_summary:
-        doc.add_heading("自我总结", level=1)
+        doc.add_heading("自我总结", level=base_level)
         _add_text(doc, self_summary)
     mistakes = str(rec.get("mistakes") or "").strip()
     if mistakes:
-        doc.add_heading("我认为的失误", level=1)
+        doc.add_heading("我认为的失误", level=base_level)
         _add_text(doc, mistakes)
+
+
+def _group_title(fav: dict) -> str:
+    """汇总导出的组标题：单体组名称（醛 + 胺），名称为空回落到 SMILES。"""
+    fav = fav if isinstance(fav, dict) else {}
+    ald = fav.get("aldehyde") if isinstance(fav.get("aldehyde"), dict) else {}
+    amine = fav.get("amine") if isinstance(fav.get("amine"), dict) else {}
+    ald_name = str(ald.get("name") or "").strip() or str(ald.get("smiles") or "未知醛单体")
+    amine_name = str(amine.get("name") or "").strip() or str(amine.get("smiles") or "未知胺单体")
+    return f"{ald_name} + {amine_name}"
+
+
+def build_bundle_docx(groups: list[dict], version: str = "") -> bytes:
+    """按收藏分组导出多组实验记录为一份 Word，返回 docx 字节串。
+
+    groups: [{"favorite": fav_dict, "records": [rec_dict, ...]}, ...]
+    （records 由调用方按时间序提供）。封面含标题/导出时间/软件版本；
+    每组一级标题为单体组名称（醛+胺），组内每条记录二级标题后接与单条
+    导出一致的正文；收藏无记录时标注「暂无实验记录」。
+    """
+    doc = Document()
+    _set_style_cn_fonts(doc)
+    now = datetime.now().astimezone()
+
+    doc.add_heading("实验记录汇总导出", 0)
+    p = doc.add_paragraph()
+    _cn_run(p.add_run(f"导出时间：{now.isoformat(timespec='seconds')}"))
+    if version:
+        p = doc.add_paragraph()
+        _cn_run(p.add_run(f"软件版本：v{version}"))
+    p = doc.add_paragraph()
+    _cn_run(p.add_run(f"收藏分组数：{len(groups)}"))
+
+    for group in groups:
+        group = group if isinstance(group, dict) else {}
+        fav = group.get("favorite") if isinstance(group.get("favorite"), dict) else {}
+        records = [r for r in (group.get("records") or []) if isinstance(r, dict)]
+        doc.add_heading(_group_title(fav), level=1)
+        if not records:
+            doc.add_paragraph("暂无实验记录")
+            continue
+        for rec in records:
+            no = str(rec.get("experiment_no") or "").strip()
+            rec_id = str(rec.get("record_id") or "")
+            label = f"实验记录 {no}" if no else f"实验记录 {rec_id}"
+            doc.add_heading(label, level=2)
+            _build_record_body(doc, rec, base_level=3)
 
     # 页脚：导出方 + 版本号
     footer_text = "由 COF 科研助手导出"
@@ -325,6 +395,12 @@ def build_record_docx(rec: dict, version: str = "") -> bytes:
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
+
+
+def bundle_export_filename(now: datetime | None = None) -> str:
+    """汇总导出文件名：实验记录汇总_YYYYMMDD_HHMM.docx。"""
+    now = now or datetime.now()
+    return f"实验记录汇总_{now.strftime('%Y%m%d_%H%M')}.docx"
 
 
 _FILENAME_BAD_CHARS = re.compile(r'[\\/:*?"<>|\r\n]+')

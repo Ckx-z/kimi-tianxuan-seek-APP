@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 
-from ..schemas import FavoriteCreate, FavoriteUpdate
+from ..schemas import FavoriteCopy, FavoriteCreate, FavoriteUpdate
 
 router = APIRouter(prefix="/api/favorites", tags=["favorites"])
 
@@ -100,3 +100,40 @@ def delete_favorite(fav_id: str):
     if not _store().delete_favorite(fav_id):
         raise HTTPException(404, f"收藏 {fav_id} 不存在")
     return {"deleted": fav_id}
+
+
+@router.post("/{fav_id}/copy", status_code=201)
+def copy_favorite(fav_id: str, req: FavoriteCopy):
+    """复制收藏到目标收藏夹：内容全量复制，id 新生成、created_at 取当前。
+
+    与 PATCH folder_id（移动）互补：复制后原收藏保留在原夹。
+    """
+    if not req.folder_id.strip():
+        raise HTTPException(400, "目标收藏夹 folder_id 不能为空")
+    try:
+        return _store().copy_favorite(fav_id, req.folder_id.strip())
+    except KeyError:
+        raise HTTPException(404, f"收藏 {fav_id} 不存在")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"收藏复制失败：{type(exc).__name__}: {exc}")
+
+
+@router.post("/{fav_id}/dft-entries")
+def add_dft_entry(fav_id: str, entry: dict = Body(...)):
+    """追加一条 DFT 计算条目到 dft_entries，返回完整收藏。
+
+    条目内容透传前端快照（job_id/x_type/x_smiles/x_description/
+    dimer_smiles/dimer_svg/method/e_bind_kcal/e_bind_kj/created_at），
+    缺 created_at 时后端补当前时间；GET 响应里 dft_snapshot 始终回填为
+    最新一条，旧前端读取不炸。
+    """
+    try:
+        return _store().add_dft_entry(fav_id, entry)
+    except KeyError:
+        raise HTTPException(404, f"收藏 {fav_id} 不存在")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"DFT 条目保存失败：{type(exc).__name__}: {exc}")
