@@ -259,7 +259,8 @@ TOOLS: dict = {
             "type": "function",
             "function": {
                 "name": "query_dft",
-                "description": "查询两个单体的 DFT 结合能（GFN-FF / GFN2-xTB "
+                "description": "查询醛/胺单体缩合二聚体与 X（助手场景固定为"
+                               "二聚体自身堆积）的结合能（GFN-FF / GFN2-xTB "
                                "半经验方法，仅供相对比较）。缓存或历史有结果时"
                                "直接返回；否则【写操作，需用户二次确认】提交计算"
                                "任务并等待（gfnff 秒级，gfn2 最长约 60 秒，超时"

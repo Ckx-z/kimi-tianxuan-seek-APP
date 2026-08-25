@@ -73,9 +73,17 @@ export interface PredictionSnapshot {
   [key: string]: unknown;
 }
 
-/** DFT 快照（P3 起由 DFT 页写入：方法/结合能/能隙/偶极/计算时间） */
+/** DFT 快照（P3 起由 DFT 页写入：方法/结合能/能隙/偶极/计算时间；2.0 起含二聚体与 X） */
 export interface DftSnapshot {
   method?: string;
+  /** 缩合二聚体 SMILES（2.0 口径；旧版 v1.0.0 快照缺省 = 两单体口径） */
+  dimer_smiles?: string;
+  dimer_multi_site?: boolean;
+  dimer_note?: string | null;
+  /** X 类型（self_stack / solvent / other_dimer / custom） */
+  x_type?: string;
+  /** X 的中文描述（如「自身堆积（二聚体·二聚体）」「溶剂：甲苯」） */
+  x_description?: string;
   e_bind_kcal?: number;
   e_bind_kj?: number;
   gap_ev?: { a?: number | null; b?: number | null; complex?: number | null };

@@ -302,6 +302,27 @@ def test_query_dft_history_hit(dft_dirs):
     r = dft_tool.query_dft(TP, PA, "gfnff")
     assert r["is_error"] is False
     assert "来自计算历史" in r["text"] and "-8.00" in r["text"]
+    # 旧版历史条目（无二聚体/X 字段）：降级标注旧口径，不臆造 X 描述
+    assert "旧版记录" in r["text"] and "两单体结合能口径" in r["text"]
+
+
+def test_query_dft_result_text_dimer_wording(dft_dirs):
+    """2.0 缓存结果：返回文案为「缩合二聚体与 X」口径并带 X 描述。"""
+    from src.dft import dimer as dimer_mod
+    canon_a, canon_b = _canon_pair()
+    dim = dimer_mod.make_dimer(TP, PA)
+    key = dft_cache.cache_key(dim["smiles"], "self_stack", "gfn2")
+    dft_cache.save_cache(key, {
+        "method": "gfn2", "smiles_a": canon_a, "smiles_b": canon_b,
+        "dimer_smiles": dim["smiles"], "x_type": "self_stack",
+        "x_description": "自身堆积（二聚体·二聚体）",
+        "e_bind_kcal": -12.34, "e_bind_kj": -51.6, "gap_ev": 2.1,
+        "dipole_debye": 1.5, "elapsed_sec": 42.0,
+    })
+    r = dft_tool.query_dft(TP, PA, "gfn2")
+    assert r["is_error"] is False
+    assert "缩合二聚体与 X（自身堆积（二聚体·二聚体））" in r["text"]
+    assert "半经验" in r["text"]
 
 
 def test_query_dft_submit_and_complete(dft_dirs, monkeypatch):

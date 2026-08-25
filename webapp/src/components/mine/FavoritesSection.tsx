@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useNavigate } from 'react-router';
-import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil, Atom } from 'lucide-react';
+import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil, Atom, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -220,7 +220,9 @@ const emptyProps: PropsState = { loading: false, error: null, data: null };
 
 /**
  * DFT 计算结果摘要（详情弹窗内）：方法/时间/结合能/能隙/偶极
+ * + 二聚体口径（2.0）：二聚体 SMILES（可复制）+ X 中文描述 + 二聚体结构图
  * + 「重新计算」跳转 DFT 页（URL 预填两个单体）。
+ * 旧版 v1.0.0 快照（无 dimer_smiles）降级显示「旧版计算口径」提示。
  */
 function DftSummarySection({ fav, onRecalc }: { fav: FavoriteItem; onRecalc: () => void }) {
   const navigate = useNavigate();
@@ -229,6 +231,18 @@ function DftSummarySection({ fav, onRecalc }: { fav: FavoriteItem; onRecalc: () 
   const eBind = snap.e_bind_kcal;
   const gap = snap.gap_ev?.complex;
   const dipole = snap.dipole_debye?.complex;
+  const dimerSmiles = typeof snap.dimer_smiles === 'string' ? snap.dimer_smiles : '';
+  const xDesc = typeof snap.x_description === 'string' ? snap.x_description : '';
+
+  /** 复制二聚体 SMILES */
+  const copyDimer = async () => {
+    try {
+      await navigator.clipboard.writeText(dimerSmiles);
+      toast.success('二聚体 SMILES 已复制');
+    } catch {
+      toast.warning('复制失败，请手动选择文本复制');
+    }
+  };
 
   /** 「重新计算」：跳转 DFT 页并预填两个单体 SMILES/名称 */
   const handleRecalc = () => {
@@ -275,6 +289,36 @@ function DftSummarySection({ fav, onRecalc }: { fav: FavoriteItem; onRecalc: () 
             </span>
           </span>
         </div>
+        {dimerSmiles ? (
+          /* DFT 2.0 口径：缩合二聚体 + X */
+          <div className="mt-2 space-y-1.5">
+            <div className="text-xs text-muted-foreground">
+              计算对象：缩合二聚体{xDesc ? ` 与 X（${xDesc}）` : ''}
+            </div>
+            <div className="flex items-start gap-2">
+              <code className="min-w-0 flex-1 break-all rounded border bg-muted/50 px-2 py-1 font-mono text-[11px]">
+                {dimerSmiles}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => void copyDimer()}
+                title="复制二聚体 SMILES"
+              >
+                <Copy className="mr-1 h-3.5 w-3.5" />
+                复制
+              </Button>
+            </div>
+            <StructureImg smiles={dimerSmiles} label="缩合二聚体" />
+          </div>
+        ) : (
+          /* 旧版 v1.0.0 快照：两单体结合能口径，无二聚体/X 字段 */
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+            旧版计算口径（两单体结合能）：DFT 2.0 起计算对象为缩合二聚体与 X，
+            可点下方「重新计算」获取新口径结果。
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button
             variant="outline"

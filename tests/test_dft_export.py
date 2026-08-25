@@ -297,3 +297,37 @@ class TestIterateDftContext:
         text, ref = it.lookup_dft_context(
             favorite={"dft_snapshot": {"method": "gfn2"}})
         assert (text, ref) == (None, None)
+
+    def test_snapshot_dimer_wording(self, it):
+        """2.0 快照（含 dimer_smiles/x_description）：注入文案为二聚体+X 口径。"""
+        snap = dict(self.SNAPSHOT)
+        snap["dimer_smiles"] = "Nc1ccc(N=Cc2ccc(C=O)cc2)cc1"
+        snap["x_type"] = "self_stack"
+        snap["x_description"] = "自身堆积（二聚体·二聚体）"
+        text, ref = it.lookup_dft_context(favorite={"dft_snapshot": snap})
+        assert ref == "dft:gfn2"
+        assert "缩合二聚体" in text
+        assert "自身堆积（二聚体·二聚体）" in text
+        assert "缩合二聚体与 X 的结合能：-5.20 kcal/mol" in text
+
+    def test_snapshot_legacy_wording(self, it):
+        """旧版 v1.0.0 快照（无 x_description）：降级标注旧口径，不臆造 X 描述。"""
+        text, ref = it.lookup_dft_context(
+            favorite={"dft_snapshot": dict(self.SNAPSHOT)})
+        assert ref == "dft:gfn2"
+        assert "缩合二聚体" in text
+        assert "旧版记录未保存 X 描述" in text
+        assert "两单体结合能口径" in text
+
+    def test_cache_hit_dimer_wording(self, it, tmp_path, monkeypatch):
+        """2.0 缓存命中：注入文案带 X 描述（自身堆积）。"""
+        from src.dft import dimer as dimer_mod
+        monkeypatch.setattr(dft_cache, "CACHE_DIR", tmp_path)
+        dim = dimer_mod.make_dimer("O=CC=O", "Nc1ccccc1")
+        key = dft_cache.cache_key(dim["smiles"], "self_stack", "gfn2")
+        dft_cache.save_cache(key, dict(FAKE_RESULT))
+        text, ref = it.lookup_dft_context(
+            aldehyde={"smiles": "O=CC=O"}, amine={"smiles": "Nc1ccccc1"},
+            favorite=None)
+        assert ref == "dft:gfn2"
+        assert "缩合二聚体与 X（自身堆积（二聚体·二聚体））" in text

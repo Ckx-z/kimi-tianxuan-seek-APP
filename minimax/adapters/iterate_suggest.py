@@ -510,12 +510,23 @@ _DFT_METHOD_LABELS = {
 }
 
 
-def _dft_context_text(method, e_kcal, e_kj, gap, dipole, when, source):
-    """拼 DFT 数据注入文本，返回 (文本, 引用标记)。数值缺失的字段跳过。"""
+def _dft_context_text(method, e_kcal, e_kj, gap, dipole, when, source,
+                      x_desc=None):
+    """拼 DFT 数据注入文本（DFT 2.0 二聚体口径），返回 (文本, 引用标记)。
+
+    数值缺失的字段跳过。x_desc 为 X 的中文描述（如「自身堆积（二聚体·二聚体）」
+    「溶剂：甲苯」）；旧版快照/缓存缺省时降级标注，不臆造。
+    """
     label = _DFT_METHOD_LABELS.get(method, method)
+    if x_desc:
+        obj_line = f'- 计算对象：该组合缩合二聚体与 X（{x_desc}）'
+    else:
+        obj_line = ('- 计算对象：缩合二聚体与 X'
+                    '（旧版记录未保存 X 描述，可能为两单体结合能口径）')
     lines = [
+        obj_line,
         f'- 方法：{label}（数据来源：{source}）',
-        f'- 结合能：{e_kcal:.2f} kcal/mol'
+        f'- 缩合二聚体与 X 的结合能：{e_kcal:.2f} kcal/mol'
         + (f'（{e_kj:.2f} kJ/mol）' if isinstance(e_kj, (int, float)) else ''),
     ]
     if isinstance(gap, (int, float)):
@@ -526,8 +537,8 @@ def _dft_context_text(method, e_kcal, e_kj, gap, dipole, when, source):
         lines.append(f'- 计算时间：{when}')
     ref = f'dft:{method}'
     lines.append(f'- 引用标记：evidence_refs 中 kind="dft_data"，ref="{ref}"')
-    text = ('该单体组合已有半经验量子化学计算数据'
-            '（仅供相对比较，精确能量需更高精度 DFT 复算）：\n'
+    text = ('该组合的缩合二聚体与 X 已有半经验量子化学结合能数据'
+            '（半经验结果仅供相对比较，精确能量需更高精度 DFT 复算）：\n'
             + '\n'.join(lines))
     return text, ref
 
@@ -549,7 +560,8 @@ def lookup_dft_context(aldehyde=None, amine=None, favorite=None):
             dip = (snap.get('dipole_debye') or {}).get('complex')
             return _dft_context_text(
                 method, snap['e_bind_kcal'], snap.get('e_bind_kj'),
-                gap, dip, str(snap.get('date') or ''), '收藏 DFT 快照')
+                gap, dip, str(snap.get('date') or ''), '收藏 DFT 快照',
+                x_desc=snap.get('x_description'))
     except Exception as e:
         print(f'[iterate_suggest] DFT 快照读取失败（降级继续）: {e}',
               file=sys.stderr)
@@ -575,7 +587,8 @@ def lookup_dft_context(aldehyde=None, amine=None, favorite=None):
                 dip = (hit.get('dipole_debye') or {}).get('complex')
                 return _dft_context_text(
                     method, hit['e_bind_kcal'], hit.get('e_bind_kj'),
-                    gap, dip, '', 'DFT 计算缓存')
+                    gap, dip, '', 'DFT 计算缓存',
+                    x_desc=hit.get('x_description'))
     except Exception as e:
         print(f'[iterate_suggest] DFT 缓存查找失败（降级继续）: {e}',
               file=sys.stderr)
@@ -716,7 +729,7 @@ def build_messages(question, aldehyde, amine, records, evidence_text, rejected,
     rec_ids_text = ('\n'.join(f'- {rid}' for rid in rec_ids)
                     if rec_ids else '(无)')
     dft_section = (
-        f'## DFT 计算数据（本单体组合的半经验计算结果，可以 kind=dft_data 引用）\n'
+        f'## DFT 计算数据（本组合缩合二聚体与 X 的半经验计算结果，可以 kind=dft_data 引用）\n'
         f'{dft_context}\n\n' if dft_context else '')
     user_prompt = f"""## 用户问题
 {question}

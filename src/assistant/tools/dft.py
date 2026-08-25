@@ -1,5 +1,8 @@
 """query_dft 工具：DFT 结合能计算（读缓存/历史 → 未命中则提交任务并轮询）。
 
+DFT 2.0 口径：计算对象是醛/胺缩合二聚体与第三物质 X；助手工具语义固定为
+「二聚体自身堆积」（self_stack），返回文案按二聚体口径表述。
+
 - 读路径（无需确认）：缓存（dft_cache）或历史（dft_log）已有该单体对
   同方法档位的完成结果 → 直接返回；
 - 写路径（需二次确认，见 confirm_impact）：未命中 → jobs.create_job 提交
@@ -33,11 +36,20 @@ def _fmt_num(v, fmt: str) -> str:
 
 
 def _fmt_result(res: dict, source: str) -> str:
-    lines = [f"DFT 结合能结果（{source}，方法 {res.get('method') or '?'}）：",
-             f"- 结合能：{_fmt_num(res.get('e_bind_kcal'), '{:.2f}')} kcal/mol"
-             f"（{_fmt_num(res.get('e_bind_kj'), '{:.1f}')} kJ/mol）",
-             f"- HOMO-LUMO 带隙：{_fmt_num(res.get('gap_ev'), '{:.2f}')} eV；"
-             f"偶极矩：{_fmt_num(res.get('dipole_debye'), '{:.2f}')} D"]
+    lines = [f"DFT 结合能结果（{source}，方法 {res.get('method') or '?'}）："]
+    # DFT 2.0 二聚体口径：结果含 dimer_smiles/x_description 时按新口径表述；
+    # 旧版历史/缓存缺字段时降级标注，不臆造 X 描述
+    x_desc = res.get("x_description")
+    if res.get("dimer_smiles") or x_desc:
+        lines.append(f"- 计算对象：缩合二聚体与 X（{x_desc or '未保存 X 描述'}）")
+    else:
+        lines.append("- 计算对象：缩合二聚体与 X"
+                     "（旧版记录，实际为两单体结合能口径）")
+    lines += [
+        f"- 结合能：{_fmt_num(res.get('e_bind_kcal'), '{:.2f}')} kcal/mol"
+        f"（{_fmt_num(res.get('e_bind_kj'), '{:.1f}')} kJ/mol）",
+        f"- HOMO-LUMO 带隙：{_fmt_num(res.get('gap_ev'), '{:.2f}')} eV；"
+        f"偶极矩：{_fmt_num(res.get('dipole_debye'), '{:.2f}')} D"]
     if isinstance(res.get("elapsed_sec"), (int, float)):
         lines.append(f"- 耗时：{float(res['elapsed_sec']):.1f} s")
     fav = res.get("favorite")

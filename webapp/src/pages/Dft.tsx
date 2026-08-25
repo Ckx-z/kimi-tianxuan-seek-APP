@@ -566,6 +566,19 @@ export default function Dft() {
                       <span className="font-mono text-xs">
                         {(h.dimer_smiles || h.smiles_a).slice(0, 12)}…
                       </span>
+                      {h.x_description ? (
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          {h.x_description}
+                        </span>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="ml-1 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                          title="DFT 2.0 前的历史记录，未保存 X 描述（两单体结合能口径）"
+                        >
+                          旧版记录
+                        </Badge>
+                      )}
                       <span className="float-right font-medium tabular-nums">
                         {h.status === 'done' && h.e_bind_kcal != null
                           ? `${h.e_bind_kcal.toFixed(1)} kcal`
