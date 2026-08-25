@@ -1,5 +1,6 @@
 /**
- * DFT 计算页本地 API 辅助（端点契约与 api/routers/dft.py 对齐）
+ * DFT 计算页本地 API 辅助（端点契约与 api/routers/dft.py 对齐，DFT 2.0）
+ * 2.0 计算对象：醛/胺单体 → 缩合二聚体 D，D 与第三物质 X 的结合能。
  * 错误处理约定同 query/api.ts：网络失败抛 BackendUnavailableError；HTTP 错误提取 detail。
  */
 import { toast } from 'sonner';
@@ -40,6 +41,8 @@ async function request<T>(path: string, options: { method?: string; body?: unkno
 
 export type DftMethod = 'gfnff' | 'gfn2';
 export type DftJobStatus = 'pending' | 'running' | 'done' | 'failed';
+/** 第三物质 X 类型：自身堆积（默认）/ 溶剂 / 另一组单体的二聚体 / 自定义分子 */
+export type DftXType = 'self_stack' | 'solvent' | 'other_dimer' | 'custom';
 
 /** 已有收藏联动信息（result.favorite） */
 export interface DftFavoriteInfo {
@@ -52,17 +55,48 @@ export interface DftFavoriteInfo {
   has_dft?: boolean;
 }
 
+/** 内置溶剂（GET /api/dft/solvents） */
+export interface DftSolvent {
+  id: string;
+  name_zh: string;
+  smiles: string;
+}
+
+/** 二聚体预览（GET /api/dft/dimer-preview） */
+export interface DimerPreview {
+  dimer_smiles: string;
+  multi_site: boolean;
+  note: string | null;
+}
+
+/** X 原始参数回显（历史结果借缓存任务导出时重建请求用） */
+export interface DftXRequest {
+  solvent_id?: string | null;
+  ald2_smiles?: string | null;
+  amine2_smiles?: string | null;
+  custom_smiles?: string | null;
+}
+
 export interface DftResult {
+  /** 规范化醛/胺单体 SMILES（收藏联动等下游兼容字段） */
   smiles_a: string;
   smiles_b: string;
+  dimer_smiles: string;
+  dimer_multi_site?: boolean;
+  dimer_note?: string | null;
+  x_type: DftXType;
+  x_smiles: string;
+  x_description: string;
+  x_request?: DftXRequest;
   method: DftMethod;
   method_label: string;
   e_bind_hartree: number;
   e_bind_kcal: number;
   e_bind_kj: number;
-  energies_hartree: { a: number; b: number; complex: number };
-  gap_ev: { a: number | null; b: number | null; complex: number | null };
-  dipole_debye: { a: number | null; b: number | null; complex: number | null };
+  energies_hartree: { dimer: number; x: number; complex: number };
+  gap_ev: { dimer: number | null; x: number | null; complex: number | null };
+  dipole_debye: { dimer: number | null; x: number | null; complex: number | null };
+  complex_atom_count?: number;
   complex_xyz: string;
   elapsed_sec: number;
   cached: boolean;
@@ -80,11 +114,30 @@ export interface DftJob {
   created_at?: string;
 }
 
-/** 历史条目（dft_log.jsonl） */
+/** 创建任务请求体（POST /jobs；旧字段 smiles_a/smiles_b 由后端兼容映射） */
+export interface DftJobRequest {
+  ald_smiles: string;
+  amine_smiles: string;
+  x_type: DftXType;
+  solvent_id?: string;
+  ald2_smiles?: string;
+  amine2_smiles?: string;
+  custom_smiles?: string;
+  method: DftMethod;
+}
+
+/** 历史条目（dft_log.jsonl；2.0 起含二聚体与 X 字段，旧条目可能缺失） */
 export interface DftHistoryEntry {
   timestamp?: string;
   smiles_a: string;
   smiles_b: string;
+  dimer_smiles?: string;
+  dimer_multi_site?: boolean;
+  dimer_note?: string | null;
+  x_type?: DftXType;
+  x_smiles?: string;
+  x_description?: string;
+  x_request?: DftXRequest;
   method: DftMethod;
   status: 'done' | 'failed';
   error?: string;
@@ -100,12 +153,25 @@ export interface DftHistoryEntry {
 // ---------- 端点 ----------
 
 /** 创建计算任务（202；缓存命中时返回的 job 直接 done 且 cached=true） */
-export const createDftJob = (smilesA: string, smilesB: string, method: DftMethod) =>
-  request<DftJob>('/jobs', { method: 'POST', body: { smiles_a: smilesA, smiles_b: smilesB, method } });
+export const createDftJob = (req: DftJobRequest) =>
+  request<DftJob>('/jobs', { method: 'POST', body: req });
 
 /** 轮询任务状态（静默：轮询期间失败由页面统一处理，不每跳弹 toast） */
 export const fetchDftJob = (jobId: string) =>
   request<DftJob>(`/jobs/${encodeURIComponent(jobId)}`, { silent: true });
+
+/** 内置溶剂表（x_type=solvent 下拉选项） */
+export const fetchDftSolvents = async (): Promise<DftSolvent[]> => {
+  const data = await request<{ solvents: DftSolvent[] }>('/solvents', { silent: true });
+  return data.solvents ?? [];
+};
+
+/** 二聚体预览：醛/胺单体 → 缩合二聚体 SMILES + 多位点标注 */
+export const fetchDimerPreview = (aldSmiles: string, amineSmiles: string) =>
+  request<DimerPreview>(
+    `/dimer-preview?ald_smiles=${encodeURIComponent(aldSmiles)}&amine_smiles=${encodeURIComponent(amineSmiles)}`,
+    { silent: true },
+  );
 
 /** 计算历史（新→旧） */
 export const fetchDftHistory = async (limit = 50): Promise<DftHistoryEntry[]> => {
@@ -136,8 +202,8 @@ function parseDownloadFilename(disposition: string | null, fallback: string): st
 
 /**
  * 导出 Gaussian(.gjf) / ORCA(.inp) 输入文件并触发浏览器下载。
- * jobId 缺省（历史回显等无任务场景）时先建任务——缓存命中会立即 done，
- * 仅借其 job_id 调后端导出端点，保证导出格式单一来源（后端生成）。
+ * jobId 缺省（历史回显等无任务场景）时先按结果的 X 原始参数重建任务——
+ * 缓存命中会立即 done，仅借其 job_id 调后端导出端点，保证导出格式单一来源（后端生成）。
  */
 export async function exportDftInput(
   result: DftResult,
@@ -146,7 +212,16 @@ export async function exportDftInput(
 ): Promise<void> {
   let id = jobId || null;
   if (!id) {
-    const job = await createDftJob(result.smiles_a, result.smiles_b, result.method);
+    const job = await createDftJob({
+      ald_smiles: result.smiles_a,
+      amine_smiles: result.smiles_b,
+      x_type: result.x_type,
+      solvent_id: result.x_request?.solvent_id ?? undefined,
+      ald2_smiles: result.x_request?.ald2_smiles ?? undefined,
+      amine2_smiles: result.x_request?.amine2_smiles ?? undefined,
+      custom_smiles: result.x_request?.custom_smiles ?? undefined,
+      method: result.method,
+    });
     id = job.job_id;
   }
   let res: Response;
@@ -187,10 +262,16 @@ export function mergeDftToFavorite(favoriteId: string, result: DftResult) {
   return requestFavorite(favoriteId, buildDftSnapshot(result));
 }
 
-/** 由计算结果构造 dft_snapshot（落盘字段，「我的」页可展示） */
+/** 由计算结果构造 dft_snapshot（落盘字段，「我的」页可展示；2.0 起含二聚体与 X） */
 export function buildDftSnapshot(result: DftResult) {
   return {
     method: result.method,
+    dimer_smiles: result.dimer_smiles,
+    dimer_multi_site: result.dimer_multi_site ?? false,
+    dimer_note: result.dimer_note ?? null,
+    x_type: result.x_type,
+    x_smiles: result.x_smiles,
+    x_description: result.x_description,
     e_bind_kcal: result.e_bind_kcal,
     e_bind_kj: result.e_bind_kj,
     gap_ev: result.gap_ev,

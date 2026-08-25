@@ -157,7 +157,20 @@ class AssistantMemoryUpdate(BaseModel):
 
 
 class DftJobCreate(BaseModel):
-    """DFT 计算任务创建：两个单体 SMILES + 方法档位。"""
-    smiles_a: str = Field(..., description="单体 A SMILES")
-    smiles_b: str = Field(..., description="单体 B SMILES")
+    """DFT 计算任务创建（2.0）：醛/胺单体 → 缩合二聚体 + 第三物质 X 类型。
+
+    旧字段 smiles_a/smiles_b 兼容映射为 ald_smiles/amine_smiles。
+    """
+    ald_smiles: str | None = Field(None, description="醛单体 SMILES")
+    amine_smiles: str | None = Field(None, description="胺单体 SMILES")
+    smiles_a: str | None = Field(None, description="旧字段：等价 ald_smiles")
+    smiles_b: str | None = Field(None, description="旧字段：等价 amine_smiles")
+    x_type: str = Field(
+        "self_stack",
+        description="第三物质类型：self_stack（默认，自身堆积）| solvent（溶剂）"
+                    "| other_dimer（另一组单体的二聚体）| custom（自定义分子）")
+    solvent_id: str | None = Field(None, description="x_type=solvent 时的内置溶剂 id")
+    ald2_smiles: str | None = Field(None, description="x_type=other_dimer 时的醛单体 2")
+    amine2_smiles: str | None = Field(None, description="x_type=other_dimer 时的胺单体 2")
+    custom_smiles: str | None = Field(None, description="x_type=custom 时的自定义 SMILES")
     method: str = Field("gfn2", description="gfnff（快速）| gfn2（精确，默认）")

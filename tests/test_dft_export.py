@@ -35,14 +35,23 @@ XYZ = "3\ncomplex\nC 0 0 0\nN 1.4 0 0\nO 2.5 0 0\n"
 FAKE_RESULT = {
     "smiles_a": engine.canonicalize_smiles("O=CC1=C(C=O)C(=O)C(C=O)=C1O"),
     "smiles_b": engine.canonicalize_smiles("Nc1ccc(N)cc1"),
+    "dimer_smiles": "Nc1ccc(N=Cc2ccc(C=O)cc2)cc1",
+    "dimer_multi_site": True,
+    "dimer_note": "示意单点缩合：多位点单体仅缩合第一个位点",
+    "x_type": "self_stack",
+    "x_smiles": "Nc1ccc(N=Cc2ccc(C=O)cc2)cc1",
+    "x_description": "自身堆积（二聚体·二聚体）",
+    "x_cache_part": "self_stack",
+    "x_request": {"solvent_id": None, "ald2_smiles": None,
+                  "amine2_smiles": None, "custom_smiles": None},
     "method": "gfn2",
     "method_label": "GFN2-xTB（精确）",
     "e_bind_hartree": -0.012,
     "e_bind_kcal": -7.5301,
     "e_bind_kj": -31.506,
-    "energies_hartree": {"a": -100.0, "b": -50.0, "complex": -150.012},
-    "gap_ev": {"a": 5.0, "b": 6.1, "complex": 4.2},
-    "dipole_debye": {"a": 0.1, "b": 1.5, "complex": 1.2},
+    "energies_hartree": {"dimer": -100.0, "x": -50.0, "complex": -150.012},
+    "gap_ev": {"dimer": 5.0, "x": 6.1, "complex": 4.2},
+    "dipole_debye": {"dimer": 0.1, "x": 1.5, "complex": 1.2},
     "complex_xyz": XYZ,
     "elapsed_sec": 0.01,
 }
@@ -113,7 +122,7 @@ def sandbox(tmp_path, monkeypatch):
     monkeypatch.setattr(engine, "xtb_binary", lambda: tmp_path / "xtb.exe")
 
     def _fake_compute(smiles_a, smiles_b, method="gfn2", on_stage=None,
-                      jobs_root=None):
+                      jobs_root=None, **_k):
         result = dict(FAKE_RESULT)
         result["method"] = method
         return result
@@ -221,11 +230,11 @@ class TestIterateDftContext:
         assert "dft:gfn2" in text
 
     def test_cache_hit_path(self, it, tmp_path, monkeypatch):
-        """无收藏快照时查 DFT 缓存：命中返回注入文本。"""
+        """无收藏快照时查 DFT 缓存（2.0 口径：二聚体+自身堆积 key）：命中返回注入文本。"""
+        from src.dft import dimer as dimer_mod
         monkeypatch.setattr(dft_cache, "CACHE_DIR", tmp_path)
-        canon_a = engine.canonicalize_smiles("O=CC=O")
-        canon_b = engine.canonicalize_smiles("Nc1ccccc1")
-        key = dft_cache.cache_key(canon_a, canon_b, "gfn2")
+        dim = dimer_mod.make_dimer("O=CC=O", "Nc1ccccc1")
+        key = dft_cache.cache_key(dim["smiles"], "self_stack", "gfn2")
         dft_cache.save_cache(key, dict(FAKE_RESULT))
         text, ref = it.lookup_dft_context(
             aldehyde={"smiles": "O=CC=O"}, amine={"smiles": "Nc1ccccc1"},

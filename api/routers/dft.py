@@ -1,9 +1,12 @@
-"""DFT 计算路由：异步任务 + 缓存 + 历史 + 收藏联动。
+"""DFT 计算路由：异步任务 + 缓存 + 历史 + 收藏联动（2.0：二聚体与 X 的结合能）。
 
-- POST /api/dft/jobs            建任务（202，缓存命中立即 done）
+- POST /api/dft/jobs            建任务（202，缓存命中立即 done；旧字段
+                                smiles_a/smiles_b 兼容映射为醛/胺单体）
 - GET  /api/dft/jobs/{id}       轮询任务状态/结果
 - GET  /api/dft/jobs/{id}/geometry  复合物优化后 xyz（纯文本，供 3D 查看/下载）
 - GET  /api/dft/jobs/{id}/export?format=gaussian|orca  量化软件输入文件下载
+- GET  /api/dft/solvents        内置溶剂表（x_type=solvent 的可选项）
+- GET  /api/dft/dimer-preview   醛/胺单体 → 缩合二聚体预览（SMILES + 多位点标注）
 - GET  /api/dft/history         计算历史（dft_log.jsonl，新→旧分页）
 """
 
@@ -17,10 +20,12 @@ from fastapi.responses import PlainTextResponse
 from ..schemas import DftJobCreate
 
 try:
+    from src.dft import dimer as dimer_mod
     from src.dft import engine, jobs
     from src.dft import export as dft_export
     from src.dft import log as dft_log
 except ImportError:  # pragma: no cover - src 直接在 sys.path 时
+    from dft import dimer as dimer_mod  # type: ignore
     from dft import engine, jobs  # type: ignore
     from dft import export as dft_export  # type: ignore
     from dft import log as dft_log  # type: ignore
@@ -42,18 +47,73 @@ def _public_job(job: dict) -> dict:
     }
 
 
+def _resolve_monomers(req: DftJobCreate) -> tuple[str, str]:
+    """新旧字段兼容：ald_smiles/amine_smiles 优先，缺省回落 smiles_a/smiles_b。"""
+    ald = (req.ald_smiles or req.smiles_a or "").strip()
+    amine = (req.amine_smiles or req.smiles_b or "").strip()
+    return ald, amine
+
+
 @router.post("/jobs", status_code=202)
 def create_dft_job(req: DftJobCreate):
-    if not req.smiles_a.strip() or not req.smiles_b.strip():
-        raise HTTPException(400, "两个单体的 SMILES 均不能为空")
+    ald, amine = _resolve_monomers(req)
+    if not ald or not amine:
+        raise HTTPException(400, "醛单体与胺单体的 SMILES 均不能为空")
     if req.method not in engine.METHODS:
         raise HTTPException(400, f"未知方法档位：{req.method}（可选 gfnff / gfn2）")
+    if req.x_type not in engine.X_TYPES:
+        raise HTTPException(
+            400, f"未知的 X 类型：{req.x_type}"
+            f"（可选 {' / '.join(engine.X_TYPES)}）")
+
+    # 前置校验：二聚体可生成 + X 参数齐全（缺参数 400 中文）
+    try:
+        dim = dimer_mod.make_dimer(ald, amine)
+    except dimer_mod.DimerError as exc:
+        raise HTTPException(400, f"二聚体生成失败：{exc}")
+    try:
+        engine.resolve_x(
+            req.x_type, dim["smiles"], solvent_id=req.solvent_id,
+            ald2_smiles=req.ald2_smiles, amine2_smiles=req.amine2_smiles,
+            custom_smiles=req.custom_smiles)
+    except engine.DftError as exc:
+        raise HTTPException(400, str(exc))
+
     if engine.xtb_binary() is None:
         raise HTTPException(
             503, "未安装计算引擎：未找到 xtb 二进制（vendor/xtb/bin/xtb.exe），"
             "DFT 计算暂不可用")
-    job = jobs.create_job(req.smiles_a.strip(), req.smiles_b.strip(), req.method)
+    job = jobs.create_job(
+        ald, amine, req.method, x_type=req.x_type,
+        solvent_id=req.solvent_id, ald2_smiles=req.ald2_smiles,
+        amine2_smiles=req.amine2_smiles, custom_smiles=req.custom_smiles)
     return _public_job(job)
+
+
+@router.get("/solvents")
+def dft_solvents():
+    """内置常用溶剂表（x_type=solvent 时前端下拉的可选项）。"""
+    return {"solvents": [
+        {"id": s["id"], "name_zh": s["name_zh"], "smiles": s["smiles"]}
+        for s in engine.SOLVENTS]}
+
+
+@router.get("/dimer-preview")
+def dft_dimer_preview(ald_smiles: str, amine_smiles: str):
+    """醛/胺单体 → 缩合二聚体预览（不计算，仅反应模板）。
+
+    返回二聚体 canonical SMILES 与多位点标注；结构图由前端调
+    /api/monomers/structure.svg?smiles=<dimer_smiles> 展示。
+    """
+    try:
+        dim = dimer_mod.make_dimer(ald_smiles, amine_smiles)
+    except dimer_mod.DimerError as exc:
+        raise HTTPException(400, str(exc))
+    return {
+        "dimer_smiles": dim["smiles"],
+        "multi_site": dim["multi_site"],
+        "note": dim["note"],
+    }
 
 
 @router.get("/jobs/{job_id}")

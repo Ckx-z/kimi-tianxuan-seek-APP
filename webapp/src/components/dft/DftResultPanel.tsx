@@ -1,7 +1,9 @@
 /**
- * DFT 结果展示面板：结合能大数字卡 + 组分描述符表 + 结构图 + xyz 下载
- * + 量化软件输入文件导出（Gaussian .gjf / ORCA .inp，后端生成下载）。
- * 固定红线提示（学术诚信底线）常驻底部。
+ * DFT 结果展示面板（2.0）：缩合二聚体 D 与第三物质 X 的结合能。
+ * 结合能大数字卡 + X 描述 + 二聚体 SMILES 可复制 + 组分描述符表
+ * + 结构图（二聚体 / X）+ 复合物 xyz 下载 + 量化软件输入文件导出
+ * （Gaussian .gjf / ORCA .inp，后端生成下载）。
+ * 固定红线提示（学术诚信底线）常驻底部；多位点单体常驻「示意单点缩合」标注。
  */
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,14 +15,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, FileDown, FileOutput } from 'lucide-react';
+import { ChevronDown, Copy, FileDown, FileOutput } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportDftInput, type DftExportFormat, type DftResult } from './api';
 
 interface Props {
   result: DftResult;
-  smilesA: string;
-  smilesB: string;
   /** 当前任务 id（历史回显无任务时为 null，导出时自动借缓存命中任务） */
   jobId?: string | null;
 }
@@ -40,10 +40,20 @@ function downloadXyz(result: DftResult) {
   URL.revokeObjectURL(url);
 }
 
-export default function DftResultPanel({ result, smilesA, smilesB, jobId }: Props) {
+export default function DftResultPanel({ result, jobId }: Props) {
   const bound = result.e_bind_kcal < 0;
   /** 导出进行中（按格式记，防重复点击） */
   const [exporting, setExporting] = useState<DftExportFormat | null>(null);
+
+  /** 复制二聚体 SMILES */
+  const copyDimer = async () => {
+    try {
+      await navigator.clipboard.writeText(result.dimer_smiles);
+      toast.success('二聚体 SMILES 已复制');
+    } catch {
+      toast.warning('复制失败，请手动选择文本复制');
+    }
+  };
 
   /** 导出量化软件输入文件（无可用 xyz 时拦截） */
   const handleExport = async (format: DftExportFormat) => {
@@ -63,23 +73,23 @@ export default function DftResultPanel({ result, smilesA, smilesB, jobId }: Prop
       setExporting(null);
     }
   };
-  const rows: { label: string; a: string; b: string; c: string }[] = [
+  const rows: { label: string; d: string; x: string; c: string }[] = [
     {
       label: '总能量 (Eh)',
-      a: fmt(result.energies_hartree.a, 6),
-      b: fmt(result.energies_hartree.b, 6),
+      d: fmt(result.energies_hartree.dimer, 6),
+      x: fmt(result.energies_hartree.x, 6),
       c: fmt(result.energies_hartree.complex, 6),
     },
     {
       label: 'HOMO-LUMO 能隙 (eV)',
-      a: fmt(result.gap_ev.a),
-      b: fmt(result.gap_ev.b),
+      d: fmt(result.gap_ev.dimer),
+      x: fmt(result.gap_ev.x),
       c: fmt(result.gap_ev.complex),
     },
     {
       label: '偶极矩 (Debye)',
-      a: fmt(result.dipole_debye.a),
-      b: fmt(result.dipole_debye.b),
+      d: fmt(result.dipole_debye.dimer),
+      x: fmt(result.dipole_debye.x),
       c: fmt(result.dipole_debye.complex),
     },
   ];
@@ -89,10 +99,15 @@ export default function DftResultPanel({ result, smilesA, smilesB, jobId }: Prop
       {/* 结合能大数字卡 */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            单体间结合能
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+            二聚体结合能
             <Badge variant="outline">{result.method_label}</Badge>
             {result.cached && <Badge variant="secondary">缓存结果</Badge>}
+            {result.dimer_multi_site && (
+              <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400">
+                示意单点缩合
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -109,11 +124,36 @@ export default function DftResultPanel({ result, smilesA, smilesB, jobId }: Prop
             </div>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
+            E(结合) = E(二聚体·X 复合物) − E(二聚体) − E(X)，其中 X = {result.x_description}。
             {bound
-              ? '负值：两单体形成复合物在能量上有利，数值越负结合越强。'
-              : '正值：该初猜取向下复合物能量高于单体之和，结合不利（或构象未找到有利取向）。'}
+              ? '负值：形成复合物在能量上有利，数值越负结合越强。'
+              : '正值：该初猜取向下复合物能量高于组分之和，结合不利（或构象未找到有利取向）。'}
             耗时 {result.elapsed_sec.toFixed(1)} s。
           </p>
+        </CardContent>
+      </Card>
+
+      {/* 二聚体 SMILES（可复制） */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">缩合二聚体（亚胺键 C=N）</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex items-center gap-2">
+            <code className="flex-1 break-all rounded border bg-muted/50 px-2 py-1.5 font-mono text-xs">
+              {result.dimer_smiles}
+            </code>
+            <Button variant="outline" size="sm" onClick={() => void copyDimer()}>
+              <Copy className="mr-1 h-4 w-4" />
+              复制
+            </Button>
+          </div>
+          {result.dimer_multi_site && result.dimer_note && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              ⚠️ {result.dimer_note}：多位点单体的真实产物可能多位点缩合或形成寡聚体，
+              本结果为示意性单点缩合二聚体。
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -127,8 +167,8 @@ export default function DftResultPanel({ result, smilesA, smilesB, jobId }: Prop
             <thead>
               <tr className="border-b text-left text-muted-foreground">
                 <th className="py-1.5 pr-2 font-medium">指标</th>
-                <th className="py-1.5 pr-2 font-medium">单体 A</th>
-                <th className="py-1.5 pr-2 font-medium">单体 B</th>
+                <th className="py-1.5 pr-2 font-medium">二聚体</th>
+                <th className="py-1.5 pr-2 font-medium">X</th>
                 <th className="py-1.5 font-medium">复合物</th>
               </tr>
             </thead>
@@ -136,8 +176,8 @@ export default function DftResultPanel({ result, smilesA, smilesB, jobId }: Prop
               {rows.map((r) => (
                 <tr key={r.label} className="border-b last:border-0">
                   <td className="py-1.5 pr-2">{r.label}</td>
-                  <td className="py-1.5 pr-2 tabular-nums">{r.a}</td>
-                  <td className="py-1.5 pr-2 tabular-nums">{r.b}</td>
+                  <td className="py-1.5 pr-2 tabular-nums">{r.d}</td>
+                  <td className="py-1.5 pr-2 tabular-nums">{r.x}</td>
                   <td className="py-1.5 tabular-nums">{r.c}</td>
                 </tr>
               ))}
@@ -151,20 +191,16 @@ export default function DftResultPanel({ result, smilesA, smilesB, jobId }: Prop
         </CardContent>
       </Card>
 
-      {/* 结构图：单体 2D + 复合物示意 + 3D xyz 下载 */}
+      {/* 结构图：二聚体 / X 2D + 复合物 3D xyz 下载 */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">化学结构</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {[
-              { src: `/api/monomers/structure.svg?smiles=${encodeURIComponent(smilesA)}`, label: '单体 A' },
-              { src: `/api/monomers/structure.svg?smiles=${encodeURIComponent(smilesB)}`, label: '单体 B' },
-              {
-                src: `/api/monomers/dimer.svg?ald=${encodeURIComponent(smilesA)}&amine=${encodeURIComponent(smilesB)}`,
-                label: '缩合产物（示意）',
-              },
+              { src: `/api/monomers/structure.svg?smiles=${encodeURIComponent(result.dimer_smiles)}`, label: '缩合二聚体' },
+              { src: `/api/monomers/structure.svg?smiles=${encodeURIComponent(result.x_smiles)}`, label: `X（${result.x_description}）` },
             ].map((im) => (
               <figure key={im.label} className="text-center">
                 <img

@@ -554,7 +554,7 @@ def lookup_dft_context(aldehyde=None, amine=None, favorite=None):
         print(f'[iterate_suggest] DFT 快照读取失败（降级继续）: {e}',
               file=sys.stderr)
 
-    # 2. DFT 缓存（按规范化单体对查缓存 key，与 src/dft 口径一致）
+    # 2. DFT 缓存（DFT 2.0 口径：二聚体 SMILES + 自身堆积 X + 方法）
     try:
         smiles_a = ((aldehyde or {}).get('smiles') or '').strip()
         smiles_b = ((amine or {}).get('smiles') or '').strip()
@@ -564,13 +564,10 @@ def lookup_dft_context(aldehyde=None, amine=None, favorite=None):
         if str(proj_root) not in sys.path:
             sys.path.insert(0, str(proj_root))
         from src.dft import cache as _dft_cache
-        from src.dft import engine as _dft_engine
-        canon_a = _dft_engine.canonicalize_smiles(smiles_a)
-        canon_b = _dft_engine.canonicalize_smiles(smiles_b)
-        if not canon_a or not canon_b:
-            return None, None
+        from src.dft import dimer as _dft_dimer
+        dim = _dft_dimer.make_dimer(smiles_a, smiles_b)
         for method in ('gfn2', 'gfnff'):
-            key = _dft_cache.cache_key(canon_a, canon_b, method)
+            key = _dft_cache.cache_key(dim['smiles'], 'self_stack', method)
             hit = _dft_cache.load_cache(key)
             if (isinstance(hit, dict)
                     and isinstance(hit.get('e_bind_kcal'), (int, float))):

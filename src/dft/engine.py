@@ -1,12 +1,19 @@
-"""xTB 半经验计算引擎：两单体结合能 + gap/偶极矩解析。
+"""xTB 半经验计算引擎：缩合二聚体与第三物质 X 的结合能 + gap/偶极矩解析。
 
-管线（方案 §3.3）：
-    SMILES → RDKit ETKDG 3D + UFF 预优化 → xyz
+DFT 2.0 管线（docs/DFT2.0设计方案.md §一）：
+    醛单体 + 胺单体 → [亚胺缩合] 二聚体 D（dimer.make_dimer）
+    D 与 X 各自 RDKit ETKDG 3D + UFF 预优化 → xyz
            → xtb --opt（GFN-FF 或 GFN2-xTB）
-           → E_bind = E_复合物 − E_A − E_B（hartree → kcal/mol、 kJ/mol）
+           → E_bind = E(D·X 复合物) − E(D) − E(X)（hartree → kcal/mol、kJ/mol）
 
-复合物初猜复用 dimer.py 思路：两单体 CombineMols 后 ETKDGv3 多构象嵌入
-（非键相互作用会把两单体放在合理相对位置），取力场能量最低的构象。
+X（第三物质）四种类型（x_type）：
+  - self_stack（默认）：X = D 自身（二聚体·二聚体堆积，π-π/自聚集倾向）
+  - solvent：          X = 内置溶剂分子（SOLVENTS 表，solvent_id 指定）
+  - other_dimer：      X = 另一组醛/胺单体缩合形成的二聚体
+  - custom：           X = 自定义 SMILES 分子
+
+复合物初猜：两分子各自独立 3D 化后多取向不重叠摆放（见 _orientations），
+UFF 预优化取力场能量最低取向。
 
 子进程约定：
   - 二进制在 resource_root()/vendor/xtb/bin/xtb.exe（frozen 时在 _MEIPASS 下）
@@ -34,6 +41,13 @@ try:
 except ImportError:  # pragma: no cover - 直接以 src 为 sys.path 运行时
     import runtime_config  # type: ignore
 
+try:
+    from src.dft import dimer as dimer_mod
+    DimerError = dimer_mod.DimerError
+except ImportError:  # pragma: no cover
+    from dft import dimer as dimer_mod  # type: ignore
+    DimerError = dimer_mod.DimerError
+
 logger = logging.getLogger(__name__)
 
 HARTREE_TO_KCAL = 627.509
@@ -47,6 +61,24 @@ METHODS: dict[str, dict] = {
 DEFAULT_TIMEOUT = {"gfnff": 60, "gfn2": 300}
 
 _XTB_MAX_Z = 86  # GFN2-xTB / GFN-FF 参数化覆盖到 Rn
+
+# 复合物原子数超过该阈值时给出「体系较大」进度提示
+LARGE_SYSTEM_ATOMS = 150
+
+# 第三物质 X 的可选类型
+X_TYPES = ("self_stack", "solvent", "other_dimer", "custom")
+
+# 内置常用溶剂表（DFT 2.0 §一：溶剂分子作为 X）
+SOLVENTS: list[dict] = [
+    {"id": "toluene", "name_zh": "甲苯", "smiles": "Cc1ccccc1"},
+    {"id": "mesitylene", "name_zh": "均三甲苯", "smiles": "Cc1cc(C)cc(C)c1"},
+    {"id": "dioxane", "name_zh": "1,4-二氧六环", "smiles": "C1COCCO1"},
+    {"id": "dmf", "name_zh": "DMF（N,N-二甲基甲酰胺）", "smiles": "CN(C)C=O"},
+    {"id": "water", "name_zh": "水", "smiles": "O"},
+    {"id": "chloroform", "name_zh": "氯仿", "smiles": "ClC(Cl)Cl"},
+    {"id": "ethanol", "name_zh": "乙醇", "smiles": "CCO"},
+    {"id": "heptane", "name_zh": "正庚烷", "smiles": "CCCCCCC"},
+]
 
 
 class DftError(Exception):
@@ -77,6 +109,61 @@ def canonicalize_smiles(smiles: str) -> str | None:
     if mol is None:
         return None
     return Chem.MolToSmiles(mol)
+
+
+def solvent_by_id(solvent_id: str) -> dict | None:
+    """按 id 查内置溶剂；未找到返回 None。"""
+    for s in SOLVENTS:
+        if s["id"] == solvent_id:
+            return s
+    return None
+
+
+def resolve_x(x_type: str, dimer_smiles: str, *, solvent_id: str | None = None,
+              ald2_smiles: str | None = None, amine2_smiles: str | None = None,
+              custom_smiles: str | None = None
+              ) -> tuple[str, str, str]:
+    """解析第三物质 X。
+
+    Returns:
+        (x_smiles_canonical, x_description_中文, x_cache_part)
+        x_cache_part 用于缓存 key（形如 self_stack / solvent:toluene /
+        other_dimer:<smiles> / custom:<smiles>）。
+
+    Raises:
+        DftError: 未知类型 / 缺参数 / SMILES 非法（中文原因）
+    """
+    if x_type == "self_stack":
+        return dimer_smiles, "自身堆积（二聚体·二聚体）", "self_stack"
+    if x_type == "solvent":
+        if not (solvent_id or "").strip():
+            raise DftError("选择「溶剂分子」时必须指定 solvent_id（内置溶剂 id）")
+        s = solvent_by_id(solvent_id.strip())
+        if s is None:
+            raise DftError(
+                f"未知溶剂：{solvent_id}（可用 {', '.join(x['id'] for x in SOLVENTS)}）")
+        canon = canonicalize_smiles(s["smiles"])
+        return canon, f"溶剂分子：{s['name_zh']}", f"solvent:{s['id']}"
+    if x_type == "other_dimer":
+        if not (ald2_smiles or "").strip() or not (amine2_smiles or "").strip():
+            raise DftError("选择「另一组单体形成的二聚体」时必须提供"
+                           " ald2_smiles 与 amine2_smiles")
+        try:
+            other = dimer_mod.make_dimer(ald2_smiles, amine2_smiles)
+        except DimerError as exc:
+            raise DftError(f"另一组单体无法形成二聚体：{exc}")
+        return other["smiles"], "另一组单体缩合形成的二聚体", \
+            f"other_dimer:{other['smiles']}"
+    if x_type == "custom":
+        if not (custom_smiles or "").strip():
+            raise DftError("选择「自定义分子」时必须提供 custom_smiles")
+        canon = canonicalize_smiles(custom_smiles)
+        if canon is None:
+            raise DftError(
+                f"自定义分子的 SMILES 无法解析：{(custom_smiles or '')[:80]}")
+        return canon, "自定义分子", f"custom:{canon}"
+    raise DftError(
+        f"未知的 X 类型：{x_type}（可选 {' / '.join(X_TYPES)}）")
 
 
 # ---------------------------------------------------------------- 输出解析
@@ -232,9 +319,9 @@ def _combined_with_b(mol_a: Chem.Mol, mol_b: Chem.Mol, pos_b) -> Chem.Mol:
 
 def embed_complex_xyz(smiles_a: str, smiles_b: str,
                       n_orientations: int = 4, seed: int = 42) -> str:
-    """两单体非共价复合物初猜 → 力场能量最低取向的 xyz。
+    """两分子非共价复合物初猜 → 力场能量最低取向的 xyz。
 
-    流程：两单体各自 ETKDG+UFF → B 多取向摆放（不重叠）→ 组合体 UFF 优化
+    流程：两分子各自 ETKDG+UFF → B 多取向摆放（不重叠）→ 组合体 UFF 优化
     → 取力场能量最低者。对应方案 §3.4「多个初猜取向取最低能」。
     """
     mol_a = _embed_one(smiles_a, seed=seed)
@@ -336,18 +423,39 @@ def _run_xtb(xyz_block: str, args: list[str], cwd: Path, timeout: int,
 
 # ---------------------------------------------------------------- 主管线
 
-def compute_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
+def _xyz_atom_count(xyz_block: str) -> int:
+    """xyz 文本第一行的原子数；解析失败返回 0。"""
+    try:
+        return int(xyz_block.strip().splitlines()[0])
+    except Exception:
+        return 0
+
+
+def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
+                    x_type: str = "self_stack",
+                    solvent_id: str | None = None,
+                    ald2_smiles: str | None = None,
+                    amine2_smiles: str | None = None,
+                    custom_smiles: str | None = None,
                     on_stage=None, jobs_root: Path | None = None) -> dict:
-    """计算两单体结合能与量化描述符。
+    """计算「缩合二聚体 D 与第三物质 X」的结合能与量化描述符。
+
+    流程：醛/胺单体 → 亚胺缩合二聚体 D（dimer.make_dimer）→ 解析 X
+    → D / X / D·X 复合物各自 xtb --opt → E_bind = E(D·X) − E(D) − E(X)。
 
     Args:
-        smiles_a/smiles_b: 原始单体 SMILES（内部做 RDKit 规范化）
+        ald_smiles/amine_smiles: 醛/胺单体 SMILES（内部做 RDKit 规范化）
         method: "gfnff" | "gfn2"
+        x_type: "self_stack"（默认）| "solvent" | "other_dimer" | "custom"
+        solvent_id / ald2_smiles / amine2_smiles / custom_smiles:
+            各 x_type 对应的补充参数
         on_stage: 可选回调 on_stage(hint: str)，用于任务进度提示
         jobs_root: 任务临时目录根（默认 user_data_root()/dft_jobs）
 
     Returns:
-        结果 dict（能量 / gap / 偶极矩 / 复合物优化后 xyz / 耗时）
+        结果 dict（二聚体 SMILES / X 描述 / 能量 / gap / 偶极矩 /
+        复合物优化后 xyz / 耗时）；smiles_a/smiles_b 保留为规范化醛/胺单体
+        （供收藏联动等下游兼容使用）。
 
     Raises:
         DftError: 任何一步失败（message 为中文原因）
@@ -355,13 +463,13 @@ def compute_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
     if method not in METHODS:
         raise DftError(f"未知方法档位：{method}（可选 gfnff / gfn2）")
 
-    canon_a = canonicalize_smiles(smiles_a)
-    canon_b = canonicalize_smiles(smiles_b)
-    if canon_a is None:
-        raise DftError(f"单体 A 的 SMILES 无法解析：{smiles_a[:80]}")
-    if canon_b is None:
-        raise DftError(f"单体 B 的 SMILES 无法解析：{smiles_b[:80]}")
-    for canon in (canon_a, canon_b):
+    canon_ald = canonicalize_smiles(ald_smiles)
+    canon_amine = canonicalize_smiles(amine_smiles)
+    if canon_ald is None:
+        raise DftError(f"醛单体的 SMILES 无法解析：{(ald_smiles or '')[:80]}")
+    if canon_amine is None:
+        raise DftError(f"胺单体的 SMILES 无法解析：{(amine_smiles or '')[:80]}")
+    for canon in (canon_ald, canon_amine):
         mol = Chem.MolFromSmiles(canon)
         if mol is not None:
             _check_elements(mol)
@@ -370,16 +478,6 @@ def compute_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
         raise DftError("未安装计算引擎：未找到 xtb 二进制（vendor/xtb/bin/xtb.exe），"
                        "无法执行量子化学计算")
 
-    if jobs_root is None:
-        jobs_root = runtime_config.user_data_root() / "dft_jobs"
-    tag = hashlib.sha1(
-        f"{canon_a}|{canon_b}|{method}|{time.time_ns()}".encode()).hexdigest()[:12]
-    job_dir = Path(tempfile.mkdtemp(prefix=f"dft_{tag}_", dir=_ensure_dir(jobs_root)))
-
-    timeout = method_timeout(method)
-    args = METHODS[method]["args"]
-    started = time.time()
-
     def stage(hint: str) -> None:
         if on_stage is not None:
             try:
@@ -387,44 +485,96 @@ def compute_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
             except Exception:
                 pass
 
+    # 1. 缩合二聚体
+    stage("正在生成缩合二聚体（醛 + 胺 → 亚胺）…")
     try:
-        stage("正在生成单体 A 的 3D 构象…")
-        xyz_a = embed_monomer_xyz(canon_a)
-        stage("正在优化单体 A 几何…")
-        out_a, _ = _run_xtb(xyz_a, args, job_dir / "monomer_a", timeout)
+        dim = dimer_mod.make_dimer(canon_ald, canon_amine)
+    except DimerError as exc:
+        raise DftError(f"二聚体生成失败：{exc}")
+    dimer_smiles = dim["smiles"]
 
-        stage("正在生成单体 B 的 3D 构象…")
-        xyz_b = embed_monomer_xyz(canon_b)
-        stage("正在优化单体 B 几何…")
-        out_b, _ = _run_xtb(xyz_b, args, job_dir / "monomer_b", timeout)
+    # 2. 解析第三物质 X
+    x_smiles, x_description, x_cache_part = resolve_x(
+        x_type, dimer_smiles, solvent_id=solvent_id,
+        ald2_smiles=ald2_smiles, amine2_smiles=amine2_smiles,
+        custom_smiles=custom_smiles)
+    mol_x = Chem.MolFromSmiles(x_smiles)
+    if mol_x is not None:
+        _check_elements(mol_x)
 
-        stage("正在构造复合物初猜…")
-        xyz_c = embed_complex_xyz(canon_a, canon_b)
-        stage("正在优化复合物几何…")
+    if jobs_root is None:
+        jobs_root = runtime_config.user_data_root() / "dft_jobs"
+    tag = hashlib.sha1(
+        f"{dimer_smiles}|{x_cache_part}|{method}|{time.time_ns()}".encode()
+    ).hexdigest()[:12]
+    job_dir = Path(tempfile.mkdtemp(prefix=f"dft_{tag}_", dir=_ensure_dir(jobs_root)))
+
+    timeout = method_timeout(method)
+    args = METHODS[method]["args"]
+    started = time.time()
+
+    try:
+        stage("正在生成二聚体的 3D 构象…")
+        xyz_d = embed_monomer_xyz(dimer_smiles)
+        stage("正在优化二聚体几何…")
+        out_d, _ = _run_xtb(xyz_d, args, job_dir / "dimer", timeout)
+
+        if x_smiles == dimer_smiles:
+            # 自身堆积：X 即 D，能量与描述符直接复用（省一次 xtb）
+            stage("X 为二聚体自身（自身堆积），复用二聚体计算结果…")
+            out_x = out_d
+        else:
+            stage("正在生成 X 的 3D 构象…")
+            xyz_x = embed_monomer_xyz(x_smiles)
+            stage("正在优化 X 几何…")
+            out_x, _ = _run_xtb(xyz_x, args, job_dir / "x", timeout)
+
+        stage("正在构造 D·X 复合物初猜…")
+        xyz_c = embed_complex_xyz(dimer_smiles, x_smiles)
+        n_atoms = _xyz_atom_count(xyz_c)
+        if n_atoms > LARGE_SYSTEM_ATOMS:
+            stage(f"体系较大（复合物 {n_atoms} 个原子），预计耗时较长，请耐心等待…")
+        else:
+            stage("正在优化 D·X 复合物几何…")
         out_c, opt_xyz = _run_xtb(xyz_c, args, job_dir / "complex", timeout)
 
         stage("正在解析计算结果…")
-        e_a, e_b, e_c = (parse_energy(out_a), parse_energy(out_b),
+        e_d, e_x, e_c = (parse_energy(out_d), parse_energy(out_x),
                          parse_energy(out_c))
-        if e_a is None or e_b is None or e_c is None:
+        if e_d is None or e_x is None or e_c is None:
             raise DftError("xtb 输出中未找到总能量（TOTAL ENERGY），无法计算结合能")
-        e_bind = e_c - e_a - e_b
+        e_bind = e_c - e_d - e_x
 
         return {
-            "smiles_a": canon_a,
-            "smiles_b": canon_b,
+            "smiles_a": canon_ald,
+            "smiles_b": canon_amine,
+            "dimer_smiles": dimer_smiles,
+            "dimer_multi_site": bool(dim.get("multi_site")),
+            "dimer_note": dim.get("note"),
+            "x_type": x_type,
+            "x_smiles": x_smiles,
+            "x_description": x_description,
+            "x_cache_part": x_cache_part,
+            # 原始 X 参数回显：前端从历史结果借缓存任务导出输入文件时用
+            "x_request": {
+                "solvent_id": solvent_id if x_type == "solvent" else None,
+                "ald2_smiles": ald2_smiles if x_type == "other_dimer" else None,
+                "amine2_smiles": amine2_smiles if x_type == "other_dimer" else None,
+                "custom_smiles": custom_smiles if x_type == "custom" else None,
+            },
             "method": method,
             "method_label": METHODS[method]["label"],
             "e_bind_hartree": e_bind,
             "e_bind_kcal": e_bind * HARTREE_TO_KCAL,
             "e_bind_kj": e_bind * HARTREE_TO_KJ,
-            "energies_hartree": {"a": e_a, "b": e_b, "complex": e_c},
-            "gap_ev": {"a": parse_gap_ev(out_a),
-                       "b": parse_gap_ev(out_b),
+            "energies_hartree": {"dimer": e_d, "x": e_x, "complex": e_c},
+            "gap_ev": {"dimer": parse_gap_ev(out_d),
+                       "x": parse_gap_ev(out_x),
                        "complex": parse_gap_ev(out_c)},
-            "dipole_debye": {"a": parse_dipole_debye(out_a),
-                             "b": parse_dipole_debye(out_b),
+            "dipole_debye": {"dimer": parse_dipole_debye(out_d),
+                             "x": parse_dipole_debye(out_x),
                              "complex": parse_dipole_debye(out_c)},
+            "complex_atom_count": n_atoms,
             "complex_xyz": opt_xyz or xyz_c,
             "elapsed_sec": round(time.time() - started, 2),
         }

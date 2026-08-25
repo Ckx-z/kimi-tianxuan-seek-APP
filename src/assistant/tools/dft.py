@@ -48,8 +48,22 @@ def _fmt_result(res: dict, source: str) -> str:
 
 
 def _lookup_done(canon_a: str, canon_b: str, method: str) -> dict | None:
-    """读路径：先缓存，后历史（新→旧第一条 done）。命中返回结果 dict。"""
-    hit = dft_cache.load_cache(dft_cache.cache_key(canon_a, canon_b, method))
+    """读路径：先缓存，后历史（新→旧第一条 done）。命中返回结果 dict。
+
+    DFT 2.0 起缓存 key 为（二聚体 SMILES, X 描述, 方法）；助手工具的
+    语义等价于「醛/胺单体 → 二聚体 → 自身堆积」，故按 self_stack 查。
+    二聚体生成失败（非醛胺体系）时跳过缓存直接查历史。
+    """
+    try:
+        from src.dft import dimer as _dimer_mod
+    except ImportError:  # pragma: no cover
+        from dft import dimer as _dimer_mod  # type: ignore
+    try:
+        dim = _dimer_mod.make_dimer(canon_a, canon_b)
+        hit = dft_cache.load_cache(
+            dft_cache.cache_key(dim["smiles"], "self_stack", method))
+    except Exception:
+        hit = None
     if hit is not None:
         out = dict(hit)
         out["cached"] = True
@@ -88,6 +102,17 @@ def _prepare(smiles_a: str, smiles_b: str, method: str):
     if not canon_a or not canon_b:
         return None, None, method, {
             "text": "SMILES 无法解析，请检查单体结构写法。",
+            "details": {}, "is_error": True}
+    # DFT 2.0：计算对象是缩合二聚体，先校验醛/胺能生成二聚体
+    try:
+        from src.dft import dimer as _dimer_mod
+    except ImportError:  # pragma: no cover
+        from dft import dimer as _dimer_mod  # type: ignore
+    try:
+        _dimer_mod.make_dimer(canon_a, canon_b)
+    except _dimer_mod.DimerError as exc:
+        return None, None, method, {
+            "text": f"二聚体生成失败：{exc}",
             "details": {}, "is_error": True}
     return canon_a, canon_b, method, None
 

@@ -12,6 +12,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import cache as dft_cache
+from . import dimer as dimer_mod
 from . import engine
 from . import log as dft_log
 
@@ -61,7 +62,10 @@ def _prune_locked() -> None:
         _JOBS.pop(jid, None)
 
 
-def create_job(smiles_a: str, smiles_b: str, method: str) -> dict:
+def create_job(ald_smiles: str, amine_smiles: str, method: str,
+               x_type: str = "self_stack", solvent_id: str | None = None,
+               ald2_smiles: str | None = None, amine2_smiles: str | None = None,
+               custom_smiles: str | None = None) -> dict:
     """建任务。缓存命中 → 直接 done；否则 pending 并起后台线程。"""
     job_id = uuid.uuid4().hex[:16]
     job = {
@@ -69,8 +73,13 @@ def create_job(smiles_a: str, smiles_b: str, method: str) -> dict:
         "status": "pending",
         "progress_hint": "排队等待计算…",
         "method": method,
-        "smiles_a_input": smiles_a,
-        "smiles_b_input": smiles_b,
+        "ald_smiles_input": ald_smiles,
+        "amine_smiles_input": amine_smiles,
+        "x_type": x_type,
+        "solvent_id": solvent_id,
+        "ald2_smiles": ald2_smiles,
+        "amine2_smiles": amine2_smiles,
+        "custom_smiles": custom_smiles,
         "result": None,
         "error": None,
         "cached": False,
@@ -80,16 +89,18 @@ def create_job(smiles_a: str, smiles_b: str, method: str) -> dict:
         _JOBS[job_id] = job
         _prune_locked()
 
-    # 规范化失败会在工作线程里变成中文错误；这里先用规范化值探缓存
-    canon_a = engine.canonicalize_smiles(smiles_a)
-    canon_b = engine.canonicalize_smiles(smiles_b)
-    if canon_a and canon_b and method in engine.METHODS:
-        key = dft_cache.cache_key(canon_a, canon_b, method)
+    # 规范化/二聚体生成失败会在工作线程里变成中文错误；
+    # 这里先算出新口径缓存 key 探缓存
+    probe = _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
+                             solvent_id, ald2_smiles, amine2_smiles,
+                             custom_smiles)
+    if probe is not None:
+        key, canon_ald, canon_amine = probe
         hit = dft_cache.load_cache(key)
         if hit is not None:
             result = dict(hit)
             result["cached"] = True
-            result["favorite"] = _find_favorite(canon_a, canon_b)
+            result["favorite"] = _find_favorite(canon_ald, canon_amine)
             job.update(status="done", progress_hint="命中缓存，直接返回历史结果",
                        result=result, cached=True)
             return job
@@ -98,6 +109,28 @@ def create_job(smiles_a: str, smiles_b: str, method: str) -> dict:
                          name=f"dft-job-{job_id}")
     t.start()
     return job
+
+
+def _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
+                     solvent_id, ald2_smiles, amine2_smiles,
+                     custom_smiles):
+    """尽力算出 (缓存 key, 规范化醛, 规范化胺)；任一步失败返回 None。"""
+    try:
+        if method not in engine.METHODS:
+            return None
+        canon_ald = engine.canonicalize_smiles(ald_smiles)
+        canon_amine = engine.canonicalize_smiles(amine_smiles)
+        if not canon_ald or not canon_amine:
+            return None
+        dim = dimer_mod.make_dimer(canon_ald, canon_amine)
+        _, _, x_part = engine.resolve_x(
+            x_type, dim["smiles"], solvent_id=solvent_id,
+            ald2_smiles=ald2_smiles, amine2_smiles=amine2_smiles,
+            custom_smiles=custom_smiles)
+        return (dft_cache.cache_key(dim["smiles"], x_part, method),
+                canon_ald, canon_amine)
+    except Exception:
+        return None
 
 
 def get_job(job_id: str) -> dict | None:
@@ -109,9 +142,10 @@ def get_job(job_id: str) -> dict | None:
 def _run_job(job_id: str) -> None:
     with _LOCK:
         job = _JOBS[job_id]
-    smiles_a = job["smiles_a_input"]
-    smiles_b = job["smiles_b_input"]
+    ald_smiles = job["ald_smiles_input"]
+    amine_smiles = job["amine_smiles_input"]
     method = job["method"]
+    x_type = job.get("x_type") or "self_stack"
 
     def on_stage(hint: str) -> None:
         with _LOCK:
@@ -123,10 +157,22 @@ def _run_job(job_id: str) -> None:
         job["status"] = "running"
         job["progress_hint"] = "正在准备计算…"
 
+    log_base = {
+        "smiles_a": ald_smiles, "smiles_b": amine_smiles,
+        "x_type": x_type, "method": method,
+    }
+
     try:
         result = engine.compute_binding(
-            smiles_a, smiles_b, method, on_stage=on_stage)
-        key = dft_cache.cache_key(result["smiles_a"], result["smiles_b"], method)
+            ald_smiles, amine_smiles, method,
+            x_type=x_type,
+            solvent_id=job.get("solvent_id"),
+            ald2_smiles=job.get("ald2_smiles"),
+            amine2_smiles=job.get("amine2_smiles"),
+            custom_smiles=job.get("custom_smiles"),
+            on_stage=on_stage)
+        key = dft_cache.cache_key(
+            result["dimer_smiles"], result["x_cache_part"], method)
         dft_cache.save_cache(key, result)
         result["cached"] = False
         result["favorite"] = _find_favorite(
@@ -134,6 +180,13 @@ def _run_job(job_id: str) -> None:
         dft_log.log_dft({
             "smiles_a": result["smiles_a"],
             "smiles_b": result["smiles_b"],
+            "dimer_smiles": result["dimer_smiles"],
+            "dimer_multi_site": result.get("dimer_multi_site", False),
+            "dimer_note": result.get("dimer_note"),
+            "x_type": result["x_type"],
+            "x_smiles": result["x_smiles"],
+            "x_description": result["x_description"],
+            "x_request": result.get("x_request"),
             "method": method,
             "status": "done",
             "e_bind_kcal": result["e_bind_kcal"],
@@ -148,17 +201,11 @@ def _run_job(job_id: str) -> None:
             job.update(status="done", progress_hint="计算完成", result=result)
     except engine.DftError as exc:
         msg = str(exc)
-        dft_log.log_dft({
-            "smiles_a": smiles_a, "smiles_b": smiles_b,
-            "method": method, "status": "failed", "error": msg,
-        })
+        dft_log.log_dft({**log_base, "status": "failed", "error": msg})
         with _LOCK:
             job.update(status="failed", error=msg, progress_hint="计算失败")
     except Exception as exc:  # noqa: BLE001 —— 兜底，绝不把异常吞到线程里
         msg = f"计算出现未预期错误：{type(exc).__name__}: {exc}"
-        dft_log.log_dft({
-            "smiles_a": smiles_a, "smiles_b": smiles_b,
-            "method": method, "status": "failed", "error": msg,
-        })
+        dft_log.log_dft({**log_base, "status": "failed", "error": msg})
         with _LOCK:
             job.update(status="failed", error=msg, progress_hint="计算失败")

@@ -1,4 +1,8 @@
-"""DFT 结果缓存：key = 规范化单体对（排序后）+ 方法档位。
+"""DFT 结果缓存：key = 二聚体 canonical SMILES + X 描述 + 方法档位。
+
+DFT 2.0 起计算对象是「缩合二聚体与第三物质 X 的结合能」，缓存 key
+相应升级为 (dimer_smiles, x_cache_part, method)——同一对单体但不同 X
+类型（自身堆积/不同溶剂/不同异质二聚体）的结果互不串扰。
 
 缓存落在 user_data_root()/dft_cache/<sha1>.json；模块级 CACHE_DIR 供测试
 monkeypatch 到 tmp 目录（与 prediction_log / favorites 的测试口径一致）。
@@ -21,10 +25,10 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = runtime_config.user_data_root() / "dft_cache"
 
 
-def cache_key(canon_a: str, canon_b: str, method: str) -> str:
-    """规范化单体对（排序，A/B 无序）+ 方法 → sha1。"""
-    pair = "|".join(sorted([canon_a, canon_b]))
-    return hashlib.sha1(f"{pair}::{method}".encode()).hexdigest()
+def cache_key(dimer_smiles: str, x_cache_part: str, method: str) -> str:
+    """(二聚体 canonical SMILES, X 缓存描述, 方法) → sha1。"""
+    return hashlib.sha1(
+        f"{dimer_smiles}::{x_cache_part}::{method}".encode()).hexdigest()
 
 
 def load_cache(key: str) -> dict | None:
