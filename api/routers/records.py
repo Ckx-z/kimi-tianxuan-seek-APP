@@ -1,10 +1,13 @@
-"""实验记录路由（含草稿暂存、时间线附件上传/下载/删除）。"""
+"""实验记录路由（含草稿暂存、时间线附件上传/下载/删除、Word 导出）。"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+import urllib.parse
+
+from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 
+from .. import __version__
 from ..schemas import RecordCreate, RecordUpdate
 
 router = APIRouter(prefix="/api/records", tags=["records"])
@@ -91,6 +94,42 @@ def delete_record(rec_id: str):
     if not _store().delete_record(rec_id):
         raise HTTPException(404, f"记录 {rec_id} 不存在")
     return {"deleted": rec_id}
+
+
+# ---------------------------------------------------------------------------
+# Word 导出
+# ---------------------------------------------------------------------------
+
+_DOCX_MEDIA = (
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+)
+
+
+@router.get("/{rec_id}/export")
+def export_record_docx(rec_id: str):
+    """导出该记录的完整 Word 报告（.docx 下载）。
+
+    中文文件名走 RFC 5987 filename* 编码，同时给 ASCII 兜底名
+    （与 /api/dft/jobs/{id}/export 同做法）；LLM 未配置 / 无打分快照
+    时文档内对应小节降级为占位说明，不报错。
+    """
+    rec = _store().get_record(rec_id)
+    if not rec:
+        raise HTTPException(404, f"记录 {rec_id} 不存在")
+    try:
+        from records import export_docx
+    except ImportError:  # pragma: no cover - src 直接在 sys.path 时
+        from src.records import export_docx  # type: ignore
+    data = export_docx.build_record_docx(rec, version=__version__)
+    filename = export_docx.export_filename(rec)
+    quoted = urllib.parse.quote(filename, encoding="utf-8")
+    fallback = f"record_{rec_id}.docx"
+    headers = {
+        "Content-Disposition": (
+            f"attachment; filename=\"{fallback}\"; "
+            f"filename*=UTF-8''{quoted}"),
+    }
+    return Response(content=data, media_type=_DOCX_MEDIA, headers=headers)
 
 
 # ---------------------------------------------------------------------------

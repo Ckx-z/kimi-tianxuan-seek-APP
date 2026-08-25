@@ -5,7 +5,8 @@
  * - 响应式：窗口限高 + 固定头部 + 内部滚动；窄屏条件网格自动换行
  * - onEdit 提供时头部出现「编辑」入口；onBack 提供时出现「返回」（嵌套场景用）
  */
-import { ArrowLeft, Pencil } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, FileDown, Loader2, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import ProcessPanel from './ProcessPanel';
 import { CONDITION_LABELS, OUTCOME_META, pairLabel } from './meta';
-import type { RecordItem } from './api';
+import { exportRecordWord, type RecordItem } from './api';
 
 export interface RecordDetailDialogProps {
   rec: RecordItem | null;
@@ -37,6 +38,20 @@ export default function RecordDetailDialog({
   onEdit,
   onBack,
 }: RecordDetailDialogProps) {
+  /** Word 导出下载中态（失败提示由 api 封装弹出） */
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async (target: RecordItem) => {
+    setExporting(true);
+    try {
+      await exportRecordWord(target);
+    } catch {
+      // 错误提示已由 api 封装弹出
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <Dialog open={rec !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
@@ -62,6 +77,20 @@ export default function RecordDetailDialog({
                     </Badge>
                   )}
                 </DialogTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={exporting}
+                  onClick={() => void handleExport(rec)}
+                >
+                  {exporting ? (
+                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FileDown className="mr-1 h-3.5 w-3.5" />
+                  )}
+                  {exporting ? '导出中…' : '导出 Word'}
+                </Button>
                 {onEdit && (
                   <Button
                     variant="outline"

@@ -241,3 +241,40 @@ export function deleteAttachment(recordId: string, attachmentId: string): Promis
 export function attachmentUrl(recordId: string, attachmentId: string): string {
   return `/api/records/${encodeURIComponent(recordId)}/attachments/${encodeURIComponent(attachmentId)}`;
 }
+
+/** 导出实验记录 Word（.docx）：触发浏览器下载，失败弹中文提示并抛错 */
+export async function exportRecordWord(rec: RecordItem): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/records/${encodeURIComponent(rec.record_id)}/export`);
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (!res.ok) {
+    let message = `导出失败（${res.status}）`;
+    try {
+      const data = await res.json();
+      if (typeof data?.detail === 'string') message = data.detail;
+    } catch {
+      // 非 JSON 响应，保留默认提示
+    }
+    toast.error(message);
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  // 文件名优先取 RFC 5987 filename*（中文名），失败则本地兜底
+  const cd = res.headers.get('content-disposition') ?? '';
+  const m = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+  const filename = m ? decodeURIComponent(m[1]) : `实验记录_${rec.record_id}.docx`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast.success('Word 报告已开始下载');
+}

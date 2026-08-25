@@ -8,7 +8,7 @@
  */
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Maximize2, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { Loader2, Maximize2, FileDown, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +26,7 @@ import { Switch } from '@/components/ui/switch';
 import RecordDetailDialog from './RecordDetailDialog';
 import RecordEditDialog from './RecordEditDialog';
 import { CONDITION_LABELS, OUTCOME_META, pairLabel } from './meta';
-import { deleteRecord, type RecordItem } from './api';
+import { deleteRecord, exportRecordWord, type RecordItem } from './api';
 
 /** 条件摘要：拼接非空条件键值 */
 function conditionsSummary(rec: RecordItem): string {
@@ -91,6 +91,20 @@ export default function RecordTimeline({
   /** 待删除确认的记录 */
   const [deletingRec, setDeletingRec] = useState<RecordItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  /** Word 导出中的记录 id（下载中态） */
+  const [exportingId, setExportingId] = useState<string | null>(null);
+
+  /** 导出 Word（失败提示由 api 封装弹出） */
+  const handleExport = async (rec: RecordItem) => {
+    setExportingId(rec.record_id);
+    try {
+      await exportRecordWord(rec);
+    } catch {
+      // 错误提示已由 api 封装弹出
+    } finally {
+      setExportingId(null);
+    }
+  };
 
   /** 确认删除 */
   const handleDelete = async () => {
@@ -199,6 +213,19 @@ export default function RecordTimeline({
                     )}
                     <Button variant="ghost" size="sm" onClick={() => setDetailRec(rec)}>
                       <Maximize2 className="mr-1 h-3.5 w-3.5" /> 放大
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="导出 Word"
+                      disabled={exportingId === rec.record_id}
+                      onClick={() => void handleExport(rec)}
+                    >
+                      {exportingId === rec.record_id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FileDown className="h-3.5 w-3.5" />
+                      )}
                     </Button>
                     <Button
                       variant="ghost"
