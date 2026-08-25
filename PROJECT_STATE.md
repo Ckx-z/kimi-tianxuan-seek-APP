@@ -1,7 +1,7 @@
 # PROJECT_STATE — 项目当前状态
 
 > ⭐ **这是每次会话的第一份必读文件**。会话开头读它进入状态，结尾更新它。
-> 最后更新：2026-08-25（阶段 28：**v1.0.1 发布**——查询打分白屏根治 + 实验记录导出 Word + **DFT 2.0 二聚体口径**（亚胺缩合生成器/四种 X 类型/Ketcher 画板）+ Electron 版本变更自清缓存；627 passed）
+> 最后更新：2026-08-25（阶段 28：**v1.0.1/v1.0.2 发布（画板白屏热修复）**——查询打分白屏根治 + 实验记录导出 Word + **DFT 2.0 二聚体口径**（亚胺缩合生成器/四种 X 类型/Ketcher 画板）+ Electron 版本变更自清缓存；627 passed）
 
 ---
 
@@ -388,7 +388,7 @@
 
 ### 分发形态（正式）
 
-- **Electron 桌面应用**：当前版本 **v1.0.1**，NSIS 安装包（约 440MB），GitHub Release 分发（exe + zip + latest.yml），**自动更新链路 v0.2.5 起端到端武装；v1.0.1 起版本变更自动清 Chromium 缓存（升级不再见旧界面）**
+- **Electron 桌面应用**：当前版本 **v1.0.2**，NSIS 安装包（约 440MB），GitHub Release 分发（exe + zip + latest.yml），**自动更新链路 v0.2.5 起端到端武装；v1.0.1 起版本变更自动清 Chromium 缓存（升级不再见旧界面）**
 - 打包构成：React 前端（`webapp/dist`）+ FastAPI 后端（PyInstaller onedir `dist-backend/cof-backend/`）+ Electron 壳（`webapp/electron/main.cjs`，自动选端口 18765 起）
 - 用户数据：`%APPDATA%\COF-Film-Recommend\`（收藏/实验记录/附件/LLM 配置），与 Chromium 缓存目录严格分离，卸载/更新不清除
 - 打包版能力分级：tree 模型内置必可用；GNN 不可分发（依赖 dphuanjing py3.8 环境）为可选增强，缺失自动降级；打分理由 frozen 环境降级为全局特征重要性并如实标注；GraphRAG 已并入主进程（networkx 3.5）
