@@ -8,7 +8,8 @@
  * 用法：
  *   <StructureSketcher value={smiles} onChange={setSmiles} />
  */
-import { lazy, Suspense, useRef, useState } from 'react';
+import { lazy, Suspense, Component, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { PencilLine } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,35 @@ import {
 import type { Ketcher } from 'ketcher-core';
 
 const KetcherPanel = lazy(() => import('./KetcherPanel'));
+
+/** 画板错误边界：chunk 加载/运行失败时降级为对话框内提示，绝不让整页白屏 */
+class SketcherErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: string | null }
+> {
+  state = { error: null as string | null };
+
+  static getDerivedStateFromError(e: unknown) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+
+  componentDidCatch(e: unknown) {
+    console.error('[sketcher] 画板加载失败', e);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
+          <p className="font-medium text-destructive">结构画板加载失败</p>
+          <p className="max-w-md break-all text-xs">{this.state.error}</p>
+          <p>可直接在输入框粘贴 SMILES，或关闭对话框后重试。</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface Props {
   /** 当前 SMILES（打开画板时作为初始结构） */
@@ -91,19 +121,21 @@ export default function StructureSketcher({
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-hidden rounded-md border bg-white">
             {open && (
-              <Suspense
-                fallback={
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    画板首次加载中（需载入化学内核，约数秒）…
-                  </div>
-                }
-              >
-                <KetcherPanel
-                  initialSmiles={value}
-                  ketcherRef={ketcherRef}
-                  onInitError={(msg) => toast.warning(msg)}
-                />
-              </Suspense>
+              <SketcherErrorBoundary>
+                <Suspense
+                  fallback={
+                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                      画板首次加载中（需载入化学内核，约数秒）…
+                    </div>
+                  }
+                >
+                  <KetcherPanel
+                    initialSmiles={value}
+                    ketcherRef={ketcherRef}
+                    onInitError={(msg) => toast.warning(msg)}
+                  />
+                </Suspense>
+              </SketcherErrorBoundary>
             )}
           </div>
           <div className="flex justify-end gap-2 pt-2">

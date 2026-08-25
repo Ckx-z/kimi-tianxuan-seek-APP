@@ -9,6 +9,8 @@
  * - ketcher-standalone 的 WASM 与 Web Worker 以 base64 内嵌于 main.js，
  *   运行时经 Blob URL 启动，完全离线可用，无需额外文件。
  */
+// 必须第一个 import：注入 raphael require 垫片后再加载 ketcher（否则白屏）
+import './ketcher-require-shim';
 import { useEffect } from 'react';
 import { Editor } from 'ketcher-react';
 import type { Ketcher } from 'ketcher-core';
