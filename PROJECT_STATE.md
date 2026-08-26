@@ -1,7 +1,7 @@
 # PROJECT_STATE — 项目当前状态
 
 > ⭐ **这是每次会话的第一份必读文件**。会话开头读它进入状态，结尾更新它。
-> 最后更新：2026-08-25（阶段 28：**v1.0.1/v1.0.2 发布（画板白屏热修复）**——查询打分白屏根治 + 实验记录导出 Word + **DFT 2.0 二聚体口径**（亚胺缩合生成器/四种 X 类型/Ketcher 画板）+ Electron 版本变更自清缓存；627 passed）
+> 最后更新：2026-08-26（阶段 29：**v1.1.0 发布**——DFT 任意双分子模式 + 3D 结合构象（3Dmol.js）+ 文献体系（resolver/审核录入/DOI 回填至 0.8% 空缺）+ 科研助手 V2.2（日报卡/连续失败提醒）+ 缓存根治包（NSIS 杀旧进程/版本看门狗/版本三显）；718 passed）
 
 ---
 
@@ -49,6 +49,7 @@
 | **阶段 26** | **GraphRAG P0 闭环（v2 检索接入 iterate_suggest + 实验记录侧车入图，迭代建议基于用户真实实验数据）+ 实验记录全字段编辑/新增「自我总结/失误」复盘字段入 RAG + 收藏页嵌套记录视图 + 科研助手 Agent MVP（ming 人格 + function calling 双路径循环 + predict_film/query_graphrag/read_experiment_records 三工具 + SSE 对话页，真实 LLM 三轮工具调用验收）+ v0.3.0 发布 + Chromium 启发式缓存"旧界面"事故根治（SPA Cache-Control）；420 passed** | ✅ **已完成** |
 | **阶段 27** | **v1.0.0 发布：品牌升级 COF科研助手 + 工具箱父模块（DFT 计算 xTB/查询打分/批量排序）+ 收藏夹体系（Folder 实体/双确认删除/打分-DFT 交叉合并快照）+ 科研助手 V2（读写闭环 9 工具 + 写操作二次确认 + 记忆编译）；578 passed** | ✅ **已完成** |
 | **阶段 28** | **v1.0.1 发布：查询打分白屏根治（vite base './'→'/' + 旧历史日志 schema 残桩过滤）+ Electron 版本变更自清 Chromium 缓存（升级不再见旧界面）+ 实验记录导出 Word + DFT 2.0 二聚体科学对象修正（亚胺缩合生成器/自身堆积·溶剂·另一二聚体·自定义四种 X/Ketcher 画板/收藏与历史口径升级）；627 passed** | ✅ **已完成** |
+| **阶段 29** | **v1.1.0 发布：DFT 任意双分子模式（pair）+ 3D 结合构象（3Dmol.js 片段着色）+ 文献体系（paper_id resolver/收藏与助手引用真实标题+DOI 链接/Crossref 审核录入/DOI 回填至 0.8% 空缺/overlay 逐条合并读）+ 科研助手 V2.2（实验日报卡/连续失败主动提醒/get_daily_brief 工具）+ 缓存根治包（NSIS 安装前杀旧进程/版本看门狗/health 版本握手红横幅/版本三显）+ 画板白屏根治（v1.0.2，raphael require/global 双垫片+错误边界）；718 passed** | ✅ **已完成** |
 
 **阶段 16 要点（2026-07-21）**：
 - 前端全量重写（`app/gradio_app.py` 284→870 行）：`gr.themes.Soft` 深青/石墨学术主题、色彩语义（⛔/⚠️/✓）、五标签页骨架（③收藏夹 ④实验记录 ⑤RAG 迭代为占位，P2/P3 期做）
@@ -388,7 +389,7 @@
 
 ### 分发形态（正式）
 
-- **Electron 桌面应用**：当前版本 **v1.0.2**，NSIS 安装包（约 440MB），GitHub Release 分发（exe + zip + latest.yml），**自动更新链路 v0.2.5 起端到端武装；v1.0.1 起版本变更自动清 Chromium 缓存（升级不再见旧界面）**
+- **Electron 桌面应用**：当前版本 **v1.1.0**，NSIS 安装包（约 440MB），GitHub Release 分发（exe + zip + latest.yml），**自动更新链路 v0.2.5 起端到端武装；v1.0.1 起版本变更自动清 Chromium 缓存（升级不再见旧界面）**
 - 打包构成：React 前端（`webapp/dist`）+ FastAPI 后端（PyInstaller onedir `dist-backend/cof-backend/`）+ Electron 壳（`webapp/electron/main.cjs`，自动选端口 18765 起）
 - 用户数据：`%APPDATA%\COF-Film-Recommend\`（收藏/实验记录/附件/LLM 配置），与 Chromium 缓存目录严格分离，卸载/更新不清除
 - 打包版能力分级：tree 模型内置必可用；GNN 不可分发（依赖 dphuanjing py3.8 环境）为可选增强，缺失自动降级；打分理由 frozen 环境降级为全局特征重要性并如实标注；GraphRAG 已并入主进程（networkx 3.5）
@@ -401,7 +402,7 @@
 - **树模型训练/脚本**：`.venv\Scripts\python.exe`（Python 3.12，numpy、pandas、scikit-learn、xgboost、rdkit、pyyaml、shap、joblib）
 - **GNN 预测**：通过 subprocess 自动调用 dphuanjing 环境 Python 3.8（torch 2.3.1 + PyG 2.6.1）；缺失时自动降级
 - **minimax GraphRAG**：已可主进程内 import（主环境 networkx 3.5）；独立解释器调用仍支持，路径经 `src/runtime_config.py` 配置链（环境变量 > `config/runtime.local.json` > 自动探测）
-- **测试**：base 环境 `pytest tests/`——基线 **627 passed**（阶段 28）
+- **测试**：base 环境 `pytest tests/`——基线 **718 passed**（阶段 29）
 
 ### 旧版 Gradio 界面（保留维护，非分发形态）
 
