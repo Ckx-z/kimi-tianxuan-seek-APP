@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm';
 import { Bot, FileText, Image as ImageIcon, User } from 'lucide-react';
 import { ToolEventCard, type ConfirmDecision } from './ToolEventCard';
 import type { AssistantAttachmentMeta, ToolEvent } from './api';
+import { openExternal } from '@/lib/external';
 
 export interface ChatMessageView {
   role: 'user' | 'assistant';
@@ -76,9 +77,25 @@ const mdComponents: Components = {
     />
   ),
   td: (props) => <td className="border border-border px-2 py-1" {...withoutNode(props)} />,
-  a: (props) => (
-    <a className="text-primary underline" target="_blank" rel="noreferrer" {...withoutNode(props)} />
-  ),
+  a: (props) => {
+    const { href, ...rest } = withoutNode(props);
+    return (
+      <a
+        className="text-primary underline"
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(e) => {
+          // http(s) 外链（DOI 等）统一走系统浏览器（Electron 下 shell.openExternal）
+          if (href && /^https?:\/\//i.test(href)) {
+            e.preventDefault();
+            openExternal(href);
+          }
+        }}
+        {...rest}
+      />
+    );
+  },
   strong: (props) => (
     <strong className="font-semibold text-foreground" {...withoutNode(props)} />
   ),

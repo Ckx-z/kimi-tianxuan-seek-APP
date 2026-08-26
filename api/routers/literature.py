@@ -1,7 +1,9 @@
 """文献录入路由：Crossref 查询生成待审核草稿 + 审核确认入库。
 
-只进文献库（data/paper_titles.json）与审计流水（data/literature_intake.jsonl）；
-不入训练集、不入 GraphRAG 图（confirm 响应注明 graphrag_indexed:false）。
+只进文献库（overlay：用户库 user_data_root/literature/paper_titles.json 优先，
+源码态为 data/paper_titles.json）与审计流水（user_data_root/literature/
+literature_intake.jsonl）；不入训练集、不入 GraphRAG 图（confirm 响应注明
+graphrag_indexed:false）。
 """
 
 from __future__ import annotations

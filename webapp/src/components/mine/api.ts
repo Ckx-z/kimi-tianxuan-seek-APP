@@ -45,10 +45,15 @@ export interface MonomerInfo {
   name?: string;
 }
 
-/** 文献引用条目（auto-matched 结构） */
+/** 文献引用条目（auto-matched 结构；GET 响应已经后端 enrichment：
+ *  编号引用解析出真实标题 + doi + url + paper_id） */
 export interface ReferenceItem {
   title?: string;
   doi?: string;
+  /** 后端 enrichment 补的 DOI 链接（https://doi.org/...；无 DOI 为 null） */
+  url?: string | null;
+  /** 后端 enrichment 补的文献库编号（编号引用可解析时存在） */
+  paper_id?: string;
   source?: string;
   path_or_url?: string;
   match_type?: string; // both | aldehyde | amine
@@ -362,4 +367,116 @@ export async function uploadPlanTemplate(file: File, name = ''): Promise<PlanTem
 /** 删除自定义方案模板（内置模板后端禁止删除） */
 export async function deletePlanTemplate(id: string): Promise<void> {
   await request(`/plan-templates/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+// ---------- 文献录入（lookup → 审核 → confirm） ----------
+
+/** 待审核文献草稿（/api/literature/lookup 响应的 draft/candidates 条目） */
+export interface LiteratureDraft {
+  title?: string;
+  authors?: string[];
+  journal?: string;
+  year?: number | null;
+  doi?: string;
+  url?: string | null;
+  abstract?: string | null;
+  source?: string;
+  /** DOI 已在文献库中时为 true */
+  existing?: boolean;
+  existing_paper_id?: string;
+}
+
+/** confirm 201 响应 */
+export interface LiteratureConfirmResult {
+  paper_id: string;
+  url: string | null;
+  in_training: boolean;
+  graphrag_indexed: boolean;
+  message: string;
+}
+
+/** 录入流程专用错误：带 HTTP 状态与结构化 detail（409 含 existing_paper_id） */
+export class LiteratureApiError extends Error {
+  status: number;
+  existingPaperId?: string;
+  constructor(status: number, message: string, existingPaperId?: string) {
+    super(message);
+    this.name = 'LiteratureApiError';
+    this.status = status;
+    this.existingPaperId = existingPaperId;
+  }
+}
+
+/** 录入接口统一请求：404/409/502 映射为中文提示，409 携带已存在 paper_id */
+async function literatureRequest<T>(path: string, body: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (res.ok) return (await res.json()) as T;
+
+  let detail: unknown = null;
+  try {
+    detail = (await res.json())?.detail;
+  } catch {
+    /* 非 JSON 响应 */
+  }
+  const detailText = typeof detail === 'string' ? detail : '';
+  if (res.status === 409) {
+    const obj = (detail && typeof detail === 'object' ? detail : {}) as {
+      message?: string;
+      existing_paper_id?: string;
+    };
+    throw new LiteratureApiError(
+      409,
+      obj.message || '该 DOI 已存在于文献库，未重复入库',
+      obj.existing_paper_id,
+    );
+  }
+  if (res.status === 502) {
+    throw new LiteratureApiError(502, 'Crossref 暂时不可达，请稍后重试');
+  }
+  if (res.status === 404) {
+    throw new LiteratureApiError(404, detailText || 'Crossref 未找到该 DOI 对应的文献');
+  }
+  throw new LiteratureApiError(res.status, detailText || `请求失败（${res.status}）`);
+}
+
+/** DOI 查询：返回单个待审核草稿（404 DOI 不存在 / 502 Crossref 不可达） */
+export async function lookupLiteratureByDoi(doi: string): Promise<LiteratureDraft> {
+  const data = await literatureRequest<{ draft: LiteratureDraft }>('/literature/lookup', { doi });
+  return data.draft;
+}
+
+/** 标题查询：返回前 3 候选草稿供选择 */
+export async function lookupLiteratureByTitle(title: string): Promise<LiteratureDraft[]> {
+  const data = await literatureRequest<{ candidates: LiteratureDraft[] }>(
+    '/literature/lookup',
+    { title },
+  );
+  return Array.isArray(data?.candidates) ? data.candidates : [];
+}
+
+/** 审核后确认入库（reviewed_by 固定 "user"；409 抛 LiteratureApiError 带 existingPaperId） */
+export async function confirmLiterature(draft: {
+  title: string;
+  authors: string[];
+  journal: string;
+  year: number | null;
+  doi: string;
+  abstract?: string | null;
+  source?: string;
+}): Promise<LiteratureConfirmResult> {
+  return literatureRequest<LiteratureConfirmResult>('/literature/confirm', {
+    ...draft,
+    reviewed_by: 'user',
+  });
 }

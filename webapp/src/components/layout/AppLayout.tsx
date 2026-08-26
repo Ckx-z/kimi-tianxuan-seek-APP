@@ -3,7 +3,7 @@
  * 所有路由页面通过 <Outlet /> 渲染在内容区
  * v1.0.0：新增「工具箱」父级分组（查询打分 / 批量排序 / DFT 计算），可展开收起
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import {
   Home,
@@ -20,9 +20,22 @@ import {
   Toolbox,
   ChevronDown,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
+
+/** preload 暴露的版本不一致事件 payload（浏览器 dev 模式下无此 API） */
+interface BackendVersionMismatchPayload {
+  backendVersion: string;
+  appVersion: string;
+}
+interface VersionHandshakeApi {
+  onBackendVersionMismatch(cb: (payload: BackendVersionMismatchPayload) => void): () => void;
+}
+function getVersionHandshake(): VersionHandshakeApi | undefined {
+  return (window as unknown as { updater?: VersionHandshakeApi }).updater;
+}
 
 // 主导航项（首页与工具箱分组单独渲染；设置单独放在侧栏底部）
 const NAV_ITEMS = [
@@ -58,9 +71,27 @@ export default function AppLayout() {
     location.pathname === '/query' ||
     location.pathname === '/batch';
   const [toolboxOpen, setToolboxOpen] = useState(true);
+  // 后端/界面版本不一致（主进程握手事件）→ 页面顶部红色横幅
+  const [versionMismatch, setVersionMismatch] = useState<BackendVersionMismatchPayload | null>(null);
+
+  useEffect(() => {
+    const api = getVersionHandshake();
+    if (!api) return; // 浏览器 dev 模式无 preload，跳过
+    return api.onBackendVersionMismatch(setVersionMismatch);
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* 后端版本握手失败横幅：固定置顶，指引用户完全退出后重开 */}
+      {versionMismatch && (
+        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-md">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            后端版本 (v{versionMismatch.backendVersion}) 与界面版本 (v{versionMismatch.appVersion})
+            不一致，请完全退出软件后重新打开
+          </span>
+        </div>
+      )}
       {/* 左侧固定导航栏 */}
       <aside className="fixed inset-y-0 left-0 z-30 flex w-60 flex-col bg-sidebar-background text-sidebar-foreground">
         {/* Logo 区 */}

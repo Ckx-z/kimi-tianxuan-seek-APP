@@ -44,6 +44,14 @@ def test_health():
     assert r.json()["tree_available"] is True
 
 
+def test_health_exposes_version():
+    """版本握手契约：health 必须带与 api.__version__ 一致的 version 字段。"""
+    import api
+    r = client.get("/api/health")
+    assert r.status_code == 200
+    assert r.json()["version"] == api.__version__
+
+
 def test_openapi_lists_core_routes():
     paths = client.get("/openapi.json").json()["paths"]
     for p in ("/api/predict", "/api/predict/batch", "/api/favorites",

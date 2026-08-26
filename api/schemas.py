@@ -164,6 +164,11 @@ class AssistantMemoryUpdate(BaseModel):
         None, description="memory.md 整体覆写内容（None 表示不修改）")
 
 
+class AssistantNudgeDismiss(BaseModel):
+    """连续失败提醒的"知道了"登记：该收藏当日不再提醒。"""
+    favorite_id: str = Field(..., description="被 dismiss 的收藏条目 ID")
+
+
 class DftJobCreate(BaseModel):
     """DFT 计算任务创建（2.0）：醛/胺单体 → 缩合二聚体 + 第三物质 X 类型。
 

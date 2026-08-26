@@ -682,6 +682,71 @@ function SoftwareUpdateCard() {
   );
 }
 
+/** 关于卡：版本三显（界面 / 后端 / 前端构建），截图即可确认真身 */
+function AboutCard({
+  health,
+  offline,
+  loading,
+}: {
+  health: HealthInfo | null;
+  offline: boolean;
+  loading: boolean;
+}) {
+  const updater = getUpdater();
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!updater) return;
+    let cancelled = false;
+    updater.getVersion().then((v) => {
+      if (!cancelled) setAppVersion(v);
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [updater]);
+
+  const rows: { label: string; value: string }[] = [
+    {
+      label: '界面（Electron）版本',
+      value: updater ? (appVersion ? `v${appVersion}` : '读取中…') : '浏览器模式（无桌面壳）',
+    },
+    {
+      label: '后端版本',
+      value: loading
+        ? '读取中…'
+        : offline
+          ? '后端未连接'
+          : health?.version
+            ? `v${health.version}`
+            : '未知（旧后端无 version 字段）',
+    },
+    { label: '前端构建', value: __BUILD_HASH__ },
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">关于</CardTitle>
+        <CardDescription>三项版本标识不一致时，说明更新未完全生效，请完全退出软件后重开。</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-1.5 text-sm text-muted-foreground">
+        <div>
+          项目：<span className="font-medium text-foreground">COF 科研系统</span>
+        </div>
+        {rows.map(({ label, value }) => (
+          <div key={label}>
+            {label}：<span className="font-mono font-medium text-foreground">{value}</span>
+          </div>
+        ))}
+        <p className="pt-1">
+          界面采用紫金主题——紫色为主色调象征科研理性，金色点缀致敬学术荣光，支持明暗模式自动切换。
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [offline, setOffline] = useState(false);
@@ -725,24 +790,7 @@ export default function Settings() {
         <div className="space-y-6">
           <BackendStatusCard health={health} offline={offline} loading={healthLoading} />
           <SoftwareUpdateCard />
-
-          {/* 关于 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">关于</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1.5 text-sm text-muted-foreground">
-              <div>
-                项目：<span className="font-medium text-foreground">COF 科研系统</span>
-              </div>
-              <div>
-                后端版本：<span className="font-medium text-foreground">0.1.0</span>
-              </div>
-              <p className="pt-1">
-                界面采用紫金主题——紫色为主色调象征科研理性，金色点缀致敬学术荣光，支持明暗模式自动切换。
-              </p>
-            </CardContent>
-          </Card>
+          <AboutCard health={health} offline={offline} loading={healthLoading} />
         </div>
       </div>
     </div>

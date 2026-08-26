@@ -10,7 +10,9 @@
 - 每次请求间隔 1s（礼貌池之外再加节流）；
 - 网络失败 / 低置信度列入「需人工」清单，最后统一打印；
 - --write 时：回填 doi 字段 + 加 doi_backfilled:true，审计行进
-  data/literature_intake.jsonl，paper_titles.json 原子落盘。
+  user_data_root/literature/literature_intake.jsonl；写路径走
+  titles.writable_titles_path（frozen 打包态写用户库，首次写入自动
+  复制内置库；源码开发态写 data/paper_titles.json），原子落盘。
 """
 
 from __future__ import annotations
@@ -116,7 +118,7 @@ def main() -> int:
             entry["doi"] = draft["doi"]
             entry["doi_backfilled"] = True
             papers[pid] = entry
-        path = Path(titles.TITLES_PATH)
+        path = titles.writable_titles_path()
         tmp = path.with_name(path.name + ".tmp")
         tmp.write_text(json.dumps(papers, ensure_ascii=False, indent=1) + "\n",
                        encoding="utf-8")

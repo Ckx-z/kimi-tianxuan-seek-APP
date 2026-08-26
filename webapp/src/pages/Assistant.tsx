@@ -31,6 +31,8 @@ import {
   type ToolEvent,
 } from '@/components/assistant/api';
 import { MessageBubble, type ChatMessageView } from '@/components/assistant/MessageBubble';
+import { DailyBriefCard } from '@/components/assistant/DailyBriefCard';
+import { NudgeBar } from '@/components/assistant/NudgeBar';
 
 interface LocalMessage extends ChatMessageView {
   id: string;
@@ -66,6 +68,7 @@ export default function Assistant() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   /** 最近一次发送（供网络中断后重试；attachments 为已上传的元信息） */
   const lastSentRef = useRef<{ message: string; attachments?: AssistantAttachmentMeta[] } | null>(null);
   const [canRetry, setCanRetry] = useState(false);
@@ -442,6 +445,12 @@ export default function Assistant() {
     setCanRetry(false);
   };
 
+  /** 提醒条点击 → 话术填入输入框并聚焦（不自动发送，用户确认后发） */
+  const handleNudgePrefill = useCallback((text: string) => {
+    setInput(text);
+    inputRef.current?.focus();
+  }, []);
+
   // ---------- 状态页：检测中 / 禁用 / 离线 ----------
   if (statusError) {
     return (
@@ -508,6 +517,10 @@ export default function Assistant() {
           新建会话
         </Button>
       </div>
+
+      {/* V2.2 主动能力：今日科研日报卡 + 连续失败提醒条 */}
+      <DailyBriefCard />
+      <NudgeBar onPrefill={handleNudgePrefill} disabled={streaming} />
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
         {/* 左侧会话列表：窄屏时变为顶部横向滚动条 */}
@@ -653,6 +666,7 @@ export default function Assistant() {
                 <Paperclip className="h-4 w-4" />
               </Button>
               <Textarea
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {

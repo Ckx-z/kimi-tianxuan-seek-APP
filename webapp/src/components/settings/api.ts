@@ -45,6 +45,8 @@ export interface LlmSettings {
 /** 后端健康（GET /api/health 响应） */
 export interface HealthInfo {
   status: string;
+  /** 后端版本号（api/__init__.py 的 __version__，旧后端无此字段） */
+  version?: string;
   tree_available?: boolean;
   gnn_available?: boolean;
   routing?: boolean;

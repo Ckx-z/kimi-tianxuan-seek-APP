@@ -15,6 +15,7 @@ import logging
 
 from .tools.dft import confirm_impact as _dft_impact
 from .tools.dft import query_dft
+from .tools.brief import get_daily_brief
 from .tools.favorites import list_favorites_tool, manage_favorite, manage_favorite_impact
 from .tools.graphrag import query_graphrag_tool
 from .tools.history import list_prediction_history
@@ -244,6 +245,26 @@ TOOLS: dict = {
                                          "description": "自我总结（可选）"},
                         "mistakes": {"type": "string",
                                      "description": "本人认为的失误（可选）"},
+                    },
+                    "required": [],
+                },
+            },
+        },
+    },
+    "get_daily_brief": {
+        "handler": lambda args: get_daily_brief(args.get("date") or None),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "get_daily_brief",
+                "description": "今日科研日报：聚合指定日期（缺省今天）新建/更新的"
+                               "实验记录、DFT 计算任务与最佳结合能、新收藏、新录入"
+                               "文献。用户问「今天/最近做了什么、今日进展」时先调它。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "date": {"type": "string",
+                                 "description": "日期 YYYY-MM-DD（可选，缺省今天）"},
                     },
                     "required": [],
                 },

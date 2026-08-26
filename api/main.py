@@ -50,11 +50,17 @@ for r in (predict.router, favorites.router, favorite_folders.router,
 
 @app.get("/api/health")
 def health():
-    """存活 + 模型可用性（不触发 GNN subprocess，仅树模型加载态）。"""
+    """存活 + 模型可用性（不触发 GNN subprocess，仅树模型加载态）。
+
+    version 字段（2026-08-26 版本握手）：Electron 主进程据此判断
+    "连上的后端是否与自己同版本"，设置页"版本三显"也读取它。
+    """
+    from . import __version__
     from .deps import get_predictor
     pred = get_predictor()
     return {
         "status": "ok",
+        "version": __version__,
         "tree_available": pred.tree_available,
         "gnn_available": pred.gnn_available,
         "routing": pred.router is not None,

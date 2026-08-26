@@ -3,10 +3,13 @@
 单一职责：把文献库（data/paper_titles.json）里的编号引用解析成完整文献
 视图，并承担文献库的追加写（录入审核流 / DOI 回填共用）。
 
-- 读：委托 references.titles（唯一缓存源，reload 一处生效）；
+- 读：委托 references.titles（唯一缓存源，reload 一处生效；overlay 策略 —
+  用户库存在优先于内置库，见 titles.titles_path）；
 - url：doi 存在时 https://doi.org/{doi}，缺失时 None；
 - 写：append_paper 纯 dict 追加 + 原子落盘（查询打分链路只读使用，追加
-  新 key 不影响既有读取）；审计流水写 data/literature_intake.jsonl。
+  新 key 不影响既有读取）；写路径走 titles.writable_titles_path（frozen
+  打包态写用户库，源码态写 data/paper_titles.json）；审计流水写
+  user_data_root/literature/literature_intake.jsonl。
 """
 
 from __future__ import annotations
@@ -27,8 +30,9 @@ except ImportError:  # 包路径导入（项目根在 sys.path 上）
     from src import runtime_config
     from src.references import titles
 
-# 审计流水（可写用户数据目录；frozen 时落 %APPDATA%/COF-Film-Recommend/data）
-INTAKE_PATH = runtime_config.user_data_root() / "literature_intake.jsonl"
+# 审计流水（可写用户数据目录 literature/ 下；frozen 时落
+# %APPDATA%/COF-Film-Recommend/data/literature/，与文献库用户库同目录）
+INTAKE_PATH = runtime_config.user_data_root() / "literature" / "literature_intake.jsonl"
 
 _DOI_PREFIX_RE = re.compile(r"^https?://(dx\.)?doi\.org/", re.IGNORECASE)
 
@@ -118,8 +122,10 @@ def enrich_references(refs) -> list:
 # ---------------------------------------------------------------- 文献库写入（录入审核流 / 回填共用）
 
 def _papers_path() -> Path:
-    """文献库路径（跟随 titles.TITLES_PATH，测试 monkeypatch 一处即生效）。"""
-    return Path(titles.TITLES_PATH)
+    """文献库【写】路径（委托 titles.writable_titles_path：overlay 生效时
+    永远写用户库，首次写入自动全量复制内置库；测试 monkeypatch
+    titles.TITLES_PATH 一处即生效）。"""
+    return titles.writable_titles_path()
 
 
 def next_paper_id() -> str:

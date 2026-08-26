@@ -34,7 +34,8 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from ..schemas import (AssistantChatRequest, AssistantConfirmRequest,
-                       AssistantMemoryUpdate, AssistantSessionCreate)
+                       AssistantMemoryUpdate, AssistantNudgeDismiss,
+                       AssistantSessionCreate)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,16 @@ def _imports():
         from assistant import (attachments, confirm, llm_bridge, loop,  # type: ignore
                                memory, registry, sessions)
     return attachments, confirm, llm_bridge, loop, memory, registry, sessions
+
+
+def _brief():
+    """延迟 import 日报/提醒聚合模块（V2.2 主动能力）。"""
+    from .. import deps  # noqa: F401
+    try:
+        from src.assistant import brief
+    except ImportError:  # pragma: no cover
+        from assistant import brief  # type: ignore
+    return brief
 
 
 def _finalize_previous_session(sessions, memory) -> None:
@@ -342,6 +353,56 @@ def compile_session_memory(session_id: str):
         raise HTTPException(404, f"会话不存在: {session_id}")
     appended = memory.compile_session(sess, force=True)
     return {"appended": appended}
+
+
+# ---------------------------------------------------------------------------
+# 主动能力（V2.2）：今日科研日报 + 连续失败提醒
+# ---------------------------------------------------------------------------
+
+def _parse_date(date: str | None) -> str | None:
+    """校验 date 查询参数（YYYY-MM-DD）；非法抛 400，缺省返回 None（=今天）。"""
+    s = (date or "").strip()
+    if not s:
+        return None
+    from datetime import datetime as _dt
+    try:
+        _dt.strptime(s, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, f"date 必须是 YYYY-MM-DD 格式，收到: {s!r}")
+    return s
+
+
+@router.get("/daily-brief")
+def daily_brief(date: str | None = None):
+    """今日科研日报：聚合当日实验记录/DFT/收藏/文献数据 + ming 点评。
+
+    LLM 未配置时 commentary 为 null，只返回结构化数据；LLM 点评失败时
+    同样降级为 null（llm_enabled 字段标识配置状态，便于前端区分）。
+    """
+    brief = _brief()
+    return brief.build_daily_brief(_parse_date(date))
+
+
+@router.get("/nudges")
+def nudges():
+    """连续失败主动提醒：同一收藏连续失败 ≥2 次即命中。
+
+    同一天同一收藏只提醒一次（已 dismiss 的当日不再返回）。
+    """
+    brief = _brief()
+    return {"nudges": brief.list_nudges()}
+
+
+@router.post("/nudges/dismiss")
+def dismiss_nudge(req: AssistantNudgeDismiss):
+    """登记"知道了"：该收藏当日不再提醒（dismiss 状态落 user_data_root）。"""
+    brief = _brief()
+    fid = (req.favorite_id or "").strip()
+    if not fid:
+        raise HTTPException(400, "favorite_id 不能为空")
+    brief.dismiss_nudge(fid)
+    return {"dismissed": True, "favorite_id": fid,
+            "nudges": brief.list_nudges()}
 
 
 def _sse(event: dict) -> str:

@@ -8,12 +8,21 @@
  *        （webapp/dist 已由 FastAPI 静态托管，前端无需单独 dev server）
  *      - prod 模式（app.isPackaged）：spawn 同目录 backend 可执行文件（本波次先用
  *        python 占位，切换逻辑见 resolveBackendCommand）
- *   3. 轮询 /api/health 通过后创建 BrowserWindow 加载 http://localhost:<port>/
+ *   3. 轮询 /api/health 通过（并记录后端版本）后创建 BrowserWindow 加载
+ *      http://localhost:<port>/
  *   4. 窗口/应用退出时杀掉后端子进程（Windows 用 taskkill /T 杀整棵进程树，
  *      只杀自己 spawn 的 PID，不碰其它用户进程）
+ *
+ * 版本健壮性（2026-08-26 根治包）：
+ *   - 运行标记 userData/.running-instance {pid, version, started_at}
+ *   - 版本看门狗：新实例拿不到单实例锁时，若运行中实例是旧版本（更新安装时
+ *     旧进程没被杀掉的残留场景），主动结束旧实例进程树、延迟 1s 重新拿锁并
+ *     继续自身启动——不再"退出并聚焦旧窗口"让用户看到旧版界面
+ *   - 后端版本握手：health 返回的 version 与 app.getVersion() 不一致时，
+ *     主窗口加载完成后向渲染进程发 'backend-version-mismatch' 事件
  */
 
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const { spawn, execSync } = require('child_process');
 const net = require('net');
 const http = require('http');
@@ -28,6 +37,8 @@ const PREFERRED_PORT = 18765;
 let backendProc = null;
 let backendPort = null;
 let mainWindow = null;
+/** 后端 /api/health 返回的版本号（旧后端无该字段时为 null） */
+let backendVersion = null;
 
 // ── 版本变更自清缓存（2026-08-24 二次缓存事故根治）─────────────
 // 背景：旧版后端无 Cache-Control 时 Chromium 启发式缓存会缓存旧页面；
@@ -52,21 +63,125 @@ async function clearCacheOnVersionChange() {
   }
 }
 
-// ── 防多开：单实例锁 ─────────────────────────────────────────
-// 连续双击桌面图标时，第二个实例直接退出；已有实例收到
+// ── 运行标记文件（.running-instance）─────────────────────────────
+// 记录当前持有单实例锁进程的 {pid, version, started_at}，供：
+//  1) 版本看门狗判断"运行中的实例是不是旧版本"；
+//  2) 启动时识别僵死标记（pid 已死直接覆盖）。
+function instanceMarkerPath() {
+  try {
+    return path.join(app.getPath('userData'), '.running-instance');
+  } catch (e) {
+    return null; // userData 路径不可用时降级（不影响启动）
+  }
+}
+
+function readInstanceMarker() {
+  try {
+    const p = instanceMarkerPath();
+    if (!p) return null;
+    return JSON.parse(fs.readFileSync(p, 'utf-8'));
+  } catch (e) {
+    return null; // 标记不存在或已损坏：按无标记处理
+  }
+}
+
+function writeInstanceMarker() {
+  try {
+    const p = instanceMarkerPath();
+    if (!p) return;
+    fs.writeFileSync(p, JSON.stringify({
+      pid: process.pid,
+      version: app.getVersion(),
+      started_at: new Date().toISOString(),
+    }), 'utf-8');
+  } catch (e) {
+    console.warn('[electron] 写运行标记失败（不影响启动）:', e.message);
+  }
+}
+
+/** 正常退出时删标记；仅当标记里的 pid 是自己时才删，防误删新实例标记 */
+function removeInstanceMarkerIfMine() {
+  try {
+    const p = instanceMarkerPath();
+    if (!p) return;
+    const m = JSON.parse(fs.readFileSync(p, 'utf-8'));
+    if (m && m.pid === process.pid) fs.unlinkSync(p);
+  } catch (e) { /* 标记不存在或已损坏：忽略 */ }
+}
+
+/** 跨平台探测进程是否存活（signal 0 不发信号只检查存在性） */
+function isPidAlive(pid) {
+  if (!pid || typeof pid !== 'number') return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e && e.code === 'EPERM'; // 存在但无权发信号也算活着
+  }
+}
+
+/** 强制结束指定进程整棵进程树（结束旧版本实例用，全程容错） */
+function killProcessTree(pid) {
+  try {
+    if (process.platform === 'win32') {
+      // /T 连同其后端子进程（cof-backend.exe / uvicorn）一起结束
+      execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore' });
+    } else {
+      process.kill(pid, 'SIGKILL');
+    }
+  } catch (e) {
+    console.warn(`[electron] 结束旧实例进程 pid=${pid} 失败（可能已退出）:`, e.message);
+  }
+}
+
+// ── 防多开：单实例锁 + 版本看门狗 ────────────────────────────────
+// 常规情况：连续双击桌面图标时，第二个实例直接退出；已有实例收到
 // second-instance 事件后 restore + focus 主窗口。
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
-if (!gotSingleInstanceLock) {
-  console.log('[electron] 已有实例在运行，本实例退出');
-  app.quit();
-} else {
+//
+// 版本看门狗（2026-08-26）：新实例拿不到锁时先读运行标记——若运行中
+// 实例版本 ≠ 自己（典型场景：更新安装时旧进程未被杀，装完用户双击，
+// 按旧逻辑会"退出并聚焦旧窗口"，用户永远看到旧版界面），则由新实例
+// 主动结束旧实例进程树，延迟 1s 等其退出后重新拿锁、继续自身启动。
+function registerSecondInstanceHandler() {
   app.on('second-instance', () => {
+    // 能走到这里说明第二实例已按上面逻辑判定为同版本并自行退出，
+    // 本实例只需把窗口唤到前台
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
     }
   });
+}
+
+let gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!gotSingleInstanceLock) {
+  const marker = readInstanceMarker();
+  const myVersion = app.getVersion();
+  if (marker && marker.version && marker.version !== myVersion && isPidAlive(marker.pid)) {
+    console.log(
+      `[electron] 版本看门狗：运行中实例为 v${marker.version} (pid=${marker.pid})，` +
+      `本实例为 v${myVersion}，结束旧实例并接管启动`
+    );
+    killProcessTree(marker.pid);
+    // 等旧实例（及其后端进程树）退出后再重新拿锁
+    setTimeout(() => {
+      gotSingleInstanceLock = app.requestSingleInstanceLock();
+      if (gotSingleInstanceLock) {
+        registerSecondInstanceHandler();
+        app.whenReady().then(startApp);
+      } else {
+        console.log('[electron] 重新获取单实例锁失败，本实例退出');
+        app.quit();
+      }
+    }, 1000);
+  } else {
+    console.log('[electron] 已有实例在运行，本实例退出');
+    app.quit();
+  }
+} else {
+  registerSecondInstanceHandler();
 }
 
 // ── 自动更新（electron-updater + GitHub Releases）────────────
@@ -264,6 +379,10 @@ async function choosePort() {
   return pickFreePort();
 }
 
+/**
+ * 轮询 /api/health 直到就绪；resolve { version }（版本握手用，
+ * 旧后端无 version 字段时 version 为 null，不算不一致）。
+ */
 function waitForHealth(port, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
@@ -271,9 +390,21 @@ function waitForHealth(port, timeoutMs = 60000) {
       const req = http.get(
         { host: '127.0.0.1', port, path: '/api/health', timeout: 2000 },
         (res) => {
-          res.resume();
-          if (res.statusCode === 200) return resolve();
-          retry();
+          if (res.statusCode !== 200) {
+            res.resume();
+            return retry();
+          }
+          let body = '';
+          res.setEncoding('utf-8');
+          res.on('data', (c) => { body += c; });
+          res.on('end', () => {
+            let version = null;
+            try {
+              const data = JSON.parse(body);
+              version = (data && typeof data.version === 'string') ? data.version : null;
+            } catch (e) { /* 非 JSON 响应：视为无版本信息 */ }
+            resolve({ version });
+          });
         }
       );
       req.on('error', retry);
@@ -314,9 +445,40 @@ async function startBackend() {
   backendProc.stdout.on('data', (d) => process.stdout.write(`[backend] ${d}`));
   backendProc.stderr.on('data', (d) => process.stderr.write(`[backend] ${d}`));
   backendProc.on('exit', (code) => console.log(`[electron] 后端退出 code=${code}`));
-  await waitForHealth(backendPort);
-  console.log(`[electron] 后端就绪: http://localhost:${backendPort}/`);
+  const health = await waitForHealth(backendPort);
+  backendVersion = health.version;
+  console.log(`[electron] 后端就绪: http://localhost:${backendPort}/ (version=${backendVersion || '未知'})`);
+  if (backendVersion && backendVersion !== app.getVersion()) {
+    // 极端情况：连上的不是自己这套后端（如旧后端进程残留占用并应答）。
+    // 不阻断启动，窗口加载完成后通知渲染进程显示红色横幅。
+    console.warn(
+      `[electron] 后端版本 v${backendVersion} 与界面版本 v${app.getVersion()} 不一致，` +
+      '将提示用户完全退出后重开'
+    );
+  }
 }
+
+/** 仅允许 http/https 外链（拦截 file:/javascript: 等危险协议） */
+function isExternalHttpUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+// 渲染进程经 preload（window.shell.openExternal）请求系统浏览器打开外链
+ipcMain.handle('open-external', (_event, url) => {
+  if (!isExternalHttpUrl(url)) {
+    console.warn('[electron] 拒绝打开非 http(s) 链接:', url);
+    return false;
+  }
+  return shell.openExternal(url).then(() => true).catch((e) => {
+    console.warn('[electron] openExternal 失败:', e);
+    return false;
+  });
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -335,13 +497,45 @@ function createWindow() {
   });
   mainWindow.loadURL(`http://localhost:${backendPort}/`);
   mainWindow.on('closed', () => { mainWindow = null; });
+
+  // 后端版本握手：页面加载完成后若版本不一致，通知渲染进程显示横幅
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (backendVersion && backendVersion !== app.getVersion()
+        && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('backend-version-mismatch', {
+        backendVersion,
+        appVersion: app.getVersion(),
+      });
+    }
+  });
+
+  // ── 外部链接（DOI 等）：不在应用窗口内打开，交系统浏览器 ──
+  // target=_blank / window.open：拦截并转 shell.openExternal
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isExternalHttpUrl(url)) {
+      shell.openExternal(url).catch((e) => console.warn('[electron] openExternal 失败:', e));
+      return { action: 'deny' };
+    }
+    return { action: 'deny' }; // 应用内一律单窗口，不允许弹新窗口
+  });
+  // 意外导航到外部 origin（如误点无 target 的外链）：拦下并转系统浏览器
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isExternalHttpUrl(url) && url !== `http://localhost:${backendPort}/`
+        && !url.startsWith(`http://localhost:${backendPort}/`)) {
+      event.preventDefault();
+      shell.openExternal(url).catch((e) => console.warn('[electron] openExternal 失败:', e));
+    }
+  });
 }
 
-app.whenReady().then(async () => {
-  // 未拿到单实例锁的第二实例已在 app.quit() 路径上，不再启动后端
-  if (!gotSingleInstanceLock) return;
+/** 应用启动主流程（首实例与看门狗接管后的新实例共用，防重入） */
+let appStarted = false;
+async function startApp() {
+  if (appStarted) return;
+  appStarted = true;
   try {
     await clearCacheOnVersionChange();
+    writeInstanceMarker(); // 覆盖旧标记（含僵死标记：旧 pid 已死也直接覆盖）
     await startBackend();
     createWindow();
     setupAutoUpdater();
@@ -350,6 +544,13 @@ app.whenReady().then(async () => {
     killBackend();
     app.exit(1);
   }
+}
+
+app.whenReady().then(() => {
+  // 未拿到单实例锁的第二实例：同版本走 app.quit() 路径；看门狗接管路径
+  // 会在拿到锁后自行调用 startApp，这里统一由 gotSingleInstanceLock 守门
+  if (!gotSingleInstanceLock) return;
+  startApp();
 });
 
 app.on('window-all-closed', () => {
@@ -358,4 +559,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', killBackend);
-process.on('exit', killBackend);
+process.on('exit', () => {
+  killBackend();
+  removeInstanceMarkerIfMine();
+});

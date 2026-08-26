@@ -25,6 +25,7 @@ import {
 } from '@/components/mine/api';
 import { FavoritesSection } from '@/components/mine/FavoritesSection';
 import { PlansSection } from '@/components/mine/PlansSection';
+import { LiteratureIntakeSection } from '@/components/mine/LiteratureIntakeSection';
 
 /** 导出备份：打包四类数据为 JSON Blob 下载 */
 async function exportBackup() {
@@ -140,6 +141,12 @@ export default function Mine() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">我的方案库</h2>
         <PlansSection plans={plans} loading={loading} />
+      </section>
+
+      {/* 文献录入：Crossref 查询 → 审核 → 入库 */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">文献录入</h2>
+        <LiteratureIntakeSection />
       </section>
 
       {/* 导出实验记录：勾选收藏组 → 分组导出 docx */}

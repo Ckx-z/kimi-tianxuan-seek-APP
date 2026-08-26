@@ -273,6 +273,53 @@ export const mockApi = {
     session.updated_at = nowIso();
     return streamEvents(events);
   },
+
+  // ---------- V2.2 主动能力 mock ----------
+
+  async dailyBrief(): Promise<import('./api').DailyBrief> {
+    return {
+      date: nowIso().slice(0, 10),
+      llm_enabled: true,
+      records_created_count: 1,
+      records_created: [
+        {
+          record_id: 'rec_20260827_001',
+          experiment_no: 'A5',
+          monomers: '均苯三甲醛 + 对苯二胺',
+          outcome: 'film',
+          outcome_zh: '成膜',
+          status: 'final',
+          self_summary: '80℃ 三天成膜完整，边缘略厚。',
+        },
+      ],
+      records_updated_count: 0,
+      records_updated: [],
+      dft_count: 2,
+      dft_best_e_bind_kcal: -7.53,
+      favorites_count: 1,
+      favorites: [{ favorite_id: 'fav_mock_001', monomers: '均苯三甲醛 + 对苯二胺' }],
+      literature_count: 0,
+      literature: [],
+      commentary:
+        '今天完成 1 组实验（成膜）并算了 2 个 DFT 任务，节奏不错。明日建议：趁势把边缘厚度问题复盘一下，试试降低单体浓度。',
+    };
+  },
+
+  async nudges(): Promise<import('./api').AssistantNudge[]> {
+    return [
+      {
+        favorite_id: 'fav_mock_002',
+        monomers: '对苯二甲醛 + 联苯胺',
+        consecutive_failures: 2,
+        latest_mistakes: '第二次仍是粉末无膜，怀疑溶剂极性不匹配。',
+        suggestion: '「对苯二甲醛 + 联苯胺」已连续 2 次实验失败，建议先复盘条件再重复。',
+      },
+    ];
+  },
+
+  async dismissNudge(_favoriteId: string): Promise<import('./api').AssistantNudge[]> {
+    return [];
+  },
 };
 
 /** 逐事件吐出为 SSE 流（每个事件间隔 ~30ms，token 流可见逐字效果） */

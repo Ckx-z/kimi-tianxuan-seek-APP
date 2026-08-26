@@ -9,6 +9,9 @@
  * - POST /api/assistant/uploads          → 附件元信息（multipart，单文件 ≤10MB）
  * - POST /api/assistant/chat (stream)    → SSE，每行 data 为 JSON 事件
  *   （attachments 字段携带 upload_id 列表，≤3 个）
+ * - GET  /api/assistant/daily-brief?date=YYYY-MM-DD → 今日科研日报（V2.2）
+ * - GET  /api/assistant/nudges           → 连续失败提醒列表（V2.2）
+ * - POST /api/assistant/nudges/dismiss   → 登记"知道了"（当日不再提醒）
  *
  * Mock 开关：VITE_ASSISTANT_MOCK=1（或 true）时走本地 mock（见 ./mock.ts），
  * 用于后端未就绪前的自测与日后联调，默认关闭。
@@ -88,6 +91,45 @@ export interface AssistantContext {
   amine_smiles?: string;
   suggestion_ids?: string[];
   [key: string]: unknown;
+}
+
+// ---------- V2.2 主动能力：日报 / 提醒 ----------
+/** 日报中的实验记录条目 */
+export interface DailyBriefRecordItem {
+  record_id: string;
+  experiment_no: string;
+  monomers: string;
+  outcome: string;
+  outcome_zh: string;
+  status: string;
+  self_summary?: string;
+}
+
+/** GET /daily-brief 响应契约 */
+export interface DailyBrief {
+  date: string;
+  llm_enabled: boolean;
+  records_created_count: number;
+  records_created: DailyBriefRecordItem[];
+  records_updated_count: number;
+  records_updated: DailyBriefRecordItem[];
+  dft_count: number;
+  dft_best_e_bind_kcal: number | null;
+  favorites_count: number;
+  favorites: { favorite_id: string; monomers: string }[];
+  literature_count: number;
+  literature: { paper_id: string | number | null; title: string }[];
+  /** ming 人格点评；LLM 未配置或生成失败时为 null */
+  commentary: string | null;
+}
+
+/** GET /nudges 的单条连续失败提醒 */
+export interface AssistantNudge {
+  favorite_id: string;
+  monomers: string;
+  consecutive_failures: number;
+  latest_mistakes: string;
+  suggestion: string;
 }
 
 // ---------- SSE 事件 ----------
@@ -336,5 +378,29 @@ export const assistantApi = {
     }
     if (!res.body) throw new AssistantUnavailableError('响应不含数据流');
     return res.body;
+  },
+
+  /** 今日科研日报（V2.2）：date 可选（YYYY-MM-DD），缺省今天 */
+  dailyBrief(date?: string): Promise<DailyBrief> {
+    if (ASSISTANT_MOCK) return mockApi.dailyBrief();
+    const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+    return request<DailyBrief>(`/daily-brief${qs}`);
+  },
+
+  /** 连续失败提醒列表（V2.2，已过滤当日 dismiss） */
+  async nudges(): Promise<AssistantNudge[]> {
+    if (ASSISTANT_MOCK) return mockApi.nudges();
+    const data = await request<{ nudges: AssistantNudge[] }>('/nudges');
+    return data.nudges ?? [];
+  },
+
+  /** 登记"知道了"：该收藏当日不再提醒；返回最新提醒列表 */
+  async dismissNudge(favoriteId: string): Promise<AssistantNudge[]> {
+    if (ASSISTANT_MOCK) return mockApi.dismissNudge(favoriteId);
+    const data = await request<{ nudges: AssistantNudge[] }>('/nudges/dismiss', {
+      method: 'POST',
+      body: { favorite_id: favoriteId },
+    });
+    return data.nudges ?? [];
   },
 };

@@ -12,8 +12,9 @@
  */
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useNavigate } from 'react-router';
-import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil, Atom, FolderInput, CopyPlus } from 'lucide-react';
+import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil, Atom, FolderInput, CopyPlus, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { doiUrl, openExternal } from '@/lib/external';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -184,31 +185,58 @@ function matchLabel(t?: string): string {
   return t === 'both' ? '醛胺同报道' : t === 'aldehyde' ? '报道过该醛' : t === 'amine' ? '报道过该胺' : '相关';
 }
 
-/** 文献列表 */
+/** 文献列表（标题截断+悬浮全文；DOI 渲染为可点击外链，缺失时灰字「暂无 DOI」） */
 function ReferenceList({ refs }: { refs?: ReferenceItem[] }) {
   if (!refs || refs.length === 0) {
     return <p className="text-sm text-muted-foreground">暂无关联文献</p>;
   }
   return (
     <ul className="space-y-2">
-      {refs.map((r, i) => (
-        <li
-          key={`${r.title}-${i}`}
-          className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2"
-        >
-          <div className="min-w-0">
-            <div className="break-words text-sm font-medium text-foreground">{r.title || '未命名文献'}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              {r.note || matchLabel(r.match_type)}
-              {typeof r.count === 'number' ? ` · 出现 ${r.count} 次` : ''}
-              {r.doi ? ` · DOI: ${r.doi}` : ''}
+      {refs.map((r, i) => {
+        const link = r.url ?? doiUrl(r.doi);
+        return (
+          <li
+            key={`${r.paper_id ?? r.title}-${i}`}
+            className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2"
+          >
+            <div className="min-w-0 flex-1">
+              <div
+                className="line-clamp-2 break-words text-sm font-medium text-foreground"
+                title={r.title || '未命名文献'}
+              >
+                {r.title || '未命名文献'}
+              </div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {r.note || matchLabel(r.match_type)}
+                {typeof r.count === 'number' ? ` · 出现 ${r.count} 次` : ''}
+              </div>
+              <div className="mt-0.5 text-xs">
+                {link ? (
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`在浏览器中打开 ${link}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openExternal(link);
+                    }}
+                    className="inline-flex items-center gap-0.5 break-all text-primary underline-offset-2 hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3 shrink-0" />
+                    DOI: {r.doi || link.replace(/^https?:\/\/doi\.org\//i, '')}
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground/70">暂无 DOI</span>
+                )}
+              </div>
             </div>
-          </div>
-          <Badge variant="outline" className="shrink-0 border-primary/40 text-primary">
-            {matchLabel(r.match_type)}
-          </Badge>
-        </li>
-      ))}
+            <Badge variant="outline" className="shrink-0 border-primary/40 text-primary">
+              {matchLabel(r.match_type)}
+            </Badge>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -262,8 +290,9 @@ const emptyProps: PropsState = { loading: false, error: null, data: null };
 
 /** 二聚体结构图：优先后端预渲染 dimer_svg，否则按 SMILES 走 structure.svg，再兜底文本 */
 function DimerFigure({ entry }: { entry: DftEntryItem }) {
-  const [svgFailed, setSvgFailed] = useState(false);
-  if (entry.dimer_svg && !svgFailed) {
+  // dimer_svg 为后端预渲染可信 SVG（dangerouslySetInnerHTML 无加载错误概念，
+  // 不需要失败回退状态）
+  if (entry.dimer_svg) {
     return (
       <div
         className="mt-1 max-h-32 overflow-hidden rounded-md border border-border bg-white p-1 dark:bg-white/95 [&>svg]:mx-auto [&>svg]:max-h-28"
