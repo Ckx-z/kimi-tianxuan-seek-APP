@@ -68,6 +68,12 @@ LARGE_SYSTEM_ATOMS = 150
 # 第三物质 X 的可选类型
 X_TYPES = ("self_stack", "solvent", "other_dimer", "custom")
 
+# 计算模式：dimer（默认，醛胺缩合二聚体·X）| pair（任意双分子 A···B 直接结合）
+MODES = ("dimer", "pair")
+
+# pair 模式下 X 描述固定文案（dimer_smiles 置 null，无第三物质概念）
+PAIR_X_DESCRIPTION = "A···B 直接结合"
+
 # 内置常用溶剂表（DFT 2.0 §一：溶剂分子作为 X）
 SOLVENTS: list[dict] = [
     {"id": "toluene", "name_zh": "甲苯", "smiles": "Cc1ccccc1"},
@@ -431,6 +437,15 @@ def _xyz_atom_count(xyz_block: str) -> int:
         return 0
 
 
+def _fragment_ranges(n_a: int, n_total: int) -> dict:
+    """复合物 xyz 中两个片段的原子序区间（0 基、左闭右开）。
+
+    复合物拼接顺序固定为先主体（二聚体 / 分子 A）后客体（X / 分子 B），
+    xtb 优化不改变原子顺序，故该区间对优化后几何同样有效。
+    """
+    return {"a": [0, n_a], "b": [n_a, n_total]}
+
+
 def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
                     x_type: str = "self_stack",
                     solvent_id: str | None = None,
@@ -546,6 +561,7 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
         e_bind = e_c - e_d - e_x
 
         return {
+            "mode": "dimer",
             "smiles_a": canon_ald,
             "smiles_b": canon_amine,
             "dimer_smiles": dimer_smiles,
@@ -576,10 +592,129 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
                              "complex": parse_dipole_debye(out_c)},
             "complex_atom_count": n_atoms,
             "complex_xyz": opt_xyz or xyz_c,
+            # 复合物 xyz 片段区间：a=二聚体 [0,n_d)，b=X [n_d,total)
+            "fragment_ranges": _fragment_ranges(_xyz_atom_count(xyz_d), n_atoms),
             "elapsed_sec": round(time.time() - started, 2),
         }
     finally:
         # xtb 每个子目录会产生大量中间文件，尽力清理（失败不影响结果）
+        import shutil
+        shutil.rmtree(job_dir, ignore_errors=True)
+
+
+def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
+                         on_stage=None, jobs_root: Path | None = None) -> dict:
+    """任意双分子模式（选项2）：A···B 复合物结合能，不经过二聚体生成。
+
+    E_bind = E(A·B 复合物) − E(A) − E(B)。ald/amine 字段位复用为分子 A/B，
+    结果字段与 compute_binding 对齐（energies/gap/dipole 的 "dimer"/"x" 键
+    在 pair 模式下分别对应分子 A / 分子 B），dimer_smiles 置 None，
+    x_description 固定为「A···B 直接结合」，x_type 置 None。
+
+    Raises:
+        DftError: 任何一步失败（message 为中文原因）
+    """
+    if method not in METHODS:
+        raise DftError(f"未知方法档位：{method}（可选 gfnff / gfn2）")
+
+    canon_a = canonicalize_smiles(smiles_a)
+    canon_b = canonicalize_smiles(smiles_b)
+    if canon_a is None:
+        raise DftError(f"分子 A 的 SMILES 无法解析：{(smiles_a or '')[:80]}")
+    if canon_b is None:
+        raise DftError(f"分子 B 的 SMILES 无法解析：{(smiles_b or '')[:80]}")
+    for canon in (canon_a, canon_b):
+        mol = Chem.MolFromSmiles(canon)
+        if mol is not None:
+            _check_elements(mol)
+
+    if xtb_binary() is None:
+        raise DftError("未安装计算引擎：未找到 xtb 二进制（vendor/xtb/bin/xtb.exe），"
+                       "无法执行量子化学计算")
+
+    def stage(hint: str) -> None:
+        if on_stage is not None:
+            try:
+                on_stage(hint)
+            except Exception:
+                pass
+
+    if jobs_root is None:
+        jobs_root = runtime_config.user_data_root() / "dft_jobs"
+    tag = hashlib.sha1(
+        f"pair|{canon_a}|{canon_b}|{method}|{time.time_ns()}".encode()
+    ).hexdigest()[:12]
+    job_dir = Path(tempfile.mkdtemp(prefix=f"dft_{tag}_", dir=_ensure_dir(jobs_root)))
+
+    timeout = method_timeout(method)
+    args = METHODS[method]["args"]
+    started = time.time()
+
+    try:
+        stage("正在生成分子 A 的 3D 构象…")
+        xyz_a = embed_monomer_xyz(canon_a)
+        stage("正在优化分子 A 几何…")
+        out_a, _ = _run_xtb(xyz_a, args, job_dir / "a", timeout)
+
+        if canon_b == canon_a:
+            # A 与 B 同分子：能量与描述符直接复用（省一次 xtb）
+            stage("分子 B 与 A 相同，复用 A 的计算结果…")
+            out_b = out_a
+        else:
+            stage("正在生成分子 B 的 3D 构象…")
+            xyz_b = embed_monomer_xyz(canon_b)
+            stage("正在优化分子 B 几何…")
+            out_b, _ = _run_xtb(xyz_b, args, job_dir / "b", timeout)
+
+        stage("正在构造 A···B 复合物初猜…")
+        xyz_c = embed_complex_xyz(canon_a, canon_b)
+        n_atoms = _xyz_atom_count(xyz_c)
+        if n_atoms > LARGE_SYSTEM_ATOMS:
+            stage(f"体系较大（复合物 {n_atoms} 个原子），预计耗时较长，请耐心等待…")
+        else:
+            stage("正在优化 A···B 复合物几何…")
+        out_c, opt_xyz = _run_xtb(xyz_c, args, job_dir / "complex", timeout)
+
+        stage("正在解析计算结果…")
+        e_a, e_b, e_c = (parse_energy(out_a), parse_energy(out_b),
+                         parse_energy(out_c))
+        if e_a is None or e_b is None or e_c is None:
+            raise DftError("xtb 输出中未找到总能量（TOTAL ENERGY），无法计算结合能")
+        e_bind = e_c - e_a - e_b
+
+        return {
+            "mode": "pair",
+            "smiles_a": canon_a,
+            "smiles_b": canon_b,
+            "dimer_smiles": None,
+            "dimer_multi_site": False,
+            "dimer_note": None,
+            "x_type": None,
+            "x_smiles": canon_b,
+            "x_description": PAIR_X_DESCRIPTION,
+            "x_cache_part": f"pair:{canon_b}",
+            "x_request": {"solvent_id": None, "ald2_smiles": None,
+                          "amine2_smiles": None, "custom_smiles": None},
+            "method": method,
+            "method_label": METHODS[method]["label"],
+            "e_bind_hartree": e_bind,
+            "e_bind_kcal": e_bind * HARTREE_TO_KCAL,
+            "e_bind_kj": e_bind * HARTREE_TO_KJ,
+            # "dimer"/"x" 键与二聚体模式对齐，pair 模式下分别对应分子 A / B
+            "energies_hartree": {"dimer": e_a, "x": e_b, "complex": e_c},
+            "gap_ev": {"dimer": parse_gap_ev(out_a),
+                       "x": parse_gap_ev(out_b),
+                       "complex": parse_gap_ev(out_c)},
+            "dipole_debye": {"dimer": parse_dipole_debye(out_a),
+                             "x": parse_dipole_debye(out_b),
+                             "complex": parse_dipole_debye(out_c)},
+            "complex_atom_count": n_atoms,
+            "complex_xyz": opt_xyz or xyz_c,
+            # 复合物 xyz 片段区间：a=分子 A [0,n_a)，b=分子 B [n_a,total)
+            "fragment_ranges": _fragment_ranges(_xyz_atom_count(xyz_a), n_atoms),
+            "elapsed_sec": round(time.time() - started, 2),
+        }
+    finally:
         import shutil
         shutil.rmtree(job_dir, ignore_errors=True)
 

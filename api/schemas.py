@@ -168,9 +168,15 @@ class DftJobCreate(BaseModel):
     """DFT 计算任务创建（2.0）：醛/胺单体 → 缩合二聚体 + 第三物质 X 类型。
 
     旧字段 smiles_a/smiles_b 兼容映射为 ald_smiles/amine_smiles。
+    mode="pair"（任意双分子）时 ald/amine 字段位复用为分子 A/B，
+    忽略 x_type 相关字段。
     """
-    ald_smiles: str | None = Field(None, description="醛单体 SMILES")
-    amine_smiles: str | None = Field(None, description="胺单体 SMILES")
+    mode: str = Field(
+        "dimer",
+        description="计算模式：dimer（默认，醛胺缩合二聚体·X）"
+                    "| pair（任意双分子 A···B 直接结合）")
+    ald_smiles: str | None = Field(None, description="醛单体 SMILES（pair 模式为分子 A）")
+    amine_smiles: str | None = Field(None, description="胺单体 SMILES（pair 模式为分子 B）")
     smiles_a: str | None = Field(None, description="旧字段：等价 ald_smiles")
     smiles_b: str | None = Field(None, description="旧字段：等价 amine_smiles")
     x_type: str = Field(
@@ -182,3 +188,22 @@ class DftJobCreate(BaseModel):
     amine2_smiles: str | None = Field(None, description="x_type=other_dimer 时的胺单体 2")
     custom_smiles: str | None = Field(None, description="x_type=custom 时的自定义 SMILES")
     method: str = Field("gfn2", description="gfnff（快速）| gfn2（精确，默认）")
+
+
+class LiteratureLookup(BaseModel):
+    """Crossref 查询：doi 与 title 二选一。"""
+    doi: str | None = Field(None, description="DOI（直接取元数据）")
+    title: str | None = Field(None, description="标题（返回前 3 候选草稿）")
+
+
+class LiteratureConfirm(BaseModel):
+    """审核后的文献草稿（用户可改 title/authors 等）→ 入库。"""
+    title: str = Field(..., description="文献标题（必填）")
+    authors: list[str] = Field(default_factory=list)
+    journal: str = ""
+    year: int | None = None
+    doi: str = ""
+    url: str | None = None
+    abstract: str | None = None
+    source: str = Field("crossref", description="草稿来源（审计记录用）")
+    reviewed_by: str = Field("", description="审核人（审计记录用）")

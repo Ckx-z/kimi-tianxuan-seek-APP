@@ -43,6 +43,14 @@ export type DftMethod = 'gfnff' | 'gfn2';
 export type DftJobStatus = 'pending' | 'running' | 'done' | 'failed';
 /** 第三物质 X 类型：自身堆积（默认）/ 溶剂 / 另一组单体的二聚体 / 自定义分子 */
 export type DftXType = 'self_stack' | 'solvent' | 'other_dimer' | 'custom';
+/** 计算模式：dimer（默认，醛胺缩合二聚体·X）| pair（任意双分子 A···B 直接结合） */
+export type DftMode = 'dimer' | 'pair';
+
+/** 复合物 xyz 片段区间（0 基、左闭右开）：a=主体（二聚体/分子 A），b=客体（X/分子 B） */
+export interface DftFragmentRanges {
+  a: [number, number];
+  b: [number, number];
+}
 
 /** 已有收藏联动信息（result.favorite） */
 export interface DftFavoriteInfo {
@@ -78,14 +86,19 @@ export interface DftXRequest {
 }
 
 export interface DftResult {
-  /** 规范化醛/胺单体 SMILES（收藏联动等下游兼容字段） */
+  /** 计算模式：缺省（旧缓存/旧历史）视为 dimer */
+  mode?: DftMode;
+  /** 规范化醛/胺单体 SMILES（pair 模式为分子 A/B；收藏联动等下游兼容字段） */
   smiles_a: string;
   smiles_b: string;
-  dimer_smiles: string;
+  /** pair 模式为 null（不经过二聚体生成） */
+  dimer_smiles: string | null;
   dimer_multi_site?: boolean;
   dimer_note?: string | null;
-  x_type: DftXType;
+  /** pair 模式为 null（无第三物质概念，忽略 X 相关字段） */
+  x_type: DftXType | null;
   x_smiles: string;
+  /** pair 模式固定为「A···B 直接结合」 */
   x_description: string;
   x_request?: DftXRequest;
   method: DftMethod;
@@ -93,11 +106,13 @@ export interface DftResult {
   e_bind_hartree: number;
   e_bind_kcal: number;
   e_bind_kj: number;
+  /** dimer/x 键在 pair 模式下分别对应分子 A / 分子 B */
   energies_hartree: { dimer: number; x: number; complex: number };
   gap_ev: { dimer: number | null; x: number | null; complex: number | null };
   dipole_debye: { dimer: number | null; x: number | null; complex: number | null };
   complex_atom_count?: number;
   complex_xyz: string;
+  fragment_ranges?: DftFragmentRanges | null;
   elapsed_sec: number;
   cached: boolean;
   favorite: DftFavoriteInfo | null;
@@ -108,6 +123,7 @@ export interface DftJob {
   status: DftJobStatus;
   progress_hint: string;
   method: DftMethod;
+  mode?: DftMode;
   cached: boolean;
   result: DftResult | null;
   error: string | null;
@@ -116,9 +132,11 @@ export interface DftJob {
 
 /** 创建任务请求体（POST /jobs；旧字段 smiles_a/smiles_b 由后端兼容映射） */
 export interface DftJobRequest {
+  /** 缺省 dimer；pair 时 ald/amine 字段位复用为分子 A/B，忽略 x_type 相关字段 */
+  mode?: DftMode;
   ald_smiles: string;
   amine_smiles: string;
-  x_type: DftXType;
+  x_type?: DftXType;
   solvent_id?: string;
   ald2_smiles?: string;
   amine2_smiles?: string;
@@ -129,12 +147,13 @@ export interface DftJobRequest {
 /** 历史条目（dft_log.jsonl；2.0 起含二聚体与 X 字段，旧条目可能缺失） */
 export interface DftHistoryEntry {
   timestamp?: string;
+  mode?: DftMode;
   smiles_a: string;
   smiles_b: string;
-  dimer_smiles?: string;
+  dimer_smiles?: string | null;
   dimer_multi_site?: boolean;
   dimer_note?: string | null;
-  x_type?: DftXType;
+  x_type?: DftXType | null;
   x_smiles?: string;
   x_description?: string;
   x_request?: DftXRequest;
@@ -147,6 +166,7 @@ export interface DftHistoryEntry {
   dipole_debye?: DftResult['dipole_debye'];
   energies_hartree?: DftResult['energies_hartree'];
   complex_xyz?: string;
+  fragment_ranges?: DftFragmentRanges | null;
   elapsed_sec?: number;
 }
 
@@ -213,9 +233,10 @@ export async function exportDftInput(
   let id = jobId || null;
   if (!id) {
     const job = await createDftJob({
+      mode: result.mode ?? 'dimer',
       ald_smiles: result.smiles_a,
       amine_smiles: result.smiles_b,
-      x_type: result.x_type,
+      x_type: result.x_type ?? undefined,
       solvent_id: result.x_request?.solvent_id ?? undefined,
       ald2_smiles: result.x_request?.ald2_smiles ?? undefined,
       amine2_smiles: result.x_request?.amine2_smiles ?? undefined,

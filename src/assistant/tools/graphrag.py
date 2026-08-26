@@ -49,6 +49,30 @@ def _local_search_block(question: str) -> str:
     return search_local_pdfs.format_results_for_prompt(results)
 
 
+def _resolve_paper(paper_id):
+    """literature.resolver 解析 paper_id → 文献视图；失败/缺失返回 None。"""
+    pid = str(paper_id or "").strip()
+    if not pid:
+        return None
+    try:
+        try:
+            from literature import resolver  # type: ignore
+        except ImportError:
+            from src.literature import resolver
+        return resolver.resolve_paper(pid)
+    except Exception as exc:
+        logger.info("文献解析降级 paper_id=%s: %s", pid, exc)
+        return None
+
+
+def _cite_suffix(paper: dict) -> str:
+    """文献引用后缀：标题 + DOI 链接；DOI 缺失如实说明（人格规则红线）。"""
+    title = paper.get("title") or f"paper {paper.get('paper_id')}"
+    if paper.get("url"):
+        return f"（文献：{title} {paper['url']}）"
+    return f"（文献：{title}，该文献暂无 DOI）"
+
+
 def _graph_block(question: str) -> str:
     """GraphRAG 图检索块；失败返回空串。"""
     import query_graphrag  # minimax/bridge 下
@@ -60,18 +84,32 @@ def _graph_block(question: str) -> str:
     literatures = (gres or {}).get("literatures") or []
     if reactions:
         lines.append("## 图谱反应节点命中")
+        cited: set[str] = set()
         for hit in reactions[:5]:
             d = hit.get("data") or {}
             desc = " ".join(str(d.get(k, "")) for k in
                             ("aldehyde", "amine", "solvent", "temperature",
                              "product", "outcome")).strip()
-            lines.append(f"- [{hit.get('id')}] {desc[:160]}")
+            line = f"- [{hit.get('id')}] {desc[:160]}"
+            pid = str(d.get("paper_id") or "").strip()
+            if pid and pid not in cited:
+                paper = _resolve_paper(pid)
+                if paper:
+                    line += _cite_suffix(paper)
+                    cited.add(pid)
+            lines.append(line)
     if literatures:
         lines.append("## 图谱文献节点命中")
         for hit in literatures[:5]:
             d = hit.get("data") or {}
             title = d.get("title") or d.get("innovation") or ""
-            lines.append(f"- [{hit.get('id')}] {str(title)[:160]}")
+            line = f"- [{hit.get('id')}] {str(title)[:160]}"
+            pid = str(d.get("paper_id") or "").strip()
+            if pid:
+                paper = _resolve_paper(pid)
+                if paper:
+                    line += _cite_suffix(paper)
+            lines.append(line)
     return "\n".join(lines)
 
 

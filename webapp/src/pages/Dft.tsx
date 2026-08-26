@@ -61,6 +61,7 @@ import {
   mergeDftToFavorite,
   type DftHistoryEntry,
   type DftMethod,
+  type DftMode,
   type DftResult,
   type DftSolvent,
   type DftXType,
@@ -77,6 +78,7 @@ const emptyProps: PropsState = { loading: false, error: null, data: null };
 /** 历史条目回显 → 拼装成 DftResult（旧条目缺二聚体/X 字段时留空兜底） */
 function resultFromHistory(h: DftHistoryEntry): DftResult {
   return {
+    mode: h.mode ?? 'dimer',
     smiles_a: h.smiles_a,
     smiles_b: h.smiles_b,
     dimer_smiles: h.dimer_smiles ?? '',
@@ -95,6 +97,7 @@ function resultFromHistory(h: DftHistoryEntry): DftResult {
     gap_ev: h.gap_ev ?? { dimer: null, x: null, complex: null },
     dipole_debye: h.dipole_debye ?? { dimer: null, x: null, complex: null },
     complex_xyz: h.complex_xyz ?? '',
+    fragment_ranges: h.fragment_ranges ?? null,
     elapsed_sec: h.elapsed_sec ?? 0,
     cached: true,
     favorite: null,
@@ -109,6 +112,10 @@ const X_TYPE_OPTIONS: { value: DftXType; label: string; hint: string }[] = [
 ];
 
 export default function Dft() {
+  // ---------- 计算模式：dimer（醛胺缩合二聚体·X）| pair（任意双分子 A···B） ----------
+  const [mode, setMode] = useState<DftMode>('dimer');
+  const isPair = mode === 'pair';
+
   // ---------- 第一步：二聚体 ----------
   const [monoA, setMonoA] = useState<MonomerValue>({ smiles: '', name: '' });
   const [monoB, setMonoB] = useState<MonomerValue>({ smiles: '', name: '' });
@@ -183,9 +190,9 @@ export default function Dft() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---------- 二聚体预览（两个单体 SMILES 齐备后防抖请求） ----------
+  // ---------- 二聚体预览（两个单体 SMILES 齐备后防抖请求；pair 模式跳过） ----------
   useEffect(() => {
-    if (!monoA.smiles || !monoB.smiles) {
+    if (mode === 'pair' || !monoA.smiles || !monoB.smiles) {
       setDimerPreview(null);
       setDimerError(null);
       setDimerLoading(false);
@@ -202,7 +209,7 @@ export default function Dft() {
         .finally(() => setDimerLoading(false));
     }, 500);
     return () => clearTimeout(timer);
-  }, [monoA.smiles, monoB.smiles]);
+  }, [mode, monoA.smiles, monoB.smiles]);
 
   /** 轮询任务直至 done/failed */
   const startPolling = useCallback((id: string) => {
@@ -238,18 +245,18 @@ export default function Dft() {
   /** 提交计算 */
   const handleSubmit = async () => {
     if (!monoA.smiles || !monoB.smiles) {
-      toast.warning('请先填写醛单体与胺单体的 SMILES');
+      toast.warning(isPair ? '请先填写分子 A 与分子 B 的 SMILES' : '请先填写醛单体与胺单体的 SMILES');
       return;
     }
-    if (xType === 'solvent' && !solventId) {
+    if (!isPair && xType === 'solvent' && !solventId) {
       toast.warning('请选择溶剂');
       return;
     }
-    if (xType === 'other_dimer' && (!monoA2.smiles || !monoB2.smiles)) {
+    if (!isPair && xType === 'other_dimer' && (!monoA2.smiles || !monoB2.smiles)) {
       toast.warning('请填写另一组醛/胺单体的 SMILES');
       return;
     }
-    if (xType === 'custom' && !customSmiles.trim()) {
+    if (!isPair && xType === 'custom' && !customSmiles.trim()) {
       toast.warning('请输入自定义分子的 SMILES');
       return;
     }
@@ -260,16 +267,25 @@ export default function Dft() {
     setBProps(emptyProps);
     setProgressHint('正在提交计算任务…');
     try {
-      const job = await createDftJob({
-        ald_smiles: monoA.smiles,
-        amine_smiles: monoB.smiles,
-        x_type: xType,
-        solvent_id: xType === 'solvent' ? solventId : undefined,
-        ald2_smiles: xType === 'other_dimer' ? monoA2.smiles : undefined,
-        amine2_smiles: xType === 'other_dimer' ? monoB2.smiles : undefined,
-        custom_smiles: xType === 'custom' ? customSmiles.trim() : undefined,
-        method,
-      });
+      const job = await createDftJob(
+        isPair
+          ? {
+            mode: 'pair',
+            ald_smiles: monoA.smiles,
+            amine_smiles: monoB.smiles,
+            method,
+          }
+          : {
+            ald_smiles: monoA.smiles,
+            amine_smiles: monoB.smiles,
+            x_type: xType,
+            solvent_id: xType === 'solvent' ? solventId : undefined,
+            ald2_smiles: xType === 'other_dimer' ? monoA2.smiles : undefined,
+            amine2_smiles: xType === 'other_dimer' ? monoB2.smiles : undefined,
+            custom_smiles: xType === 'custom' ? customSmiles.trim() : undefined,
+            method,
+          },
+      );
       setCurrentJobId(job.job_id);
       if (job.status === 'done' && job.result) {
         // 缓存命中：无需轮询
@@ -378,10 +394,10 @@ export default function Dft() {
     try {
       await appendDftEntry(targetId, {
         job_id: currentJobId ?? undefined,
-        x_type: result.x_type,
+        x_type: result.x_type ?? undefined,
         x_smiles: result.x_smiles,
         x_description: result.x_description,
-        dimer_smiles: result.dimer_smiles,
+        dimer_smiles: result.dimer_smiles ?? undefined,
         method: result.method,
         e_bind_kcal: result.e_bind_kcal,
         e_bind_kj: result.e_bind_kj,
@@ -418,6 +434,7 @@ export default function Dft() {
 
   /** 历史点击：回显输入与结果（无任务 id，导出时会借缓存命中任务） */
   const handleHistoryClick = (h: DftHistoryEntry) => {
+    setMode(h.mode ?? 'dimer');
     setMonoA({ smiles: h.smiles_a, name: '' });
     setMonoB({ smiles: h.smiles_b, name: '' });
     setMethod(h.method);
@@ -454,33 +471,66 @@ export default function Dft() {
         </Alert>
       )}
 
+      {/* 计算模式切换：二聚体模式 / 任意双分子模式 */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {([
+          {
+            value: 'dimer' as DftMode,
+            title: '二聚体模式（COF 醛胺缩合）',
+            desc: '醛 + 胺 → 亚胺缩合二聚体，再与第三物质 X（自身堆积 / 溶剂 / 异质二聚体 / 自定义）计算结合能',
+          },
+          {
+            value: 'pair' as DftMode,
+            title: '任意双分子模式',
+            desc: '直接输入任意两个分子 A 和 B，计算 A···B 复合物结合能，不经过二聚体生成、不限醛胺体系',
+          },
+        ]).map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            disabled={running}
+            onClick={() => setMode(opt.value)}
+            className={`rounded-xl border p-4 text-left transition-colors ${
+              mode === opt.value
+                ? 'border-gold bg-gold-muted/40 ring-1 ring-gold'
+                : 'bg-card hover:bg-accent'
+            } ${running ? 'cursor-not-allowed opacity-60' : ''}`}
+          >
+            <p className="text-sm font-semibold text-foreground">{opt.title}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{opt.desc}</p>
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* 左侧输入区 */}
         <div className="space-y-4">
-          {/* 第一步：二聚体 */}
+          {/* 第一步：二聚体 / 双分子 */}
           <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">第一步：二聚体（醛 + 胺 → 亚胺缩合）</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              {isPair ? '第一步：两个分子（任意体系）' : '第一步：二聚体（醛 + 胺 → 亚胺缩合）'}
+            </h2>
             <MonomerInput
-              title="醛单体"
+              title={isPair ? '分子 A' : '醛单体'}
               role="aldehyde"
               value={monoA}
               onChange={setMonoA}
-              library={library.aldehydes}
+              library={isPair ? [...library.aldehydes, ...library.amines] : library.aldehydes}
               libraryLoading={libraryLoading}
               disabled={running}
             />
             <MonomerInput
-              title="胺单体"
+              title={isPair ? '分子 B' : '胺单体'}
               role="amine"
               value={monoB}
               onChange={setMonoB}
-              library={library.amines}
+              library={isPair ? [...library.aldehydes, ...library.amines] : library.amines}
               libraryLoading={libraryLoading}
               disabled={running}
             />
 
-            {/* 二聚体预览 */}
-            {monoA.smiles && monoB.smiles && (
+            {/* 二聚体预览（仅二聚体模式） */}
+            {!isPair && monoA.smiles && monoB.smiles && (
               <div className="rounded-xl border bg-card p-4">
                 <h3 className="mb-2 text-sm font-semibold text-foreground">二聚体预览</h3>
                 {dimerLoading && <p className="text-xs text-muted-foreground">正在生成缩合二聚体预览…</p>}
@@ -507,7 +557,8 @@ export default function Dft() {
             )}
           </div>
 
-          {/* 第二步：与什么计算结合能 */}
+          {/* 第二步：与什么计算结合能（仅二聚体模式；pair 模式无 X 概念） */}
+          {!isPair && (
           <div className="space-y-3 rounded-xl border bg-card p-4">
             <h2 className="text-sm font-semibold text-foreground">第二步：与什么计算结合能（X）</h2>
             <RadioGroup value={xType} onValueChange={(v) => setXType(v as DftXType)} disabled={running}>
@@ -586,6 +637,7 @@ export default function Dft() {
               </div>
             )}
           </div>
+          )}
 
           {/* 方法档位 */}
           <div className="space-y-2 rounded-xl border bg-card p-4">
@@ -645,6 +697,11 @@ export default function Dft() {
                       <Badge variant="outline" className="mr-1 text-[10px]">
                         {h.method === 'gfnff' ? '快速' : '精确'}
                       </Badge>
+                      {h.mode === 'pair' && (
+                        <Badge variant="secondary" className="mr-1 text-[10px]" title="任意双分子模式（A···B 直接结合）">
+                          双分子
+                        </Badge>
+                      )}
                       <span className="font-mono text-xs">
                         {(h.dimer_smiles || h.smiles_a).slice(0, 12)}…
                       </span>
@@ -698,8 +755,9 @@ export default function Dft() {
           {/* 空态 */}
           {!running && !result && !error && (
             <div className="rounded-lg border border-dashed bg-card/50 p-10 text-center text-sm text-muted-foreground">
-              第一步输入醛/胺单体并确认二聚体预览，第二步选择与什么计算结合能，
-              然后点击「开始计算」；结果包含结合能、能隙、偶极矩、二聚体 SMILES 与优化后复合物几何。
+              {isPair
+                ? '输入任意两个分子 A 和 B 的 SMILES（或用画板绘制 / CAS 解析），选择方法档位后点击「开始计算」；结果包含 A···B 结合能、能隙、偶极矩与优化后复合物几何。'
+                : '第一步输入醛/胺单体并确认二聚体预览，第二步选择与什么计算结合能，然后点击「开始计算」；结果包含结合能、能隙、偶极矩、二聚体 SMILES 与优化后复合物几何。'}
             </div>
           )}
 
@@ -708,7 +766,17 @@ export default function Dft() {
             <>
               <DftResultPanel result={result} jobId={currentJobId} />
 
-              {/* 收藏联动 */}
+              {/* 收藏联动（pair 模式无单体组归属，禁用） */}
+              {result.mode === 'pair' ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" disabled title="任意双分子模式暂不支持收藏">
+                    ☆ 收藏这组单体（含 DFT 结果）
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    任意双分子模式无醛/胺单体组归属，暂不支持收藏与追加 DFT 记录
+                  </span>
+                </div>
+              ) : (
               <div className="flex flex-wrap items-center gap-2">
                 {fav ? (
                   <>
@@ -747,18 +815,19 @@ export default function Dft() {
                   </Button>
                 )}
               </div>
+              )}
 
               {/* 单体性质卡 */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <MonomerPropsCard
-                  title="醛单体性质"
+                  title={result.mode === 'pair' ? '分子 A 性质' : '醛单体性质'}
                   name={monoA.name || undefined}
                   loading={aProps.loading}
                   error={aProps.error}
                   props={aProps.data}
                 />
                 <MonomerPropsCard
-                  title="胺单体性质"
+                  title={result.mode === 'pair' ? '分子 B 性质' : '胺单体性质'}
                   name={monoB.name || undefined}
                   loading={bProps.loading}
                   error={bProps.error}

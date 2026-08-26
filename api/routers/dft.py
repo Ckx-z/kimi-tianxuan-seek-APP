@@ -40,6 +40,7 @@ def _public_job(job: dict) -> dict:
         "status": job["status"],
         "progress_hint": job["progress_hint"],
         "method": job["method"],
+        "mode": job.get("mode", "dimer"),
         "cached": job.get("cached", False),
         "result": job.get("result"),
         "error": job.get("error"),
@@ -56,11 +57,32 @@ def _resolve_monomers(req: DftJobCreate) -> tuple[str, str]:
 
 @router.post("/jobs", status_code=202)
 def create_dft_job(req: DftJobCreate):
+    mode = (req.mode or "dimer").strip()
+    if mode not in engine.MODES:
+        raise HTTPException(
+            400, f"未知的计算模式：{req.mode}"
+            f"（可选 {' / '.join(engine.MODES)}）")
     ald, amine = _resolve_monomers(req)
-    if not ald or not amine:
-        raise HTTPException(400, "醛单体与胺单体的 SMILES 均不能为空")
     if req.method not in engine.METHODS:
         raise HTTPException(400, f"未知方法档位：{req.method}（可选 gfnff / gfn2）")
+
+    if mode == "pair":
+        # 任意双分子模式：ald/amine 字段位复用为分子 A/B，跳过二聚体与 X 校验
+        if not ald or not amine:
+            raise HTTPException(400, "分子 A 与分子 B 的 SMILES 均不能为空")
+        if engine.canonicalize_smiles(ald) is None:
+            raise HTTPException(400, f"分子 A 的 SMILES 无法解析：{ald[:80]}")
+        if engine.canonicalize_smiles(amine) is None:
+            raise HTTPException(400, f"分子 B 的 SMILES 无法解析：{amine[:80]}")
+        if engine.xtb_binary() is None:
+            raise HTTPException(
+                503, "未安装计算引擎：未找到 xtb 二进制（vendor/xtb/bin/xtb.exe），"
+                "DFT 计算暂不可用")
+        job = jobs.create_job(ald, amine, req.method, mode="pair")
+        return _public_job(job)
+
+    if not ald or not amine:
+        raise HTTPException(400, "醛单体与胺单体的 SMILES 均不能为空")
     if req.x_type not in engine.X_TYPES:
         raise HTTPException(
             400, f"未知的 X 类型：{req.x_type}"
@@ -126,7 +148,11 @@ def get_dft_job(job_id: str):
 
 @router.get("/jobs/{job_id}/geometry", response_class=PlainTextResponse)
 def get_dft_geometry(job_id: str):
-    """复合物优化后几何（xyz 文本），供前端下载/3D 渲染。"""
+    """复合物优化后几何（xyz 文本），供前端下载/3D 渲染。
+
+    响应头 X-Fragment-Ranges 携带两片段原子序区间（JSON，0 基左闭右开），
+    供 3D 着色区分两分子；旧任务无该字段时省略。
+    """
     job = jobs.get_job(job_id)
     if job is None:
         raise HTTPException(404, f"计算任务 {job_id} 不存在")
@@ -134,7 +160,13 @@ def get_dft_geometry(job_id: str):
     xyz = result.get("complex_xyz")
     if not xyz:
         raise HTTPException(404, "该任务暂无可用几何（未完成或已失败）")
-    return PlainTextResponse(xyz, media_type="chemical/x-xyz")
+    headers = {}
+    frag = result.get("fragment_ranges")
+    if isinstance(frag, dict) and "a" in frag and "b" in frag:
+        import json as _json
+        headers["X-Fragment-Ranges"] = _json.dumps(frag)
+        headers["Access-Control-Expose-Headers"] = "X-Fragment-Ranges"
+    return PlainTextResponse(xyz, media_type="chemical/x-xyz", headers=headers)
 
 
 @router.get("/jobs/{job_id}/export")

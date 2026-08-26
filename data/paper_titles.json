@@ -4,8 +4,9 @@
   "title": "(3,3)-Connected Triazine-Based Covalent Organic Frameworks for Efficient CO2 Separation over N2 and Dye Adsorption"
  },
  "10": {
-  "doi": "",
-  "title": "Porous, Covalent Triazine-Based Frameworks Prepared via Ionothermal Synthesis"
+  "doi": "10.1002/anie.200705710",
+  "title": "Porous, Covalent Triazine-Based Frameworks Prepared via Ionothermal Synthesis",
+  "doi_backfilled": true
  },
  "100": {
   "doi": "10.1039/D0TA05894G",
@@ -320,8 +321,9 @@
   "title": "Atomically dispersed Ni active sites on covalent organic frameworks for heterogeneous metallaphotocatalytic C–N cross-coupling"
  },
  "1071": {
-  "doi": "",
-  "title": "Atomic-precision determination of one-dimensional covalent organic frameworks"
+  "doi": "10.1016/j.cclet.2026.112887",
+  "title": "Atomic-precision determination of one-dimensional covalent organic frameworks",
+  "doi_backfilled": true
  },
  "1072": {
   "doi": "https://doi.org/10.1016/j.jcis.2025.139691",
@@ -348,8 +350,9 @@
   "title": "Benzotrithiophene-based covalent organic frameworks for sensitive fluorescence detection and efficient removal of Ag+ from drinking water"
  },
  "1079": {
-  "doi": "",
-  "title": "Beyond imine-linked COFs: Does framework stability and characterization depth influence the reliability of photodynamic therapeutic conclusions?"
+  "doi": "10.1016/j.pdpdt.2026.105477",
+  "title": "Beyond imine-linked COFs: Does framework stability and characterization depth influence the reliability of photodynamic therapeutic conclusions?",
+  "doi_backfilled": true
  },
  "108": {
   "doi": "https://doi.org/10.1038/s41467-019-10157-5",
@@ -624,8 +627,9 @@
   "title": "Covalent Organic Framework for Q-Switched All-Solid-State Laser"
  },
  "1141": {
-  "doi": "",
-  "title": "Covalent Organic Framework with Polarization Dependence for Ultrafast Pulse generation"
+  "doi": "10.1109/cleo/europe-eqec57999.2023.10231539",
+  "title": "Covalent Organic Framework with Polarization Dependence for Ultrafast Pulse generation",
+  "doi_backfilled": true
  },
  "1142": {
   "doi": "https://doi.org/10.1016/j.jphotochem.2025.116872",
@@ -1964,8 +1968,9 @@
   "title": "CoF: Coarse to Fine-Grained Image Understanding for Multi-modal Large Language Models"
  },
  "1445": {
-  "doi": "",
-  "title": "COFAP: A Universal Framework for COFs Adsorption Prediction through Designed Multi-Modal Extraction and Cross-Modal Synergy"
+  "doi": "10.1007/s40843-025-4104-4",
+  "title": "COFAP: A Universal Framework for COFs Adsorption Prediction through Designed Multi-Modal Extraction and Cross-Modal Synergy",
+  "doi_backfilled": true
  },
  "1446": {
   "doi": "10.48550/arXiv.2205.14657",
@@ -2000,16 +2005,18 @@
   "title": "Spin-split flat bands at the band edge and two-dimensional hole gases towards quantum Hall effect in altermagnetic CoF2"
  },
  "1453": {
-  "doi": "",
-  "title": "Two New Members of the Covalent Organic Frameworks Family: Crystalline 2D-Oxocarbon and 3D-Borocarbon Structures"
+  "doi": "10.1016/j.commatsci.2024.113022",
+  "title": "Two New Members of the Covalent Organic Frameworks Family: Crystalline 2D-Oxocarbon and 3D-Borocarbon Structures",
+  "doi_backfilled": true
  },
  "1454": {
   "doi": "",
   "title": "Nature of the interactions determining the stacking motif of covalent organic frameworks"
  },
  "1455": {
-  "doi": "",
-  "title": "Synthesis and Tailored Properties Towards Designer Covalent Organic Framework Thin Films and Heterostructures"
+  "doi": "10.1016/j.mattod.2021.08.007",
+  "title": "Synthesis and Tailored Properties Towards Designer Covalent Organic Framework Thin Films and Heterostructures",
+  "doi_backfilled": true
  },
  "1456": {
   "doi": "",
@@ -2024,32 +2031,38 @@
   "title": "pyCOFBuilder: A python package for automated creation of Covalent Organic Framework models based on the reticular approach"
  },
  "1459": {
-  "doi": "",
-  "title": "Hierarchies of Hofstadter butterflies in 2D covalent-organic frameworks"
+  "doi": "10.1038/s41699-023-00378-0",
+  "title": "Hierarchies of Hofstadter butterflies in 2D covalent-organic frameworks",
+  "doi_backfilled": true
  },
  "146": {
   "doi": "10.1021/acsami.5c03943",
   "title": "Benzophenone-Based Polymers and Covalent Organic Framework for Photocatalytic Molecular Oxygen Activation"
  },
  "1460": {
-  "doi": "",
-  "title": "Designing Covalent Organic Framework-based Light-driven Microswimmers towards Intraocular Theranostic Applications"
+  "doi": "10.1002/adma.202301126",
+  "title": "Designing Covalent Organic Framework-based Light-driven Microswimmers towards Intraocular Theranostic Applications",
+  "doi_backfilled": true
  },
  "1461": {
-  "doi": "",
-  "title": "Single-Atom Tuning of Structural and Optoelectronic Properties in Halogenated Anthracene-Based Covalent Organic Frameworks"
+  "doi": "10.1021/acsomega.6c01720",
+  "title": "Single-Atom Tuning of Structural and Optoelectronic Properties in Halogenated Anthracene-Based Covalent Organic Frameworks",
+  "doi_backfilled": true,
+  "doi_backfill_note": "原回填 10.1021/acsomega.6c01720.s003 为补充材料 DOI，已更正为主文 DOI"
  },
  "1462": {
-  "doi": "",
-  "title": "Ultrahigh Responsivity Photodetectors of Two-dimensional Covalent Organic Frameworks Integrated on Graphene"
+  "doi": "10.1002/adma.201907242",
+  "title": "Ultrahigh Responsivity Photodetectors of Two-dimensional Covalent Organic Frameworks Integrated on Graphene",
+  "doi_backfilled": true
  },
  "1463": {
   "doi": "",
   "title": "Ferrocene-functionalized covalent organic framework exceeding the ultimate hydrogen storage targets: a first-principles multiscale computational study"
  },
  "1464": {
-  "doi": "",
-  "title": "Influence of Layer Slipping on Adsorption of Light Gases in Covalent Organic Frameworks: A Combined Experimental and Computational Study"
+  "doi": "10.1016/j.micromeso.2022.111796",
+  "title": "Influence of Layer Slipping on Adsorption of Light Gases in Covalent Organic Frameworks: A Combined Experimental and Computational Study",
+  "doi_backfilled": true
  },
  "1465": {
   "doi": "10.48550/arXiv.2507.07386",
@@ -2076,8 +2089,9 @@
   "title": "Beta-Cyclodextrin-Modified Covalent Organic Framework Nanochannel for Electrochemical Chiral Recognition of Amino Acids"
  },
  "1470": {
-  "doi": "",
-  "title": "Escaping the Hydrolysis Trap: An Agentic Workflow for Inverse Design of Durable Photocatalytic Covalent Organic Frameworks"
+  "doi": "10.1038/s41524-026-02168-w",
+  "title": "Escaping the Hydrolysis Trap: An Agentic Workflow for Inverse Design of Durable Photocatalytic Covalent Organic Frameworks",
+  "doi_backfilled": true
  },
  "1471": {
   "doi": "https://doi.org/10.1016/j.apmt.2023.101974",
@@ -3388,8 +3402,10 @@
   "title": "Covalent-Frameworked 2D Crown Ether with Chemical Multifunctionality"
  },
  "218": {
-  "doi": "",
-  "title": "Covalently Doped and Highly Oriented Covalent Organic Framework Thin Films"
+  "doi": "10.1021/acsnano.5c03065",
+  "title": "Covalently Doped and Highly Oriented Covalent Organic Framework Thin Films",
+  "doi_backfilled": true,
+  "doi_backfill_note": "原回填 10.1021/acsnano.5c03065.s001 为补充材料 DOI，已更正为主文 DOI"
  },
  "219": {
   "doi": "https://doi.org/10.1021/acsapm.4c00572",
@@ -3468,8 +3484,9 @@
   "title": "Covalent Organic Framework Mediated Solvation in Quasi-Solid-State Polymer Electrolyte for High-Performance Silicon-Based Lithium-Ion Batteries"
  },
  "236": {
-  "doi": "",
-  "title": "Scalable Synthesis and Electrocatalytic Performance of Highly Fluorinated Covalent Organic Frameworks for Oxygen Reduction"
+  "doi": "10.1002/ange.202313940",
+  "title": "Scalable Synthesis and Electrocatalytic Performance of Highly Fluorinated Covalent Organic Frameworks for Oxygen Reduction",
+  "doi_backfilled": true
  },
  "237": {
   "doi": "10.1021/jacs.3c10832",
@@ -3732,8 +3749,10 @@
   "title": "Effective Photocatalytic Initiation of Reactive Oxygen Species by a Photoactive Covalent Organic Framework for Oxidation Reactions"
  },
  "296": {
-  "doi": "",
-  "title": "Efficient Removal of Pb2+ from Aqueous Solution by an Ionic Covalent Organic Framework: Molecular Simulation Study"
+  "doi": "10.1021/acs.iecr.8b00625",
+  "title": "Efficient Removal of Pb2+ from Aqueous Solution by an Ionic Covalent Organic Framework: Molecular Simulation Study",
+  "doi_backfilled": true,
+  "doi_backfill_note": "原回填 10.1021/acs.iecr.8b00625.s001 为补充材料 DOI，已更正为主文 DOI"
  },
  "297": {
   "doi": "10.1021/acssuschemeng.0c09205",
@@ -4652,8 +4671,9 @@
   "title": "Multi-walled Carbon Nanotube-Templated Nickel Porphyrin Covalent Organic Framework for Pencil-Drawn Noninvasive Respiration Sensors"
  },
  "502": {
-  "doi": "",
-  "title": "Nanocrystalline Porous Materials for Chiral Separation: Synthesis, Mechanisms, and Applications"
+  "doi": "10.1021/acs.analchem.3c01178",
+  "title": "Nanocrystalline Porous Materials for Chiral Separation: Synthesis, Mechanisms, and Applications",
+  "doi_backfilled": true
  },
  "503": {
   "doi": "10.1021/acsnano.4c16480",
@@ -6136,8 +6156,9 @@
   "title": "Toward Covalent Organic Framework Metastructures"
  },
  "837": {
-  "doi": "",
-  "title": "Core–shell conjugated microporous polymers: a new strategy for exploring color-tunable and -controllable light emissions"
+  "doi": "10.1039/c2cc38211c",
+  "title": "Core–shell conjugated microporous polymers: a new strategy for exploring color-tunable and -controllable light emissions",
+  "doi_backfilled": true
  },
  "838": {
   "doi": "10.1021/acsami.0c13792",
@@ -6392,16 +6413,22 @@
   "title": "Highly Emissive Covalent Organic Frameworks"
  },
  "896": {
-  "doi": "",
-  "title": "Towards coarse-grained elasticity of single-layer Covalent Organic Frameworks"
+  "doi": "10.1021/acs.jpcc.2c06268",
+  "title": "Towards coarse-grained elasticity of single-layer Covalent Organic Frameworks",
+  "doi_backfilled": true,
+  "doi_backfill_note": "原回填 10.1021/acs.jpcc.2c06268.s001 为补充材料 DOI，已更正为主文 DOI"
  },
  "897": {
-  "doi": "",
-  "title": "Metal-free magnetism in chemically doped covalent organic frameworks"
+  "doi": "10.1021/jacs.0c02254",
+  "title": "Metal-free magnetism in chemically doped covalent organic frameworks",
+  "doi_backfilled": true,
+  "doi_backfill_note": "原回填 10.1021/jacs.0c02254.s001 为补充材料 DOI，已更正为主文 DOI"
  },
  "898": {
-  "doi": "",
-  "title": "Ultralong Room-Temperature Qubit Lifetimes of Covalent Organic Frameworks"
+  "doi": "10.1021/jacs.5c09638",
+  "title": "Ultralong Room-Temperature Qubit Lifetimes of Covalent Organic Frameworks",
+  "doi_backfilled": true,
+  "doi_backfill_note": "原回填 10.1021/jacs.5c09638.s001 为补充材料 DOI，已更正为主文 DOI"
  },
  "899": {
   "doi": "",
@@ -6420,32 +6447,38 @@
   "title": "Half a century of amyloids: past, present and future"
  },
  "902": {
-  "doi": "",
-  "title": "Isolated Flat Bands and Physics of Mixed Dimensions in a 2D Covalent Organic Framework"
+  "doi": "10.1039/d0nr04428h",
+  "title": "Isolated Flat Bands and Physics of Mixed Dimensions in a 2D Covalent Organic Framework",
+  "doi_backfilled": true
  },
  "903": {
   "doi": "null",
   "title": "Deep learning reveals key predictors of thermal conductivity in covalent organic frameworks"
  },
  "904": {
-  "doi": "",
-  "title": "Quasiparticle Electronic Structure of Two-Dimensional Heterotriangulene-Based Covalent Organic Frameworks Adsorbed on Au(111)"
+  "doi": "10.1088/1361-648x/abf7a0",
+  "title": "Quasiparticle Electronic Structure of Two-Dimensional Heterotriangulene-Based Covalent Organic Frameworks Adsorbed on Au(111)",
+  "doi_backfilled": true
  },
  "905": {
-  "doi": "",
-  "title": "Laser-induced THz magnetism of antiferromagnetic CoF2"
+  "doi": "10.1088/1361-648x/ac5c20",
+  "title": "Laser-induced THz magnetism of antiferromagnetic CoF2",
+  "doi_backfilled": true
  },
  "906": {
-  "doi": "",
-  "title": "N-Carbophenes: two-dimensional covalent organic frameworks derived from linear N-phenylenes"
+  "doi": "10.1088/2053-1591/ab4513",
+  "title": "N-Carbophenes: two-dimensional covalent organic frameworks derived from linear N-phenylenes",
+  "doi_backfilled": true
  },
  "907": {
-  "doi": "",
-  "title": "Polar phonons and magnetic excitations in the antiferromagnet CoF2"
+  "doi": "10.1103/physrevb.109.224312",
+  "title": "Polar phonons and magnetic excitations in the antiferromagnet CoF2",
+  "doi_backfilled": true
  },
  "908": {
-  "doi": "",
-  "title": "Two-dimensional multiferroic NbPc COF with strong magnetoelectric coupling and room-temperature ferroelectricity"
+  "doi": "10.1103/physrevb.111.035439",
+  "title": "Two-dimensional multiferroic NbPc COF with strong magnetoelectric coupling and room-temperature ferroelectricity",
+  "doi_backfilled": true
  },
  "909": {
   "doi": "10.1016/j.xcrp.2021.100495",

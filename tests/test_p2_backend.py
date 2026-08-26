@@ -205,8 +205,10 @@ class TestAutoMatchReferences:
         assert refs[0]["note"] == "报道过该醛胺组合"
         for r in refs:
             assert set(r) == {
+                "paper_id",
                 "title",
                 "doi",
+                "url",
                 "source",
                 "path_or_url",
                 "match_type",
@@ -215,6 +217,12 @@ class TestAutoMatchReferences:
             }
             assert r["source"] == "auto-matched"
             assert r["count"] >= 1
+            assert isinstance(r["paper_id"], str) and r["paper_id"]
+            assert isinstance(r["title"], str) and r["title"]
+            if r["doi"]:  # 解析出 DOI 时 url 必须是 doi.org 链接
+                assert r["url"] == f"https://doi.org/{r['doi']}"
+            else:
+                assert r["url"] is None
 
     def test_max_refs_respected(self):
         refs = fav_store.auto_match_references(TP, PA, max_refs=2)

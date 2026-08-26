@@ -25,10 +25,16 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = runtime_config.user_data_root() / "dft_cache"
 
 
-def cache_key(dimer_smiles: str, x_cache_part: str, method: str) -> str:
-    """(二聚体 canonical SMILES, X 缓存描述, 方法) → sha1。"""
+def cache_key(dimer_smiles: str, x_cache_part: str, method: str,
+              mode: str = "dimer") -> str:
+    """(模式, 主体 canonical SMILES, X 缓存描述, 方法) → sha1。
+
+    mode 参与散列：同一对 SMILES 的 dimer（缩合二聚体·X）与 pair
+    （任意双分子 A···B）结果互不命中。pair 模式下 dimer_smiles 位
+    传分子 A 的 canonical SMILES、x_cache_part 为 "pair:<canon_b>"。
+    """
     return hashlib.sha1(
-        f"{dimer_smiles}::{x_cache_part}::{method}".encode()).hexdigest()
+        f"{mode}::{dimer_smiles}::{x_cache_part}::{method}".encode()).hexdigest()
 
 
 def load_cache(key: str) -> dict | None:

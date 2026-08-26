@@ -26,6 +26,11 @@ try:
 except ImportError:  # 裸名导入（src/ 直接在 sys.path 上）
     import runtime_config  # type: ignore
 
+try:
+    from literature import resolver as lit_resolver  # type: ignore
+except ImportError:  # 包路径导入
+    from src.literature import resolver as lit_resolver
+
 PROJECT_ROOT = runtime_config.resource_root()
 # 用户数据（可写）：frozen 时落 %APPDATA%/COF-Film-Recommend/data
 FAVORITES_DIR = runtime_config.user_data_root() / "favorites"
@@ -389,6 +394,27 @@ def _dft_response_view(fav: dict) -> dict:
     return fav
 
 
+def _references_response_view(fav: dict) -> dict:
+    """GET 响应 enrichment：auto-matched 编号引用解析为真实标题/DOI/URL。
+
+    仅改内存视图不落盘（与 _dft_response_view 同做法）——磁盘上旧格式
+    {"title": 编号, "doi": ""} 保持不变，响应里 title/doi/url 已解析。
+    解析失败不影响读取（resolver 内部兜底，原引用原样返回）。
+    """
+    refs = fav.get("references")
+    if isinstance(refs, list) and refs:
+        try:
+            fav["references"] = lit_resolver.enrich_references(refs)
+        except Exception as exc:
+            logger.warning("references enrichment 失败 %s: %s", fav.get("id"), exc)
+    return fav
+
+
+def _response_view(fav: dict) -> dict:
+    """GET 响应统一视图：DFT 快照回填 + 文献引用 enrichment（均内存视图）。"""
+    return _references_response_view(_dft_response_view(fav))
+
+
 def _ensure_folder_fields(fav: dict) -> dict:
     """旧格式迁移（幂等）：补 folder_id（归兜底夹）、dft_snapshot（None）
     与 dft_entries（旧快照包成列表）。
@@ -435,9 +461,11 @@ def auto_match_references(
 ) -> list[dict]:
     """在训练语料（v5_train_stage1_cond_filled.csv）反查报道过该醛/胺的文献。
 
-    返回 [{"title": paper_id, "doi": "", "source": "auto-matched",
-           "path_or_url": "", "match_type": "both|aldehyde|amine",
+    返回 [{"paper_id", "title": 真实标题（解析失败回退编号）, "doi", "url",
+           "source": "auto-matched", "path_or_url": "",
+           "match_type": "both|aldehyde|amine",
            "count": 出现次数, "note": "报道过该醛/胺/组合"}]
+    标题/DOI/URL 由 literature.resolver 按 paper_id 从文献库解析；
     both（同 paper 同组合）优先，其次按出现次数降序；最多 max_refs 条。
     输入无法解析或数据缺失时返回 []，不抛异常。
     """
@@ -485,12 +513,15 @@ def auto_match_references(
         order = {"both": 0, "aldehyde": 1, "amine": 2}
         refs = []
         for pid, st in stats.items():
+            paper = lit_resolver.resolve_paper(pid) or {}
             for mtype in ("both", "aldehyde", "amine"):
                 if st[mtype] > 0:
                     refs.append(
                         {
-                            "title": pid,
-                            "doi": "",
+                            "paper_id": pid,
+                            "title": paper.get("title") or pid,
+                            "doi": paper.get("doi") or "",
+                            "url": paper.get("url"),
                             "source": "auto-matched",
                             "path_or_url": "",
                             "match_type": mtype,
@@ -562,7 +593,7 @@ def add_favorite(
         "experiment_record_ids": [],
     }
     _write(fav)
-    return _dft_response_view(fav)
+    return _response_view(fav)
 
 
 def list_favorites() -> list[dict]:
@@ -575,7 +606,7 @@ def list_favorites() -> list[dict]:
         if fav and _ID_RE.match(str(fav.get("id", ""))):
             favs.append(fav)
     favs.sort(key=lambda f: str(f.get("created_at", "")), reverse=True)
-    return [_dft_response_view(_ensure_snapshot(_ensure_folder_fields(f)))
+    return [_response_view(_ensure_snapshot(_ensure_folder_fields(f)))
             for f in favs]
 
 
@@ -585,7 +616,7 @@ def get_favorite(fav_id: str) -> dict | None:
     fav = _read_file(path) if path else None
     if not fav:
         return None
-    return _dft_response_view(_ensure_snapshot(_ensure_folder_fields(fav)))
+    return _response_view(_ensure_snapshot(_ensure_folder_fields(fav)))
 
 
 def copy_favorite(fav_id: str, folder_id: str) -> dict:
@@ -609,7 +640,7 @@ def copy_favorite(fav_id: str, folder_id: str) -> dict:
     fav["created_at"] = _now_iso()
     fav["experiment_record_ids"] = []
     _write(fav)
-    return _dft_response_view(fav)
+    return _response_view(fav)
 
 
 def add_dft_entry(fav_id: str, entry: dict) -> dict:
@@ -635,7 +666,7 @@ def add_dft_entry(fav_id: str, entry: dict) -> dict:
     fav["dft_entries"] = entries
     fav["dft_snapshot"] = None
     _write(fav)
-    return _dft_response_view(fav)
+    return _response_view(fav)
 
 
 def update_favorite(fav_id: str, **fields) -> dict:
@@ -661,7 +692,7 @@ def update_favorite(fav_id: str, **fields) -> dict:
             fields["dft_entries"] = [snap]
     fav.update(fields)
     _write(fav)
-    return _dft_response_view(fav)
+    return _response_view(fav)
 
 
 def delete_favorite(fav_id: str) -> bool:

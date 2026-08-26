@@ -1,8 +1,9 @@
 /**
- * DFT 结果展示面板（2.0）：缩合二聚体 D 与第三物质 X 的结合能。
+ * DFT 结果展示面板（2.0）：缩合二聚体 D 与第三物质 X 的结合能；
+ * pair 模式（任意双分子）文案适配为分子 A···B 直接结合。
  * 结合能大数字卡 + X 描述 + 二聚体 SMILES 可复制 + 组分描述符表
- * + 结构图（二聚体 / X）+ 复合物 xyz 下载 + 量化软件输入文件导出
- * （Gaussian .gjf / ORCA .inp，后端生成下载）。
+ * + 结构图（二聚体 / X）+ 3D 结合构象（3Dmol.js，懒加载折叠区块）
+ * + 复合物 xyz 下载 + 量化软件输入文件导出（Gaussian .gjf / ORCA .inp）。
  * 固定红线提示（学术诚信底线）常驻底部；多位点单体常驻「示意单点缩合」标注。
  */
 import { useState } from 'react';
@@ -18,6 +19,7 @@ import {
 import { ChevronDown, Copy, FileDown, FileOutput } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportDftInput, type DftExportFormat, type DftResult } from './api';
+import DftViewer3D from './DftViewer3D';
 
 interface Props {
   result: DftResult;
@@ -29,8 +31,15 @@ function fmt(v: number | null | undefined, digits = 2, unit = ''): string {
   return v == null ? '—' : `${v.toFixed(digits)}${unit}`;
 }
 
-/** 下载复合物优化后几何（xyz） */
-function downloadXyz(result: DftResult) {
+/** 下载复合物优化后几何（xyz）；有任务 id 时走 geometry 端点，否则本地 blob */
+function downloadXyz(result: DftResult, jobId?: string | null) {
+  if (jobId) {
+    const a = document.createElement('a');
+    a.href = `/api/dft/jobs/${encodeURIComponent(jobId)}/geometry`;
+    a.download = `dft_complex_${result.method}.xyz`;
+    a.click();
+    return;
+  }
   const blob = new Blob([result.complex_xyz], { type: 'chemical/x-xyz' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -42,14 +51,15 @@ function downloadXyz(result: DftResult) {
 
 export default function DftResultPanel({ result, jobId }: Props) {
   const bound = result.e_bind_kcal < 0;
+  const isPair = result.mode === 'pair';
   /** 导出进行中（按格式记，防重复点击） */
   const [exporting, setExporting] = useState<DftExportFormat | null>(null);
 
-  /** 复制二聚体 SMILES */
-  const copyDimer = async () => {
+  /** 复制文本（二聚体 / 分子 SMILES） */
+  const copyText = async (text: string, label: string) => {
     try {
-      await navigator.clipboard.writeText(result.dimer_smiles);
-      toast.success('二聚体 SMILES 已复制');
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label}已复制`);
     } catch {
       toast.warning('复制失败，请手动选择文本复制');
     }
@@ -100,10 +110,11 @@ export default function DftResultPanel({ result, jobId }: Props) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-            二聚体结合能
+            {isPair ? '双分子结合能' : '二聚体结合能'}
             <Badge variant="outline">{result.method_label}</Badge>
+            {isPair && <Badge variant="secondary">任意双分子模式</Badge>}
             {result.cached && <Badge variant="secondary">缓存结果</Badge>}
-            {result.dimer_multi_site && (
+            {!isPair && result.dimer_multi_site && (
               <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400">
                 示意单点缩合
               </Badge>
@@ -125,7 +136,9 @@ export default function DftResultPanel({ result, jobId }: Props) {
             </div>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            E(结合) = E(二聚体·X 复合物) − E(二聚体) − E(X)，其中 X = {result.x_description}。
+            {isPair
+              ? 'E(结合) = E(A···B 复合物) − E(A) − E(B)，两分子任意选取、不经过缩合反应。'
+              : `E(结合) = E(二聚体·X 复合物) − E(二聚体) − E(X)，其中 X = ${result.x_description}。`}
             {bound
               ? '负值：形成复合物在能量上有利，数值越负结合越强。'
               : '正值：该初猜取向下复合物能量高于组分之和，结合不利（或构象未找到有利取向）。'}
@@ -134,29 +147,58 @@ export default function DftResultPanel({ result, jobId }: Props) {
         </CardContent>
       </Card>
 
-      {/* 二聚体 SMILES（可复制） */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">缩合二聚体（亚胺键 C=N）</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-center gap-2">
-            <code className="flex-1 break-all rounded border bg-muted/50 px-2 py-1.5 font-mono text-xs">
-              {result.dimer_smiles}
-            </code>
-            <Button variant="outline" size="sm" onClick={() => void copyDimer()}>
-              <Copy className="mr-1 h-4 w-4" />
-              复制
-            </Button>
-          </div>
-          {result.dimer_multi_site && result.dimer_note && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">
-              ⚠️ {result.dimer_note}：多位点单体的真实产物可能多位点缩合或形成寡聚体，
-              本结果为示意性单点缩合二聚体。
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {/* 二聚体 SMILES（可复制）；pair 模式展示分子 A/B */}
+      {isPair ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">双分子（A···B 直接结合）</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {[
+              { label: '分子 A', smiles: result.smiles_a },
+              { label: '分子 B', smiles: result.smiles_b },
+            ].map((m) => (
+              <div key={m.label} className="flex items-center gap-2">
+                <span className="w-14 shrink-0 text-xs text-muted-foreground">{m.label}</span>
+                <code className="flex-1 break-all rounded border bg-muted/50 px-2 py-1.5 font-mono text-xs">
+                  {m.smiles}
+                </code>
+                <Button variant="outline" size="sm" onClick={() => void copyText(m.smiles, `${m.label} SMILES `)}>
+                  <Copy className="mr-1 h-4 w-4" />
+                  复制
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">缩合二聚体（亚胺键 C=N）</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center gap-2">
+              <code className="flex-1 break-all rounded border bg-muted/50 px-2 py-1.5 font-mono text-xs">
+                {result.dimer_smiles}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => result.dimer_smiles && void copyText(result.dimer_smiles, '二聚体 SMILES ')}
+              >
+                <Copy className="mr-1 h-4 w-4" />
+                复制
+              </Button>
+            </div>
+            {result.dimer_multi_site && result.dimer_note && (
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                ⚠️ {result.dimer_note}：多位点单体的真实产物可能多位点缩合或形成寡聚体，
+                本结果为示意性单点缩合二聚体。
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 组分描述符表 */}
       <Card>
@@ -168,8 +210,8 @@ export default function DftResultPanel({ result, jobId }: Props) {
             <thead>
               <tr className="border-b text-left text-muted-foreground">
                 <th className="py-1.5 pr-2 font-medium">指标</th>
-                <th className="py-1.5 pr-2 font-medium">二聚体</th>
-                <th className="py-1.5 pr-2 font-medium">X</th>
+                <th className="py-1.5 pr-2 font-medium">{isPair ? '分子 A' : '二聚体'}</th>
+                <th className="py-1.5 pr-2 font-medium">{isPair ? '分子 B' : 'X'}</th>
                 <th className="py-1.5 font-medium">复合物</th>
               </tr>
             </thead>
@@ -192,17 +234,23 @@ export default function DftResultPanel({ result, jobId }: Props) {
         </CardContent>
       </Card>
 
-      {/* 结构图：二聚体 / X 2D + 复合物 3D xyz 下载 */}
+      {/* 结构图：2D 结构 + 3D 结合构象 + 复合物 xyz 下载 */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">化学结构</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {[
-              { src: `/api/monomers/structure.svg?smiles=${encodeURIComponent(result.dimer_smiles)}`, label: '缩合二聚体' },
-              { src: `/api/monomers/structure.svg?smiles=${encodeURIComponent(result.x_smiles)}`, label: `X（${result.x_description}）` },
-            ].map((im) => (
+            {(isPair
+              ? [
+                { src: `/api/monomers/structure.svg?smiles=${encodeURIComponent(result.smiles_a)}`, label: '分子 A' },
+                { src: `/api/monomers/structure.svg?smiles=${encodeURIComponent(result.smiles_b)}`, label: '分子 B' },
+              ]
+              : [
+                { src: `/api/monomers/structure.svg?smiles=${encodeURIComponent(result.dimer_smiles ?? '')}`, label: '缩合二聚体' },
+                { src: `/api/monomers/structure.svg?smiles=${encodeURIComponent(result.x_smiles)}`, label: `X（${result.x_description}）` },
+              ]
+            ).map((im) => (
               <figure key={im.label} className="text-center">
                 <img
                   src={im.src}
@@ -214,8 +262,19 @@ export default function DftResultPanel({ result, jobId }: Props) {
               </figure>
             ))}
           </div>
+
+          {/* 3D 结合构象（懒加载折叠区块，按片段区间双色渲染） */}
+          {result.complex_xyz?.trim() && (
+            <DftViewer3D
+              xyz={result.complex_xyz}
+              fragmentRanges={result.fragment_ranges}
+              labelA={isPair ? '分子 A' : '二聚体'}
+              labelB={isPair ? '分子 B' : 'X'}
+            />
+          )}
+
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => downloadXyz(result)}>
+            <Button variant="outline" size="sm" onClick={() => downloadXyz(result, jobId)}>
               <FileDown className="mr-1 h-4 w-4" />
               下载复合物优化后 3D 几何（.xyz）
             </Button>
