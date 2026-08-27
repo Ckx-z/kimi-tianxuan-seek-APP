@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from ..schemas import LiteratureConfirm, LiteratureLookup
 
@@ -25,6 +25,11 @@ def _resolver():
 def _crossref():
     from literature import crossref
     return crossref
+
+
+def _pdf_extract():
+    from literature import pdf_extract
+    return pdf_extract
 
 
 def _mark_existing(draft: dict) -> dict:
@@ -54,6 +59,38 @@ def lookup(req: LiteratureLookup):
         raise HTTPException(404, str(exc))
     except cx.CrossrefError as exc:
         raise HTTPException(502, str(exc))
+
+
+@router.post("/extract-pdf")
+def extract_pdf(file: UploadFile = File(...)):
+    """上传文献 PDF → LLM 提取元数据 → 与 lookup 相同的「待审核草稿」。
+
+    Crossref 查不到/网络不通时的录入通道。source 标 "pdf-llm" 并附带
+    pdf_filename；≤20MB；无文本层（扫描件）→ 422；LLM 未配置 → 503；
+    LLM 调用失败/返回无法解析 → 502；非 PDF/损坏 → 400。
+    """
+    pe = _pdf_extract()
+    filename = (file.filename or "").strip()
+    if filename and not filename.lower().endswith(".pdf"):
+        raise HTTPException(400, "请上传 PDF 文件")
+    data = file.file.read()
+    if not data:
+        raise HTTPException(400, "上传文件为空")
+    if len(data) > pe.MAX_PDF_BYTES:
+        raise HTTPException(
+            413,
+            f"PDF 超过 {pe.MAX_PDF_BYTES // (1024 * 1024)}MB 上限，请压缩后重试")
+    try:
+        draft = pe.draft_from_pdf(data, pdf_filename=filename)
+    except pe.PdfExtractError as exc:
+        raise HTTPException(400, str(exc))
+    except pe.PdfNoTextError as exc:
+        raise HTTPException(422, str(exc))
+    except pe.LLMNotConfiguredError as exc:
+        raise HTTPException(503, str(exc))
+    except pe.LLMExtractError as exc:
+        raise HTTPException(502, str(exc))
+    return {"draft": _mark_existing(draft)}
 
 
 @router.post("/confirm", status_code=201)

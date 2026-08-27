@@ -371,7 +371,7 @@ export async function deletePlanTemplate(id: string): Promise<void> {
 
 // ---------- 文献录入（lookup → 审核 → confirm） ----------
 
-/** 待审核文献草稿（/api/literature/lookup 响应的 draft/candidates 条目） */
+/** 待审核文献草稿（/api/literature/lookup 与 /extract-pdf 响应的 draft/candidates 条目） */
 export interface LiteratureDraft {
   title?: string;
   authors?: string[];
@@ -381,6 +381,8 @@ export interface LiteratureDraft {
   url?: string | null;
   abstract?: string | null;
   source?: string;
+  /** PDF 提取通道附带的原始文件名（source=pdf-llm 时存在） */
+  pdf_filename?: string;
   /** DOI 已在文献库中时为 true */
   existing?: boolean;
   existing_paper_id?: string;
@@ -463,6 +465,33 @@ export async function lookupLiteratureByTitle(title: string): Promise<Literature
     { title },
   );
   return Array.isArray(data?.candidates) ? data.candidates : [];
+}
+
+/** 上传文献 PDF → LLM 提取元数据 → 待审核草稿（multipart；
+ *  422 无文本层 / 503 未配置 LLM / 502 提取失败，错误信息按后端 detail 展示） */
+export async function extractLiteratureFromPdf(file: File): Promise<LiteratureDraft> {
+  const form = new FormData();
+  form.append('file', file);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/literature/extract-pdf`, { method: 'POST', body: form });
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (res.ok) {
+    const data = (await res.json()) as { draft: LiteratureDraft };
+    return data.draft;
+  }
+  let detailText = '';
+  try {
+    const detail = (await res.json())?.detail;
+    if (typeof detail === 'string') detailText = detail;
+  } catch {
+    /* 非 JSON 响应 */
+  }
+  throw new LiteratureApiError(res.status, detailText || `PDF 提取失败（${res.status}）`);
 }
 
 /** 审核后确认入库（reviewed_by 固定 "user"；409 抛 LiteratureApiError 带 existingPaperId） */

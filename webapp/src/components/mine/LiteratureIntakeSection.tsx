@@ -10,7 +10,7 @@
  *   502 中文提示「Crossref 暂时不可达，请稍后重试」。
  */
 import { useState } from 'react';
-import { BookPlus, Search, AlertTriangle, CheckCircle2, RotateCcw, Loader2 } from 'lucide-react';
+import { BookPlus, Search, AlertTriangle, CheckCircle2, RotateCcw, Loader2, FileUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,8 +18,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   confirmLiterature,
+  extractLiteratureFromPdf,
   lookupLiteratureByDoi,
   lookupLiteratureByTitle,
   LiteratureApiError,
@@ -43,6 +45,10 @@ interface DraftForm {
   abstractText: string;
   existing: boolean;
   existingPaperId?: string;
+  /** 草稿来源（crossref / pdf-llm），confirm 时透传给审计 */
+  source: string;
+  /** PDF 提取通道的原始文件名（pdf-llm 时存在） */
+  pdfFilename?: string;
 }
 
 function draftToForm(d: LiteratureDraft): DraftForm {
@@ -55,6 +61,8 @@ function draftToForm(d: LiteratureDraft): DraftForm {
     abstractText: d.abstract ?? '',
     existing: d.existing === true,
     existingPaperId: d.existing_paper_id,
+    source: d.source ?? 'crossref',
+    pdfFilename: d.pdf_filename,
   };
 }
 
@@ -68,8 +76,13 @@ function DraftMetaLine({ d }: { d: LiteratureDraft }) {
 }
 
 export function LiteratureIntakeSection() {
+  /** 录入方式 Tab：doi / title / pdf */
+  const [mode, setMode] = useState<'doi' | 'title' | 'pdf'>('doi');
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
+  /** PDF 上传通道：选中的文件与提取状态 */
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [extracting, setExtracting] = useState(false);
   /** 标题查询的候选列表（非空时先选候选再进审核） */
   const [candidates, setCandidates] = useState<LiteratureDraft[] | null>(null);
   /** 审核中的草稿表单（非空即进入第二步） */
@@ -82,7 +95,10 @@ export function LiteratureIntakeSection() {
 
   /** 重置回第一步（保留/清空输入由调用方决定） */
   const reset = (clearQuery: boolean) => {
-    if (clearQuery) setQuery('');
+    if (clearQuery) {
+      setQuery('');
+      setPdfFile(null);
+    }
     setCandidates(null);
     setForm(null);
     setResult(null);
@@ -93,7 +109,11 @@ export function LiteratureIntakeSection() {
   const handleLookup = async () => {
     const q = query.trim();
     if (!q) {
-      toast.error('请输入 DOI 或文献标题');
+      toast.error(mode === 'doi' ? '请输入 DOI' : '请输入文献标题');
+      return;
+    }
+    if (mode === 'doi' && !looksLikeDoi(q)) {
+      toast.error('DOI 格式不正确（形如 10.xxxx/... 或 doi.org 链接）');
       return;
     }
     setSearching(true);
@@ -102,7 +122,7 @@ export function LiteratureIntakeSection() {
     setCandidates(null);
     setForm(null);
     try {
-      if (looksLikeDoi(q)) {
+      if (mode === 'doi') {
         const draft = await lookupLiteratureByDoi(q);
         setForm(draftToForm(draft));
       } else {
@@ -125,6 +145,38 @@ export function LiteratureIntakeSection() {
     }
   };
 
+  /** 第一步（PDF 通道）：上传 → LLM 提取 → 直接进审核卡 */
+  const handleExtractPdf = async () => {
+    if (!pdfFile) {
+      toast.error('请先选择 PDF 文件');
+      return;
+    }
+    if (!pdfFile.name.toLowerCase().endsWith('.pdf')) {
+      toast.error('请选择 .pdf 文件');
+      return;
+    }
+    if (pdfFile.size > 20 * 1024 * 1024) {
+      setError({ message: 'PDF 超过 20MB 上限，请压缩后重试' });
+      return;
+    }
+    setExtracting(true);
+    setError(null);
+    setResult(null);
+    setCandidates(null);
+    setForm(null);
+    try {
+      const draft = await extractLiteratureFromPdf(pdfFile);
+      setForm(draftToForm(draft));
+    } catch (e) {
+      if (e instanceof LiteratureApiError) {
+        setError({ message: e.message, existingPaperId: e.existingPaperId });
+      }
+      /* 网络层错误已由 api 层 toast */
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   /** 第三步：确认入库（审核后可改；409 展示已存在 paper_id） */
   const handleConfirm = async () => {
     if (!form) return;
@@ -143,7 +195,7 @@ export function LiteratureIntakeSection() {
         year: Number.isFinite(year) ? year : null,
         doi: form.doi.trim(),
         abstract: form.abstractText.trim() || null,
-        source: 'crossref',
+        source: form.source || 'crossref',
       });
       setResult(res);
       setForm(null);
@@ -169,31 +221,107 @@ export function LiteratureIntakeSection() {
     <Card>
       <CardContent className="space-y-4 p-4">
         <div className="text-sm text-muted-foreground">
-          粘贴 DOI 或输入文献标题查询 Crossref，核对（可修改）元数据后确认入库；
-          仅入文献库，不入训练集、暂不入图谱。
+          三种方式录入：DOI 直查 / 标题检索 Crossref / 上传 PDF 由 LLM 提取；
+          核对（可修改）元数据后确认入库；仅入文献库，不入训练集、暂不入图谱。
         </div>
 
-        {/* 第一步：查询输入 */}
-        <div className="flex gap-2">
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !searching) void handleLookup();
-            }}
-            placeholder="粘贴 DOI（如 10.1021/jacs.1c00001）或输入文献标题"
-            className="flex-1"
-            disabled={searching || confirming}
-          />
-          <Button onClick={() => void handleLookup()} disabled={searching || confirming}>
-            {searching ? (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="mr-1.5 h-4 w-4" />
-            )}
-            {searching ? '查询中…' : '查询'}
-          </Button>
-        </div>
+        {/* 第一步：三种录入方式 */}
+        <Tabs
+          value={mode}
+          onValueChange={(v) => {
+            setMode(v as 'doi' | 'title' | 'pdf');
+            setError(null);
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="doi" disabled={searching || extracting || confirming}>
+              DOI 查询
+            </TabsTrigger>
+            <TabsTrigger value="title" disabled={searching || extracting || confirming}>
+              标题查询
+            </TabsTrigger>
+            <TabsTrigger value="pdf" disabled={searching || extracting || confirming}>
+              上传 PDF
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="doi" className="pt-3">
+            <div className="flex gap-2">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !searching) void handleLookup();
+                }}
+                placeholder="粘贴 DOI（如 10.1021/jacs.1c00001 或 doi.org 链接）"
+                className="flex-1"
+                disabled={searching || confirming}
+              />
+              <Button onClick={() => void handleLookup()} disabled={searching || confirming}>
+                {searching ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="mr-1.5 h-4 w-4" />
+                )}
+                {searching ? '查询中…' : '查询'}
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="title" className="pt-3">
+            <div className="flex gap-2">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !searching) void handleLookup();
+                }}
+                placeholder="输入文献标题（Crossref 检索，返回前 3 候选）"
+                className="flex-1"
+                disabled={searching || confirming}
+              />
+              <Button onClick={() => void handleLookup()} disabled={searching || confirming}>
+                {searching ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="mr-1.5 h-4 w-4" />
+                )}
+                {searching ? '查询中…' : '查询'}
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="pdf" className="space-y-2 pt-3">
+            <div className="flex gap-2">
+              <Input
+                type="file"
+                accept=".pdf"
+                className="flex-1"
+                disabled={extracting || confirming}
+                onChange={(e) => {
+                  setPdfFile(e.target.files?.[0] ?? null);
+                  setError(null);
+                }}
+              />
+              <Button
+                onClick={() => void handleExtractPdf()}
+                disabled={extracting || confirming || !pdfFile}
+              >
+                {extracting ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileUp className="mr-1.5 h-4 w-4" />
+                )}
+                {extracting ? '提取中…' : '上传并提取'}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {extracting
+                ? 'LLM 正在阅读 PDF，约 10-30 秒…'
+                : '适用于 Crossref 查不到或网络不通的文献；需 PDF 有文本层（扫描件请改用 DOI/标题），≤20MB。'}
+            </p>
+          </TabsContent>
+        </Tabs>
 
         {/* 内联错误（404 / 502 / 409 等） */}
         {error && (
@@ -250,7 +378,14 @@ export function LiteratureIntakeSection() {
         {form && (
           <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-foreground">核对并编辑文献信息</span>
+              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                核对并编辑文献信息
+                {form.source === 'pdf-llm' && (
+                  <Badge variant="outline" className="font-normal">
+                    PDF LLM 提取{form.pdfFilename ? ` · ${form.pdfFilename}` : ''}
+                  </Badge>
+                )}
+              </span>
               <Button variant="ghost" size="sm" onClick={() => reset(false)}>
                 <RotateCcw className="mr-1 h-3.5 w-3.5" /> 重新查询
               </Button>

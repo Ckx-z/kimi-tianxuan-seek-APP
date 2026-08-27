@@ -90,6 +90,23 @@ hiddenimports = [
     "dft.cache", "src.dft.cache",
     "dft.log", "src.dft.log",
     "favorites.store", "src.favorites.store",
+    # 文献录入链路（routers/literature.py 函数内惰性 import，静态分析漏收；
+    # 双命名空间变体同 recommend/dft 口径）
+    "literature.resolver", "src.literature.resolver",
+    "literature.crossref", "src.literature.crossref",
+    "literature.pdf_extract", "src.literature.pdf_extract",
+    # 实验记录导出（routers/records.py 内惰性 import；docx → lxml 原生依赖
+    # 见下方 binaries）
+    "records.store", "src.records.store",
+    "records.export_docx", "src.records.export_docx",
+    # LLM 门面与方案模板（routers/llm.py、routers/plan.py 内惰性 import）
+    "llm.client", "src.llm.client",
+    "recommend.plan_templates", "src.recommend.plan_templates",
+    "recommend.plan_card", "src.recommend.plan_card",
+    "runtime_config", "src.runtime_config",
+    # PDF 提取（PyMuPDF，原生组件）与 multipart 上传解析
+    "fitz", "pymupdf",
+    "multipart",
 ]
 
 a = Analysis(
@@ -101,6 +118,15 @@ a = Analysis(
         (r"E:/ANACONDA/Library/bin/liblapack.dll", "."),
         (r"E:/ANACONDA/Library/bin/libblas.dll", "."),
         (r"E:/ANACONDA/Library/bin/libcblas.dll", "."),
+        # lxml（python-docx 依赖的 lxml.etree）原生依赖：anaconda 的 lxml .pyd
+        # 动态链接 Library/bin 下这些 DLL，PyInstaller 依赖扫描漏收，显式带上
+        # （否则 frozen 下 import lxml.etree → DLL load failed，docx 导出 500）
+        (r"E:/ANACONDA/Library/bin/libxml2.dll", "."),
+        (r"E:/ANACONDA/Library/bin/libxslt.dll", "."),
+        (r"E:/ANACONDA/Library/bin/libexslt.dll", "."),
+        (r"E:/ANACONDA/Library/bin/iconv.dll", "."),
+        (r"E:/ANACONDA/Library/bin/zlib.dll", "."),
+        (r"E:/ANACONDA/Library/bin/zlib-ng2.dll", "."),
         # XGBoost 原生库（hook 未收集，运行时按包内 lib/ 布局查找）
         (r"E:/ANACONDA/Lib/site-packages/xgboost/lib/xgboost.dll", "xgboost/lib"),
     ],
