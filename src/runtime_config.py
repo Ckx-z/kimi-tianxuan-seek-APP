@@ -5,7 +5,7 @@
 
 解析顺序（高 → 低）：
 1. 环境变量（COF_GRAPHRAG_PYTHON / COF_GNN_PYTHON / COF_APP_PYTHONW /
-   COF_GNN_PROJECT_ROOT）
+   COF_PSI4_PYTHON / COF_GNN_PROJECT_ROOT）
 2. 项目根 config/runtime.local.json（gitignored，本机覆盖用；
    模板见 config/runtime.example.json）
 3. 自动探测：开发机历史路径存在则用；否则 shutil.which("python") 等
@@ -73,6 +73,11 @@ LEGACY_PATHS = {
     "graphrag": [r"E:\python3.12\python.exe"],
     "gnn": [r"E:\ANACONDA\envs\dphuanjing\python.exe"],
     "app": [r"E:\ANACONDA\pythonw.exe", r"E:\ANACONDA\python.exe"],
+    "psi4": [
+        r"E:\ANACONDA\envs\psi4-env\python.exe",
+        str(Path.home() / "anaconda3" / "envs" / "psi4-env" / "python.exe"),
+        str(Path.home() / "miniconda3" / "envs" / "psi4-env" / "python.exe"),
+    ],
 }
 LEGACY_GNN_PROJECT_ROOT = Path(r"C:\Users\ckx\Desktop\tianxuan seek")
 
@@ -80,6 +85,7 @@ ENV_VARS = {
     "graphrag": "COF_GRAPHRAG_PYTHON",
     "gnn": "COF_GNN_PYTHON",
     "app": "COF_APP_PYTHONW",
+    "psi4": "COF_PSI4_PYTHON",
 }
 
 _LOCAL_CACHE: dict | None = None
@@ -154,6 +160,15 @@ def gnn_python() -> Path | None:
 def app_pythonw() -> Path | None:
     """桌面启动器用的 pythonw/python（Gradio App 进程解释器）。"""
     return resolve_python("app", probe_names=("pythonw", "python"))
+
+
+def psi4_python() -> Path | None:
+    """Psi4 真 DFT 精度档的独立 conda 环境（psi4-env）解释器。
+
+    与 gnn 同理不做 PATH 探测（系统 python 多半没装 psi4），None 表示
+    精度档未安装——调用方据此引导用户运行 scripts/install_psi4_env.bat。
+    """
+    return resolve_python("psi4", probe_names=())
 
 
 def gnn_project_root() -> Path:

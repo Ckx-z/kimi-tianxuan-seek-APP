@@ -192,7 +192,12 @@ class DftJobCreate(BaseModel):
     ald2_smiles: str | None = Field(None, description="x_type=other_dimer 时的醛单体 2")
     amine2_smiles: str | None = Field(None, description="x_type=other_dimer 时的胺单体 2")
     custom_smiles: str | None = Field(None, description="x_type=custom 时的自定义 SMILES")
-    method: str = Field("gfn2", description="gfnff（快速）| gfn2（精确，默认）")
+    method: str = Field("gfn2", description="backend=xtb：gfnff（快速）| gfn2（精确，默认）；"
+                                            "backend=psi4：wb97xd3bj_svp（默认）")
+    backend: str = Field(
+        "xtb",
+        description="计算后端：xtb（默认，半经验快速档）| psi4（真 DFT 精度档，"
+                    "需已安装 psi4-env，见 scripts/install_psi4_env.bat）")
 
 
 class LiteratureLookup(BaseModel):

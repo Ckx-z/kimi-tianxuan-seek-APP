@@ -39,7 +39,8 @@ async function request<T>(path: string, options: { method?: string; body?: unkno
 
 // ---------- 类型（与后端契约对齐） ----------
 
-export type DftMethod = 'gfnff' | 'gfn2';
+export type DftBackend = 'xtb' | 'psi4';
+export type DftMethod = 'gfnff' | 'gfn2' | 'wb97xd3bj_svp';
 export type DftJobStatus = 'pending' | 'running' | 'done' | 'failed';
 /** 第三物质 X 类型：自身堆积（默认）/ 溶剂 / 另一组单体的二聚体 / 自定义分子 */
 export type DftXType = 'self_stack' | 'solvent' | 'other_dimer' | 'custom';
@@ -86,6 +87,8 @@ export interface DftXRequest {
 }
 
 export interface DftResult {
+  /** 计算后端：缺省（旧缓存/旧历史）视为 xtb */
+  backend?: DftBackend;
   /** 计算模式：缺省（旧缓存/旧历史）视为 dimer */
   mode?: DftMode;
   /** 规范化醛/胺单体 SMILES（pair 模式为分子 A/B；收藏联动等下游兼容字段） */
@@ -116,6 +119,20 @@ export interface DftResult {
   elapsed_sec: number;
   cached: boolean;
   favorite: DftFavoriteInfo | null;
+  /** Psi4 精度档附加信息（backend=psi4 时存在） */
+  psi4_detail?: DftPsi4Detail | null;
+}
+
+/** Psi4 精度档附加信息（方法/基组/BSSE 口径/fchk） */
+export interface DftPsi4Detail {
+  method: string;
+  basis: string;
+  bsse_type: string;
+  psi4_version?: string | null;
+  /** 未做 BSSE 校正的参考结合能（kcal/mol） */
+  e_bind_raw_kcal?: number | null;
+  fchk_available?: boolean;
+  fchk_path?: string | null;
 }
 
 export interface DftJob {
@@ -124,6 +141,7 @@ export interface DftJob {
   progress_hint: string;
   method: DftMethod;
   mode?: DftMode;
+  backend?: DftBackend;
   cached: boolean;
   result: DftResult | null;
   error: string | null;
@@ -142,12 +160,16 @@ export interface DftJobRequest {
   amine2_smiles?: string;
   custom_smiles?: string;
   method: DftMethod;
+  /** 缺省 xtb；psi4 为真 DFT 精度档（分钟级，需已安装 psi4-env） */
+  backend?: DftBackend;
 }
 
 /** 历史条目（dft_log.jsonl；2.0 起含二聚体与 X 字段，旧条目可能缺失） */
 export interface DftHistoryEntry {
   timestamp?: string;
   mode?: DftMode;
+  /** 缺省（旧条目）视为 xtb */
+  backend?: DftBackend;
   smiles_a: string;
   smiles_b: string;
   dimer_smiles?: string | null;
@@ -158,6 +180,8 @@ export interface DftHistoryEntry {
   x_description?: string;
   x_request?: DftXRequest;
   method: DftMethod;
+  /** 后端记录的方法中文标签（新条目；旧条目由前端按 method 推断） */
+  method_label?: string | null;
   status: 'done' | 'failed';
   error?: string;
   e_bind_kcal?: number;
@@ -168,6 +192,36 @@ export interface DftHistoryEntry {
   complex_xyz?: string;
   fragment_ranges?: DftFragmentRanges | null;
   elapsed_sec?: number;
+}
+
+// ---------- 后端可用状态（GET /backends） ----------
+
+export interface DftBackendMethodOption {
+  id: string;
+  label: string;
+}
+
+export interface DftBackendInfo {
+  installed: boolean;
+  version: string | null;
+  path: string | null;
+  label: string;
+  methods: DftBackendMethodOption[];
+  /** 仅 psi4：默认方法档 / 安装引导 */
+  default_method?: string;
+  install_hint?: string | null;
+  reason?: string;
+}
+
+export interface DftBackendsResponse {
+  backends: { xtb: DftBackendInfo; psi4: DftBackendInfo };
+}
+
+/** 方法中文标签：优先用后端记录的 method_label，否则按 backend+method 推断 */
+export function dftMethodLabel(backend: DftBackend | undefined, method: string, recorded?: string | null): string {
+  if (recorded) return recorded;
+  if (backend === 'psi4' || method === 'wb97xd3bj_svp') return 'ωB97X-D3BJ/def2-SVP（真 DFT）';
+  return method === 'gfnff' ? 'GFN-FF 力场（快速）' : 'GFN2-xTB（精确）';
 }
 
 // ---------- 端点 ----------
@@ -184,6 +238,12 @@ export const fetchDftJob = (jobId: string) =>
 export const fetchDftSolvents = async (): Promise<DftSolvent[]> => {
   const data = await request<{ solvents: DftSolvent[] }>('/solvents', { silent: true });
   return data.solvents ?? [];
+};
+
+/** 各计算后端可用状态（静默：选择器初始化与安装后轮询检测用） */
+export const fetchDftBackends = async (): Promise<DftBackendsResponse['backends']> => {
+  const data = await request<DftBackendsResponse>('/backends', { silent: true });
+  return data.backends;
 };
 
 /** 二聚体预览：醛/胺单体 → 缩合二聚体 SMILES + 多位点标注 */
@@ -242,6 +302,7 @@ export async function exportDftInput(
       amine2_smiles: result.x_request?.amine2_smiles ?? undefined,
       custom_smiles: result.x_request?.custom_smiles ?? undefined,
       method: result.method,
+      backend: result.backend ?? 'xtb',
     });
     id = job.job_id;
   }
@@ -286,7 +347,9 @@ export function mergeDftToFavorite(favoriteId: string, result: DftResult) {
 /** 由计算结果构造 dft_snapshot（落盘字段，「我的」页可展示；2.0 起含二聚体与 X） */
 export function buildDftSnapshot(result: DftResult) {
   return {
+    backend: result.backend ?? 'xtb',
     method: result.method,
+    method_label: result.method_label,
     dimer_smiles: result.dimer_smiles,
     dimer_multi_site: result.dimer_multi_site ?? false,
     dimer_note: result.dimer_note ?? null,

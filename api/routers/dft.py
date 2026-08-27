@@ -1,7 +1,9 @@
 """DFT 计算路由：异步任务 + 缓存 + 历史 + 收藏联动（2.0：二聚体与 X 的结合能）。
 
 - POST /api/dft/jobs            建任务（202，缓存命中立即 done；旧字段
-                                smiles_a/smiles_b 兼容映射为醛/胺单体）
+                                smiles_a/smiles_b 兼容映射为醛/胺单体；
+                                backend="xtb"（默认）| "psi4" 精度档）
+- GET  /api/dft/backends        各计算后端可用状态（psi4 未安装时给安装引导）
 - GET  /api/dft/jobs/{id}       轮询任务状态/结果
 - GET  /api/dft/jobs/{id}/geometry  复合物优化后 xyz（纯文本，供 3D 查看/下载）
 - GET  /api/dft/jobs/{id}/export?format=gaussian|orca  量化软件输入文件下载
@@ -24,11 +26,13 @@ try:
     from src.dft import engine, jobs
     from src.dft import export as dft_export
     from src.dft import log as dft_log
+    from src.dft import psi4_backend
 except ImportError:  # pragma: no cover - src 直接在 sys.path 时
     from dft import dimer as dimer_mod  # type: ignore
     from dft import engine, jobs  # type: ignore
     from dft import export as dft_export  # type: ignore
     from dft import log as dft_log  # type: ignore
+    from dft import psi4_backend  # type: ignore
 
 router = APIRouter(prefix="/api/dft", tags=["dft"])
 
@@ -41,6 +45,7 @@ def _public_job(job: dict) -> dict:
         "progress_hint": job["progress_hint"],
         "method": job["method"],
         "mode": job.get("mode", "dimer"),
+        "backend": job.get("backend", "xtb"),
         "cached": job.get("cached", False),
         "result": job.get("result"),
         "error": job.get("error"),
@@ -62,9 +67,21 @@ def create_dft_job(req: DftJobCreate):
         raise HTTPException(
             400, f"未知的计算模式：{req.mode}"
             f"（可选 {' / '.join(engine.MODES)}）")
+    backend = (req.backend or "xtb").strip()
+    if backend not in jobs.BACKENDS:
+        raise HTTPException(
+            400, f"未知的计算后端：{req.backend}"
+            f"（可选 {' / '.join(jobs.BACKENDS)}）")
     ald, amine = _resolve_monomers(req)
-    if req.method not in engine.METHODS:
-        raise HTTPException(400, f"未知方法档位：{req.method}（可选 gfnff / gfn2）")
+
+    # 方法档位按后端解释；psi4 未显式给方法档时回落默认（前端可能沿用 xtb 默认 gfn2）
+    if backend == "psi4":
+        method = req.method if req.method in psi4_backend.PSI4_METHODS \
+            else psi4_backend.DEFAULT_PSI4_METHOD
+    else:
+        method = req.method
+        if method not in engine.METHODS:
+            raise HTTPException(400, f"未知方法档位：{req.method}（可选 gfnff / gfn2）")
 
     if mode == "pair":
         # 任意双分子模式：ald/amine 字段位复用为分子 A/B，跳过二聚体与 X 校验
@@ -74,11 +91,8 @@ def create_dft_job(req: DftJobCreate):
             raise HTTPException(400, f"分子 A 的 SMILES 无法解析：{ald[:80]}")
         if engine.canonicalize_smiles(amine) is None:
             raise HTTPException(400, f"分子 B 的 SMILES 无法解析：{amine[:80]}")
-        if engine.xtb_binary() is None:
-            raise HTTPException(
-                503, "未安装计算引擎：未找到 xtb 二进制（vendor/xtb/bin/xtb.exe），"
-                "DFT 计算暂不可用")
-        job = jobs.create_job(ald, amine, req.method, mode="pair")
+        _check_backend_available(backend)
+        job = jobs.create_job(ald, amine, method, mode="pair", backend=backend)
         return _public_job(job)
 
     if not ald or not amine:
@@ -101,15 +115,58 @@ def create_dft_job(req: DftJobCreate):
     except engine.DftError as exc:
         raise HTTPException(400, str(exc))
 
-    if engine.xtb_binary() is None:
-        raise HTTPException(
-            503, "未安装计算引擎：未找到 xtb 二进制（vendor/xtb/bin/xtb.exe），"
-            "DFT 计算暂不可用")
+    _check_backend_available(backend)
     job = jobs.create_job(
-        ald, amine, req.method, x_type=req.x_type,
+        ald, amine, method, x_type=req.x_type,
         solvent_id=req.solvent_id, ald2_smiles=req.ald2_smiles,
-        amine2_smiles=req.amine2_smiles, custom_smiles=req.custom_smiles)
+        amine2_smiles=req.amine2_smiles, custom_smiles=req.custom_smiles,
+        backend=backend)
     return _public_job(job)
+
+
+def _check_backend_available(backend: str) -> None:
+    """后端可用性前置校验；不可用抛 503 中文原因（psi4 附带安装引导）。"""
+    if backend == "xtb":
+        if engine.xtb_binary() is None:
+            raise HTTPException(
+                503, "未安装计算引擎：未找到 xtb 二进制（vendor/xtb/bin/xtb.exe），"
+                "DFT 计算暂不可用")
+        return
+    det = psi4_backend.detect_psi4()
+    if not det["installed"]:
+        raise HTTPException(503, det["reason"])
+
+
+@router.get("/backends")
+def dft_backends():
+    """各计算后端的可用状态（前端后端选择器与 Psi4 安装引导用）。"""
+    det = psi4_backend.detect_psi4()
+    return {
+        "backends": {
+            "xtb": {
+                "installed": engine.xtb_binary() is not None,
+                "version": None,
+                "path": str(engine.xtb_binary() or "") or None,
+                "label": "xTB 半经验（快速档）",
+                "methods": [
+                    {"id": m, "label": spec["label"]}
+                    for m, spec in engine.METHODS.items()],
+            },
+            "psi4": {
+                "installed": det["installed"],
+                "version": det["version"],
+                "path": det["path"],
+                "label": "Psi4 真 DFT（精度档）",
+                "methods": [
+                    {"id": m, "label": spec["label"]}
+                    for m, spec in psi4_backend.PSI4_METHODS.items()],
+                "default_method": psi4_backend.DEFAULT_PSI4_METHOD,
+                "install_hint": None if det["installed"]
+                else psi4_backend.INSTALL_HINT,
+                "reason": det["reason"],
+            },
+        }
+    }
 
 
 @router.get("/solvents")

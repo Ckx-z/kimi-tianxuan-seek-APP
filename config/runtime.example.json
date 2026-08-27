@@ -3,7 +3,8 @@
   "pythons": {
     "graphrag": "E:\\python3.12\\python.exe",
     "gnn": "E:\\ANACONDA\\envs\\dphuanjing\\python.exe",
-    "app": "E:\\ANACONDA\\pythonw.exe"
+    "app": "E:\\ANACONDA\\pythonw.exe",
+    "psi4": "E:\\ANACONDA\\envs\\psi4-env\\python.exe"
   },
   "gnn_project_root": "C:\\Users\\ckx\\Desktop\\tianxuan seek"
 }

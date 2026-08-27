@@ -15,6 +15,10 @@ from . import cache as dft_cache
 from . import dimer as dimer_mod
 from . import engine
 from . import log as dft_log
+from . import psi4_backend
+
+# 计算后端：xtb 快速档（默认）| psi4 真 DFT 精度档
+BACKENDS = ("xtb", "psi4")
 
 _LOCK = threading.Lock()
 _JOBS: dict[str, dict] = {}
@@ -65,10 +69,12 @@ def _prune_locked() -> None:
 def create_job(ald_smiles: str, amine_smiles: str, method: str,
                x_type: str = "self_stack", solvent_id: str | None = None,
                ald2_smiles: str | None = None, amine2_smiles: str | None = None,
-               custom_smiles: str | None = None, mode: str = "dimer") -> dict:
+               custom_smiles: str | None = None, mode: str = "dimer",
+               backend: str = "xtb") -> dict:
     """建任务。缓存命中 → 直接 done；否则 pending 并起后台线程。
 
     mode="pair" 时 ald/amine 参数位复用为分子 A/B，忽略 x_type 相关字段。
+    backend="psi4" 时 method 为 psi4_backend.PSI4_METHODS 键，走真 DFT 精度档。
     """
     job_id = uuid.uuid4().hex[:16]
     job = {
@@ -77,6 +83,7 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
         "progress_hint": "排队等待计算…",
         "method": method,
         "mode": mode,
+        "backend": backend,
         "ald_smiles_input": ald_smiles,
         "amine_smiles_input": amine_smiles,
         "x_type": x_type,
@@ -97,7 +104,7 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
     # 这里先算出新口径缓存 key 探缓存
     probe = _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
                              solvent_id, ald2_smiles, amine2_smiles,
-                             custom_smiles, mode)
+                             custom_smiles, mode, backend)
     if probe is not None:
         key, canon_ald, canon_amine = probe
         hit = dft_cache.load_cache(key)
@@ -119,10 +126,11 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
 
 def _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
                      solvent_id, ald2_smiles, amine2_smiles,
-                     custom_smiles, mode="dimer"):
+                     custom_smiles, mode="dimer", backend="xtb"):
     """尽力算出 (缓存 key, 规范化 A, 规范化 B)；任一步失败返回 None。"""
     try:
-        if method not in engine.METHODS:
+        methods = engine.METHODS if backend == "xtb" else psi4_backend.PSI4_METHODS
+        if method not in methods:
             return None
         canon_ald = engine.canonicalize_smiles(ald_smiles)
         canon_amine = engine.canonicalize_smiles(amine_smiles)
@@ -130,14 +138,16 @@ def _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
             return None
         if mode == "pair":
             return (dft_cache.cache_key(
-                        canon_ald, f"pair:{canon_amine}", method, mode="pair"),
+                        canon_ald, f"pair:{canon_amine}", method, mode="pair",
+                        backend=backend),
                     canon_ald, canon_amine)
         dim = dimer_mod.make_dimer(canon_ald, canon_amine)
         _, _, x_part = engine.resolve_x(
             x_type, dim["smiles"], solvent_id=solvent_id,
             ald2_smiles=ald2_smiles, amine2_smiles=amine2_smiles,
             custom_smiles=custom_smiles)
-        return (dft_cache.cache_key(dim["smiles"], x_part, method),
+        return (dft_cache.cache_key(dim["smiles"], x_part, method,
+                                    backend=backend),
                 canon_ald, canon_amine)
     except Exception:
         return None
@@ -157,6 +167,7 @@ def _run_job(job_id: str) -> None:
     method = job["method"]
     x_type = job.get("x_type") or "self_stack"
     mode = job.get("mode") or "dimer"
+    backend = job.get("backend") or "xtb"
 
     def on_stage(hint: str) -> None:
         with _LOCK:
@@ -170,11 +181,25 @@ def _run_job(job_id: str) -> None:
 
     log_base = {
         "smiles_a": ald_smiles, "smiles_b": amine_smiles,
-        "x_type": x_type, "method": method, "mode": mode,
+        "x_type": x_type, "method": method, "mode": mode, "backend": backend,
     }
 
     try:
-        if mode == "pair":
+        if backend == "psi4":
+            # 精度档：真 DFT（ωB97X-D3BJ/def2-SVP + BSSE counterpoise）
+            if mode == "pair":
+                result = psi4_backend.compute_pair_binding_psi4(
+                    ald_smiles, amine_smiles, method, on_stage=on_stage)
+            else:
+                result = psi4_backend.compute_binding_psi4(
+                    ald_smiles, amine_smiles, method,
+                    x_type=x_type,
+                    solvent_id=job.get("solvent_id"),
+                    ald2_smiles=job.get("ald2_smiles"),
+                    amine2_smiles=job.get("amine2_smiles"),
+                    custom_smiles=job.get("custom_smiles"),
+                    on_stage=on_stage)
+        elif mode == "pair":
             # 任意双分子模式：A···B 直接结合，跳过二聚体生成与 X 解析
             result = engine.compute_pair_binding(
                 ald_smiles, amine_smiles, method, on_stage=on_stage)
@@ -189,7 +214,7 @@ def _run_job(job_id: str) -> None:
                 on_stage=on_stage)
         key = dft_cache.cache_key(
             result["smiles_a"] if mode == "pair" else result["dimer_smiles"],
-            result["x_cache_part"], method, mode=mode)
+            result["x_cache_part"], method, mode=mode, backend=backend)
         dft_cache.save_cache(key, result)
         result["cached"] = False
         # pair 模式无单体组归属，不做收藏联动
@@ -197,6 +222,7 @@ def _run_job(job_id: str) -> None:
             _find_favorite(result["smiles_a"], result["smiles_b"])
         dft_log.log_dft({
             "mode": mode,
+            "backend": backend,
             "smiles_a": result["smiles_a"],
             "smiles_b": result["smiles_b"],
             "dimer_smiles": result["dimer_smiles"],
@@ -207,6 +233,7 @@ def _run_job(job_id: str) -> None:
             "x_description": result["x_description"],
             "x_request": result.get("x_request"),
             "method": method,
+            "method_label": result.get("method_label"),
             "status": "done",
             "e_bind_kcal": result["e_bind_kcal"],
             "e_bind_kj": result["e_bind_kj"],

@@ -18,13 +18,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChevronDown, Copy, FileDown, FileOutput } from 'lucide-react';
 import { toast } from 'sonner';
-import { exportDftInput, type DftExportFormat, type DftResult } from './api';
+import { exportDftInput, type DftBackend, type DftExportFormat, type DftResult } from './api';
 import DftViewer3D from './DftViewer3D';
 
 interface Props {
   result: DftResult;
   /** 当前任务 id（历史回显无任务时为 null，导出时自动借缓存命中任务） */
   jobId?: string | null;
+  /** 同组合另一后端的最近一次结果（精度档/快速档互相对比；无则 null） */
+  compare?: {
+    backend: DftBackend;
+    method_label: string;
+    e_bind_kcal: number;
+    e_bind_kj: number;
+  } | null;
 }
 
 function fmt(v: number | null | undefined, digits = 2, unit = ''): string {
@@ -49,9 +56,10 @@ function downloadXyz(result: DftResult, jobId?: string | null) {
   URL.revokeObjectURL(url);
 }
 
-export default function DftResultPanel({ result, jobId }: Props) {
+export default function DftResultPanel({ result, jobId, compare }: Props) {
   const bound = result.e_bind_kcal < 0;
   const isPair = result.mode === 'pair';
+  const isPsi4 = result.backend === 'psi4';
   /** 导出进行中（按格式记，防重复点击） */
   const [exporting, setExporting] = useState<DftExportFormat | null>(null);
 
@@ -112,6 +120,18 @@ export default function DftResultPanel({ result, jobId }: Props) {
           <CardTitle className="flex flex-wrap items-center gap-2 text-base">
             {isPair ? '双分子结合能' : '二聚体结合能'}
             <Badge variant="outline">{result.method_label}</Badge>
+            {isPsi4 ? (
+              <Badge className="border-gold bg-gold-muted/60 text-amber-800 dark:text-gold">
+                Psi4 精度档
+              </Badge>
+            ) : (
+              <Badge variant="secondary">xTB 快速档</Badge>
+            )}
+            {isPsi4 && result.psi4_detail?.bsse_type === 'cp' && (
+              <Badge variant="outline" title="counterpoise 基组重叠误差（BSSE）校正">
+                BSSE 校正
+              </Badge>
+            )}
             {isPair && <Badge variant="secondary">任意双分子模式</Badge>}
             {result.cached && <Badge variant="secondary">缓存结果</Badge>}
             {!isPair && result.dimer_multi_site && (
@@ -139,6 +159,25 @@ export default function DftResultPanel({ result, jobId }: Props) {
             {isPair
               ? 'E(结合) = E(A···B 复合物) − E(A) − E(B)，两分子任意选取、不经过缩合反应。'
               : `E(结合) = E(二聚体·X 复合物) − E(二聚体) − E(X)，其中 X = ${result.x_description}。`}
+            {isPsi4 && (
+              <span className="block mt-1">
+                方法/基组：{result.psi4_detail?.method ?? 'wb97x-d3bj'} /{' '}
+                {result.psi4_detail?.basis ?? 'def2-svp'}，结合能经 counterpoise（BSSE）校正
+                {result.psi4_detail?.psi4_version ? `；Psi4 ${result.psi4_detail.psi4_version}` : ''}。
+                {result.psi4_detail?.e_bind_raw_kcal != null && (
+                  <>未校正参考值：{result.psi4_detail.e_bind_raw_kcal.toFixed(2)} kcal/mol。</>
+                )}
+                {result.psi4_detail?.fchk_available && (
+                  <>fchk 检查点文件已生成（可对接 Gaussian 工作流）。</>
+                )}
+              </span>
+            )}
+            {compare && (
+              <span className="block mt-1">
+                对比｜同组合{compare.backend === 'psi4' ? ' Psi4 精度档' : ' xTB 快速档'}（{compare.method_label}）：
+                {compare.e_bind_kj.toFixed(2)} kJ/mol（{compare.e_bind_kcal.toFixed(2)} kcal/mol）。
+              </span>
+            )}
             {bound
               ? '负值：形成复合物在能量上有利，数值越负结合越强。'
               : '正值：该初猜取向下复合物能量高于组分之和，结合不利（或构象未找到有利取向）。'}
@@ -306,7 +345,9 @@ export default function DftResultPanel({ result, jobId }: Props) {
 
       {/* 固定红线提示（学术诚信底线，常驻） */}
       <p className="rounded-lg border border-dashed border-gold/50 bg-gold-muted/40 px-4 py-2 text-xs text-muted-foreground">
-        学术诚信提示：半经验方法（xTB）结果仅供相对比较，精确能量请导出输入文件用 DFT 复算。
+        {isPsi4
+          ? '学术诚信提示：Psi4 精度档为团簇模型（二聚体·客体）真 DFT 结果，已做 BSSE 校正；周期性框架级吸附请导出几何/输入文件到超算复算。'
+          : '学术诚信提示：半经验方法（xTB）结果仅供相对比较，精确能量请切换到 Psi4 精度档或导出输入文件用 DFT 复算。'}
       </p>
     </div>
   );

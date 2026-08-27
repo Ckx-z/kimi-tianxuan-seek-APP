@@ -54,11 +54,15 @@ import {
   buildDftSnapshot,
   createDftJob,
   createFavoriteWithDft,
+  dftMethodLabel,
+  fetchDftBackends,
   fetchDftHistory,
   fetchDftJob,
   fetchDftSolvents,
   fetchDimerPreview,
   mergeDftToFavorite,
+  type DftBackend,
+  type DftBackendsResponse,
   type DftHistoryEntry,
   type DftMethod,
   type DftMode,
@@ -79,6 +83,7 @@ const emptyProps: PropsState = { loading: false, error: null, data: null };
 function resultFromHistory(h: DftHistoryEntry): DftResult {
   return {
     mode: h.mode ?? 'dimer',
+    backend: h.backend ?? 'xtb',
     smiles_a: h.smiles_a,
     smiles_b: h.smiles_b,
     dimer_smiles: h.dimer_smiles ?? '',
@@ -89,7 +94,7 @@ function resultFromHistory(h: DftHistoryEntry): DftResult {
     x_description: h.x_description ?? '（旧记录未保存 X 描述）',
     x_request: h.x_request,
     method: h.method,
-    method_label: h.method === 'gfnff' ? 'GFN-FF 力场（快速）' : 'GFN2-xTB（精确）',
+    method_label: dftMethodLabel(h.backend, h.method, h.method_label),
     e_bind_hartree: 0,
     e_bind_kcal: h.e_bind_kcal ?? 0,
     e_bind_kj: h.e_bind_kj ?? 0,
@@ -131,6 +136,13 @@ export default function Dft() {
   const [monoB2, setMonoB2] = useState<MonomerValue>({ smiles: '', name: '' });
   const [customSmiles, setCustomSmiles] = useState('');
   const [method, setMethod] = useState<DftMethod>('gfn2');
+
+  // ---------- 计算后端：xtb 快速档（默认）| psi4 真 DFT 精度档 ----------
+  const [backend, setBackend] = useState<DftBackend>('xtb');
+  const isPsi4 = backend === 'psi4';
+  /** GET /api/dft/backends 的可用状态（null = 尚未取到） */
+  const [backends, setBackends] = useState<DftBackendsResponse['backends'] | null>(null);
+  const psi4Installed = backends?.psi4?.installed === true;
 
   /** URL 预填（收藏详情「重新计算」跳转）：?a=<smiles>&b=<smiles>&an=<名>&bn=<名> */
   const [searchParams] = useSearchParams();
@@ -185,10 +197,25 @@ export default function Dft() {
     fetchDftSolvents()
       .then((list) => { setSolvents(list); if (list.length > 0) setSolventId(list[0].id); })
       .catch(() => {});
+    fetchDftBackends().then(setBackends).catch(() => {});
     refreshHistory();
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 选中 Psi4 但未安装时：每 15s 轮询检测（用户可能在跑 install_psi4_env.bat）
+  useEffect(() => {
+    if (!isPsi4 || psi4Installed) return;
+    const timer = setInterval(() => {
+      fetchDftBackends()
+        .then((b) => {
+          setBackends(b);
+          if (b.psi4?.installed) toast.success(`已检测到 Psi4 精度档环境（v${b.psi4.version ?? '?'}）`);
+        })
+        .catch(() => {});
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [isPsi4, psi4Installed]);
 
   // ---------- 二聚体预览（两个单体 SMILES 齐备后防抖请求；pair 模式跳过） ----------
   useEffect(() => {
@@ -248,6 +275,10 @@ export default function Dft() {
       toast.warning(isPair ? '请先填写分子 A 与分子 B 的 SMILES' : '请先填写醛单体与胺单体的 SMILES');
       return;
     }
+    if (isPsi4 && !psi4Installed) {
+      toast.warning('Psi4 精度档环境未安装，请先按引导完成安装');
+      return;
+    }
     if (!isPair && xType === 'solvent' && !solventId) {
       toast.warning('请选择溶剂');
       return;
@@ -273,7 +304,8 @@ export default function Dft() {
             mode: 'pair',
             ald_smiles: monoA.smiles,
             amine_smiles: monoB.smiles,
-            method,
+            method: isPsi4 ? 'wb97xd3bj_svp' : method,
+            backend,
           }
           : {
             ald_smiles: monoA.smiles,
@@ -283,7 +315,8 @@ export default function Dft() {
             ald2_smiles: xType === 'other_dimer' ? monoA2.smiles : undefined,
             amine2_smiles: xType === 'other_dimer' ? monoB2.smiles : undefined,
             custom_smiles: xType === 'custom' ? customSmiles.trim() : undefined,
-            method,
+            method: isPsi4 ? 'wb97xd3bj_svp' : method,
+            backend,
           },
       );
       setCurrentJobId(job.job_id);
@@ -399,6 +432,7 @@ export default function Dft() {
         x_description: result.x_description,
         dimer_smiles: result.dimer_smiles ?? undefined,
         method: result.method,
+        backend: result.backend ?? 'xtb',
         e_bind_kcal: result.e_bind_kcal,
         e_bind_kj: result.e_bind_kj,
         created_at: new Date().toISOString(),
@@ -435,9 +469,10 @@ export default function Dft() {
   /** 历史点击：回显输入与结果（无任务 id，导出时会借缓存命中任务） */
   const handleHistoryClick = (h: DftHistoryEntry) => {
     setMode(h.mode ?? 'dimer');
+    setBackend(h.backend ?? 'xtb');
     setMonoA({ smiles: h.smiles_a, name: '' });
     setMonoB({ smiles: h.smiles_b, name: '' });
-    setMethod(h.method);
+    if (h.method === 'gfnff' || h.method === 'gfn2') setMethod(h.method);
     if (h.x_type) setXType(h.x_type);
     if (h.x_request?.solvent_id) setSolventId(h.x_request.solvent_id);
     if (h.x_request?.ald2_smiles) setMonoA2({ smiles: h.x_request.ald2_smiles, name: '' });
@@ -453,12 +488,36 @@ export default function Dft() {
   /** 追加 DFT 记录的目标收藏 id（后端联动 result.favorite 或前端双序匹配） */
   const appendTargetId = fav?.id || pairFavorite?.id;
 
+  /** 同组合另一后端的最近一次成功结果（精度档/快速档并排对比用） */
+  const compareResult = (() => {
+    if (!result || history.length === 0) return null;
+    const curBackend = result.backend ?? 'xtb';
+    const peer = history.find(
+      (h) =>
+        h.status === 'done' &&
+        h.e_bind_kcal != null &&
+        (h.backend ?? 'xtb') !== curBackend &&
+        (h.mode ?? 'dimer') === (result.mode ?? 'dimer') &&
+        (h.dimer_smiles ?? h.smiles_a) === (result.dimer_smiles || result.smiles_a) &&
+        (h.x_smiles ?? h.smiles_b) === (result.x_smiles || result.smiles_b),
+    );
+    if (!peer || peer.e_bind_kcal == null) return null;
+    const peerKcal: number = peer.e_bind_kcal;
+    return {
+      backend: (peer.backend ?? 'xtb') as DftBackend,
+      method_label: dftMethodLabel(peer.backend, peer.method, peer.method_label),
+      e_bind_kcal: peerKcal,
+      e_bind_kj: peer.e_bind_kj ?? peerKcal * 4.184,
+    };
+  })();
+
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-gradient-royal">DFT 计算</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          半经验量子化学（xTB）计算「缩合二聚体与第三物质」的结合能，辅助判断堆积 / 溶剂化 / 异质聚集倾向
+          计算「缩合二聚体与第三物质」的结合能，辅助判断堆积 / 溶剂化 / 异质聚集倾向；
+          支持 xTB 半经验快速档与 Psi4 真 DFT 精度档（BSSE 校正）
         </p>
       </div>
 
@@ -639,7 +698,68 @@ export default function Dft() {
           </div>
           )}
 
-          {/* 方法档位 */}
+          {/* 计算后端：xTB 快速档 / Psi4 精度档 */}
+          <div className="space-y-2 rounded-xl border bg-card p-4">
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-semibold text-foreground">计算后端</h3>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <CircleHelp className="h-4 w-4 cursor-help text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs">
+                    xTB 快速档：半经验 GFN2-xTB/GFN-FF，秒级出结果，适合批量筛选与相对比较；
+                    Psi4 精度档：真 DFT（ωB97X-D3BJ/def2-SVP），结合能做 BSSE counterpoise 校正，
+                    分钟级耗时，结果带 fchk 文件可对接 Gaussian 工作流。
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <RadioGroup value={backend} onValueChange={(v) => setBackend(v as DftBackend)} disabled={running}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="xtb" id="b-xtb" />
+                <Label htmlFor="b-xtb">xTB 快速档（秒级，批量筛选）</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="psi4" id="b-psi4" />
+                <Label htmlFor="b-psi4">
+                  Psi4 精确（真 DFT，分钟级）
+                  {psi4Installed && backends?.psi4?.version && (
+                    <span className="ml-1 text-xs text-muted-foreground">v{backends.psi4.version}</span>
+                  )}
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {/* Psi4 未安装：引导安装卡 */}
+            {isPsi4 && backends && !psi4Installed && (
+              <Alert className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
+                <AlertTitle className="text-amber-800 dark:text-amber-300">Psi4 精度档未安装</AlertTitle>
+                <AlertDescription className="space-y-2 text-amber-700 dark:text-amber-400">
+                  <p>
+                    {backends.psi4?.install_hint ??
+                      '请运行 scripts/install_psi4_env.bat 一键安装（conda create -n psi4-env -c conda-forge psi4 python=3.11，约 300MB+ 下载）。'}
+                  </p>
+                  <p className="text-xs">
+                    安装脚本运行期间本页面每 15 秒自动检测一次；装好后无需刷新即可使用。
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchDftBackends().then(setBackends).catch(() => {})}
+                  >
+                    立即重新检测
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            {isPsi4 && backends === null && (
+              <p className="text-xs text-muted-foreground">正在检测 Psi4 环境…</p>
+            )}
+          </div>
+
+          {/* 方法档位（仅 xTB 后端；Psi4 固定 ωB97X-D3BJ/def2-SVP） */}
+          {!isPsi4 && (
           <div className="space-y-2 rounded-xl border bg-card p-4">
             <div className="flex items-center gap-1.5">
               <h3 className="font-semibold text-foreground">方法档位</h3>
@@ -667,15 +787,26 @@ export default function Dft() {
               </div>
             </RadioGroup>
           </div>
+          )}
+
+          {/* Psi4 精度档方法说明（固定 ωB97X-D3BJ/def2-SVP） */}
+          {isPsi4 && (
+            <div className="rounded-xl border bg-card p-4 text-xs text-muted-foreground">
+              方法/基组：<span className="font-medium text-foreground">ωB97X-D3BJ / def2-SVP</span>
+              ，结合能经 counterpoise（BSSE）校正；几何以 xTB 预优化结果为初猜再做 Psi4 优化。
+              输出含 HOMO-LUMO 能隙、偶极矩与 fchk 检查点文件。
+            </div>
+          )}
 
           {/* 第三步：开始计算 */}
           <Button
             className="w-full"
             size="lg"
             onClick={handleSubmit}
-            disabled={running || !monoA.smiles || !monoB.smiles}
+            disabled={running || !monoA.smiles || !monoB.smiles || (isPsi4 && !psi4Installed)}
+            title={isPsi4 && !psi4Installed ? 'Psi4 精度档环境未安装，请先按上方引导完成安装' : undefined}
           >
-            {running ? '计算中…' : '开始计算'}
+            {running ? '计算中…' : isPsi4 && !psi4Installed ? '开始计算（需先安装 Psi4 精度档）' : '开始计算'}
           </Button>
 
           {/* 历史计算记录 */}
@@ -695,8 +826,15 @@ export default function Dft() {
                         {(h.timestamp ?? '').replace('T', ' ').slice(0, 19)}
                       </span>
                       <Badge variant="outline" className="mr-1 text-[10px]">
-                        {h.method === 'gfnff' ? '快速' : '精确'}
+                        {h.backend === 'psi4'
+                          ? '真DFT'
+                          : h.method === 'gfnff' ? '快速' : '精确'}
                       </Badge>
+                      {h.backend === 'psi4' && (
+                        <Badge className="mr-1 border-gold bg-gold-muted/60 text-[10px] text-amber-800 dark:text-gold" title="Psi4 精度档（ωB97X-D3BJ/def2-SVP，BSSE 校正）">
+                          Psi4
+                        </Badge>
+                      )}
                       {h.mode === 'pair' && (
                         <Badge variant="secondary" className="mr-1 text-[10px]" title="任意双分子模式（A···B 直接结合）">
                           双分子
@@ -739,7 +877,11 @@ export default function Dft() {
               <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-gold border-t-transparent" />
               <p className="text-sm font-medium">{progressHint || '计算中…'}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {method === 'gfn2' ? '精确档位通常需要数十秒，二聚体·二聚体等大体系可能数分钟' : '快速档位通常数秒内完成'}
+                {isPsi4
+                  ? 'Psi4 真 DFT 精度档通常需要数分钟（大体系可能更久），期间可离开本页，完成后从历史记录查看'
+                  : method === 'gfn2'
+                    ? '精确档位通常需要数十秒，二聚体·二聚体等大体系可能数分钟'
+                    : '快速档位通常数秒内完成'}
               </p>
             </div>
           )}
@@ -764,7 +906,7 @@ export default function Dft() {
           {/* 结果 */}
           {result && !running && (
             <>
-              <DftResultPanel result={result} jobId={currentJobId} />
+              <DftResultPanel result={result} jobId={currentJobId} compare={compareResult} />
 
               {/* 收藏联动（pair 模式无单体组归属，禁用） */}
               {result.mode === 'pair' ? (

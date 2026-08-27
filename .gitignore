@@ -135,3 +135,5 @@ vendor/xtb/
 data/dft_log.jsonl
 data/dft_cache/
 data/dft_jobs/
+data/dft_artifacts/
+timer.dat

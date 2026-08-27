@@ -146,6 +146,7 @@ function ScoreBadge({ fav }: { fav: FavoriteItem }) {
 function dftMethodLabel(method?: string): string {
   if (method === 'gfn2') return 'GFN2-xTB（精确）';
   if (method === 'gfnff') return 'GFN-FF 力场（快速）';
+  if (method === 'wb97xd3bj_svp') return 'ωB97X-D3BJ/def2-SVP（Psi4 真 DFT）';
   return method || '未知方法';
 }
 

@@ -107,6 +107,8 @@ export interface DftEntryItem {
   /** 后端预渲染的二聚体 SVG（缺失时前端按 dimer_smiles 走 structure.svg 兜底） */
   dimer_svg?: string;
   method?: string;
+  /** 计算后端：xtb（缺省）| psi4（真 DFT 精度档） */
+  backend?: string;
   e_bind_kcal?: number;
   e_bind_kj?: number;
   created_at?: string;

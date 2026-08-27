@@ -1,7 +1,7 @@
 # PROJECT_STATE — 项目当前状态
 
 > ⭐ **这是每次会话的第一份必读文件**。会话开头读它进入状态，结尾更新它。
-> 最后更新：2026-08-27（阶段 30：**打包版导出/文献 500 修复 + 文献 PDF 录入 + DFT 后端替换方案**——spec 补 lxml 6 个原生 DLL、literature 模块 hiddenimports、extract-pdf 端点（PyMuPDF+LLM 结构化提取→审核卡）；DFT 后端替换方案推荐 Psi4 精度档，见 docs/DFT后端替换方案.md；736 passed）
+> 最后更新：2026-08-27（阶段 31：**DFT Psi4 精度档落地**——psi4-env 1.11+dftd3-python 装妥、psi4_backend.py（ωB97X-D3BJ/def2-SVP + CP BSSE + fchk）、API backend 参数与 /backends、前端后端选择器与安装引导、真实冒烟连通；765 passed）
 
 ---
 
@@ -51,6 +51,7 @@
 | **阶段 28** | **v1.0.1 发布：查询打分白屏根治（vite base './'→'/' + 旧历史日志 schema 残桩过滤）+ Electron 版本变更自清 Chromium 缓存（升级不再见旧界面）+ 实验记录导出 Word + DFT 2.0 二聚体科学对象修正（亚胺缩合生成器/自身堆积·溶剂·另一二聚体·自定义四种 X/Ketcher 画板/收藏与历史口径升级）；627 passed** | ✅ **已完成** |
 | **阶段 29** | **v1.1.0 发布：DFT 任意双分子模式（pair）+ 3D 结合构象（3Dmol.js 片段着色）+ 文献体系（paper_id resolver/收藏与助手引用真实标题+DOI 链接/Crossref 审核录入/DOI 回填至 0.8% 空缺/overlay 逐条合并读）+ 科研助手 V2.2（实验日报卡/连续失败主动提醒/get_daily_brief 工具）+ 缓存根治包（NSIS 安装前杀旧进程/版本看门狗/health 版本握手红横幅/版本三显）+ 画板白屏根治（v1.0.2，raphael require/global 双垫片+错误边界）；718 passed** | ✅ **已完成** |
 | **阶段 30** | **打包版修复 + 文献 PDF 录入 + DFT 后端替换方案：导出 Word 500 根治（spec binaries 补 lxml 6 原生 DLL）+ 文献 lookup 500 根治（literature/records/llm/recommend hiddenimports + fitz/multipart）+ POST /api/literature/extract-pdf（PyMuPDF 提取→LLM 严格 JSON→审核卡入库，三 Tab UI）+ DFT 后端替换方案（分层：xTB 快速档保留 + Psi4 精度档【真 DFT/BSSE counterpoise/fchk 输出/conda 子进程按需安装】+ MACE-OFF23 可选 ML 档，PySCF 无 win wheel 排除、ORCA 禁止再分发）；736 passed** | ✅ **已完成** |
+| **阶段 31** | **DFT Psi4 精度档实施：psi4-env（Psi4 1.11 + dftd3-python，conda 子进程隔离 + install_psi4_env.bat 一键安装 + runtime_config psi4 能力链）+ src/dft/psi4_backend.py（ωB97X-D3BJ/def2-SVP、counterpoise BSSE、xTB 预优化初猜、fchk 写出归档、@@PROGRESS@@ 进度回传、30min 超时）+ 中文 Windows 三连坑修复（py-cpuinfo 桩/PYTHONUTF8/PYTHONIOENCODING）+ API backend 参数与 GET /api/dft/backends + 缓存 key 含 backend（xtb 旧格式兼容）+ 前端后端选择器/引导安装卡/精度档徽标/跨档对比/历史标记 + 真实冒烟连通（苯·苯酚 96s）；765 passed** | ✅ **已完成** |
 
 **阶段 16 要点（2026-07-21）**：
 - 前端全量重写（`app/gradio_app.py` 284→870 行）：`gr.themes.Soft` 深青/石墨学术主题、色彩语义（⛔/⚠️/✓）、五标签页骨架（③收藏夹 ④实验记录 ⑤RAG 迭代为占位，P2/P3 期做）
