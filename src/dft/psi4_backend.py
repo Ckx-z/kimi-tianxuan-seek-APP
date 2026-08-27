@@ -562,11 +562,14 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
                          amine2_smiles: str | None = None,
                          custom_smiles: str | None = None,
                          on_stage=None, jobs_root: Path | None = None,
-                         optimize: bool = True) -> dict:
+                         optimize: bool = True,
+                         complex_xyz: str | None = None) -> dict:
     """「缩合二聚体 D 与第三物质 X」结合能的 Psi4 精度档实现。
 
     参数与返回值口径对齐 engine.compute_binding，多带 backend="psi4" 与
     psi4_detail（方法/基组/BSSE 口径/未校正结合能/fchk 路径）。
+    complex_xyz：可选，外部提供的 D·X 复合物初猜 xyz（如经 xTB 取向筛选后的
+    几何）；提供时跳过 engine.embed_complex_xyz 的 UFF 取向初猜。
 
     Raises:
         Psi4NotInstalledError: psi4-env 未安装
@@ -618,7 +621,7 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
     try:
         stage("正在构造 D·X 复合物初猜…")
         xyz_d = engine.embed_monomer_xyz(dimer_smiles)
-        xyz_c = engine.embed_complex_xyz(dimer_smiles, x_smiles)
+        xyz_c = complex_xyz or engine.embed_complex_xyz(dimer_smiles, x_smiles)
         n_a = engine._xyz_atom_count(xyz_d)
         n_atoms = engine._xyz_atom_count(xyz_c)
         if n_atoms > engine.LARGE_SYSTEM_ATOMS:
@@ -669,8 +672,13 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
 def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
                               method: str = DEFAULT_PSI4_METHOD,
                               on_stage=None, jobs_root: Path | None = None,
-                              optimize: bool = True) -> dict:
+                              optimize: bool = True,
+                              complex_xyz: str | None = None) -> dict:
     """任意双分子 A···B 结合能的 Psi4 精度档实现（对齐 engine.compute_pair_binding）。
+
+    complex_xyz：可选，外部提供的 A···B 复合物初猜 xyz（如经 xTB 取向筛选后的
+    几何）；提供时跳过 engine.embed_complex_xyz 的 UFF 取向初猜。原子顺序须
+    为 A 片段在前、B 片段在后。
 
     Raises:
         Psi4NotInstalledError / DftError（中文原因）
@@ -709,7 +717,7 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
     try:
         stage("正在构造 A···B 复合物初猜…")
         xyz_a = engine.embed_monomer_xyz(canon_a)
-        xyz_c = engine.embed_complex_xyz(canon_a, canon_b)
+        xyz_c = complex_xyz or engine.embed_complex_xyz(canon_a, canon_b)
         n_a = engine._xyz_atom_count(xyz_a)
         n_atoms = engine._xyz_atom_count(xyz_c)
         if n_atoms > engine.LARGE_SYSTEM_ATOMS:

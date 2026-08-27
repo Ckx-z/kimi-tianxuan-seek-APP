@@ -1,0 +1,376 @@
+{
+  "generated_at": "2026-08-27 19:11:25",
+  "protocol": {
+    "version": "v2（5 取向 xTB 筛选 + Psi4 CP 单点）",
+    "geometry": "5 取向 UFF 初猜（seed [42, 101, 202, 303, 404]）→ 各自 GFN2-xTB 优化，取复合物能量最低者（非 S66 几何）",
+    "xtb": "GFN2-xTB：E_bind = E_complex(最优取向) - E_a - E_b",
+    "psi4": "ωB97X-D3BJ/def2-SVP 单点 + counterpoise BSSE（最优 xTB 几何上，optimize=False）",
+    "psi4_full_opt_keys": [
+      "water_dimer"
+    ],
+    "reference": "S66 CCSD(T)/CBS（Řezáč et al. JCTC 2011）"
+  },
+  "systems": [
+    {
+      "key": "water_dimer",
+      "name": "水二聚体",
+      "smiles_a": "O",
+      "smiles_b": "O",
+      "s66_kcal": -5.02,
+      "s66_note": "S66 #01，氢键",
+      "monomers": {
+        "e_a_hartree": -5.070544094137,
+        "e_b_hartree": -5.070544094137,
+        "elapsed_sec": 0.1
+      },
+      "orientation_screen": {
+        "seeds": [
+          42,
+          101,
+          202,
+          303,
+          404
+        ],
+        "best_seed": 303,
+        "trials": [
+          {
+            "seed": 42,
+            "e_complex_hartree": -10.14899664356,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 101,
+            "e_complex_hartree": -10.148951191316,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 202,
+            "e_complex_hartree": -10.149001924531,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 303,
+            "e_complex_hartree": -10.149004229047,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 404,
+            "e_complex_hartree": -10.149002157646,
+            "elapsed_sec": 0.1
+          }
+        ],
+        "elapsed_sec": 0.4
+      },
+      "xtb": {
+        "ok": true,
+        "e_bind_kcal": -4.967,
+        "error_kcal": 0.053
+      },
+      "psi4": {
+        "ok": true,
+        "e_bind_kcal": -5.031102155266355,
+        "error_kcal": -0.011,
+        "elapsed_sec": 7.7,
+        "detail": {
+          "method": "wb97x-d3bj",
+          "basis": "def2-svp",
+          "bsse_type": "cp",
+          "psi4_version": "1.11",
+          "e_bind_raw_kcal": -8.31447805783826,
+          "fchk_available": true,
+          "fchk_path": "C:\\Users\\ckx\\Desktop\\全新机器学习实验\\data\\dft_artifacts\\7ac579e28e01.fchk"
+        }
+      },
+      "psi4_full_opt": {
+        "ok": true,
+        "e_bind_kcal": -4.903292306882612,
+        "error_kcal": 0.117,
+        "elapsed_sec": 17.4
+      }
+    },
+    {
+      "key": "formamide_dimer",
+      "name": "甲酰胺二聚体",
+      "smiles_a": "NC=O",
+      "smiles_b": "NC=O",
+      "s66_kcal": -16.12,
+      "s66_note": "S66，环形双氢键",
+      "monomers": {
+        "e_a_hartree": -10.644270258379,
+        "e_b_hartree": -10.644270258379,
+        "elapsed_sec": 0.0
+      },
+      "orientation_screen": {
+        "seeds": [
+          42,
+          101,
+          202,
+          303,
+          404
+        ],
+        "best_seed": 404,
+        "trials": [
+          {
+            "seed": 42,
+            "e_complex_hartree": -21.298517576303,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 101,
+            "e_complex_hartree": -21.298984468263,
+            "elapsed_sec": 0.2
+          },
+          {
+            "seed": 202,
+            "e_complex_hartree": -21.300450025106,
+            "elapsed_sec": 0.2
+          },
+          {
+            "seed": 303,
+            "e_complex_hartree": -21.298968101352,
+            "elapsed_sec": 0.2
+          },
+          {
+            "seed": 404,
+            "e_complex_hartree": -21.302425556433,
+            "elapsed_sec": 0.1
+          }
+        ],
+        "elapsed_sec": 0.9
+      },
+      "xtb": {
+        "ok": true,
+        "e_bind_kcal": -8.713,
+        "error_kcal": 7.407
+      },
+      "psi4": {
+        "ok": true,
+        "e_bind_kcal": -9.968872495260404,
+        "error_kcal": 6.151,
+        "elapsed_sec": 15.3,
+        "detail": {
+          "method": "wb97x-d3bj",
+          "basis": "def2-svp",
+          "bsse_type": "cp",
+          "psi4_version": "1.11",
+          "e_bind_raw_kcal": -13.76181405206858,
+          "fchk_available": true,
+          "fchk_path": "C:\\Users\\ckx\\Desktop\\全新机器学习实验\\data\\dft_artifacts\\6d7764e6e402.fchk"
+        }
+      }
+    },
+    {
+      "key": "benzene_water",
+      "name": "苯···水",
+      "smiles_a": "c1ccccc1",
+      "smiles_b": "O",
+      "s66_kcal": -3.28,
+      "s66_note": "S66，OH-π",
+      "monomers": {
+        "e_a_hartree": -15.87964065252,
+        "e_b_hartree": -5.070544094137,
+        "elapsed_sec": 0.1
+      },
+      "orientation_screen": {
+        "seeds": [
+          42,
+          101,
+          202,
+          303,
+          404
+        ],
+        "best_seed": 404,
+        "trials": [
+          {
+            "seed": 42,
+            "e_complex_hartree": -20.95046502744,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 101,
+            "e_complex_hartree": -20.95198629791,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 202,
+            "e_complex_hartree": -20.952079623656,
+            "elapsed_sec": 0.2
+          },
+          {
+            "seed": 303,
+            "e_complex_hartree": -20.952073556492,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 404,
+            "e_complex_hartree": -20.953834394089,
+            "elapsed_sec": 0.3
+          }
+        ],
+        "elapsed_sec": 0.7
+      },
+      "xtb": {
+        "ok": true,
+        "e_bind_kcal": -2.29,
+        "error_kcal": 0.99
+      },
+      "psi4": {
+        "ok": true,
+        "e_bind_kcal": -3.094204582229729,
+        "error_kcal": 0.186,
+        "elapsed_sec": 19.9,
+        "detail": {
+          "method": "wb97x-d3bj",
+          "basis": "def2-svp",
+          "bsse_type": "cp",
+          "psi4_version": "1.11",
+          "e_bind_raw_kcal": -5.111850363522635,
+          "fchk_available": true,
+          "fchk_path": "C:\\Users\\ckx\\Desktop\\全新机器学习实验\\data\\dft_artifacts\\8952fdc75463.fchk"
+        }
+      }
+    },
+    {
+      "key": "benzene_dimer_pd",
+      "name": "苯二聚体",
+      "smiles_a": "c1ccccc1",
+      "smiles_b": "c1ccccc1",
+      "s66_kcal": -2.74,
+      "s66_note": "S66，平行错位 π-π",
+      "monomers": {
+        "e_a_hartree": -15.87964065252,
+        "e_b_hartree": -15.87964065252,
+        "elapsed_sec": 0.1
+      },
+      "orientation_screen": {
+        "seeds": [
+          42,
+          101,
+          202,
+          303,
+          404
+        ],
+        "best_seed": 42,
+        "trials": [
+          {
+            "seed": 42,
+            "e_complex_hartree": -31.760084011889,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 101,
+            "e_complex_hartree": -31.759358902734,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 202,
+            "e_complex_hartree": -31.759968545243,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 303,
+            "e_complex_hartree": -31.759813877056,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 404,
+            "e_complex_hartree": -31.759824394334,
+            "elapsed_sec": 0.1
+          }
+        ],
+        "elapsed_sec": 0.3
+      },
+      "xtb": {
+        "ok": true,
+        "e_bind_kcal": -0.504,
+        "error_kcal": 2.236
+      },
+      "psi4": {
+        "ok": true,
+        "e_bind_kcal": -0.37907944188932885,
+        "error_kcal": 2.361,
+        "elapsed_sec": 34.8,
+        "detail": {
+          "method": "wb97x-d3bj",
+          "basis": "def2-svp",
+          "bsse_type": "cp",
+          "psi4_version": "1.11",
+          "e_bind_raw_kcal": -0.4742721277276703,
+          "fchk_available": true,
+          "fchk_path": "C:\\Users\\ckx\\Desktop\\全新机器学习实验\\data\\dft_artifacts\\308d49c8d2da.fchk"
+        }
+      }
+    },
+    {
+      "key": "phenol_dimer",
+      "name": "苯酚二聚体",
+      "smiles_a": "Oc1ccccc1",
+      "smiles_b": "Oc1ccccc1",
+      "s66_kcal": -7.05,
+      "s66_note": "S66，氢键+π",
+      "monomers": {
+        "e_a_hartree": -19.954146208357,
+        "e_b_hartree": -19.954146208357,
+        "elapsed_sec": 0.1
+      },
+      "orientation_screen": {
+        "seeds": [
+          42,
+          101,
+          202,
+          303,
+          404
+        ],
+        "best_seed": 42,
+        "trials": [
+          {
+            "seed": 42,
+            "e_complex_hartree": -39.910640399799,
+            "elapsed_sec": 0.2
+          },
+          {
+            "seed": 101,
+            "e_complex_hartree": -39.908567160923,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 202,
+            "e_complex_hartree": -39.908259008889,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 303,
+            "e_complex_hartree": -39.908630068154,
+            "elapsed_sec": 0.1
+          },
+          {
+            "seed": 404,
+            "e_complex_hartree": -39.908483796722,
+            "elapsed_sec": 0.1
+          }
+        ],
+        "elapsed_sec": 0.6
+      },
+      "xtb": {
+        "ok": true,
+        "e_bind_kcal": -1.473,
+        "error_kcal": 5.577
+      },
+      "psi4": {
+        "ok": true,
+        "e_bind_kcal": -1.4673294854792773,
+        "error_kcal": 5.583,
+        "elapsed_sec": 48.1,
+        "detail": {
+          "method": "wb97x-d3bj",
+          "basis": "def2-svp",
+          "bsse_type": "cp",
+          "psi4_version": "1.11",
+          "e_bind_raw_kcal": -2.742191145653259,
+          "fchk_available": true,
+          "fchk_path": "C:\\Users\\ckx\\Desktop\\全新机器学习实验\\data\\dft_artifacts\\1ae5efa93c47.fchk"
+        }
+      }
+    }
+  ]
+}
