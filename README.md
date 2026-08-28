@@ -28,7 +28,7 @@ $$E_{bind} = E(\text{二聚体}\cdot X) - E(\text{二聚体}) - E(X)$$
 
 **⚠️ 学术口径**：结合能精度分档——**xTB 快速档**（半经验 GFN2-xTB）仅供**相对比较与趋势筛选**，对复合物初猜取向敏感，S66 基准实测误差 0.05–7.4 kcal/mol（取决于取向是否命中正确结合基序）；**Psi4 精度档**（ωB97X-D3BJ/def2-SVP + BSSE counterpoise）在取向合理时误差约 0.1–0.2 kcal/mol（S66 水二聚体/苯·水实测），可用于论文定量数据。基准详情见 [docs/DFT基准验证.md](docs/DFT基准验证.md)。界面内常驻此提示。
 
-> 📐 **精度档已落地**：Psi4 真 DFT 后端已并入（ωB97X-D3BJ/def2 基组、BSSE counterpoise 结合能、fchk 输出、按需安装），方案见 [docs/DFT后端替换方案.md](docs/DFT后端替换方案.md)，S66 基准验证见 [docs/DFT基准验证.md](docs/DFT基准验证.md)。已知遗留：复合物取向采样（UFF 初猜对 π-π/双氢键基序不敏感）是下一步精度改进重点；可选 MACE-OFF23 ML 力场档仍在二期。
+> 📐 **精度档已落地**：Psi4 真 DFT 后端已并入（ωB97X-D3BJ/def2 基组、BSSE counterpoise 结合能、fchk 输出、按需安装），方案见 [docs/DFT后端替换方案.md](docs/DFT后端替换方案.md)，S66 基准验证见 [docs/DFT基准验证.md](docs/DFT基准验证.md)。精度档运行时的 GB 级临时文件默认写入 `data/psi4_scratch/`（打包版为用户数据目录），可用环境变量 `COF_PSI4_SCRATCH` 或 `config/runtime.local.json` 的 `psi4_scratch` 字段改到其他盘；大体系（>50 原子）超时自动放宽至 60–90 分钟。已知遗留：复合物取向采样（UFF 初猜对 π-π/双氢键基序不敏感）是下一步精度改进重点；可选 MACE-OFF23 ML 力场档仍在二期。
 
 ---
 

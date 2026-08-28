@@ -1,7 +1,7 @@
 # PROJECT_STATE — 项目当前状态
 
 > ⭐ **这是每次会话的第一份必读文件**。会话开头读它进入状态，结尾更新它。
-> 最后更新：2026-08-27（阶段 31：**DFT Psi4 精度档落地**——psi4-env 1.11+dftd3-python 装妥、psi4_backend.py（ωB97X-D3BJ/def2-SVP + CP BSSE + fchk）、API backend 参数与 /backends、前端后端选择器与安装引导、真实冒烟连通；765 passed）
+> 最后更新：2026-08-28（阶段 32：**DFT 精度提升与产品化收尾**——MC 多取向采样 + π-π/卤键基序模板、Psi4 preset（precision/literature）、kJ/mol 主显、PSI_SCRATCH 产品化、大体系长时提示与超时自适应；784 passed）
 
 ---
 
@@ -52,6 +52,7 @@
 | **阶段 29** | **v1.1.0 发布：DFT 任意双分子模式（pair）+ 3D 结合构象（3Dmol.js 片段着色）+ 文献体系（paper_id resolver/收藏与助手引用真实标题+DOI 链接/Crossref 审核录入/DOI 回填至 0.8% 空缺/overlay 逐条合并读）+ 科研助手 V2.2（实验日报卡/连续失败主动提醒/get_daily_brief 工具）+ 缓存根治包（NSIS 安装前杀旧进程/版本看门狗/health 版本握手红横幅/版本三显）+ 画板白屏根治（v1.0.2，raphael require/global 双垫片+错误边界）；718 passed** | ✅ **已完成** |
 | **阶段 30** | **打包版修复 + 文献 PDF 录入 + DFT 后端替换方案：导出 Word 500 根治（spec binaries 补 lxml 6 原生 DLL）+ 文献 lookup 500 根治（literature/records/llm/recommend hiddenimports + fitz/multipart）+ POST /api/literature/extract-pdf（PyMuPDF 提取→LLM 严格 JSON→审核卡入库，三 Tab UI）+ DFT 后端替换方案（分层：xTB 快速档保留 + Psi4 精度档【真 DFT/BSSE counterpoise/fchk 输出/conda 子进程按需安装】+ MACE-OFF23 可选 ML 档，PySCF 无 win wheel 排除、ORCA 禁止再分发）；736 passed** | ✅ **已完成** |
 | **阶段 31** | **DFT Psi4 精度档实施：psi4-env（Psi4 1.11 + dftd3-python，conda 子进程隔离 + install_psi4_env.bat 一键安装 + runtime_config psi4 能力链）+ src/dft/psi4_backend.py（ωB97X-D3BJ/def2-SVP、counterpoise BSSE、xTB 预优化初猜、fchk 写出归档、@@PROGRESS@@ 进度回传、30min 超时）+ 中文 Windows 三连坑修复（py-cpuinfo 桩/PYTHONUTF8/PYTHONIOENCODING）+ API backend 参数与 GET /api/dft/backends + 缓存 key 含 backend（xtb 旧格式兼容）+ 前端后端选择器/引导安装卡/精度档徽标/跨档对比/历史标记 + 真实冒烟连通（苯·苯酚 96s）；765 passed** | ✅ **已完成** |
+| **阶段 32** | **DFT 精度提升与产品化收尾：engine.py Monte Carlo 多取向采样 + π-π/卤键基序模板（两体系最优初猜均命中 template_pi_stack）+ Psi4 method preset（precision=ωB97X-D3BJ/def2-SVP / literature=B3LYP/6-31G(d,p)）+ 前端 preset 选择器与 kJ/mol 主显全链路 + 真实基准（BDE-154：xTB −68.95 / precision −27.78 / literature +10.54 kJ/mol，文献 −48.47；BDE-47：xTB −90.07 / precision −71.90，文献 −31.06，literature 档未跑）+ PSI_SCRATCH 产品化（COF_PSI4_SCRATCH > runtime.local.json psi4_scratch > E:\psi4_scratch 探测 > user_data_root()/psi4_scratch）+ 大体系长时提示（前端预估原子数 >50 提示 30min+）与 psi4 超时按原子数自适应（1800/3600/5400s）；784 passed** | ✅ **已完成** |
 
 **阶段 16 要点（2026-07-21）**：
 - 前端全量重写（`app/gradio_app.py` 284→870 行）：`gr.themes.Soft` 深青/石墨学术主题、色彩语义（⛔/⚠️/✓）、五标签页骨架（③收藏夹 ④实验记录 ⑤RAG 迭代为占位，P2/P3 期做）
@@ -404,7 +405,7 @@
 - **树模型训练/脚本**：`.venv\Scripts\python.exe`（Python 3.12，numpy、pandas、scikit-learn、xgboost、rdkit、pyyaml、shap、joblib）
 - **GNN 预测**：通过 subprocess 自动调用 dphuanjing 环境 Python 3.8（torch 2.3.1 + PyG 2.6.1）；缺失时自动降级
 - **minimax GraphRAG**：已可主进程内 import（主环境 networkx 3.5）；独立解释器调用仍支持，路径经 `src/runtime_config.py` 配置链（环境变量 > `config/runtime.local.json` > 自动探测）
-- **测试**：base 环境 `pytest tests/`——基线 **736 passed**（阶段 30）
+- **测试**：base 环境 `pytest tests/`——基线 **784 passed**（阶段 32）
 
 ### 旧版 Gradio 界面（保留维护，非分发形态）
 

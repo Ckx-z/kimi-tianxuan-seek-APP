@@ -96,12 +96,20 @@ class Psi4NotInstalledError(DftError):
     """psi4-env 未安装/不可用的专属异常（API 层据此给 503 + 安装引导）。"""
 
 
-def psi4_timeout() -> int:
-    """精度档超时秒数（环境变量可覆盖）。"""
+def psi4_timeout(n_atoms: int | None = None) -> int:
+    """精度档超时秒数（环境变量 COF_DFT_TIMEOUT_PSI4 可覆盖）。
+
+    未覆盖时按复合物原子数自适应：默认 1800s 对 >50 原子的大体系偏紧
+    （基准实测 89 原子 CP 单点需约 67 min），故分档放宽。
+    """
     env = os.environ.get("COF_DFT_TIMEOUT_PSI4", "").strip()
     if env.isdigit():
         return int(env)
-    return DEFAULT_TIMEOUT
+    if n_atoms is None or n_atoms <= 50:
+        return DEFAULT_TIMEOUT
+    if n_atoms <= 90:
+        return 3600
+    return 5400
 
 
 # ---------------------------------------------------------------- 环境检测
@@ -392,6 +400,15 @@ def _run_psi4_script(script_text: str, cwd: Path, timeout: int,
 
     env = os.environ.copy()
     env.setdefault("OMP_NUM_THREADS", "4")
+    # PSI_SCRATCH 产品化：Psi4 运行时产生 GB 级临时文件，目录经
+    # runtime_config 配置链解析（COF_PSI4_SCRATCH > runtime.local.json
+    # psi4_scratch > E:\psi4_scratch 探测 > user_data_root()/psi4_scratch）
+    try:
+        scratch = runtime_config.psi4_scratch_dir()
+        scratch.mkdir(parents=True, exist_ok=True)
+        env["PSI_SCRATCH"] = str(scratch)
+    except Exception as exc:  # 目录不可写等异常不阻断计算（psi4 用默认临时目录）
+        logger.warning("PSI_SCRATCH 目录准备失败，退回系统默认临时目录: %s", exc)
     env["PYTHONIOENCODING"] = "utf-8"  # 子进程 stdout/stderr 统一 UTF-8（进度行为中文）
     # UTF-8 模式：psi4 schema_wrapper 等用 locale 默认编码读输出文件，
     # 中文 Windows（cp936）下会对 psi4 输出中的非 ASCII 字符炸 UnicodeDecodeError
@@ -671,7 +688,8 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
         script = generate_psi4_script(guess, n_a, method, optimize=optimize,
                                       same_fragments=(x_smiles == dimer_smiles))
         run_dir = job_dir / "psi4"
-        data = _run_psi4_script(script, run_dir, psi4_timeout(), on_stage=stage)
+        data = _run_psi4_script(script, run_dir, psi4_timeout(n_atoms),
+                                on_stage=stage)
 
         stage("正在解析计算结果…")
         parsed = parse_psi4_result(data)
@@ -786,7 +804,8 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
         script = generate_psi4_script(guess, n_a, method, optimize=optimize,
                                       same_fragments=(canon_b == canon_a))
         run_dir = job_dir / "psi4"
-        data = _run_psi4_script(script, run_dir, psi4_timeout(), on_stage=stage)
+        data = _run_psi4_script(script, run_dir, psi4_timeout(n_atoms),
+                                on_stage=stage)
 
         stage("正在解析计算结果…")
         parsed = parse_psi4_result(data)

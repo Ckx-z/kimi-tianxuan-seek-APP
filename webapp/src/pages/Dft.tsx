@@ -79,6 +79,16 @@ interface PropsState {
 }
 const emptyProps: PropsState = { loading: false, error: null, data: null };
 
+/**
+ * 粗估 SMILES 重原子数（数元素符号：双字母 Br/Cl、大写开头符号、芳香小写
+ * c/n/o/s/p）。不求精确，仅供大体系长时提示的阈值判断。
+ */
+function estimateHeavyAtoms(smiles: string): number {
+  if (!smiles) return 0;
+  const m = smiles.match(/Br|Cl|[A-Z][a-z]?|[cnosp]/g);
+  return m ? m.length : 0;
+}
+
 /** 历史条目回显 → 拼装成 DftResult（旧条目缺二聚体/X 字段时留空兜底） */
 function resultFromHistory(h: DftHistoryEntry): DftResult {
   return {
@@ -145,6 +155,21 @@ export default function Dft() {
   /** GET /api/dft/backends 的可用状态（null = 尚未取到） */
   const [backends, setBackends] = useState<DftBackendsResponse['backends'] | null>(null);
   const psi4Installed = backends?.psi4?.installed === true;
+
+  /** 大体系长时提示：粗估复合物总原子数（重原子×2 近似含氢），>50 时提示 */
+  const estTotalAtoms = (() => {
+    const dimerHeavy = estimateHeavyAtoms(monoA.smiles) + estimateHeavyAtoms(monoB.smiles);
+    if (!dimerHeavy) return 0;
+    let heavy = dimerHeavy;
+    if (!isPair) {
+      if (xType === 'self_stack') heavy = dimerHeavy * 2;
+      else if (xType === 'other_dimer')
+        heavy = dimerHeavy + estimateHeavyAtoms(monoA2.smiles) + estimateHeavyAtoms(monoB2.smiles);
+      else if (xType === 'custom') heavy = dimerHeavy + estimateHeavyAtoms(customSmiles);
+      else heavy = dimerHeavy + 10; // 溶剂小分子粗估
+    }
+    return heavy * 2;
+  })();
 
   /** URL 预填（收藏详情「重新计算」跳转）：?a=<smiles>&b=<smiles>&an=<名>&bn=<名> */
   const [searchParams] = useSearchParams();
@@ -830,6 +855,11 @@ export default function Dft() {
           )}
 
           {/* 第三步：开始计算 */}
+          {isPsi4 && estTotalAtoms > 50 && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              ⏳ 当前组合预估复合物约 {estTotalAtoms} 个原子（&gt;50），Psi4 精度档可能需要 30 分钟以上，请耐心等待；计算在后台进行，期间可切换其他页面。
+            </p>
+          )}
           <Button
             className="w-full"
             size="lg"

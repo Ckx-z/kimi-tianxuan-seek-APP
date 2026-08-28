@@ -171,6 +171,30 @@ def psi4_python() -> Path | None:
     return resolve_python("psi4", probe_names=())
 
 
+def psi4_scratch_dir() -> Path:
+    """Psi4 精度档的临时文件目录（PSI_SCRATCH）。
+
+    Psi4 运行时会产生 GB 级 scratch（积分/波函数临时文件），默认落在系统
+    临时目录；C 盘空间紧张时可显式指定到其他盘。解析顺序（高 → 低）：
+    1. 环境变量 COF_PSI4_SCRATCH
+    2. config/runtime.local.json 顶层 "psi4_scratch" 字段
+    3. 开发机历史路径 E:\\psi4_scratch 存在则用
+    4. user_data_root()/psi4_scratch（默认，保证可写）
+
+    返回路径不保证已创建，调用方负责 mkdir。
+    """
+    val = os.environ.get("COF_PSI4_SCRATCH", "").strip()
+    if val:
+        return Path(val)
+    val = str(load_local_config().get("psi4_scratch") or "").strip()
+    if val:
+        return Path(val)
+    legacy = Path(r"E:\psi4_scratch")
+    if legacy.exists() or legacy.parent.exists():
+        return legacy
+    return user_data_root() / "psi4_scratch"
+
+
 def gnn_project_root() -> Path:
     """旧 GNN 项目根（predict_pair.py 所在目录）。
 
