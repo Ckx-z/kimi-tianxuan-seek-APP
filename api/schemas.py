@@ -193,11 +193,16 @@ class DftJobCreate(BaseModel):
     amine2_smiles: str | None = Field(None, description="x_type=other_dimer 时的胺单体 2")
     custom_smiles: str | None = Field(None, description="x_type=custom 时的自定义 SMILES")
     method: str = Field("gfn2", description="backend=xtb：gfnff（快速）| gfn2（精确，默认）；"
-                                            "backend=psi4：wb97xd3bj_svp（默认）")
+                                            "backend=psi4：wb97xd3bj_svp（默认，别名 precision）"
+                                            "| b3lyp_631gdp（别名 literature）")
     backend: str = Field(
         "xtb",
         description="计算后端：xtb（默认，半经验快速档）| psi4（真 DFT 精度档，"
                     "需已安装 psi4-env，见 scripts/install_psi4_env.bat）")
+    n_samples: int | None = Field(
+        None, ge=1, le=64,
+        description="复合物取向 MC 采样数（缺省=环境变量 COF_DFT_MC_SAMPLES 或 12；"
+                    "1=旧单取向 UFF 初猜口径；仅 gfn2/psi4 档生效）")
 
 
 class LiteratureLookup(BaseModel):

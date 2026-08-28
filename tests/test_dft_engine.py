@@ -166,7 +166,8 @@ class TestComputeBinding:
         """自身堆积：X=D，只跑两次 xtb（二聚体 + 复合物）。"""
         hints: list[str] = []
         r = engine.compute_binding(ALD, AMINE, method="gfn2",
-                                   on_stage=hints.append, jobs_root=tmp_path)
+                                   on_stage=hints.append, jobs_root=tmp_path,
+                                   n_samples=1)  # 旧单取向口径，固定调用次数
         # E_bind = -31.7 - (-15.878693712486) - (-15.878693712486)
         e_d = -15.878693712486
         assert r["e_bind_hartree"] == pytest.approx(-31.7 - 2 * e_d, abs=1e-9)
@@ -205,7 +206,7 @@ class TestComputeBinding:
         r = engine.compute_binding(
             ALD, AMINE, method="gfn2", x_type="other_dimer",
             ald2_smiles="O=CC=O", amine2_smiles="Nc1ccc(N)cc1",
-            jobs_root=tmp_path)
+            jobs_root=tmp_path, n_samples=1)
         assert len(fake_xtb_by_dir) == 3
         assert "另一组单体" in r["x_description"]
         assert r["x_cache_part"].startswith("other_dimer:")
@@ -215,7 +216,7 @@ class TestComputeBinding:
     def test_custom_x(self, fake_xtb_by_dir, tmp_path):
         r = engine.compute_binding(ALD, AMINE, method="gfn2",
                                    x_type="custom", custom_smiles="CCO",
-                                   jobs_root=tmp_path)
+                                   jobs_root=tmp_path, n_samples=1)
         assert len(fake_xtb_by_dir) == 3
         assert r["x_smiles"] == engine.canonicalize_smiles("CCO")
         assert "自定义" in r["x_description"]
@@ -223,7 +224,8 @@ class TestComputeBinding:
 
     def test_multi_site_dimer_note(self, fake_xtb_by_dir, tmp_path):
         r = engine.compute_binding("O=Cc1ccc(C=O)cc1", "Nc1ccc(N)cc1",
-                                   method="gfn2", jobs_root=tmp_path)
+                                   method="gfn2", jobs_root=tmp_path,
+                                   n_samples=1)
         assert r["dimer_multi_site"] is True
         assert "示意单点缩合" in (r["dimer_note"] or "")
 
@@ -231,7 +233,8 @@ class TestComputeBinding:
         monkeypatch.setattr(engine, "LARGE_SYSTEM_ATOMS", 1)
         hints: list[str] = []
         engine.compute_binding(ALD, AMINE, method="gfn2",
-                               on_stage=hints.append, jobs_root=tmp_path)
+                               on_stage=hints.append, jobs_root=tmp_path,
+                               n_samples=1)
         assert any("体系较大" in h and "耗时较长" in h for h in hints)
 
     def test_non_ald_amine_chinese_error(self, fake_xtb_by_dir, tmp_path):
@@ -269,7 +272,7 @@ class TestComputeBinding:
         monkeypatch.setattr(engine, "_run_xtb",
                             lambda *a, **k: ("crash, no termination", None))
         with pytest.raises(engine.DftError, match="未找到总能量"):
-            engine.compute_binding(ALD, AMINE, jobs_root=tmp_path)
+            engine.compute_binding(ALD, AMINE, jobs_root=tmp_path, n_samples=1)
 
 
 class TestClassifyFailure:

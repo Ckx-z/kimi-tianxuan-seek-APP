@@ -76,8 +76,9 @@ def create_dft_job(req: DftJobCreate):
 
     # 方法档位按后端解释；psi4 未显式给方法档时回落默认（前端可能沿用 xtb 默认 gfn2）
     if backend == "psi4":
-        method = req.method if req.method in psi4_backend.PSI4_METHODS \
-            else psi4_backend.DEFAULT_PSI4_METHOD
+        method = psi4_backend.resolve_method_key(req.method)
+        if method not in psi4_backend.PSI4_METHODS:
+            method = psi4_backend.DEFAULT_PSI4_METHOD
     else:
         method = req.method
         if method not in engine.METHODS:
@@ -92,7 +93,8 @@ def create_dft_job(req: DftJobCreate):
         if engine.canonicalize_smiles(amine) is None:
             raise HTTPException(400, f"分子 B 的 SMILES 无法解析：{amine[:80]}")
         _check_backend_available(backend)
-        job = jobs.create_job(ald, amine, method, mode="pair", backend=backend)
+        job = jobs.create_job(ald, amine, method, mode="pair", backend=backend,
+                              n_samples=req.n_samples)
         return _public_job(job)
 
     if not ald or not amine:
@@ -120,7 +122,7 @@ def create_dft_job(req: DftJobCreate):
         ald, amine, method, x_type=req.x_type,
         solvent_id=req.solvent_id, ald2_smiles=req.ald2_smiles,
         amine2_smiles=req.amine2_smiles, custom_smiles=req.custom_smiles,
-        backend=backend)
+        backend=backend, n_samples=req.n_samples)
     return _public_job(job)
 
 
@@ -158,7 +160,8 @@ def dft_backends():
                 "path": det["path"],
                 "label": "Psi4 真 DFT（精度档）",
                 "methods": [
-                    {"id": m, "label": spec["label"]}
+                    {"id": m, "label": spec["label"],
+                     "preset": spec.get("preset")}
                     for m, spec in psi4_backend.PSI4_METHODS.items()],
                 "default_method": psi4_backend.DEFAULT_PSI4_METHOD,
                 "install_hint": None if det["installed"]

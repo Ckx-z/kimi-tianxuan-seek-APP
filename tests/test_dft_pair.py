@@ -74,7 +74,7 @@ class TestPairEngine:
         hints: list[str] = []
         r = engine.compute_pair_binding(
             BENZENE, PHENOL, method="gfn2",
-            on_stage=hints.append, jobs_root=tmp_path)
+            on_stage=hints.append, jobs_root=tmp_path, n_samples=1)
         assert r["mode"] == "pair"
         assert r["dimer_smiles"] is None
         assert r["x_type"] is None
@@ -105,7 +105,8 @@ class TestPairEngine:
     def test_pair_fragment_ranges(self, fake_xtb_pair, tmp_path):
         """片段区间 = A 加氢原子数 / 复合物总原子数（0 基左闭右开）。"""
         r = engine.compute_pair_binding(
-            BENZENE, FORMALDEHYDE, method="gfn2", jobs_root=tmp_path)
+            BENZENE, FORMALDEHYDE, method="gfn2", jobs_root=tmp_path,
+            n_samples=1)
         frag = r["fragment_ranges"]
         assert frag["a"] == [0, 12]           # 苯 12 原子
         assert frag["b"] == [12, 12 + 4]      # 甲醛 4 原子
@@ -119,7 +120,8 @@ class TestPairEngine:
             return stdout, None  # 无 xtbopt.xyz → 用初猜 xyz
         monkeypatch.setattr(engine, "_run_xtb", _no_opt)
         r = engine.compute_pair_binding(
-            BENZENE, FORMALDEHYDE, method="gfn2", jobs_root=tmp_path)
+            BENZENE, FORMALDEHYDE, method="gfn2", jobs_root=tmp_path,
+            n_samples=1)
         frag = r["fragment_ranges"]
         assert frag["a"] == [0, 12]
         assert frag["b"] == [12, 16]
@@ -151,7 +153,7 @@ class TestPairEngine:
             raise AssertionError("pair 模式不应调用 make_dimer")
         monkeypatch.setattr(engine.dimer_mod, "make_dimer", _boom)
         r = engine.compute_pair_binding(BENZENE, PHENOL, method="gfn2",
-                                        jobs_root=tmp_path)
+                                        jobs_root=tmp_path, n_samples=1)
         assert r["mode"] == "pair"
 
 
@@ -213,7 +215,7 @@ def sandbox(tmp_path, monkeypatch):
     calls = {"pair": [], "dimer": []}
 
     def _fake_pair(smiles_a, smiles_b, method="gfn2", on_stage=None,
-                   jobs_root=None):
+                   jobs_root=None, **kwargs):
         calls["pair"].append((smiles_a, smiles_b, method))
         if on_stage:
             on_stage("正在优化分子 A 几何…")

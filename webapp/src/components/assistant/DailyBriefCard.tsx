@@ -139,8 +139,8 @@ export function DailyBriefCard() {
               {brief.dft_best_e_bind_kcal !== null && (
                 <span className="inline-flex items-center gap-1">
                   最佳结合能
-                  <b className="text-foreground">{brief.dft_best_e_bind_kcal} kcal/mol</b>
-                  （半经验）
+                  <b className="text-foreground">{(brief.dft_best_e_bind_kcal * 4.184).toFixed(1)} kJ/mol</b>
+                  （{brief.dft_best_e_bind_kcal.toFixed(2)} kcal/mol，半经验）
                 </span>
               )}
             </div>

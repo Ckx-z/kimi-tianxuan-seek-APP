@@ -61,9 +61,26 @@ PSI4_METHODS: dict[str, dict] = {
         "psi4_name": "wb97x-d3bj",
         "basis": "def2-svp",
         "label": "ωB97X-D3BJ/def2-SVP（真 DFT）",
+        "preset": "precision",
+    },
+    "b3lyp_631gdp": {
+        "psi4_name": "b3lyp",
+        "basis": "6-31g(d,p)",
+        "label": "B3LYP/6-31G(d,p)（文献口径）",
+        "preset": "literature",
     },
 }
 DEFAULT_PSI4_METHOD = "wb97xd3bj_svp"
+
+# preset 别名 → method key（对齐 COF 文献常用口径：precision=高精度泛函，
+# literature=B3LYP/6-31G(d,p)，如刘璐 2021 J. Hazard. Mater. 403, 123917）
+PSI4_PRESET_ALIASES = {"precision": "wb97xd3bj_svp",
+                       "literature": "b3lyp_631gdp"}
+
+
+def resolve_method_key(method: str) -> str:
+    """preset 别名（precision/literature）→ 方法档 key；非别名原样返回。"""
+    return PSI4_PRESET_ALIASES.get((method or "").strip(), method)
 DEFAULT_TIMEOUT = 1800  # 真 DFT 分钟级：默认 30 分钟
 
 PROGRESS_PREFIX = "@@PROGRESS@@"
@@ -157,7 +174,7 @@ def generate_psi4_script(complex_xyz: str, n_frag_a: int,
     脚本产物（cwd 下）：result.json（结构化结果）、complex_opt.xyz（优化后几何，
     表头第二行注释带 fragment 边界）、complex.fchk（Gaussian 格式检查点）。
     """
-    spec = PSI4_METHODS.get(method_key)
+    spec = PSI4_METHODS.get(resolve_method_key(method_key))
     if spec is None:
         raise DftError(f"未知的 Psi4 方法档位：{method_key}"
                        f"（可选 {' / '.join(PSI4_METHODS)}）")
@@ -563,21 +580,27 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
                          custom_smiles: str | None = None,
                          on_stage=None, jobs_root: Path | None = None,
                          optimize: bool = True,
-                         complex_xyz: str | None = None) -> dict:
+                         complex_xyz: str | None = None,
+                         n_samples: int | None = None) -> dict:
     """「缩合二聚体 D 与第三物质 X」结合能的 Psi4 精度档实现。
 
     参数与返回值口径对齐 engine.compute_binding，多带 backend="psi4" 与
     psi4_detail（方法/基组/BSSE 口径/未校正结合能/fchk 路径）。
+    method 支持 preset 别名：precision（默认 ωB97X-D3BJ/def2-SVP）/
+    literature（B3LYP/6-31G(d,p)，对齐刘璐 2021 等 COF 文献口径）。
     complex_xyz：可选，外部提供的 D·X 复合物初猜 xyz（如经 xTB 取向筛选后的
-    几何）；提供时跳过 engine.embed_complex_xyz 的 UFF 取向初猜。
+    几何）；提供时跳过取向采样/初猜生成。n_samples：MC 取向采样数
+    （None=默认/环境变量；1=旧单取向 UFF 初猜）。
 
     Raises:
         Psi4NotInstalledError: psi4-env 未安装
         DftError: 任何一步失败（message 为中文原因）
     """
+    method = resolve_method_key(method)
     if method not in PSI4_METHODS:
         raise DftError(f"未知的 Psi4 方法档位：{method}"
-                       f"（可选 {' / '.join(PSI4_METHODS)}）")
+                       f"（可选 {' / '.join(PSI4_METHODS)}"
+                       "，或 preset 别名 precision / literature）")
 
     canon_ald = engine.canonicalize_smiles(ald_smiles)
     canon_amine = engine.canonicalize_smiles(amine_smiles)
@@ -621,7 +644,21 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
     try:
         stage("正在构造 D·X 复合物初猜…")
         xyz_d = engine.embed_monomer_xyz(dimer_smiles)
-        xyz_c = complex_xyz or engine.embed_complex_xyz(dimer_smiles, x_smiles)
+        sampling = None
+        if complex_xyz is not None:
+            xyz_c = complex_xyz
+        elif engine.xtb_binary() is not None and n_samples != 1:
+            # MC 取向采样 + xTB 分级筛选（对标文献 Monte Carlo 吸附构象采样）
+            info = engine.screen_complex_xtb(dimer_smiles, x_smiles,
+                                             job_dir / "screen",
+                                             n_samples=n_samples,
+                                             on_stage=stage)
+            xyz_c = info["best_xyz"]
+            sampling = {"n_samples": info["n_samples"],
+                        "best_kind": info["best_kind"],
+                        "screen_level": info["screen_level"]}
+        else:
+            xyz_c = engine.embed_complex_xyz(dimer_smiles, x_smiles)
         n_a = engine._xyz_atom_count(xyz_d)
         n_atoms = engine._xyz_atom_count(xyz_c)
         if n_atoms > engine.LARGE_SYSTEM_ATOMS:
@@ -659,6 +696,7 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
             },
             "complex_atom_count": n_atoms,
             "fragment_ranges": {"a": [0, n_a], "b": [n_a, n_atoms]},
+            "sampling": sampling,
         }
         return _finalize(
             common, parsed, opt_xyz, run_dir / "complex.fchk",
@@ -673,19 +711,24 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
                               method: str = DEFAULT_PSI4_METHOD,
                               on_stage=None, jobs_root: Path | None = None,
                               optimize: bool = True,
-                              complex_xyz: str | None = None) -> dict:
+                              complex_xyz: str | None = None,
+                              n_samples: int | None = None) -> dict:
     """任意双分子 A···B 结合能的 Psi4 精度档实现（对齐 engine.compute_pair_binding）。
 
+    method 支持 preset 别名：precision（默认 ωB97X-D3BJ/def2-SVP）/
+    literature（B3LYP/6-31G(d,p)，对齐刘璐 2021 等 COF 文献口径）。
     complex_xyz：可选，外部提供的 A···B 复合物初猜 xyz（如经 xTB 取向筛选后的
-    几何）；提供时跳过 engine.embed_complex_xyz 的 UFF 取向初猜。原子顺序须
-    为 A 片段在前、B 片段在后。
+    几何）；提供时跳过取向采样/初猜生成。原子顺序须为 A 片段在前、B 片段
+    在后。n_samples：MC 取向采样数（None=默认/环境变量；1=旧单取向初猜）。
 
     Raises:
         Psi4NotInstalledError / DftError（中文原因）
     """
+    method = resolve_method_key(method)
     if method not in PSI4_METHODS:
         raise DftError(f"未知的 Psi4 方法档位：{method}"
-                       f"（可选 {' / '.join(PSI4_METHODS)}）")
+                       f"（可选 {' / '.join(PSI4_METHODS)}"
+                       "，或 preset 别名 precision / literature）")
 
     canon_a = engine.canonicalize_smiles(smiles_a)
     canon_b = engine.canonicalize_smiles(smiles_b)
@@ -717,7 +760,20 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
     try:
         stage("正在构造 A···B 复合物初猜…")
         xyz_a = engine.embed_monomer_xyz(canon_a)
-        xyz_c = complex_xyz or engine.embed_complex_xyz(canon_a, canon_b)
+        sampling = None
+        if complex_xyz is not None:
+            xyz_c = complex_xyz
+        elif engine.xtb_binary() is not None and n_samples != 1:
+            info = engine.screen_complex_xtb(canon_a, canon_b,
+                                             job_dir / "screen",
+                                             n_samples=n_samples,
+                                             on_stage=stage)
+            xyz_c = info["best_xyz"]
+            sampling = {"n_samples": info["n_samples"],
+                        "best_kind": info["best_kind"],
+                        "screen_level": info["screen_level"]}
+        else:
+            xyz_c = engine.embed_complex_xyz(canon_a, canon_b)
         n_a = engine._xyz_atom_count(xyz_a)
         n_atoms = engine._xyz_atom_count(xyz_c)
         if n_atoms > engine.LARGE_SYSTEM_ATOMS:
@@ -751,6 +807,7 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
                           "amine2_smiles": None, "custom_smiles": None},
             "complex_atom_count": n_atoms,
             "fragment_ranges": {"a": [0, n_a], "b": [n_a, n_atoms]},
+            "sampling": sampling,
         }
         return _finalize(
             common, parsed, opt_xyz, run_dir / "complex.fchk",

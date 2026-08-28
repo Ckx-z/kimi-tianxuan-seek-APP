@@ -483,6 +483,71 @@ class TestPsi4Jobs:
         assert body["result"]["mode"] == "pair"
 
 
+class TestPsi4PresetsAndSamplingApi:
+    """method preset 别名（precision/literature）与 MC 采样数 API 口径。"""
+
+    def test_preset_alias_literature_resolved(self, client, sandbox):
+        """method='literature' → 任务与缓存均按 b3lyp_631gdp 口径。"""
+        r = client.post("/api/dft/jobs", json={
+            "ald_smiles": ALD, "amine_smiles": AMINE,
+            "backend": "psi4", "method": "literature"})
+        assert r.status_code == 202
+        assert r.json()["method"] == "b3lyp_631gdp"
+        body = _wait_done(client, r.json()["job_id"])
+        assert body["status"] == "done"
+        # fake 收到的是解析后的方法 key
+        assert sandbox["psi4"][0][2] == "b3lyp_631gdp"
+        # 直接给方法 key 与别名同口径 → 命中同一缓存
+        r2 = client.post("/api/dft/jobs", json={
+            "ald_smiles": ALD, "amine_smiles": AMINE,
+            "backend": "psi4", "method": "b3lyp_631gdp"})
+        assert r2.json()["cached"] is True
+        # 不同 preset 缓存隔离
+        r3 = client.post("/api/dft/jobs", json={
+            "ald_smiles": ALD, "amine_smiles": AMINE,
+            "backend": "psi4", "method": "precision"})
+        assert r3.json()["cached"] is False
+
+    def test_preset_unknown_method_falls_back_default(self, client, sandbox):
+        r = client.post("/api/dft/jobs", json={
+            "ald_smiles": ALD, "amine_smiles": AMINE,
+            "backend": "psi4", "method": "nonsense"})
+        assert r.status_code == 202
+        assert r.json()["method"] == "wb97xd3bj_svp"
+
+    def test_n_samples_validation(self, client, sandbox):
+        r = client.post("/api/dft/jobs", json={
+            "ald_smiles": ALD, "amine_smiles": AMINE,
+            "backend": "psi4", "n_samples": 0})
+        assert r.status_code == 422
+        r = client.post("/api/dft/jobs", json={
+            "ald_smiles": ALD, "amine_smiles": AMINE,
+            "backend": "psi4", "n_samples": 200})
+        assert r.status_code == 422
+
+    def test_n_samples_forwarded_and_cache_tagged(self, client, sandbox,
+                                                  monkeypatch):
+        captured = {}
+
+        def _fake_capture(a, b, method="wb97xd3bj_svp", on_stage=None,
+                          n_samples=None, **kw):
+            captured["n_samples"] = n_samples
+            return dict(FAKE_PSI4_RESULT)
+
+        monkeypatch.setattr(pb, "compute_binding_psi4", _fake_capture)
+        r = client.post("/api/dft/jobs", json={
+            "ald_smiles": ALD, "amine_smiles": AMINE,
+            "backend": "psi4", "n_samples": 8})
+        assert r.status_code == 202
+        _wait_done(client, r.json()["job_id"])
+        assert captured["n_samples"] == 8
+        # 同组合不同采样数 → 缓存不命中（重算）
+        r2 = client.post("/api/dft/jobs", json={
+            "ald_smiles": ALD, "amine_smiles": AMINE,
+            "backend": "psi4", "n_samples": 16})
+        assert r2.json()["cached"] is False
+
+
 # ---------------------------------------------------------------- 真实 Psi4 冒烟（默认跳过）
 
 @pytest.mark.skipif(

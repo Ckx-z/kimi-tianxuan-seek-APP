@@ -347,6 +347,361 @@ def embed_complex_xyz(smiles_a: str, smiles_b: str,
     return best_xyz
 
 
+# ---------------------------------------------------- MC 取向采样（对标文献流程）
+
+# 默认采样数（环境变量 COF_DFT_MC_SAMPLES 覆盖）；大体系自适应缩减
+DEFAULT_MC_SAMPLES = 12
+# MC 链长度随原子数缩减：UFF 单点在大体系上每步都要重建力场
+_MC_STEPS_SMALL = 600
+_MC_STEPS_LARGE = 260
+_MC_LARGE_ATOMS = 50
+# gfn2 单点复评的原子数上限（超过则用 GFN-FF 能量直接排名，省时）
+_MC_SP_MAX_ATOMS = 60
+
+# 卤键模板：卤素（客体 B）→ 给体原子（主体 A 的 N/O/S）目标距离（Å）
+_HALOGENS = {9: 2.80, 17: 3.00, 35: 3.10, 53: 3.25}
+_ACCEPTORS = {7, 8, 16}
+
+
+def mc_sample_count(n_atoms_complex: int | None = None) -> int:
+    """MC 取向采样数：环境变量 COF_DFT_MC_SAMPLES 覆盖默认 12；大体系自适应缩减。"""
+    env = os.environ.get("COF_DFT_MC_SAMPLES", "").strip()
+    n = int(env) if env.isdigit() and int(env) > 0 else DEFAULT_MC_SAMPLES
+    if n_atoms_complex is not None and n_atoms_complex > _MC_LARGE_ATOMS:
+        n = min(n, max(4, 360 // max(n_atoms_complex, 1)))
+    return max(1, n)
+
+
+def _rotation_aligning(src, dst):
+    """把单位向量 src 旋转到单位向量 dst 的 3×3 旋转矩阵（Rodrigues）。"""
+    import numpy as np
+
+    src = np.asarray(src, float)
+    dst = np.asarray(dst, float)
+    src /= np.linalg.norm(src) + 1e-12
+    dst /= np.linalg.norm(dst) + 1e-12
+    v = np.cross(src, dst)
+    c = float(np.dot(src, dst))
+    if c < -0.999999:  # 反向：取任一垂直轴转 180°
+        axis = np.cross(src, [1.0, 0, 0])
+        if np.linalg.norm(axis) < 1e-6:
+            axis = np.cross(src, [0.0, 1, 0])
+        axis /= np.linalg.norm(axis)
+        kx = np.array([[0, -axis[2], axis[1]], [axis[2], 0, -axis[0]],
+                       [-axis[1], axis[0], 0]])
+        return np.eye(3) + 2 * (kx @ kx)
+    kx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    return np.eye(3) + kx + (kx @ kx) * (1 / (1 + c))
+
+
+def _largest_aromatic_ring(mol: Chem.Mol) -> tuple | None:
+    """最大全芳环的原子索引元组；无芳环返回 None。"""
+    rings = [r for r in mol.GetRingInfo().AtomRings()
+             if len(r) >= 5 and all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in r)]
+    return max(rings, key=len) if rings else None
+
+
+def _ring_frame(pos, ring_idx):
+    """环心 + 单位法向量（由环上前三个不共线原子叉乘）。"""
+    import numpy as np
+
+    pts = np.asarray(pos)[list(ring_idx)]
+    cen = pts.mean(axis=0)
+    n = None
+    for i in range(len(pts) - 2):
+        v1 = pts[i + 1] - pts[0]
+        v2 = pts[i + 2] - pts[0]
+        n = np.cross(v1, v2)
+        if np.linalg.norm(n) > 1e-6:
+            break
+    if n is None or np.linalg.norm(n) < 1e-6:
+        n = np.array([0.0, 0, 1])
+    return cen, n / (np.linalg.norm(n) + 1e-12)
+
+
+def _motif_templates(mol_a: Chem.Mol, mol_b: Chem.Mol) -> list[tuple]:
+    """基序模板初猜（确定性，无随机）：返回 [(kind, pos_b), ...]。
+
+    - π-π 平行错位堆叠：双方都有芳环时，B 环面平行 A 环面，环心距 3.4 Å、
+      面内错位 1.6 Å（S66 苯二聚体 PD 几何量级）
+    - T 型：B 环面垂直 A 环面，B 面内轴指向 A 环心，环心距 4.9 Å
+    - 卤键：B 含 Cl/Br/I 且 A 含 N/O/S 时，C–X σ 空穴轴指向给体原子，
+      X···给体 3.0–3.3 Å（PBDEs 与三嗪/甲氧基位点的核心相互作用）
+    """
+    import numpy as np
+
+    pos_a = mol_a.GetConformer(0).GetPositions()
+    cen_a = pos_a.mean(axis=0)
+    pos_b0 = mol_b.GetConformer(0).GetPositions()
+    cen_b0 = pos_b0.mean(axis=0)
+    out: list[tuple] = []
+
+    ring_a = _largest_aromatic_ring(mol_a)
+    ring_b = _largest_aromatic_ring(mol_b)
+    if ring_a is not None and ring_b is not None:
+        cen_ra, n_a = _ring_frame(pos_a, ring_a)
+        cen_rb, n_b = _ring_frame(pos_b0, ring_b)
+        in_plane = np.cross(n_a, np.array([1.0, 0, 0]))
+        if np.linalg.norm(in_plane) < 1e-6:
+            in_plane = np.cross(n_a, np.array([0.0, 1, 0]))
+        in_plane /= np.linalg.norm(in_plane) + 1e-12
+
+        # π-π 平行错位堆叠（两个错位方向各一个）
+        r_align = _rotation_aligning(n_b, n_a)
+        for lat in (1.6, -1.6):
+            target = cen_ra + n_a * 3.4 + in_plane * lat
+            rot = (pos_b0 - cen_b0) @ r_align.T
+            ring_c = rot[list(ring_b)].mean(axis=0)
+            out.append(("template_pi_stack", rot + (target - ring_c),
+                        np.array(n_a)))
+
+        # T 型：B 面内轴 → A 法向，B 法向 ⊥ A 法向，环心距 4.9 Å
+        rb_pts = np.asarray(pos_b0)[list(ring_b)]
+        u_b = rb_pts[1] - rb_pts[0]
+        u_b /= np.linalg.norm(u_b) + 1e-12
+        # 目标：B 面内轴沿 n_a（指向 A 环心方向），B 法向沿 in_plane
+        m_src = np.column_stack([u_b, n_b, np.cross(u_b, n_b)])
+        m_dst = np.column_stack([n_a, in_plane, np.cross(n_a, in_plane)])
+        r_t = m_dst @ np.linalg.inv(m_src)
+        target = cen_ra + n_a * 4.9
+        rot = (pos_b0 - cen_b0) @ r_t.T
+        ring_c = rot[list(ring_b)].mean(axis=0)
+        out.append(("template_t_shape", rot + (target - ring_c),
+                    np.array(n_a)))
+
+    # 卤键模板：客体 B 的 C–X σ 空穴指向主体 A 的 N/O/S 给体
+    hal_idx = [a.GetIdx() for a in mol_b.GetAtoms()
+               if a.GetAtomicNum() in _HALOGENS][:3]
+    acc_idx = [a.GetIdx() for a in mol_a.GetAtoms()
+               if a.GetAtomicNum() in _ACCEPTORS]
+    # 给体按离 A 质心距离均匀挑最多 4 个，避免模板挤在同一侧
+    if acc_idx:
+        acc_sorted = sorted(
+            acc_idx,
+            key=lambda i: float(np.linalg.norm(pos_a[i] - cen_a)))
+        step = max(1, len(acc_sorted) // 4)
+        acc_pick = acc_sorted[::step][:4]
+    else:
+        acc_pick = []
+
+    def _lone_pair_dir(ia: int):
+        """给体孤对电子方向 ≈ 其所有键方向的反向角平分线（环内 O/N 不外挤）。"""
+        nb_vecs = []
+        for nb in mol_a.GetAtomWithIdx(int(ia)).GetNeighbors():
+            v = pos_a[nb.GetIdx()] - pos_a[ia]
+            nrm = np.linalg.norm(v)
+            if nrm > 1e-6:
+                nb_vecs.append(v / nrm)
+        if not nb_vecs:
+            u0 = pos_a[ia] - cen_a
+            return u0 / (np.linalg.norm(u0) + 1e-12)
+        s = np.sum(nb_vecs, axis=0)
+        if np.linalg.norm(s) < 0.3:  # 键方向近对称（如三键 N）：退化为质心外向
+            u0 = pos_a[ia] - cen_a
+            return u0 / (np.linalg.norm(u0) + 1e-12)
+        return -s / np.linalg.norm(s)
+
+    for ix in hal_idx:
+        x_atom = mol_b.GetAtomWithIdx(ix)
+        d_xb = _HALOGENS[x_atom.GetAtomicNum()]
+        neighbors = [nb for nb in x_atom.GetNeighbors()
+                     if nb.GetAtomicNum() == 6]
+        if not neighbors:
+            continue
+        ic = neighbors[0].GetIdx()
+        v_local = pos_b0[ix] - pos_b0[ic]  # C → X 方向（σ 空穴外向）
+        for ia in acc_pick:
+            p_acc = pos_a[ia]
+            u = _lone_pair_dir(ia)
+            # 给体···X–C 线形：C 必须在 X 的远侧（X 尖端朝向给体），
+            # 故 C→X 方向对齐 -u（对齐 +u 会把取代基的环扣进主体骨架）
+            r_xb = _rotation_aligning(v_local, -u)
+            pivot = p_acc + u * d_xb
+            rot = (pos_b0 - pos_b0[ix]) @ r_xb.T + pivot
+            # 绕键轴（u，过 pivot）滚转采样 12 个角度，取最小接触最大者——
+            # 单纯对齐键轴时 B 的环面可能恰好插进 A 的骨架
+            best_rot, best_clear = rot, -1.0
+            for deg in range(0, 360, 30):
+                th = np.radians(deg)
+                kx = np.array([[0, -u[2], u[1]], [u[2], 0, -u[0]],
+                               [-u[1], u[0], 0]])
+                roll = (np.eye(3) + np.sin(th) * kx
+                        + (1 - np.cos(th)) * (kx @ kx))
+                cand = (rot - pivot) @ roll.T + pivot
+                diff = cand[:, None, :] - pos_a[None, :, :]
+                dmin = float(np.sqrt((diff ** 2).sum(-1)).min())
+                if dmin > best_clear:
+                    best_rot, best_clear = cand, dmin
+            out.append(("template_halogen", best_rot, np.array(u)))
+
+    # 防穿插：模板几何若有过近接触（<1.6 Å），沿各模板自身的外推方向拉开
+    # （卤键沿给体→X 键轴外推，保持 X···给体共线；π 模板沿环法向）
+    cleaned = []
+    for kind, pos_b, push in out:
+        pos_b = np.asarray(pos_b, float)
+        for _ in range(12):
+            diff = pos_b[:, None, :] - pos_a[None, :, :]
+            dmin = float(np.sqrt((diff ** 2).sum(-1)).min())
+            if dmin >= 1.6:
+                break
+            pos_b = pos_b + push * 0.4
+        cleaned.append((kind, pos_b))
+    return cleaned
+
+
+def _uff_single_point(mol: Chem.Mol) -> float | None:
+    """组合体 UFF 单点能量（不优化）；不可用返回 None。"""
+    try:
+        ff = AllChem.UFFGetMoleculeForceField(mol, confId=0)
+        return float(ff.CalcEnergy())
+    except Exception:
+        pass
+    try:
+        props = AllChem.MMFFGetMoleculeProperties(mol)
+        ff = AllChem.MMFFGetMoleculeForceField(mol, props, confId=0)
+        return float(ff.CalcEnergy())
+    except Exception:
+        return None
+
+
+def _mc_orientations(mol_a: Chem.Mol, mol_b: Chem.Mol, n_out: int, seed: int
+                     ) -> list:
+    """Metropolis Monte Carlo 刚体取向采样（对标 COMPASS+MC 文献流程的 UFF 版）。
+
+    A 固定，B 作刚体随机平移/旋转；UFF 单点能量 + Metropolis 接受准则
+    （kT 从 8 → 1.2 kcal/mol 几何退火）；快照经 max-min 多样化挑选 n_out 个。
+    返回 [pos_b(np 数组), ...]；UFF 不可用返回 []。
+    """
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    pos_a = mol_a.GetConformer(0).GetPositions()
+    cen_a = pos_a.mean(axis=0)
+    r_a = float(np.linalg.norm(pos_a - cen_a, axis=1).max())
+    pos_b0 = mol_b.GetConformer(0).GetPositions()
+    cen_b0 = pos_b0.mean(axis=0)
+    r_b = float(np.linalg.norm(pos_b0 - cen_b0, axis=1).max())
+    n_atoms = mol_a.GetNumAtoms() + mol_b.GetNumAtoms()
+    steps = _MC_STEPS_SMALL if n_atoms <= _MC_LARGE_ATOMS else _MC_STEPS_LARGE
+    max_sep = r_a + r_b + 4.0
+
+    combined = Chem.CombineMols(mol_a, mol_b)
+    combined.UpdatePropertyCache(strict=False)
+    Chem.FastFindRings(combined)
+    conf = combined.GetConformer(0)
+    n_a = mol_a.GetNumAtoms()
+
+    from rdkit.Geometry import Point3D
+
+    def energy_of(pos_b) -> float | None:
+        for i in range(mol_b.GetNumAtoms()):
+            x, y, z = (float(v) for v in pos_b[i])
+            conf.SetAtomPosition(n_a + i, Point3D(x, y, z))
+        return _uff_single_point(combined)
+
+    # 初始态：随机取向（与 _orientations 同口径，保证不重叠出发）
+    cur = _orientations(mol_a, mol_b, 1, seed)[0]
+    e_cur = energy_of(cur)
+    if e_cur is None:
+        return []
+
+    burn = steps // 5
+    snapshots: list = []
+    for step in range(steps):
+        # 几何退火：kT 8.0 → 1.2 kcal/mol
+        kt = 8.0 * (1.2 / 8.0) ** (step / max(steps - 1, 1))
+        # 提案：随机轴小角旋转 + 各向同性小步平移
+        axis = rng.normal(size=3)
+        axis /= np.linalg.norm(axis) + 1e-12
+        theta = float(rng.normal(0, np.radians(25)))
+        kx = np.array([[0, -axis[2], axis[1]], [axis[2], 0, -axis[0]],
+                       [-axis[1], axis[0], 0]])
+        rot = (np.eye(3) + np.sin(theta) * kx + (1 - np.cos(theta)) * (kx @ kx))
+        cen_cur = cur.mean(axis=0)
+        prop = (cur - cen_cur) @ rot.T + cen_cur + rng.normal(0, 0.8, size=3)
+        # 约束：B 质心不许飘离（> max_sep 时按比例拉回）
+        cen_prop = prop.mean(axis=0)
+        d_cen = float(np.linalg.norm(cen_prop - cen_a))
+        if d_cen > max_sep:
+            prop = prop + (cen_a - cen_prop) * (1 - max_sep / d_cen)
+        e_prop = energy_of(prop)
+        if e_prop is None:
+            continue
+        d_e = e_prop - e_cur
+        if d_e <= 0 or rng.random() < float(np.exp(-min(d_e / kt, 50))):
+            cur, e_cur = prop, e_prop
+        if step >= burn and (step - burn) % 5 == 0:
+            snapshots.append(cur.copy())
+
+    if not snapshots:
+        return [cur]
+    # max-min 多样化：特征 = [质心方向(3), 质心距, 惯性主轴(3)]
+    def feat(p):
+        c = p.mean(axis=0)
+        off = c - cen_a
+        d = float(np.linalg.norm(off))
+        u = off / (d + 1e-12)
+        cov = (p - c).T @ (p - c)
+        _, vecs = np.linalg.eigh(cov)
+        axis = vecs[:, -1]
+        axis = axis if axis[0] >= 0 else -axis  # 符号固定，便于比较
+        return np.concatenate([u * 2.0, [d / 5.0], axis])
+
+    feats = [feat(p) for p in snapshots]
+    picked = [int(np.argmin([np.sum((s - cen_a) ** 2) for s in
+                             [p.mean(axis=0) for p in snapshots]]))]
+    while len(picked) < min(n_out, len(snapshots)):
+        dmin = []
+        for i, f in enumerate(feats):
+            if i in picked:
+                dmin.append(-1.0)
+            else:
+                dmin.append(min(float(np.sum((f - feats[j]) ** 2))
+                                for j in picked))
+        picked.append(int(np.argmax(dmin)))
+    return [snapshots[i] for i in picked]
+
+
+def sample_complex_orientations(smiles_a: str, smiles_b: str,
+                                n_samples: int | None = None,
+                                seed: int = 42) -> list[dict]:
+    """复合物多样化初猜采样：基序模板（确定性）+ MC（Metropolis/UFF）。
+
+    返回 [{"kind": str, "xyz": 组合体 UFF 预优化后的 xyz 文本,
+           "uff_e": float|None}, ...]，长度 = n_samples（模板不足时由
+    MC/随机取向补足）。种子固定时结果完全确定（可缓存、可复现）。
+    """
+    import numpy as np
+
+    mol_a = _embed_one(smiles_a, seed=seed)
+    mol_b = _embed_one(smiles_b, seed=seed + 1)
+    if mol_a is None or mol_b is None:
+        raise DftError("SMILES 无法解析或 3D 化失败，无法构造复合物初猜")
+    n_atoms = mol_a.GetNumAtoms() + mol_b.GetNumAtoms()
+    n_total = n_samples if n_samples and n_samples > 0 else mc_sample_count(n_atoms)
+
+    cands: list[tuple[str, object]] = list(_motif_templates(mol_a, mol_b))
+    remaining = max(0, n_total - len(cands))
+    if remaining:
+        mc = _mc_orientations(mol_a, mol_b, remaining, seed + 7)
+        cands.extend(("mc", p) for p in mc)
+    if len(cands) < n_total:
+        # MC 不可用（UFF 失败）等兜底：补随机取向
+        extra = _orientations(mol_a, mol_b, n_total - len(cands), seed + 13)
+        cands.extend(("random", np.asarray(p)) for p in extra)
+
+    out: list[dict] = []
+    for kind, pos_b in cands[:n_total]:
+        combined = _combined_with_b(mol_a, mol_b, pos_b)
+        e = _forcefield_energy(combined, 0)  # UFF 预优化（松弛接触）
+        out.append({"kind": kind,
+                    "xyz": Chem.MolToXYZBlock(combined, confId=0),
+                    "uff_e": e})
+    if not out:
+        raise DftError("复合物 3D 构象生成失败：两单体组合可能难以嵌入同一空间")
+    return out
+
+
 # ---------------------------------------------------------------- xtb 子进程
 
 def _check_elements(mol: Chem.Mol) -> None:
@@ -371,14 +726,11 @@ def _classify_failure(stdout: str, stderr: str, returncode: int | None) -> str:
 
 
 def _run_xtb(xyz_block: str, args: list[str], cwd: Path, timeout: int,
-             ) -> tuple[str, str | None]:
-    """在 cwd 下跑一次 xtb --opt。
+             opt: bool = True) -> tuple[str, str | None]:
+    """在 cwd 下跑一次 xtb（opt=True 几何优化；False 单点）。
 
     Returns:
-        (stdout 全文, xtbopt.xyz 内容或 None)
-
-    Raises:
-        DftError: 未安装引擎 / 超时 / 非 normal termination
+        (stdout 全文, xtbopt.xyz 内容或 None；单点模式恒为 None)
     """
     exe = xtb_binary()
     if exe is None:
@@ -394,7 +746,7 @@ def _run_xtb(xyz_block: str, args: list[str], cwd: Path, timeout: int,
     env.setdefault("OMP_NUM_THREADS", "4")
     env.setdefault("OMP_STACKSIZE", "1G")
 
-    cmd = [str(exe), "input.xyz", "--opt", *args]
+    cmd = [str(exe), "input.xyz", *(["--opt"] if opt else []), *args]
     creationflags = 0
     if sys.platform == "win32":
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -427,6 +779,78 @@ def _run_xtb(xyz_block: str, args: list[str], cwd: Path, timeout: int,
     return stdout, opt_xyz
 
 
+def screen_complex_xtb(smiles_a: str, smiles_b: str, workdir: Path,
+                       n_samples: int | None = None, seed: int = 42,
+                       on_stage=None) -> dict:
+    """MC/模板多样化初猜 → xTB 分级筛选 → 最优复合物几何（对标文献 MC 流程）。
+
+    流程：sample_complex_orientations 生成 N 个初猜（基序模板 + Metropolis MC）
+    → 每个初猜 GFN-FF 快速优化松弛 → 小体系（≤_MC_SP_MAX_ATOMS 原子）再用
+    GFN2-xTB 单点复评排名，大体系直接按 GFN-FF 能量排名 → 取能量最低者。
+
+    Returns:
+        {"best_xyz": 筛选最优几何（GFN-FF 优化后，可直接交 gfn2 精修）,
+         "best_kind": 最优候选来源（template_pi_stack / mc / …）,
+         "screen_level": "gfn2sp" | "gfnff",
+         "n_samples": 实际候选数,
+         "trials": [{kind, e_rank_hartree, elapsed_sec}, ...]}
+    """
+    def stage(hint: str) -> None:
+        if on_stage is not None:
+            try:
+                on_stage(hint)
+            except Exception:
+                pass
+
+    candidates = sample_complex_orientations(smiles_a, smiles_b,
+                                             n_samples=n_samples, seed=seed)
+    n_atoms = _xyz_atom_count(candidates[0]["xyz"])
+    use_sp = n_atoms <= _MC_SP_MAX_ATOMS
+    screen_level = "gfn2sp" if use_sp else "gfnff"
+    stage(f"取向采样完成（{len(candidates)} 个初猜：基序模板 + Monte Carlo），"
+          "正在逐一快速筛选…")
+
+    trials: list[dict] = []
+    best_xyz: str | None = None
+    best_e: float | None = None
+    best_kind = ""
+    ff_args = METHODS["gfnff"]["args"]
+    g2_args = METHODS["gfn2"]["args"]
+    t_ff = method_timeout("gfnff")
+    t_g2 = method_timeout("gfn2")
+    for i, cand in enumerate(candidates):
+        t0 = time.time()
+        wd = workdir / f"cand_{i:02d}_{cand['kind']}"
+        try:
+            out_ff, xyz_ff = _run_xtb(cand["xyz"], ff_args, wd / "gfnff", t_ff)
+            e_ff = parse_energy(out_ff)
+            xyz_use = xyz_ff or cand["xyz"]
+            if e_ff is None:
+                raise DftError("GFN-FF 未给出能量")
+            e_rank = e_ff
+            if use_sp:
+                out_sp, _ = _run_xtb(xyz_use, g2_args, wd / "gfn2sp", t_g2,
+                                     opt=False)
+                e_sp = parse_energy(out_sp)
+                if e_sp is not None:
+                    e_rank = e_sp
+        except DftError as exc:
+            trials.append({"kind": cand["kind"], "error": str(exc)[:200],
+                           "elapsed_sec": round(time.time() - t0, 1)})
+            continue
+        trials.append({"kind": cand["kind"], "e_rank_hartree": e_rank,
+                       "elapsed_sec": round(time.time() - t0, 1)})
+        if best_e is None or e_rank < best_e:
+            best_xyz, best_e, best_kind = xyz_use, e_rank, cand["kind"]
+    if best_xyz is None:
+        raise DftError("取向筛选全部失败：xtb 对所有初猜均未给出有效能量")
+    stage(f"取向筛选完成：最优初猜来自 {best_kind}"
+          f"（{screen_level} 口径，共 {len(trials)} 个候选）")
+    return {"best_xyz": best_xyz, "best_kind": best_kind,
+            "screen_level": screen_level, "n_samples": len(candidates),
+            "trials": trials}
+
+
 # ---------------------------------------------------------------- 主管线
 
 def _xyz_atom_count(xyz_block: str) -> int:
@@ -435,6 +859,15 @@ def _xyz_atom_count(xyz_block: str) -> int:
         return int(xyz_block.strip().splitlines()[0])
     except Exception:
         return 0
+
+
+def _use_mc_screening(method: str, n_samples: int | None) -> bool:
+    """gfn2 档默认走 MC 采样 + xTB 筛选；n_samples=1 显式回到旧单取向口径。"""
+    if method != "gfn2":
+        return False
+    if n_samples is not None:
+        return n_samples > 1
+    return mc_sample_count() > 1
 
 
 def _fragment_ranges(n_a: int, n_total: int) -> dict:
@@ -452,7 +885,8 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
                     ald2_smiles: str | None = None,
                     amine2_smiles: str | None = None,
                     custom_smiles: str | None = None,
-                    on_stage=None, jobs_root: Path | None = None) -> dict:
+                    on_stage=None, jobs_root: Path | None = None,
+                    n_samples: int | None = None) -> dict:
     """计算「缩合二聚体 D 与第三物质 X」的结合能与量化描述符。
 
     流程：醛/胺单体 → 亚胺缩合二聚体 D（dimer.make_dimer）→ 解析 X
@@ -545,7 +979,17 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
             out_x, _ = _run_xtb(xyz_x, args, job_dir / "x", timeout)
 
         stage("正在构造 D·X 复合物初猜…")
-        xyz_c = embed_complex_xyz(dimer_smiles, x_smiles)
+        sampling = None
+        if _use_mc_screening(method, n_samples):
+            info = screen_complex_xtb(dimer_smiles, x_smiles,
+                                      job_dir / "screen",
+                                      n_samples=n_samples, on_stage=stage)
+            xyz_c = info["best_xyz"]
+            sampling = {"n_samples": info["n_samples"],
+                        "best_kind": info["best_kind"],
+                        "screen_level": info["screen_level"]}
+        else:
+            xyz_c = embed_complex_xyz(dimer_smiles, x_smiles)
         n_atoms = _xyz_atom_count(xyz_c)
         if n_atoms > LARGE_SYSTEM_ATOMS:
             stage(f"体系较大（复合物 {n_atoms} 个原子），预计耗时较长，请耐心等待…")
@@ -594,6 +1038,8 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
             "complex_xyz": opt_xyz or xyz_c,
             # 复合物 xyz 片段区间：a=二聚体 [0,n_d)，b=X [n_d,total)
             "fragment_ranges": _fragment_ranges(_xyz_atom_count(xyz_d), n_atoms),
+            # MC 取向采样信息（gfn2 档默认启用；旧单取向口径为 None）
+            "sampling": sampling,
             "elapsed_sec": round(time.time() - started, 2),
         }
     finally:
@@ -603,7 +1049,8 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
 
 
 def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
-                         on_stage=None, jobs_root: Path | None = None) -> dict:
+                         on_stage=None, jobs_root: Path | None = None,
+                         n_samples: int | None = None) -> dict:
     """任意双分子模式（选项2）：A···B 复合物结合能，不经过二聚体生成。
 
     E_bind = E(A·B 复合物) − E(A) − E(B)。ald/amine 字段位复用为分子 A/B，
@@ -667,7 +1114,16 @@ def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
             out_b, _ = _run_xtb(xyz_b, args, job_dir / "b", timeout)
 
         stage("正在构造 A···B 复合物初猜…")
-        xyz_c = embed_complex_xyz(canon_a, canon_b)
+        sampling = None
+        if _use_mc_screening(method, n_samples):
+            info = screen_complex_xtb(canon_a, canon_b, job_dir / "screen",
+                                      n_samples=n_samples, on_stage=stage)
+            xyz_c = info["best_xyz"]
+            sampling = {"n_samples": info["n_samples"],
+                        "best_kind": info["best_kind"],
+                        "screen_level": info["screen_level"]}
+        else:
+            xyz_c = embed_complex_xyz(canon_a, canon_b)
         n_atoms = _xyz_atom_count(xyz_c)
         if n_atoms > LARGE_SYSTEM_ATOMS:
             stage(f"体系较大（复合物 {n_atoms} 个原子），预计耗时较长，请耐心等待…")
@@ -712,6 +1168,7 @@ def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
             "complex_xyz": opt_xyz or xyz_c,
             # 复合物 xyz 片段区间：a=分子 A [0,n_a)，b=分子 B [n_a,total)
             "fragment_ranges": _fragment_ranges(_xyz_atom_count(xyz_a), n_atoms),
+            "sampling": sampling,
             "elapsed_sec": round(time.time() - started, 2),
         }
     finally:

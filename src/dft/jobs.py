@@ -66,15 +66,25 @@ def _prune_locked() -> None:
         _JOBS.pop(jid, None)
 
 
+def _sampler_tag(backend: str, method: str, n_samples: int | None
+                 ) -> str | None:
+    """缓存 key 的采样口径标记：gfnff 不采样（None 保持旧格式）；
+    gfn2/psi4 走 MC 采样，按请求采样数区分（None → "mc0" 默认口径）。"""
+    if backend == "xtb" and method != "gfn2":
+        return None
+    return f"mc{n_samples if n_samples and n_samples > 0 else 0}"
+
+
 def create_job(ald_smiles: str, amine_smiles: str, method: str,
                x_type: str = "self_stack", solvent_id: str | None = None,
                ald2_smiles: str | None = None, amine2_smiles: str | None = None,
                custom_smiles: str | None = None, mode: str = "dimer",
-               backend: str = "xtb") -> dict:
+               backend: str = "xtb", n_samples: int | None = None) -> dict:
     """建任务。缓存命中 → 直接 done；否则 pending 并起后台线程。
 
     mode="pair" 时 ald/amine 参数位复用为分子 A/B，忽略 x_type 相关字段。
     backend="psi4" 时 method 为 psi4_backend.PSI4_METHODS 键，走真 DFT 精度档。
+    n_samples：MC 取向采样数（None=默认；1=旧单取向初猜口径）。
     """
     job_id = uuid.uuid4().hex[:16]
     job = {
@@ -84,6 +94,7 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
         "method": method,
         "mode": mode,
         "backend": backend,
+        "n_samples": n_samples,
         "ald_smiles_input": ald_smiles,
         "amine_smiles_input": amine_smiles,
         "x_type": x_type,
@@ -104,7 +115,7 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
     # 这里先算出新口径缓存 key 探缓存
     probe = _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
                              solvent_id, ald2_smiles, amine2_smiles,
-                             custom_smiles, mode, backend)
+                             custom_smiles, mode, backend, n_samples)
     if probe is not None:
         key, canon_ald, canon_amine = probe
         hit = dft_cache.load_cache(key)
@@ -126,12 +137,16 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
 
 def _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
                      solvent_id, ald2_smiles, amine2_smiles,
-                     custom_smiles, mode="dimer", backend="xtb"):
+                     custom_smiles, mode="dimer", backend="xtb",
+                     n_samples=None):
     """尽力算出 (缓存 key, 规范化 A, 规范化 B)；任一步失败返回 None。"""
     try:
         methods = engine.METHODS if backend == "xtb" else psi4_backend.PSI4_METHODS
+        method = psi4_backend.resolve_method_key(method) \
+            if backend == "psi4" else method
         if method not in methods:
             return None
+        tag = _sampler_tag(backend, method, n_samples)
         canon_ald = engine.canonicalize_smiles(ald_smiles)
         canon_amine = engine.canonicalize_smiles(amine_smiles)
         if not canon_ald or not canon_amine:
@@ -139,7 +154,7 @@ def _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
         if mode == "pair":
             return (dft_cache.cache_key(
                         canon_ald, f"pair:{canon_amine}", method, mode="pair",
-                        backend=backend),
+                        backend=backend, sampler_tag=tag),
                     canon_ald, canon_amine)
         dim = dimer_mod.make_dimer(canon_ald, canon_amine)
         _, _, x_part = engine.resolve_x(
@@ -147,7 +162,7 @@ def _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
             ald2_smiles=ald2_smiles, amine2_smiles=amine2_smiles,
             custom_smiles=custom_smiles)
         return (dft_cache.cache_key(dim["smiles"], x_part, method,
-                                    backend=backend),
+                                    backend=backend, sampler_tag=tag),
                 canon_ald, canon_amine)
     except Exception:
         return None
@@ -168,6 +183,9 @@ def _run_job(job_id: str) -> None:
     x_type = job.get("x_type") or "self_stack"
     mode = job.get("mode") or "dimer"
     backend = job.get("backend") or "xtb"
+    n_samples = job.get("n_samples")
+    if backend == "psi4":
+        method = psi4_backend.resolve_method_key(method)
 
     def on_stage(hint: str) -> None:
         with _LOCK:
@@ -182,14 +200,16 @@ def _run_job(job_id: str) -> None:
     log_base = {
         "smiles_a": ald_smiles, "smiles_b": amine_smiles,
         "x_type": x_type, "method": method, "mode": mode, "backend": backend,
+        "n_samples": n_samples,
     }
 
     try:
         if backend == "psi4":
-            # 精度档：真 DFT（ωB97X-D3BJ/def2-SVP + BSSE counterpoise）
+            # 精度档：真 DFT（ωB97X-D3BJ/def2-SVP 或 B3LYP/6-31G(d,p) + BSSE）
             if mode == "pair":
                 result = psi4_backend.compute_pair_binding_psi4(
-                    ald_smiles, amine_smiles, method, on_stage=on_stage)
+                    ald_smiles, amine_smiles, method, on_stage=on_stage,
+                    n_samples=n_samples)
             else:
                 result = psi4_backend.compute_binding_psi4(
                     ald_smiles, amine_smiles, method,
@@ -198,11 +218,12 @@ def _run_job(job_id: str) -> None:
                     ald2_smiles=job.get("ald2_smiles"),
                     amine2_smiles=job.get("amine2_smiles"),
                     custom_smiles=job.get("custom_smiles"),
-                    on_stage=on_stage)
+                    on_stage=on_stage, n_samples=n_samples)
         elif mode == "pair":
             # 任意双分子模式：A···B 直接结合，跳过二聚体生成与 X 解析
             result = engine.compute_pair_binding(
-                ald_smiles, amine_smiles, method, on_stage=on_stage)
+                ald_smiles, amine_smiles, method, on_stage=on_stage,
+                n_samples=n_samples)
         else:
             result = engine.compute_binding(
                 ald_smiles, amine_smiles, method,
@@ -211,10 +232,11 @@ def _run_job(job_id: str) -> None:
                 ald2_smiles=job.get("ald2_smiles"),
                 amine2_smiles=job.get("amine2_smiles"),
                 custom_smiles=job.get("custom_smiles"),
-                on_stage=on_stage)
+                on_stage=on_stage, n_samples=n_samples)
         key = dft_cache.cache_key(
             result["smiles_a"] if mode == "pair" else result["dimer_smiles"],
-            result["x_cache_part"], method, mode=mode, backend=backend)
+            result["x_cache_part"], method, mode=mode, backend=backend,
+            sampler_tag=_sampler_tag(backend, method, n_samples))
         dft_cache.save_cache(key, result)
         result["cached"] = False
         # pair 模式无单体组归属，不做收藏联动
@@ -242,6 +264,7 @@ def _run_job(job_id: str) -> None:
             "energies_hartree": result["energies_hartree"],
             "complex_xyz": result["complex_xyz"],
             "fragment_ranges": result.get("fragment_ranges"),
+            "sampling": result.get("sampling"),
             "elapsed_sec": result["elapsed_sec"],
         })
         with _LOCK:

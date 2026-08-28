@@ -26,19 +26,24 @@ CACHE_DIR = runtime_config.user_data_root() / "dft_cache"
 
 
 def cache_key(dimer_smiles: str, x_cache_part: str, method: str,
-              mode: str = "dimer", backend: str = "xtb") -> str:
-    """(后端, 模式, 主体 canonical SMILES, X 缓存描述, 方法) → sha1。
+              mode: str = "dimer", backend: str = "xtb",
+              sampler_tag: str | None = None) -> str:
+    """(后端, 模式, 主体 canonical SMILES, X 缓存描述, 方法[, 采样口径]) → sha1。
 
     mode 参与散列：同一对 SMILES 的 dimer（缩合二聚体·X）与 pair
     （任意双分子 A···B）结果互不命中。pair 模式下 dimer_smiles 位
     传分子 A 的 canonical SMILES、x_cache_part 为 "pair:<canon_b>"。
     backend 参与散列：xTB 快速档与 Psi4 精度档结果互不命中；
     backend="xtb" 保持旧串格式以兼容存量缓存。
+    sampler_tag（如 "mc0"/"mc12"）参与散列：MC 取向采样引入后，
+    旧单取向口径的缓存不被误命中（gfnff 档不采样，传 None 保持旧格式）。
     """
     if backend == "xtb":
         raw = f"{mode}::{dimer_smiles}::{x_cache_part}::{method}"
     else:
         raw = f"{backend}::{mode}::{dimer_smiles}::{x_cache_part}::{method}"
+    if sampler_tag:
+        raw += f"::{sampler_tag}"
     return hashlib.sha1(raw.encode()).hexdigest()
 
 

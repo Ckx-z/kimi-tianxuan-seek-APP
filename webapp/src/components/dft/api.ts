@@ -40,7 +40,7 @@ async function request<T>(path: string, options: { method?: string; body?: unkno
 // ---------- 类型（与后端契约对齐） ----------
 
 export type DftBackend = 'xtb' | 'psi4';
-export type DftMethod = 'gfnff' | 'gfn2' | 'wb97xd3bj_svp';
+export type DftMethod = 'gfnff' | 'gfn2' | 'wb97xd3bj_svp' | 'b3lyp_631gdp';
 export type DftJobStatus = 'pending' | 'running' | 'done' | 'failed';
 /** 第三物质 X 类型：自身堆积（默认）/ 溶剂 / 另一组单体的二聚体 / 自定义分子 */
 export type DftXType = 'self_stack' | 'solvent' | 'other_dimer' | 'custom';
@@ -162,6 +162,8 @@ export interface DftJobRequest {
   method: DftMethod;
   /** 缺省 xtb；psi4 为真 DFT 精度档（分钟级，需已安装 psi4-env） */
   backend?: DftBackend;
+  /** 复合物取向 MC 采样数（缺省后端默认 12；1=旧单取向口径；仅 gfn2/psi4 生效） */
+  n_samples?: number;
 }
 
 /** 历史条目（dft_log.jsonl；2.0 起含二聚体与 X 字段，旧条目可能缺失） */
@@ -199,6 +201,8 @@ export interface DftHistoryEntry {
 export interface DftBackendMethodOption {
   id: string;
   label: string;
+  /** Psi4 档位的 preset 名（precision/literature）；xtb 无此字段 */
+  preset?: string | null;
 }
 
 export interface DftBackendInfo {
@@ -220,6 +224,7 @@ export interface DftBackendsResponse {
 /** 方法中文标签：优先用后端记录的 method_label，否则按 backend+method 推断 */
 export function dftMethodLabel(backend: DftBackend | undefined, method: string, recorded?: string | null): string {
   if (recorded) return recorded;
+  if (method === 'b3lyp_631gdp') return 'B3LYP/6-31G(d,p)（文献口径）';
   if (backend === 'psi4' || method === 'wb97xd3bj_svp') return 'ωB97X-D3BJ/def2-SVP（真 DFT）';
   return method === 'gfnff' ? 'GFN-FF 力场（快速）' : 'GFN2-xTB（精确）';
 }

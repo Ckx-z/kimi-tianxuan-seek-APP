@@ -1,0 +1,126 @@
+{
+  "generated_at": "2026-08-28 16:59:10",
+  "protocol": {
+    "scenario": "TAPT–DMTA 亚胺二聚体 vs PBDEs（刘璐 2021 JHM 403, 123917 场景对齐）",
+    "geometry": "MC 取向采样（基序模板含卤键 + Metropolis/UFF）→ GFN-FF 分级筛选 → GFN2-xTB 全优化（分子团簇，非周期性模型）",
+    "xtb": "GFN2-xTB：E_bind = E_complex - E_dimer - E_guest",
+    "psi4": "xTB 优化几何上单点 + counterpoise BSSE（optimize=False）；precision=ωB97X-D3BJ/def2-SVP，literature=B3LYP/6-31G(d,p)",
+    "reference": "刘璐 2021：COMPASSII MC + DMol3 周期性 E_ads + B3LYP/6-31G(d,p) 精修；BDE47 −31.06、BDE154 −48.47 kJ/mol",
+    "note": "文献为周期性框架多层吸附口径，本计算为分子团簇；数量级与 Br 数排序正确即算成功"
+  },
+  "dimer": {
+    "ald": "COc1cc(C=O)c(OC)cc1C=O",
+    "amine": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+    "smiles": "COc1cc(C=Nc2ccc(-c3nc(-c4ccc(N)cc4)nc(-c4ccc(N)cc4)n3)cc2)c(OC)cc1C=O",
+    "multi_site": true,
+    "atom_count": 66
+  },
+  "guests": [
+    {
+      "key": "bde154",
+      "name": "BDE-154（六溴联苯醚）",
+      "smiles": "C1=C(C=C(C(=C1Br)OC2=CC(=C(C=C2Br)Br)Br)Br)Br",
+      "ref_kj": -48.47,
+      "n_br": 6,
+      "e_dimer_hartree": -109.353622409449,
+      "guest_e_hartree": -56.294721675147,
+      "screen": {
+        "n_samples": 4,
+        "best_kind": "template_pi_stack",
+        "screen_level": "gfnff",
+        "elapsed_sec": 1.6,
+        "trials": [
+          {
+            "kind": "template_pi_stack",
+            "e_rank_hartree": -18.055414787739,
+            "elapsed_sec": 0.2
+          },
+          {
+            "kind": "template_pi_stack",
+            "e_rank_hartree": -18.099716849344,
+            "elapsed_sec": 0.5
+          },
+          {
+            "kind": "template_t_shape",
+            "e_rank_hartree": -17.972240572084,
+            "elapsed_sec": 0.5
+          },
+          {
+            "kind": "template_halogen",
+            "e_rank_hartree": -18.056921085901,
+            "elapsed_sec": 0.3
+          }
+        ]
+      },
+      "xtb": {
+        "e_bind_kj": -68.95,
+        "e_bind_kcal": -16.481,
+        "error_kj": -20.48,
+        "elapsed_sec": 12.7
+      },
+      "psi4_precision": {
+        "ok": true,
+        "e_bind_kj": -27.78403935969436,
+        "e_bind_kcal": -6.640538851480651,
+        "error_kj": 20.69,
+        "elapsed_sec": 4025.5,
+        "detail": {
+          "method": "wb97x-d3bj",
+          "basis": "def2-svp",
+          "bsse_type": "cp",
+          "psi4_version": "1.11",
+          "e_bind_raw_kcal": -10.719704420846345,
+          "fchk_available": true,
+          "fchk_path": "C:\\Users\\ckx\\Desktop\\全新机器学习实验\\data\\dft_artifacts\\c044b4ce7021.fchk"
+        }
+      },
+      "psi4_literature": {
+        "ok": true,
+        "e_bind_kj": 10.541592858899094,
+        "e_bind_kcal": 2.5194989119386446,
+        "error_kj": 59.01,
+        "elapsed_sec": 2169.9,
+        "detail": {
+          "method": "b3lyp",
+          "basis": "6-31g(d,p)",
+          "bsse_type": "cp",
+          "psi4_version": "1.11",
+          "e_bind_raw_kcal": -1.3650167448006814,
+          "fchk_available": true,
+          "fchk_path": "C:\\Users\\ckx\\Desktop\\全新机器学习实验\\data\\dft_artifacts\\192b24c64288.fchk"
+        }
+      }
+    },
+    {
+      "key": "bde47",
+      "name": "BDE-47（四溴联苯醚）",
+      "smiles": "C1=CC(=C(C=C1Br)Br)OC2=C(C=C(C=C2)Br)Br",
+      "ref_kj": -31.06,
+      "n_br": 4,
+      "e_dimer_hartree": -109.353622,
+      "guest_e_hartree": -49.147822,
+      "screen": {
+        "n_samples": 4,
+        "best_kind": "template_pi_stack",
+        "screen_level": "gfnff",
+        "note": "trials 明细随进程中断丢失；口径与 BDE-154 相同"
+      },
+      "xtb": {
+        "e_bind_kj": -90.07,
+        "e_bind_kcal": -21.527,
+        "error_kj": -59.01
+      },
+      "psi4_precision": {
+        "ok": true,
+        "e_bind_kj": -71.9,
+        "e_bind_kcal": -17.185,
+        "error_kj": -40.84,
+        "elapsed_sec": 4411
+      },
+      "psi4_literature": {
+        "ok": false,
+        "error": "会话超时中断，待补（B3LYP/6-31G(d,p) 单点 CP）"
+      }
+    }
+  ]
+}

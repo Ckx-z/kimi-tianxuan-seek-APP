@@ -139,6 +139,8 @@ export default function Dft() {
 
   // ---------- 计算后端：xtb 快速档（默认）| psi4 真 DFT 精度档 ----------
   const [backend, setBackend] = useState<DftBackend>('xtb');
+  /** Psi4 方法 preset：wb97xd3bj_svp（高精度泛函）| b3lyp_631gdp（文献口径） */
+  const [psi4Method, setPsi4Method] = useState<DftMethod>('wb97xd3bj_svp');
   const isPsi4 = backend === 'psi4';
   /** GET /api/dft/backends 的可用状态（null = 尚未取到） */
   const [backends, setBackends] = useState<DftBackendsResponse['backends'] | null>(null);
@@ -304,7 +306,7 @@ export default function Dft() {
             mode: 'pair',
             ald_smiles: monoA.smiles,
             amine_smiles: monoB.smiles,
-            method: isPsi4 ? 'wb97xd3bj_svp' : method,
+            method: isPsi4 ? psi4Method : method,
             backend,
           }
           : {
@@ -315,7 +317,7 @@ export default function Dft() {
             ald2_smiles: xType === 'other_dimer' ? monoA2.smiles : undefined,
             amine2_smiles: xType === 'other_dimer' ? monoB2.smiles : undefined,
             custom_smiles: xType === 'custom' ? customSmiles.trim() : undefined,
-            method: isPsi4 ? 'wb97xd3bj_svp' : method,
+            method: isPsi4 ? psi4Method : method,
             backend,
           },
       );
@@ -473,6 +475,7 @@ export default function Dft() {
     setMonoA({ smiles: h.smiles_a, name: '' });
     setMonoB({ smiles: h.smiles_b, name: '' });
     if (h.method === 'gfnff' || h.method === 'gfn2') setMethod(h.method);
+    if (h.method === 'wb97xd3bj_svp' || h.method === 'b3lyp_631gdp') setPsi4Method(h.method);
     if (h.x_type) setXType(h.x_type);
     if (h.x_request?.solvent_id) setSolventId(h.x_request.solvent_id);
     if (h.x_request?.ald2_smiles) setMonoA2({ smiles: h.x_request.ald2_smiles, name: '' });
@@ -709,8 +712,9 @@ export default function Dft() {
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs text-xs">
                     xTB 快速档：半经验 GFN2-xTB/GFN-FF，秒级出结果，适合批量筛选与相对比较；
-                    Psi4 精度档：真 DFT（ωB97X-D3BJ/def2-SVP），结合能做 BSSE counterpoise 校正，
-                    分钟级耗时，结果带 fchk 文件可对接 Gaussian 工作流。
+                    Psi4 精度档：真 DFT（ωB97X-D3BJ/def2-SVP 或 B3LYP/6-31G(d,p) 文献口径），
+                    结合能做 BSSE counterpoise 校正，分钟级耗时，结果带 fchk 文件可对接 Gaussian 工作流。
+                    两档默认均经 Monte Carlo 多取向采样 + xTB 筛选确定复合物几何。
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -789,12 +793,39 @@ export default function Dft() {
           </div>
           )}
 
-          {/* Psi4 精度档方法说明（固定 ωB97X-D3BJ/def2-SVP） */}
+          {/* Psi4 方法 preset（高精度泛函 / 文献口径） */}
           {isPsi4 && (
-            <div className="rounded-xl border bg-card p-4 text-xs text-muted-foreground">
-              方法/基组：<span className="font-medium text-foreground">ωB97X-D3BJ / def2-SVP</span>
-              ，结合能经 counterpoise（BSSE）校正；几何以 xTB 预优化结果为初猜再做 Psi4 优化。
-              输出含 HOMO-LUMO 能隙、偶极矩与 fchk 检查点文件。
+            <div className="space-y-2 rounded-xl border bg-card p-4">
+              <div className="flex items-center gap-1.5">
+                <h3 className="font-semibold text-foreground">方法 / 基组</h3>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <CircleHelp className="h-4 w-4 cursor-help text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      高精度泛函（默认）：ωB97X-D3BJ/def2-SVP，色散校正完备，S66 基准实测误差
+                      0.1–0.2 kcal/mol（取向命中时）；文献口径：B3LYP/6-31G(d,p)，对齐刘璐 2021
+                      等 COF 吸附文献的方法学，便于直接对比发表值（无色散校正，绝对值仅供参考）。
+                      两者结合能均经 counterpoise（BSSE）校正。
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <RadioGroup value={psi4Method} onValueChange={(v) => setPsi4Method(v as DftMethod)} disabled={running}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="wb97xd3bj_svp" id="pm-precision" />
+                  <Label htmlFor="pm-precision">高精度泛函（ωB97X-D3BJ/def2-SVP，推荐）</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="b3lyp_631gdp" id="pm-literature" />
+                  <Label htmlFor="pm-literature">文献口径（B3LYP/6-31G(d,p)，对齐已发表 COF 吸附计算）</Label>
+                </div>
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground">
+                结合能经 counterpoise（BSSE）校正；复合物几何经 Monte Carlo 多取向采样 + xTB 筛选
+                再以 xTB 预优化。输出含 HOMO-LUMO 能隙、偶极矩与 fchk 检查点文件。
+              </p>
             </div>
           )}
 
