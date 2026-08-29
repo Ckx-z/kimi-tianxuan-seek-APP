@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -28,10 +29,26 @@ else:
     PROJECT_ROOT = Path(__file__).resolve().parent.parent
 WEBAPP_DIST = PROJECT_ROOT / "webapp" / "dist"
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """启动时恢复上次的 DFT 任务注册表（进行中的标为 interrupted）。
+
+    注意：TestClient 不带 with 上下文时不执行 lifespan，因此测试不会
+    意外加载真实用户目录的 dft_jobs.json（测试经 conftest 隔离路径）。
+    """
+    from .routers import dft as dft_router
+    try:
+        dft_router.jobs.load_persisted_jobs()
+    except Exception:
+        pass
+    yield
+
+
 app = FastAPI(
     title="COF 科研系统 API",
     version="0.1.0",
     description="src/ 后端的 REST 封装：打分 / 收藏 / 实验记录 / 方案卡 / LLM。",
+    lifespan=lifespan,
 )
 
 # 开发期放开本地前端跨域（React dev server 等）；上线时按域名收紧

@@ -1,7 +1,7 @@
 # PROJECT_STATE — 项目当前状态
 
 > ⭐ **这是每次会话的第一份必读文件**。会话开头读它进入状态，结尾更新它。
-> 最后更新：2026-08-29（阶段 33：**v1.2.0 发布**——Psi4 精度档（precision/literature 两档）+ 导出 Word/文献录入修复 + 文献 PDF 录入正式发版；784 passed）
+> 最后更新：2026-08-29（阶段 33：**v1.2.0 发布**——Psi4 精度档（precision/literature 两档）+ 导出 Word/文献录入修复 + 文献 PDF 录入正式发版；**追加：DFT 计算页状态保持修复**——任务落盘 `dft_jobs.json` + 草稿接口 `PUT/GET /api/dft/draft` + 前端切页/刷新/重启恢复（interrupted 状态），纯本机无服务器；792 passed）
 
 ---
 

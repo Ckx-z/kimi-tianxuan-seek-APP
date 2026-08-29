@@ -189,6 +189,14 @@ class TestExportEndpoint:
         job_id = r.json()["job_id"]
         assert client.get(
             f"/api/dft/jobs/{job_id}/export?format=gaussian").status_code == 404
+        # 等任务真正完成再结束：工作线程在下一个测试期间才写历史日志的话，
+        # 会写进下一个测试的临时 LOG_PATH（线程竞态），必须在本测试内收口。
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            body = client.get(f"/api/dft/jobs/{job_id}").json()
+            if body["status"] in ("done", "failed"):
+                break
+            time.sleep(0.05)
 
 
 # ---------------------------------------------------------------- 迭代上下文 DFT 注入

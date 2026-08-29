@@ -41,7 +41,8 @@ async function request<T>(path: string, options: { method?: string; body?: unkno
 
 export type DftBackend = 'xtb' | 'psi4';
 export type DftMethod = 'gfnff' | 'gfn2' | 'wb97xd3bj_svp' | 'b3lyp_631gdp';
-export type DftJobStatus = 'pending' | 'running' | 'done' | 'failed';
+/** interrupted = 服务重启后恢复的任务（参数保留，可重新提交） */
+export type DftJobStatus = 'pending' | 'running' | 'done' | 'failed' | 'interrupted';
 /** 第三物质 X 类型：自身堆积（默认）/ 溶剂 / 另一组单体的二聚体 / 自定义分子 */
 export type DftXType = 'self_stack' | 'solvent' | 'other_dimer' | 'custom';
 /** 计算模式：dimer（默认，醛胺缩合二聚体·X）| pair（任意双分子 A···B 直接结合） */
@@ -135,6 +136,18 @@ export interface DftPsi4Detail {
   fchk_path?: string | null;
 }
 
+/** 任务输入参数（GET /jobs/{id} 的 input 字段，返回页面时据此恢复表单） */
+export interface DftJobInput {
+  ald_smiles?: string | null;
+  amine_smiles?: string | null;
+  x_type?: DftXType | null;
+  solvent_id?: string | null;
+  ald2_smiles?: string | null;
+  amine2_smiles?: string | null;
+  custom_smiles?: string | null;
+  n_samples?: number | null;
+}
+
 export interface DftJob {
   job_id: string;
   status: DftJobStatus;
@@ -146,6 +159,8 @@ export interface DftJob {
   result: DftResult | null;
   error: string | null;
   created_at?: string;
+  /** 原始输入参数（后端透出，供表单恢复） */
+  input?: DftJobInput | null;
 }
 
 /** 创建任务请求体（POST /jobs；旧字段 smiles_a/smiles_b 由后端兼容映射） */
@@ -231,6 +246,22 @@ export function dftMethodLabel(backend: DftBackend | undefined, method: string, 
 
 // ---------- 端点 ----------
 
+/** 计算页表单草稿（后端落盘，切页/刷新后恢复；结构由前端定义，后端原样存取） */
+export interface DftDraft {
+  mode?: DftMode;
+  monoA?: { smiles: string; name: string };
+  monoB?: { smiles: string; name: string };
+  xType?: DftXType;
+  solventId?: string;
+  monoA2?: { smiles: string; name: string };
+  monoB2?: { smiles: string; name: string };
+  customSmiles?: string;
+  method?: DftMethod;
+  backend?: DftBackend;
+  psi4Method?: DftMethod;
+  currentJobId?: string | null;
+}
+
 /** 创建计算任务（202；缓存命中时返回的 job 直接 done 且 cached=true） */
 export const createDftJob = (req: DftJobRequest) =>
   request<DftJob>('/jobs', { method: 'POST', body: req });
@@ -263,6 +294,14 @@ export const fetchDftHistory = async (limit = 50): Promise<DftHistoryEntry[]> =>
   const data = await request<{ history: DftHistoryEntry[] }>(`/history?limit=${limit}`, { silent: true });
   return data.history ?? [];
 };
+
+/** 读计算页草稿（静默：页面初始化用，失败由页面兜底） */
+export const fetchDftDraft = () =>
+  request<{ draft: DftDraft | null }>('/draft', { silent: true });
+
+/** 保存计算页草稿（静默：防抖自动保存，失败不打扰用户） */
+export const saveDftDraft = (draft: DftDraft) =>
+  request<{ ok: boolean }>('/draft', { method: 'PUT', body: { draft }, silent: true });
 
 // ---------- 导出量化软件输入文件（GET /jobs/{id}/export） ----------
 

@@ -136,4 +136,9 @@ data/dft_log.jsonl
 data/dft_cache/
 data/dft_jobs/
 data/dft_artifacts/
+# DFT 任务落盘与计算页草稿（状态保持，运行时用户数据）
+data/dft_jobs.json
+data/dft_jobs.json.tmp
+data/dft_draft.json
+data/dft_draft.json.tmp
 timer.dat

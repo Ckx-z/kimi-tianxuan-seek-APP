@@ -7,15 +7,22 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from . import cache as dft_cache
 from . import dimer as dimer_mod
 from . import engine
 from . import log as dft_log
 from . import psi4_backend
+
+try:
+    from src import runtime_config
+except ImportError:  # pragma: no cover
+    import runtime_config  # type: ignore
 
 # 计算后端：xtb 快速档（默认）| psi4 真 DFT 精度档
 BACKENDS = ("xtb", "psi4")
@@ -24,6 +31,52 @@ _LOCK = threading.Lock()
 _JOBS: dict[str, dict] = {}
 
 MAX_JOBS = 200  # 超出后淘汰最旧的已完成任务，防止内存膨胀
+
+_PERSIST_LOCK = threading.Lock()  # 落盘互斥（tmp+replace 原子写，防并发交错）
+
+
+def _job_store_path() -> Path:
+    """任务注册表落盘路径（user_data_root，frozen 时为 %APPDATA%/COF-Film-Recommend/data）。"""
+    return runtime_config.user_data_root() / "dft_jobs.json"
+
+
+def _persist() -> None:
+    """把任务注册表快照写入 dft_jobs.json（尽力而为，失败不影响计算主流程）。"""
+    try:
+        with _LOCK:
+            snapshot = dict(_JOBS)
+        path = _job_store_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        with _PERSIST_LOCK:
+            tmp.write_text(json.dumps(snapshot, ensure_ascii=False),
+                           encoding="utf-8")
+            tmp.replace(path)
+    except Exception:
+        pass
+
+
+def load_persisted_jobs() -> None:
+    """进程启动时恢复上次的任务注册表；遗留 pending/running 标为 interrupted。
+
+    由 FastAPI lifespan 调用（见 api/main.py）；测试可显式调用以模拟重启。
+    """
+    try:
+        path = _job_store_path()
+        if not path.is_file():
+            return
+        data = json.loads(path.read_text(encoding="utf-8"))
+        with _LOCK:
+            for jid, j in data.items():
+                if not isinstance(j, dict) or not jid:
+                    continue
+                if j.get("status") in ("pending", "running"):
+                    j["status"] = "interrupted"
+                    j["progress_hint"] = "服务重启，任务已中断"
+                    j.setdefault("error", "服务重启导致任务中断（参数已保留，可重新提交）")
+                _JOBS[jid] = j
+    except Exception:
+        pass
 
 
 def _utc_now() -> str:
@@ -110,6 +163,7 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
     with _LOCK:
         _JOBS[job_id] = job
         _prune_locked()
+    _persist()
 
     # 规范化/二聚体生成失败会在工作线程里变成中文错误；
     # 这里先算出新口径缓存 key 探缓存
@@ -127,11 +181,13 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
                 _find_favorite(canon_ald, canon_amine)
             job.update(status="done", progress_hint="命中缓存，直接返回历史结果",
                        result=result, cached=True)
+            _persist()
             return job
 
     t = threading.Thread(target=_run_job, args=(job_id,), daemon=True,
                          name=f"dft-job-{job_id}")
     t.start()
+    _persist()
     return job
 
 
@@ -196,6 +252,7 @@ def _run_job(job_id: str) -> None:
     with _LOCK:
         job["status"] = "running"
         job["progress_hint"] = "正在准备计算…"
+    _persist()
 
     log_base = {
         "smiles_a": ald_smiles, "smiles_b": amine_smiles,
@@ -269,13 +326,16 @@ def _run_job(job_id: str) -> None:
         })
         with _LOCK:
             job.update(status="done", progress_hint="计算完成", result=result)
+        _persist()
     except engine.DftError as exc:
         msg = str(exc)
         dft_log.log_dft({**log_base, "status": "failed", "error": msg})
         with _LOCK:
             job.update(status="failed", error=msg, progress_hint="计算失败")
+        _persist()
     except Exception as exc:  # noqa: BLE001 —— 兜底，绝不把异常吞到线程里
         msg = f"计算出现未预期错误：{type(exc).__name__}: {exc}"
         dft_log.log_dft({**log_base, "status": "failed", "error": msg})
         with _LOCK:
             job.update(status="failed", error=msg, progress_hint="计算失败")
+        _persist()

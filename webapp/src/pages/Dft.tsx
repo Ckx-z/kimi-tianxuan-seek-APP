@@ -56,13 +56,16 @@ import {
   createFavoriteWithDft,
   dftMethodLabel,
   fetchDftBackends,
+  fetchDftDraft,
   fetchDftHistory,
   fetchDftJob,
   fetchDftSolvents,
   fetchDimerPreview,
   mergeDftToFavorite,
+  saveDftDraft,
   type DftBackend,
   type DftBackendsResponse,
+  type DftDraft,
   type DftHistoryEntry,
   type DftMethod,
   type DftMode,
@@ -202,6 +205,8 @@ export default function Dft() {
   /** 409 冲突时待合并的已有收藏摘要 */
   const [mergeTarget, setMergeTarget] = useState<{ id: string; folder_name?: string; aldehyde_name?: string; amine_name?: string; has_dft?: boolean } | null>(null);
   const [merging, setMerging] = useState(false);
+  /** 草稿是否已从后端恢复（恢复完成前不自动保存，避免默认值覆盖已有草稿） */
+  const draftHydratedRef = useRef(false);
 
   const refreshHistory = useCallback(() => {
     fetchDftHistory().then(setHistory).catch(() => {});
@@ -222,7 +227,7 @@ export default function Dft() {
       .catch(() => { setLibrary({ aldehydes: [], amines: [] }); setBackendDown(true); })
       .finally(() => setLibraryLoading(false));
     fetchDftSolvents()
-      .then((list) => { setSolvents(list); if (list.length > 0) setSolventId(list[0].id); })
+      .then((list) => { setSolvents(list); if (list.length > 0) setSolventId((prev) => prev || list[0].id); })
       .catch(() => {});
     fetchDftBackends().then(setBackends).catch(() => {});
     refreshHistory();
@@ -284,7 +289,14 @@ export default function Dft() {
           pollRef.current = null;
           setRunning(false);
           setError(job.error || '计算失败（未知原因）');
+          setCurrentJobId(null);
           refreshHistory();
+        } else if (job.status === 'interrupted') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          setRunning(false);
+          setError(job.error || '任务已中断（服务重启），参数已保留，请重新提交');
+          setCurrentJobId(null);
         }
       } catch {
         // 轮询失败（后端重启等）：停止轮询并提示
@@ -295,6 +307,87 @@ export default function Dft() {
       }
     }, 1500);
   }, [refreshHistory]);
+
+  /** 拼装当前表单 + 任务 id 的草稿（后端落盘，切页/刷新后恢复用） */
+  const buildDraft = useCallback((jobIdOverride?: string | null): DftDraft => ({
+    mode,
+    monoA,
+    monoB,
+    xType,
+    solventId,
+    monoA2,
+    monoB2,
+    customSmiles,
+    method,
+    backend,
+    psi4Method,
+    currentJobId: jobIdOverride !== undefined ? jobIdOverride : currentJobId,
+  }), [mode, monoA, monoB, xType, solventId, monoA2, monoB2, customSmiles,
+      method, backend, psi4Method, currentJobId]);
+
+  /** 返回页面时恢复任务状态：done 直接展示结果；pending/running 续轮询；
+   *  failed/interrupted 展示原因并清空任务引用（参数保留可重提）。 */
+  const resumeJob = useCallback(async (jobId: string) => {
+    try {
+      const job = await fetchDftJob(jobId);
+      if (job.status === 'done' && job.result) {
+        setResult(job.result);
+        setRunning(false);
+        refreshHistory();
+      } else if (job.status === 'failed') {
+        setError(job.error || '计算失败（未知原因）');
+        setCurrentJobId(null);
+      } else if (job.status === 'interrupted') {
+        setError(job.error || '上次计算任务已中断（服务重启），参数已恢复，请重新提交');
+        setCurrentJobId(null);
+      } else {
+        setRunning(true);
+        setProgressHint(job.progress_hint || '恢复计算任务…');
+        startPolling(jobId);
+      }
+    } catch {
+      // 任务不存在（已清理）：保留表单，提示可重提
+      setCurrentJobId(null);
+      toast.info('上次计算任务已结束，参数已恢复，可重新提交');
+    }
+  }, [refreshHistory, startPolling]);
+
+  // ---------- 草稿恢复（后端落盘：切页/刷新后恢复表单与任务状态） ----------
+  useEffect(() => {
+    // URL 预填（收藏「重新计算」跳转）意图优先，跳过草稿恢复
+    if (searchParams.get('a') || searchParams.get('b')) {
+      draftHydratedRef.current = true;
+      return;
+    }
+    let cancelled = false;
+    fetchDftDraft()
+      .then(({ draft }) => {
+        if (cancelled || !draft) return;
+        if (draft.mode) setMode(draft.mode);
+        if (draft.monoA) setMonoA(draft.monoA);
+        if (draft.monoB) setMonoB(draft.monoB);
+        if (draft.xType) setXType(draft.xType);
+        if (draft.solventId) setSolventId(draft.solventId);
+        if (draft.monoA2) setMonoA2(draft.monoA2);
+        if (draft.monoB2) setMonoB2(draft.monoB2);
+        if (draft.customSmiles) setCustomSmiles(draft.customSmiles);
+        if (draft.method) setMethod(draft.method);
+        if (draft.backend) setBackend(draft.backend);
+        if (draft.psi4Method) setPsi4Method(draft.psi4Method);
+        if (draft.currentJobId) void resumeJob(draft.currentJobId);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) draftHydratedRef.current = true; });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---------- 草稿防抖自动保存（表单/任务变化后 500ms 落盘） ----------
+  useEffect(() => {
+    if (!draftHydratedRef.current) return;
+    const timer = setTimeout(() => { void saveDftDraft(buildDraft()); }, 500);
+    return () => clearTimeout(timer);
+  }, [buildDraft]);
 
   /** 提交计算 */
   const handleSubmit = async () => {
@@ -347,6 +440,7 @@ export default function Dft() {
           },
       );
       setCurrentJobId(job.job_id);
+      void saveDftDraft(buildDraft(job.job_id)); // 立即落盘：切页/刷新后据此恢复任务引用
       if (job.status === 'done' && job.result) {
         // 缓存命中：无需轮询
         setRunning(false);

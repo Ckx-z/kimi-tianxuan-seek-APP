@@ -14,12 +14,20 @@
 
 from __future__ import annotations
 
+import json
 import urllib.parse
+from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 
-from ..schemas import DftJobCreate
+from ..schemas import DftDraftPut, DftJobCreate
+
+try:
+    from src import runtime_config
+except ImportError:  # pragma: no cover
+    import runtime_config  # type: ignore
 
 try:
     from src.dft import dimer as dimer_mod
@@ -38,7 +46,7 @@ router = APIRouter(prefix="/api/dft", tags=["dft"])
 
 
 def _public_job(job: dict) -> dict:
-    """对外视图：去掉内部输入冗余字段，保留轮询所需。"""
+    """对外视图：保留轮询所需 + 透出输入参数（前端返回页面时据此恢复表单）。"""
     return {
         "job_id": job["job_id"],
         "status": job["status"],
@@ -50,7 +58,22 @@ def _public_job(job: dict) -> dict:
         "result": job.get("result"),
         "error": job.get("error"),
         "created_at": job.get("created_at"),
+        "input": {
+            "ald_smiles": job.get("ald_smiles_input"),
+            "amine_smiles": job.get("amine_smiles_input"),
+            "x_type": job.get("x_type"),
+            "solvent_id": job.get("solvent_id"),
+            "ald2_smiles": job.get("ald2_smiles"),
+            "amine2_smiles": job.get("amine2_smiles"),
+            "custom_smiles": job.get("custom_smiles"),
+            "n_samples": job.get("n_samples"),
+        },
     }
+
+
+def _draft_path() -> Path:
+    """计算页草稿落盘路径（user_data_root，惰性解析便于测试隔离）。"""
+    return runtime_config.user_data_root() / "dft_draft.json"
 
 
 def _resolve_monomers(req: DftJobCreate) -> tuple[str, str]:
@@ -137,6 +160,36 @@ def _check_backend_available(backend: str) -> None:
     det = psi4_backend.detect_psi4()
     if not det["installed"]:
         raise HTTPException(503, det["reason"])
+
+
+@router.get("/draft")
+def get_dft_draft():
+    """读计算页表单草稿（切页/刷新后恢复表单与任务引用用）。无草稿返回 null。"""
+    try:
+        p = _draft_path()
+        if p.is_file():
+            data = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and "draft" in data:
+                return {"draft": data["draft"]}
+    except Exception:
+        pass
+    return {"draft": None}
+
+
+@router.put("/draft")
+def put_dft_draft(req: DftDraftPut):
+    """保存计算页表单草稿（结构由前端定义，后端原样存取，落 user_data_root）。"""
+    try:
+        p = _draft_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(".tmp")
+        payload = {"draft": req.draft,
+                   "updated_at": datetime.now(timezone.utc).isoformat()}
+        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(p)
+        return {"ok": True}
+    except Exception:
+        return {"ok": False}
 
 
 @router.get("/backends")

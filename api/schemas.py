@@ -205,6 +205,11 @@ class DftJobCreate(BaseModel):
                     "1=旧单取向 UFF 初猜口径；仅 gfn2/psi4 档生效）")
 
 
+class DftDraftPut(BaseModel):
+    """DFT 计算页表单草稿保存（草稿结构由前端定义，后端原样存取）。"""
+    draft: dict = Field(default_factory=dict, description="表单草稿 JSON（含 currentJobId）")
+
+
 class LiteratureLookup(BaseModel):
     """Crossref 查询：doi 与 title 二选一。"""
     doi: str | None = Field(None, description="DOI（直接取元数据）")
