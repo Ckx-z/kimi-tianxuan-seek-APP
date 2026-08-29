@@ -1,7 +1,7 @@
 # PROJECT_STATE — 项目当前状态
 
 > ⭐ **这是每次会话的第一份必读文件**。会话开头读它进入状态，结尾更新它。
-> 最后更新：2026-08-28（阶段 32：**DFT 精度提升与产品化收尾**——MC 多取向采样 + π-π/卤键基序模板、Psi4 preset（precision/literature）、kJ/mol 主显、PSI_SCRATCH 产品化、大体系长时提示与超时自适应；784 passed）
+> 最后更新：2026-08-29（阶段 33：**v1.2.0 发布**——Psi4 精度档（precision/literature 两档）+ 导出 Word/文献录入修复 + 文献 PDF 录入正式发版；784 passed）
 
 ---
 
@@ -53,6 +53,7 @@
 | **阶段 30** | **打包版修复 + 文献 PDF 录入 + DFT 后端替换方案：导出 Word 500 根治（spec binaries 补 lxml 6 原生 DLL）+ 文献 lookup 500 根治（literature/records/llm/recommend hiddenimports + fitz/multipart）+ POST /api/literature/extract-pdf（PyMuPDF 提取→LLM 严格 JSON→审核卡入库，三 Tab UI）+ DFT 后端替换方案（分层：xTB 快速档保留 + Psi4 精度档【真 DFT/BSSE counterpoise/fchk 输出/conda 子进程按需安装】+ MACE-OFF23 可选 ML 档，PySCF 无 win wheel 排除、ORCA 禁止再分发）；736 passed** | ✅ **已完成** |
 | **阶段 31** | **DFT Psi4 精度档实施：psi4-env（Psi4 1.11 + dftd3-python，conda 子进程隔离 + install_psi4_env.bat 一键安装 + runtime_config psi4 能力链）+ src/dft/psi4_backend.py（ωB97X-D3BJ/def2-SVP、counterpoise BSSE、xTB 预优化初猜、fchk 写出归档、@@PROGRESS@@ 进度回传、30min 超时）+ 中文 Windows 三连坑修复（py-cpuinfo 桩/PYTHONUTF8/PYTHONIOENCODING）+ API backend 参数与 GET /api/dft/backends + 缓存 key 含 backend（xtb 旧格式兼容）+ 前端后端选择器/引导安装卡/精度档徽标/跨档对比/历史标记 + 真实冒烟连通（苯·苯酚 96s）；765 passed** | ✅ **已完成** |
 | **阶段 32** | **DFT 精度提升与产品化收尾：engine.py Monte Carlo 多取向采样 + π-π/卤键基序模板（两体系最优初猜均命中 template_pi_stack）+ Psi4 method preset（precision=ωB97X-D3BJ/def2-SVP / literature=B3LYP/6-31G(d,p)）+ 前端 preset 选择器与 kJ/mol 主显全链路 + 真实基准（BDE-154：xTB −68.95 / precision −27.78 / literature +10.54 kJ/mol，文献 −48.47；BDE-47：xTB −90.07 / precision −71.90，文献 −31.06，literature 档未跑）+ PSI_SCRATCH 产品化（COF_PSI4_SCRATCH > runtime.local.json psi4_scratch > E:\psi4_scratch 探测 > user_data_root()/psi4_scratch）+ 大体系长时提示（前端预估原子数 >50 提示 30min+）与 psi4 超时按原子数自适应（1800/3600/5400s）；784 passed** | ✅ **已完成** |
+| **阶段 33** | **v1.2.0 发布：Psi4 精度档（precision/literature 两档）+ 导出 Word/文献录入修复 + 文献 PDF 录入正式发版；GitHub Release 三资产（exe/zip/latest.yml）+ 自动更新链路武装；接续 k3 收尾——补提交版本号 bump（d3417f5）+ 修正 tag 指向 + 打包版自证全过；784 passed** | ✅ **已完成** |
 
 **阶段 16 要点（2026-07-21）**：
 - 前端全量重写（`app/gradio_app.py` 284→870 行）：`gr.themes.Soft` 深青/石墨学术主题、色彩语义（⛔/⚠️/✓）、五标签页骨架（③收藏夹 ④实验记录 ⑤RAG 迭代为占位，P2/P3 期做）
@@ -392,7 +393,7 @@
 
 ### 分发形态（正式）
 
-- **Electron 桌面应用**：当前版本 **v1.1.0**，NSIS 安装包（约 440MB），GitHub Release 分发（exe + zip + latest.yml），**自动更新链路 v0.2.5 起端到端武装；v1.0.1 起版本变更自动清 Chromium 缓存（升级不再见旧界面）**
+- **Electron 桌面应用**：当前版本 **v1.2.0**，NSIS 安装包（约 440MB），GitHub Release 分发（exe + zip + latest.yml），**自动更新链路 v0.2.5 起端到端武装；v1.0.1 起版本变更自动清 Chromium 缓存（升级不再见旧界面）**
 - 打包构成：React 前端（`webapp/dist`）+ FastAPI 后端（PyInstaller onedir `dist-backend/cof-backend/`）+ Electron 壳（`webapp/electron/main.cjs`，自动选端口 18765 起）
 - 用户数据：`%APPDATA%\COF-Film-Recommend\`（收藏/实验记录/附件/LLM 配置），与 Chromium 缓存目录严格分离，卸载/更新不清除
 - 打包版能力分级：tree 模型内置必可用；GNN 不可分发（依赖 dphuanjing py3.8 环境）为可选增强，缺失自动降级；打分理由 frozen 环境降级为全局特征重要性并如实标注；GraphRAG 已并入主进程（networkx 3.5）
