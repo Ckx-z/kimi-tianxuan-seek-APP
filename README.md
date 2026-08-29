@@ -39,7 +39,7 @@ $$E_{bind} = E(\text{二聚体}\cdot X) - E(\text{二聚体}) - E(X)$$
 **第 1 步：下载安装（1 分钟）**
 
 1. 打开 [Release 下载页](https://github.com/Ckx-z/kimi-tianxuan-seek-APP/releases/latest)
-2. 下载 `COF科研助手-Setup-x.x.x-win-x64.zip`（约 450MB，含 xTB 计算引擎），解压得到安装程序
+2. 下载 `COF-Assistant-Setup-x.x.x-win-x64.zip`（约 450MB，含 xTB 计算引擎），解压得到安装程序
 3. 双击安装：可自定义安装目录，完成后桌面出现「COF科研助手」图标
 
 **第 2 步：首次启动（1 分钟）**
