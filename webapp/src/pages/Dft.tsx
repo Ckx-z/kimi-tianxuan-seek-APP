@@ -50,6 +50,7 @@ import {
 } from '@/components/query/api';
 import { appendDftEntry } from '@/components/mine/api';
 import DftResultPanel from '@/components/dft/DftResultPanel';
+import { useDftTask } from '@/components/dft/DftTaskContext';
 import {
   buildDftSnapshot,
   createDftJob,
@@ -207,6 +208,8 @@ export default function Dft() {
   const [merging, setMerging] = useState(false);
   /** 草稿是否已从后端恢复（恢复完成前不自动保存，避免默认值覆盖已有草稿） */
   const draftHydratedRef = useRef(false);
+  /** 全局任务状态（跨页面进度徽标 + 完成通知） */
+  const { trackTask } = useDftTask();
 
   const refreshHistory = useCallback(() => {
     fetchDftHistory().then(setHistory).catch(() => {});
@@ -282,7 +285,7 @@ export default function Dft() {
           pollRef.current = null;
           setRunning(false);
           setResult(job.result);
-          toast.success(job.cached ? '命中缓存，已返回历史结果' : '计算完成');
+          // 完成通知由全局 DftTaskContext 统一发出，页面内不再重复提示
           refreshHistory();
         } else if (job.status === 'failed') {
           if (pollRef.current) clearInterval(pollRef.current);
@@ -441,12 +444,20 @@ export default function Dft() {
       );
       setCurrentJobId(job.job_id);
       void saveDftDraft(buildDraft(job.job_id)); // 立即落盘：切页/刷新后据此恢复任务引用
+      // 登记到全局任务状态：其他页面实时可见进度，完成/失败由全局上下文统一通知
+      const summary = [monoA.name || monoA.smiles, monoB.name || monoB.smiles]
+        .filter(Boolean).join(' × ') || 'DFT 计算';
+      trackTask(job.job_id, {
+        summary,
+        backend: job.backend ?? backend,
+        cached: job.cached,
+        initialStatus: job.status,
+      });
       if (job.status === 'done' && job.result) {
         // 缓存命中：无需轮询
         setRunning(false);
         setResult(job.result);
         setProgressHint('');
-        toast.success('命中缓存，已返回历史结果');
       } else {
         setProgressHint(job.progress_hint);
         startPolling(job.job_id);

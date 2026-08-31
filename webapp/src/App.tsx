@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router';
 import { Toaster } from 'sonner';
 import AppLayout from '@/components/layout/AppLayout';
+import { DftTaskProvider } from '@/components/dft/DftTaskContext';
 import Home from '@/pages/Home';
 import Query from '@/pages/Query';
 import Batch from '@/pages/Batch';
@@ -13,7 +14,7 @@ import Settings from '@/pages/Settings';
 
 export default function App() {
   return (
-    <>
+    <DftTaskProvider>
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Home />} />
@@ -33,6 +34,6 @@ export default function App() {
       </Routes>
       {/* 全局中文 toast（api.ts 统一错误提示使用） */}
       <Toaster richColors position="top-center" />
-    </>
+    </DftTaskProvider>
   );
 }

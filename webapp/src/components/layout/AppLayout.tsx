@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
+import DftGlobalChip from '@/components/dft/DftGlobalChip';
 
 /** preload 暴露的版本不一致事件 payload（浏览器 dev 模式下无此 API） */
 interface BackendVersionMismatchPayload {
@@ -186,6 +187,9 @@ export default function AppLayout() {
           <Outlet />
         </div>
       </main>
+
+      {/* DFT 全局任务悬浮徽标（所有页面可见，跨页进度 + 完成通知入口） */}
+      <DftGlobalChip />
     </div>
   );
 }
