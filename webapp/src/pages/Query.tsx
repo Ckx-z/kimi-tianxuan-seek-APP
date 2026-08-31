@@ -337,6 +337,8 @@ export default function Query() {
           <Button
             className="w-full"
             size="lg"
+            variant="gold"
+            loading={predicting}
             onClick={handlePredict}
             disabled={predicting || !ald.smiles || !amine.smiles}
           >

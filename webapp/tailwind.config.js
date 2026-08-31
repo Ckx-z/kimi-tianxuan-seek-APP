@@ -44,6 +44,19 @@ module.exports = {
           foreground: "hsl(var(--gold-foreground))",
           muted: "hsl(var(--gold-muted))",
         },
+        // 语义三色（v1.3.0 精修版新增：状态反馈统一走 token）
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -80,9 +93,20 @@ module.exports = {
           '"Songti SC"',
           'serif',
         ],
+        // 数据读数（结合能/原子数等）：等宽数字栈（v1.3.0 精修版）
+        mono: [
+          '"Cascadia Mono"',
+          'Consolas',
+          '"Courier New"',
+          'monospace',
+        ],
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        // 柔和阴影三档（v1.3.0 精修版：带紫味，暖调）
+        soft: "var(--shadow-soft)",
+        card: "var(--shadow-card)",
+        pop: "var(--shadow-pop)",
       },
       keyframes: {
         "accordion-down": {

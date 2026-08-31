@@ -157,12 +157,12 @@ export default function ResultTable({ results }: { results: BatchResultItem[] })
                           style={{ width: `${Math.max(4, ((r.score ?? 0) / maxScore) * 100)}%` }}
                         />
                       </div>
-                      <span className="text-sm font-semibold text-foreground">{fmtScore(r.score)}</span>
+                      <span className="text-sm font-semibold tabular-nums font-mono text-foreground">{fmtScore(r.score)}</span>
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="text-sm">{fmtScore(r.tree_score)}</TableCell>
-                <TableCell className="text-sm">{fmtScore(r.gnn_score)}</TableCell>
+                <TableCell className="text-sm tabular-nums font-mono">{fmtScore(r.tree_score)}</TableCell>
+                <TableCell className="text-sm tabular-nums font-mono">{fmtScore(r.gnn_score)}</TableCell>
                 <TableCell>
                   <OodBadge level={r.ood?.level ?? 'in'} />
                 </TableCell>

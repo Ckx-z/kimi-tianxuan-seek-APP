@@ -968,6 +968,8 @@ export default function Dft() {
           <Button
             className="w-full"
             size="lg"
+            variant="gold"
+            loading={running}
             onClick={handleSubmit}
             disabled={running || !monoA.smiles || !monoB.smiles || (isPsi4 && !psi4Installed)}
             title={isPsi4 && !psi4Installed ? 'Psi4 精度档环境未安装，请先按上方引导完成安装' : undefined}

@@ -162,7 +162,7 @@ function DftBadge({ fav }: { fav: FavoriteItem }) {
         className="cursor-pointer border-gold/60 bg-gold-muted text-gold-foreground"
         title="点击查看 DFT 计算结果"
       >
-        结合能 {kj.toFixed(1)} kJ/mol
+        <span className="tabular-nums font-mono">结合能 {kj.toFixed(1)}</span> kJ/mol
         {entries.length > 1 ? `（${entries.length} 条）` : ''}
       </Badge>
     );

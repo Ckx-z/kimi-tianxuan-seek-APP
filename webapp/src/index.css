@@ -3,82 +3,106 @@
 @tailwind utilities;
 
 /*
- * 紫金主题 design tokens
- * 主紫：#6d28d9 系（皇家紫）；金色点缀：#d4af37 / #b8860b 系
- * 亮色 / 暗色双套，通过 <html class="dark"> 切换
+ * 学术紫金主题 design tokens（v1.3.0 精修版，方向 A）
+ * 设计哲学：学术权威感 + 温暖克制
+ * - 主紫降饱和：#6d28d9(263 70% 50%) → 柔和紫 258 52% 46%
+ * - 金色转暖：#d4af37 系 → 暖金 43 62% 45%
+ * - 新增语义三色：success / warning / info（此前散落在组件里写死）
+ * - 阴影带紫味、更柔和（对齐 2025-2026 温暖柔和趋势）
+ * - 亮色 / 暗色双套，通过 <html class="dark"> 切换
  */
 @layer base {
   :root {
-    --background: 270 20% 98.5%;
-    --foreground: 262 30% 14%;
+    --background: 252 25% 97%;
+    --foreground: 258 24% 16%;
     --card: 0 0% 100%;
-    --card-foreground: 262 30% 14%;
+    --card-foreground: 258 24% 16%;
     --popover: 0 0% 100%;
-    --popover-foreground: 262 30% 14%;
-    /* 主紫 #6d28d9 */
-    --primary: 263 70% 50%;
+    --popover-foreground: 258 24% 16%;
+    /* 主紫（柔和，可访问） */
+    --primary: 258 52% 46%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 262 30% 94%;
-    --secondary-foreground: 263 60% 30%;
-    --muted: 262 20% 94%;
-    /* 浅色模式次要文字调深（原 42% 对比度不足，32% 约 7:1） */
-    --muted-foreground: 262 14% 32%;
-    --accent: 262 40% 92%;
-    --accent-foreground: 263 60% 32%;
-    --destructive: 0 72% 51%;
+    --secondary: 258 30% 93%;
+    --secondary-foreground: 258 55% 30%;
+    --muted: 252 22% 92%;
+    /* 浅色模式次要文字（约 5.8:1，满足 WCAG AA） */
+    --muted-foreground: 258 12% 40%;
+    --accent: 258 35% 90%;
+    --accent-foreground: 258 55% 32%;
+    --destructive: 0 65% 48%;
     --destructive-foreground: 0 0% 98%;
-    /* 浅色模式边框/输入框边框调深，避免看不清 */
-    --border: 262 18% 78%;
-    --input: 262 18% 72%;
-    --ring: 263 70% 50%;
-    /* 金色点缀 #d4af37；浅色下作文字用时调深为暗金 #b8860b 系保证可读 */
-    --gold: 45 75% 40%;
-    --gold-foreground: 40 30% 12%;
-    --gold-muted: 46 45% 88%;
+    --border: 258 16% 78%;
+    --input: 258 16% 72%;
+    --ring: 258 52% 46%;
+    /* 暖金点缀（界面作文字用时为暗金系，保证可读） */
+    --gold: 43 62% 45%;
+    --gold-foreground: 40 30% 10%;
+    --gold-muted: 46 42% 90%;
+    /* 语义三色（新增） */
+    --success: 152 55% 35%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 90% 40%;
+    --warning-foreground: 0 0% 100%;
+    --info: 210 70% 45%;
+    --info-foreground: 0 0% 100%;
+    /* 柔和阴影（带紫味，暖调） */
+    --shadow-soft: 0 1px 2px rgb(88 60 160 / 0.06), 0 2px 6px -1px rgb(88 60 160 / 0.06);
+    --shadow-card: 0 4px 12px -2px rgb(88 60 160 / 0.10), 0 2px 4px -1px rgb(88 60 160 / 0.06);
+    --shadow-pop: 0 12px 28px -8px rgb(88 60 160 / 0.16);
     --radius: 0.625rem;
-    /* 侧栏（深紫底） */
-    --sidebar-background: 264 45% 16%;
-    --sidebar-foreground: 262 25% 88%;
-    --sidebar-primary: 263 70% 62%;
+    /* 侧栏（深紫底，与主紫同相） */
+    --sidebar-background: 258 42% 15%;
+    --sidebar-foreground: 252 22% 88%;
+    --sidebar-primary: 258 62% 62%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 263 40% 24%;
-    --sidebar-accent-foreground: 46 65% 62%;
-    --sidebar-border: 263 35% 26%;
-    --sidebar-ring: 46 65% 52%;
+    --sidebar-accent: 258 36% 24%;
+    --sidebar-accent-foreground: 45 62% 62%;
+    --sidebar-border: 258 32% 26%;
+    --sidebar-ring: 45 62% 52%;
   }
 
   .dark {
-    --background: 264 35% 8%;
-    --foreground: 262 20% 92%;
-    --card: 264 30% 12%;
-    --card-foreground: 262 20% 92%;
-    --popover: 264 30% 12%;
-    --popover-foreground: 262 20% 92%;
-    --primary: 263 75% 66%;
-    --primary-foreground: 264 40% 10%;
-    --secondary: 263 25% 20%;
-    --secondary-foreground: 262 25% 88%;
-    --muted: 263 22% 18%;
-    --muted-foreground: 262 12% 60%;
-    --accent: 263 30% 24%;
-    --accent-foreground: 262 30% 90%;
-    --destructive: 0 62% 45%;
+    --background: 258 30% 8%;
+    --foreground: 252 20% 92%;
+    --card: 258 26% 12%;
+    --card-foreground: 252 20% 92%;
+    --popover: 258 26% 12%;
+    --popover-foreground: 252 20% 92%;
+    --primary: 258 62% 68%;
+    --primary-foreground: 258 40% 10%;
+    --secondary: 258 24% 19%;
+    --secondary-foreground: 252 22% 88%;
+    --muted: 258 22% 17%;
+    --muted-foreground: 252 12% 66%;
+    --accent: 258 28% 23%;
+    --accent-foreground: 252 26% 90%;
+    --destructive: 0 68% 56%;
     --destructive-foreground: 0 0% 98%;
-    --border: 263 25% 24%;
-    --input: 263 25% 28%;
-    --ring: 263 75% 66%;
+    --border: 258 22% 24%;
+    --input: 258 22% 28%;
+    --ring: 258 62% 68%;
     /* 暗色下金色提亮 */
-    --gold: 46 70% 60%;
-    --gold-foreground: 40 35% 10%;
+    --gold: 45 68% 58%;
+    --gold-foreground: 40 32% 10%;
     --gold-muted: 46 30% 20%;
-    --sidebar-background: 265 50% 10%;
-    --sidebar-foreground: 262 22% 85%;
-    --sidebar-primary: 263 75% 66%;
+    --success: 152 50% 50%;
+    --success-foreground: 152 60% 12%;
+    --warning: 38 92% 56%;
+    --warning-foreground: 38 80% 12%;
+    --info: 210 75% 60%;
+    --info-foreground: 210 70% 12%;
+    /* 暗色阴影更重（黑系，带透明度） */
+    --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.30);
+    --shadow-card: 0 4px 12px -2px rgb(0 0 0 / 0.45);
+    --shadow-pop: 0 12px 28px -8px rgb(0 0 0 / 0.55);
+    --sidebar-background: 258 42% 10%;
+    --sidebar-foreground: 252 20% 85%;
+    --sidebar-primary: 258 62% 68%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 263 35% 20%;
-    --sidebar-accent-foreground: 46 70% 65%;
-    --sidebar-border: 263 30% 22%;
-    --sidebar-ring: 46 70% 60%;
+    --sidebar-accent: 258 34% 20%;
+    --sidebar-accent-foreground: 45 66% 64%;
+    --sidebar-border: 258 30% 22%;
+    --sidebar-ring: 45 66% 60%;
   }
 }
 
@@ -101,6 +125,11 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+  /* 数据等宽数字：结合能、原子数等读数用（配合 font-mono 使用效果最佳） */
+  .num-data {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
   }
 }
 
