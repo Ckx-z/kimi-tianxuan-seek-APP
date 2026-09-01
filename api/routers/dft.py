@@ -125,6 +125,7 @@ def create_dft_job(req: DftJobCreate):
         job = jobs.create_job(ald, amine, method, mode="pair", backend=backend,
                               n_samples=req.n_samples,
                               optimize=req.optimize, threads=req.threads,
+                              with_props=req.with_props,
                               complex_xyz=req.complex_xyz)
         return _public_job(job)
 
@@ -155,6 +156,7 @@ def create_dft_job(req: DftJobCreate):
         amine2_smiles=req.amine2_smiles, custom_smiles=req.custom_smiles,
         backend=backend, n_samples=req.n_samples,
         optimize=req.optimize, threads=req.threads,
+        with_props=req.with_props,
         complex_xyz=req.complex_xyz)
     return _public_job(job)
 

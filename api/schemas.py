@@ -209,7 +209,11 @@ class DftJobCreate(BaseModel):
                           "初猜已是 xTB 预优化几何，直接单点 CP 提速）")
     threads: int | None = Field(
         None, ge=1, le=32, description="仅 psi4 档：并行线程数"
-                                       "（缺省=环境变量 COF_PSI4_THREADS 或配置或 4）")
+                                       "（缺省=环境变量 COF_PSI4_THREADS 或配置或 24）")
+    with_props: bool | None = Field(
+        None, description="仅 psi4 档：是否计算片段单点能/复合物 HOMO-LUMO/偶极矩/"
+                          "fchk（缺省 True）。False=仅结合能模式，跳过 3 次 SCF，"
+                          "大体系可大幅提速（结合能 CP 结果不受影响）")
     complex_xyz: str | None = Field(
         None, description="可选：外部提供的复合物初猜 xyz（手动摆放/构象采样产物），"
                           "提供时跳过取向采样与自动初猜；原子顺序须为主体在前、客体在后")

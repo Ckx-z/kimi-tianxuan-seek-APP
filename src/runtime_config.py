@@ -199,7 +199,8 @@ def psi4_threads() -> int:
     """Psi4 精度档并行线程数。解析顺序（高 → 低）：
     1. 环境变量 COF_PSI4_THREADS（1–32）
     2. config/runtime.local.json 顶层 "psi4_threads"（1–32）
-    3. 默认 4
+    3. 默认 24（v1.5.1：93 原子级大体系在 4 线程下 6 次 SCF 需数小时，
+       24 线程约 5–6× 提速，配合 quick 档/仅结合能模式可控制在 40 分钟内）
     """
     val = os.environ.get("COF_PSI4_THREADS", "").strip()
     if val.isdigit() and 1 <= int(val) <= 32:
@@ -207,7 +208,7 @@ def psi4_threads() -> int:
     cfg_val = load_local_config().get("psi4_threads")
     if isinstance(cfg_val, int) and 1 <= cfg_val <= 32:
         return cfg_val
-    return 4
+    return 24
 
 
 def gnn_project_root() -> Path:

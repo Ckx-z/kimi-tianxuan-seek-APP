@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
@@ -200,6 +201,12 @@ export default function Dft() {
   const [cancelling, setCancelling] = useState(false);
   /** 最近一次任务被取消（显示琥珀提示条，新提交时清除） */
   const [cancelled, setCancelled] = useState(false);
+  /** 仅 psi4：并行线程数（v1.5.1：默认 24；32 核机器大体系 40 分钟级） */
+  const [psi4Threads, setPsi4Threads] = useState(24);
+  /** 仅 psi4：是否计算片段单点/复合物性质/fchk（false=仅结合能，跳过 3 次 SCF 大幅提速） */
+  const [withProps, setWithProps] = useState(true);
+  /** 运行卡已运行时长（秒，每秒跳表，缓解长 SCF 静默的"假死"感知） */
+  const [runningSecs, setRunningSecs] = useState(0);
 
   // ---------- 联动 ----------
   const [aProps, setAProps] = useState<PropsState>(emptyProps);
@@ -374,9 +381,11 @@ export default function Dft() {
     method,
     backend,
     psi4Method,
+    psi4Threads,
+    withProps,
     currentJobId: jobIdOverride !== undefined ? jobIdOverride : currentJobId,
   }), [mode, monoA, monoB, xType, solventId, monoA2, monoB2, customSmiles,
-      method, backend, psi4Method, currentJobId]);
+      method, backend, psi4Method, psi4Threads, withProps, currentJobId]);
 
   /** 返回页面时恢复任务状态：done 直接展示结果；pending/running 续轮询；
    *  failed/interrupted 展示原因并清空任务引用（参数保留可重提）。 */
@@ -432,6 +441,8 @@ export default function Dft() {
         if (draft.method) setMethod(draft.method);
         if (draft.backend) setBackend(draft.backend);
         if (draft.psi4Method) setPsi4Method(draft.psi4Method);
+        if (draft.psi4Threads) setPsi4Threads(draft.psi4Threads);
+        if (draft.withProps !== undefined) setWithProps(draft.withProps);
         if (draft.currentJobId) void resumeJob(draft.currentJobId);
       })
       .catch(() => {})
@@ -446,6 +457,17 @@ export default function Dft() {
     const timer = setTimeout(() => { void saveDftDraft(buildDraft()); }, 500);
     return () => clearTimeout(timer);
   }, [buildDraft]);
+
+  // ---------- 运行时长跳表（长 SCF 静默期间提供"仍在计算"的可感知信号） ----------
+  useEffect(() => {
+    if (!running) {
+      setRunningSecs(0);
+      return;
+    }
+    setRunningSecs(0);
+    const timer = setInterval(() => setRunningSecs((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, [running]);
 
   /** 提交计算 */
   const handleSubmit = async () => {
@@ -486,6 +508,8 @@ export default function Dft() {
             amine_smiles: monoB.smiles,
             method: isPsi4 ? psi4Method : method,
             backend,
+            threads: isPsi4 ? psi4Threads : undefined,
+            with_props: isPsi4 ? withProps : undefined,
             complex_xyz: placedXyz ?? undefined,
           }
           : {
@@ -498,6 +522,8 @@ export default function Dft() {
             custom_smiles: xType === 'custom' ? customSmiles.trim() : undefined,
             method: isPsi4 ? psi4Method : method,
             backend,
+            threads: isPsi4 ? psi4Threads : undefined,
+            with_props: isPsi4 ? withProps : undefined,
             complex_xyz: placedXyz ?? undefined,
           },
       );
@@ -1030,6 +1056,42 @@ export default function Dft() {
                   <Label htmlFor="pm-batch">批量快速档（ωB97X-D3BJ/def2-SV(P)，多构象初筛用，速度更快）</Label>
                 </div>
               </RadioGroup>
+              {/* v1.5.1：并行线程 + 仅结合能模式（大体系 40 分钟级的关键开关） */}
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="psi4-threads" className="text-xs text-muted-foreground">并行线程</Label>
+                  <Input
+                    id="psi4-threads"
+                    type="number"
+                    min={1}
+                    max={32}
+                    value={psi4Threads}
+                    disabled={running}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v)) setPsi4Threads(Math.min(32, Math.max(1, Math.round(v))));
+                    }}
+                    className="h-8 w-20"
+                  />
+                  <span className="text-xs text-muted-foreground">（1–32，默认 24）</span>
+                </div>
+                <label className="flex items-center gap-2 text-xs" htmlFor="psi4-with-props">
+                  <Checkbox
+                    id="psi4-with-props"
+                    checked={withProps}
+                    disabled={running}
+                    onCheckedChange={(v) => setWithProps(v === true)}
+                  />
+                  计算片段性质/能隙/偶极/fchk（取消勾选=仅结合能，跳过 3 次 SCF，约再快一半）
+                </label>
+              </div>
+              {estAtoms?.complex_atom_count != null && estAtoms.complex_atom_count > 90
+                && psi4Method !== 'wb97xd3bj_svp_quick' && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  ⚡ 复合物约 {estAtoms.complex_atom_count} 个原子：建议改用「批量快速档」或取消「片段性质」
+                  勾选，24 线程下可控制在 40 分钟内完成。
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 结合能经 counterpoise（BSSE）校正；复合物几何经 Monte Carlo 多取向采样 + xTB 筛选
                 再以 xTB 预优化。输出含 HOMO-LUMO 能隙、偶极矩与 fchk 检查点文件。
@@ -1185,6 +1247,10 @@ export default function Dft() {
               </div>
               <p className="text-sm font-medium">
                 {progressPercent > 0 ? `${Math.min(progressPercent, 99)}% · ` : ''}{progressHint || '计算中…'}
+              </p>
+              <p className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
+                已运行 {String(Math.floor(runningSecs / 60)).padStart(2, '0')}:{String(runningSecs % 60).padStart(2, '0')}
+                {isPsi4 ? ' · Psi4 SCF 阶段可能数十分钟进度不变，属正常计算中' : ''}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {isPsi4

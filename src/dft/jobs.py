@@ -137,6 +137,7 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
                backend: str = "xtb", n_samples: int | None = None,
                optimize: bool | None = None,
                threads: int | None = None,
+               with_props: bool | None = None,
                complex_xyz: str | None = None) -> dict:
     """建任务。缓存命中 → 直接 done；否则 pending 并起后台线程。
 
@@ -160,6 +161,7 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
         "n_samples": n_samples,
         "optimize": optimize,
         "threads": threads,
+        "with_props": with_props,
         "complex_xyz": complex_xyz,
         "ald_smiles_input": ald_smiles,
         "amine_smiles_input": amine_smiles,
@@ -356,6 +358,8 @@ def _run_job(job_id: str) -> None:
                 psi4_kwargs["optimize"] = bool(job["optimize"])
             if job.get("threads"):
                 psi4_kwargs["threads"] = int(job["threads"])
+            if job.get("with_props") is not None:
+                psi4_kwargs["with_props"] = bool(job["with_props"])
             if mode == "pair":
                 result = psi4_backend.compute_pair_binding_psi4(
                     ald_smiles, amine_smiles, method, on_stage=on_stage,

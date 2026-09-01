@@ -83,6 +83,8 @@ class TestCancelEndpoint:
             raise engine.DftError("test-slow-compute-timeout")
 
         monkeypatch.setattr(dft_jobs.engine, "compute_binding", slow_compute)
+        # 对本机真实使用/历史验收产生的 DFT 缓存免疫：强制缓存未命中，确保起线程
+        monkeypatch.setattr(dft_jobs.dft_cache, "load_cache", lambda key: None)
 
         # 用不常见的分子对，避免命中本机真实使用产生的 DFT 缓存
         #（缓存命中会直接 done、不起计算线程）

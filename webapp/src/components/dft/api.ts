@@ -185,8 +185,10 @@ export interface DftJobRequest {
   n_samples?: number;
   /** 仅 psi4：是否 Psi4 全几何优化（缺省 false——单点 CP 提速） */
   optimize?: boolean;
-  /** 仅 psi4：并行线程数（缺省=后端配置/环境变量/4） */
+  /** 仅 psi4：并行线程数（缺省=后端配置/环境变量/24） */
   threads?: number;
+  /** 仅 psi4：是否计算片段单点/复合物性质/fchk（缺省 true；false=仅结合能，跳过 3 次 SCF 大幅提速） */
+  with_props?: boolean;
   /** 可选外部复合物初猜 xyz（手动摆放/构象采样产物，v1.5.0） */
   complex_xyz?: string;
 }
@@ -270,6 +272,8 @@ export interface DftDraft {
   method?: DftMethod;
   backend?: DftBackend;
   psi4Method?: DftMethod;
+  psi4Threads?: number;
+  withProps?: boolean;
   currentJobId?: string | null;
 }
 

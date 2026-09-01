@@ -112,8 +112,9 @@ class Psi4NotInstalledError(DftError):
 def psi4_timeout(n_atoms: int | None = None) -> int:
     """精度档超时秒数（环境变量 COF_DFT_TIMEOUT_PSI4 可覆盖）。
 
-    未覆盖时按复合物原子数自适应：默认 1800s 对 >50 原子的大体系偏紧
-    （基准实测 89 原子 CP 单点需约 67 min），故分档放宽。
+    未覆盖时按复合物原子数自适应。v1.5.1 重新标定：默认 24 线程下
+    >90 原子全档（6 次 SCF）实测约 1.5–2.5 小时，5400s 必超时，
+    故 >90 档放宽到 10800s；配合 quick 档/仅结合能模式可远快于此。
     """
     env = os.environ.get("COF_DFT_TIMEOUT_PSI4", "").strip()
     if env.isdigit():
@@ -122,7 +123,7 @@ def psi4_timeout(n_atoms: int | None = None) -> int:
         return DEFAULT_TIMEOUT
     if n_atoms <= 90:
         return 3600
-    return 5400
+    return 10800
 
 
 # ---------------------------------------------------------------- 环境检测
@@ -182,8 +183,9 @@ def _xyz_atoms(xyz_block: str) -> list[tuple[str, float, float, float]]:
 def generate_psi4_script(complex_xyz: str, n_frag_a: int,
                          method_key: str = DEFAULT_PSI4_METHOD,
                          *, optimize: bool = True, same_fragments: bool = False,
-                         threads: int = 4, memory_mb: int = 6000,
-                         e_convergence: float | None = None) -> str:
+                         threads: int = 24, memory_mb: int = 12000,
+                         e_convergence: float | None = None,
+                         with_props: bool = True) -> str:
     """生成 psi4-env 子进程要跑的 Python 脚本（计算逻辑全在脚本内，结果落 result.json）。
 
     Args:
@@ -193,9 +195,12 @@ def generate_psi4_script(complex_xyz: str, n_frag_a: int,
         optimize: True 时先做 psi4 几何优化（初猜已是 xTB 预优化几何）
         threads/memory_mb: psi4 并行与内存上限
         e_convergence: SCF 能量收敛阈值（缺省取方法档 spec，默认 1e-6）
+        with_props: False=仅结合能模式——跳过片段单点/复合物性质/fchk
+            （少 3 次 SCF，大体系大幅提速；gap/偶极/fchk 置 None）
 
     脚本产物（cwd 下）：result.json（结构化结果）、complex_opt.xyz（优化后几何，
-    表头第二行注释带 fragment 边界）、complex.fchk（Gaussian 格式检查点）。
+    表头第二行注释带 fragment 边界）、complex.fchk（Gaussian 格式检查点，
+    仅 with_props=True 写出）。
     """
     spec = PSI4_METHODS.get(resolve_method_key(method_key))
     if spec is None:
@@ -211,6 +216,9 @@ def generate_psi4_script(complex_xyz: str, n_frag_a: int,
     e_conv = e_convergence if e_convergence is not None \
         else spec.get("e_convergence", 1e-6)
     atoms_json = json.dumps(atoms)
+    props_block = (_PROPS_BLOCK.format(
+        same_fragments="True" if same_fragments else "False")
+        if with_props else _SKIP_PROPS_BLOCK)
     return _SCRIPT_TEMPLATE.format(
         atoms_json=atoms_json,
         n_frag_a=n_frag_a,
@@ -218,11 +226,11 @@ def generate_psi4_script(complex_xyz: str, n_frag_a: int,
         basis=spec["basis"],
         label=spec["label"],
         optimize_flag="True" if optimize else "False",
-        same_fragments="True" if same_fragments else "False",
         threads=threads,
         memory_mb=memory_mb,
         e_convergence=e_conv,
         progress_prefix=PROGRESS_PREFIX,
+        props_block=props_block,
     )
 
 
@@ -311,7 +319,26 @@ def main():
     e_cp = psi4.energy(method, bsse_type="cp", molecule=mol)
     result["e_bind_cp_hartree"] = float(e_cp)
 
-    progress("片段单点能计算中（能量分解用）…")
+{props_block}
+
+    progress("正在写出结果…")
+    with open("result.json", "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False)
+    progress("计算完成")
+
+
+try:
+    main()
+except Exception:
+    traceback.print_exc()
+    with open("result.json", "w", encoding="utf-8") as f:
+        json.dump({{"error": traceback.format_exc()[-1500:]}}, f,
+                  ensure_ascii=False)
+    raise SystemExit(1)
+'''
+
+# with_props=True：片段单点能 + 复合物性质（gap/偶极/fchk）——额外 3 次 SCF
+_PROPS_BLOCK = '''    progress("片段单点能计算中（能量分解用）…")
     mol_a = psi4.geometry(mol_string(atoms_a))
     e_a = psi4.energy(method, molecule=mol_a)
     if {same_fragments}:
@@ -370,21 +397,17 @@ def main():
     except Exception as exc:
         result["fchk_written"] = False
         result["fchk_error"] = str(exc)[:200]
+'''
 
-    progress("正在写出结果…")
-    with open("result.json", "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False)
-    progress("计算完成")
-
-
-try:
-    main()
-except Exception:
-    traceback.print_exc()
-    with open("result.json", "w", encoding="utf-8") as f:
-        json.dump({{"error": traceback.format_exc()[-1500:]}}, f,
-                  ensure_ascii=False)
-    raise SystemExit(1)
+# with_props=False：仅结合能（只跑 CP 三次 SCF），性质字段置 None
+_SKIP_PROPS_BLOCK = '''    progress("仅结合能模式：跳过片段单点与复合物性质（fchk 不写出）…")
+    result["e_monomer_a_hartree"] = None
+    result["e_monomer_b_hartree"] = None
+    result["e_complex_hartree"] = None
+    result["e_bind_raw_hartree"] = None
+    result["gap_ev_complex"] = None
+    result["dipole_debye_complex"] = None
+    result["fchk_written"] = False
 '''
 
 
@@ -510,7 +533,8 @@ def _run_psi4_script(script_text: str, cwd: Path, timeout: int,
                         pass
                     raise DftError(
                         f"Psi4 计算超时（超过 {timeout} 秒仍未完成）：体系过大或优化不收敛，"
-                        "可设环境变量 COF_DFT_TIMEOUT_PSI4 放宽超时，或改用 xTB 快速档")
+                        "可设环境变量 COF_DFT_TIMEOUT_PSI4 放宽超时，或改用 xTB 快速档"
+                        f"（运行目录保留供诊断：{cwd}）")
     finally:
         t_out.join(timeout=5)
         t_err.join(timeout=5)
@@ -528,10 +552,12 @@ def _run_psi4_script(script_text: str, cwd: Path, timeout: int,
         detail = (data.get("error") or stderr_tail or "未知错误").strip()
         # traceback 最后一行通常最能说明问题
         last = detail.splitlines()[-1] if detail else "未知错误"
-        raise DftError(f"Psi4 计算失败：{last[:300]}")
+        raise DftError(f"Psi4 计算失败：{last[:300]}"
+                       f"（运行目录保留供诊断：{cwd}）")
     if not data:
         raise DftError("Psi4 子进程未产出结果文件（result.json 缺失或损坏），"
-                       f"stderr 摘要：{stderr_tail[:300] or '（空）'}")
+                       f"stderr 摘要：{stderr_tail[:300] or '（空）'}"
+                       f"（运行目录保留供诊断：{cwd}）")
     return data
 
 
@@ -641,6 +667,7 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
                          complex_xyz: str | None = None,
                          n_samples: int | None = None,
                          threads: int | None = None,
+                         with_props: bool = True,
                          cancel_event: threading.Event | None = None) -> dict:
     """「缩合二聚体 D 与第三物质 X」结合能的 Psi4 精度档实现。
 
@@ -702,6 +729,7 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
     job_dir = Path(tempfile.mkdtemp(prefix=f"dft_psi4_{tag}_",
                                     dir=_ensure_dir(jobs_root)))
     started = time.time()
+    _job_success = False
 
     try:
         stage("正在构造 D·X 复合物初猜…")
@@ -734,7 +762,8 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
         stage("正在生成 Psi4 输入脚本…")
         script = generate_psi4_script(guess, n_a, method, optimize=optimize,
                                       same_fragments=(x_smiles == dimer_smiles),
-                                      threads=(threads or runtime_config.psi4_threads()))
+                                      threads=(threads or runtime_config.psi4_threads()),
+                                      with_props=with_props)
         run_dir = job_dir / "psi4"
         data = _run_psi4_script(script, run_dir, psi4_timeout(n_atoms),
                                 on_stage=stage, **_cancel_kwargs(cancel_event))
@@ -766,13 +795,18 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
             "fragment_ranges": {"a": [0, n_a], "b": [n_a, n_atoms]},
             "sampling": sampling,
         }
+        _job_success = True
         return _finalize(
             common, parsed, opt_xyz, run_dir / "complex.fchk",
             runtime_config.user_data_root() / "dft_artifacts", tag, method,
             started)
     finally:
         import shutil
-        shutil.rmtree(job_dir, ignore_errors=True)
+        # 失败/取消时保留运行目录（psi4_output.dat / result.json 是诊断现场）
+        if _job_success:
+            shutil.rmtree(job_dir, ignore_errors=True)
+        else:
+            logger.warning("Psi4 计算未成功，运行目录保留供诊断: %s", job_dir)
 
 
 def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
@@ -782,6 +816,7 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
                               complex_xyz: str | None = None,
                               n_samples: int | None = None,
                               threads: int | None = None,
+                              with_props: bool = True,
                               cancel_event: threading.Event | None = None
                               ) -> dict:
     """任意双分子 A···B 结合能的 Psi4 精度档实现（对齐 engine.compute_pair_binding）。
@@ -829,6 +864,7 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
     job_dir = Path(tempfile.mkdtemp(prefix=f"dft_psi4_{tag}_",
                                     dir=_ensure_dir(jobs_root)))
     started = time.time()
+    _job_success = False
 
     try:
         stage("正在构造 A···B 复合物初猜…")
@@ -860,7 +896,8 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
         stage("正在生成 Psi4 输入脚本…")
         script = generate_psi4_script(guess, n_a, method, optimize=optimize,
                                       same_fragments=(canon_b == canon_a),
-                                      threads=(threads or runtime_config.psi4_threads()))
+                                      threads=(threads or runtime_config.psi4_threads()),
+                                      with_props=with_props)
         run_dir = job_dir / "psi4"
         data = _run_psi4_script(script, run_dir, psi4_timeout(n_atoms),
                                 on_stage=stage, **_cancel_kwargs(cancel_event))
@@ -888,13 +925,18 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
             "fragment_ranges": {"a": [0, n_a], "b": [n_a, n_atoms]},
             "sampling": sampling,
         }
+        _job_success = True
         return _finalize(
             common, parsed, opt_xyz, run_dir / "complex.fchk",
             runtime_config.user_data_root() / "dft_artifacts", tag, method,
             started)
     finally:
         import shutil
-        shutil.rmtree(job_dir, ignore_errors=True)
+        # 失败/取消时保留运行目录（psi4_output.dat / result.json 是诊断现场）
+        if _job_success:
+            shutil.rmtree(job_dir, ignore_errors=True)
+        else:
+            logger.warning("Psi4 计算未成功，运行目录保留供诊断: %s", job_dir)
 
 
 def _ensure_dir(p: Path) -> str:

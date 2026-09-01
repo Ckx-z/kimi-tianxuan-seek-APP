@@ -95,6 +95,65 @@ class TestScriptGeneration:
             pb.generate_psi4_script(XYZ_6, 6)
 
 
+class TestTimeoutTiersV151:
+    """v1.5.1 超时重分档：>90 原子放宽到 10800s（5400s 在大体系 6 次 SCF 下必超时）。"""
+
+    def test_tiers(self):
+        assert pb.psi4_timeout(None) == 1800
+        assert pb.psi4_timeout(50) == 1800
+        assert pb.psi4_timeout(51) == 3600
+        assert pb.psi4_timeout(90) == 3600
+        assert pb.psi4_timeout(91) == 10800
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("COF_DFT_TIMEOUT_PSI4", "600")
+        assert pb.psi4_timeout(200) == 600
+
+
+class TestWithPropsV151:
+    """v1.5.1 仅结合能模式：跳过片段单点/复合物性质/fchk（少 3 次 SCF）。"""
+
+    def test_with_props_true_includes_props(self):
+        s = pb.generate_psi4_script(XYZ_6, 4, with_props=True)
+        assert "片段单点能计算中" in s
+        assert "psi4.fchk" in s
+
+    def test_with_props_false_skips_props(self):
+        s = pb.generate_psi4_script(XYZ_6, 4, with_props=False)
+        assert "仅结合能模式" in s
+        assert "片段单点能计算中" not in s
+        assert "psi4.fchk" not in s
+        assert 'bsse_type="cp"' in s  # CP 结合能仍在
+        import py_compile
+        import tempfile
+        p = Path(tempfile.mkdtemp()) / "gen.py"
+        p.write_text(s, encoding="utf-8")
+        py_compile.compile(str(p), doraise=True)
+
+    def test_with_props_false_still_syntactically_valid(self):
+        s = pb.generate_psi4_script(XYZ_6, 4, with_props=False)
+        import py_compile
+        import tempfile
+        p = Path(tempfile.mkdtemp()) / "gen.py"
+        p.write_text(s, encoding="utf-8")
+        py_compile.compile(str(p), doraise=True)
+
+
+class TestThreadsDefaultV151:
+    """v1.5.1 线程默认值 4 → 24（32 核机器大体系 40 分钟级）。"""
+
+    def test_default_24(self, monkeypatch):
+        monkeypatch.delenv("COF_PSI4_THREADS", raising=False)
+        monkeypatch.setattr(runtime_config, "load_local_config", lambda: {})
+        assert runtime_config.psi4_threads() == 24
+
+    def test_config_override(self, monkeypatch):
+        monkeypatch.delenv("COF_PSI4_THREADS", raising=False)
+        monkeypatch.setattr(runtime_config, "load_local_config",
+                            lambda: {"psi4_threads": 8})
+        assert runtime_config.psi4_threads() == 8
+
+
 # ---------------------------------------------------------------- 输出解析
 
 class TestResultParsing:
