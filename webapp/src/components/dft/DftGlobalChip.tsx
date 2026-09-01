@@ -1,43 +1,51 @@
 /**
  * DFT 全局任务悬浮徽标：所有页面可见（右下角固定）。
  * - pending/running：金色脉冲 + 实时进度提示，点击返回 DFT 计算页；
+ *   附「停止」按钮可取消计算（v1.5.0 修复：全局取消入口）；
  * - done：绿色「查看结果」，点击跳转并关闭徽标；
- * - failed/interrupted：红色提示，点击跳转查看原因。
+ * - failed/interrupted/cancelled：红色/琥珀提示，点击跳转查看。
  */
 import { useNavigate } from 'react-router';
-import { CheckCircle2, Loader2, TriangleAlert, X } from 'lucide-react';
+import { Ban, CheckCircle2, Loader2, Square, TriangleAlert, X } from 'lucide-react';
 import { useDftTask } from './DftTaskContext';
 
 export default function DftGlobalChip() {
-  const { task, clearTask } = useDftTask();
+  const { task, cancelTask, clearTask } = useDftTask();
   const navigate = useNavigate();
   if (!task) return null;
 
   const terminal =
-    task.status === 'done' || task.status === 'failed' || task.status === 'interrupted';
+    task.status === 'done' || task.status === 'failed' || task.status === 'interrupted' || task.status === 'cancelled';
 
   const handleClick = () => {
     navigate('/toolbox/dft');
     if (terminal) clearTask();
   };
 
+  // 进度钳制：终态前最多显示 99%（100 仅由后端终态写入，防「Psi4 初始化完成」类文案提前满格）
+  const shownPercent = Math.min(task.progressPercent, 99);
+
   const colorClass =
     task.status === 'done'
       ? 'border-green-300 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-300'
-      : terminal
-        ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300'
-        : 'border-gold/60 bg-background/95 text-foreground shadow-lg backdrop-blur';
+      : task.status === 'cancelled'
+        ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300'
+        : terminal
+          ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300'
+          : 'border-gold/60 bg-background/95 text-foreground shadow-lg backdrop-blur';
 
   const label =
     task.status === 'done'
       ? `DFT 完成 · ${task.summary}`
       : task.status === 'failed'
         ? `DFT 失败 · ${task.summary}`
-        : task.status === 'interrupted'
-          ? `DFT 已中断 · ${task.summary}`
-          : task.progressPercent > 0
-            ? `DFT 计算中 ${task.progressPercent}% · ${task.progressHint}`
-            : `DFT 计算中 · ${task.progressHint}`;
+        : task.status === 'cancelled'
+          ? `DFT 已取消 · ${task.summary}`
+          : task.status === 'interrupted'
+            ? `DFT 已中断 · ${task.summary}`
+            : task.progressPercent > 0
+              ? `DFT 计算中 ${shownPercent}% · ${task.progressHint}`
+              : `DFT 计算中 · ${task.progressHint}`;
 
   return (
     <div
@@ -51,11 +59,25 @@ export default function DftGlobalChip() {
       {terminal ? (
         task.status === 'done'
           ? <CheckCircle2 className="h-4 w-4 shrink-0" />
-          : <TriangleAlert className="h-4 w-4 shrink-0" />
+          : task.status === 'cancelled'
+            ? <Ban className="h-4 w-4 shrink-0" />
+            : <TriangleAlert className="h-4 w-4 shrink-0" />
       ) : (
         <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
       )}
       <span className="truncate">{label}</span>
+      {!terminal && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); void cancelTask(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); void cancelTask(); } }}
+          className="rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
+          title="取消计算"
+        >
+          <Square className="h-3.5 w-3.5" />
+        </span>
+      )}
       {terminal && (
         <span
           role="button"

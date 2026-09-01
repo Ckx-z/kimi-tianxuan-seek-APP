@@ -29,6 +29,8 @@ BACKENDS = ("xtb", "psi4")
 
 _LOCK = threading.Lock()
 _JOBS: dict[str, dict] = {}
+# 任务取消事件注册表：request_cancel 置位 → 各计算后端子进程轮询检查并终止
+_CANCEL_EVENTS: dict[str, threading.Event] = {}
 
 MAX_JOBS = 200  # 超出后淘汰最旧的已完成任务，防止内存膨胀
 
@@ -241,15 +243,53 @@ def get_job(job_id: str) -> dict | None:
         return dict(job) if job else None
 
 
+def cancel_event_for(job_id: str) -> threading.Event:
+    """取（或登记）任务的取消事件；同一 job 始终复用同一个 Event。"""
+    with _LOCK:
+        ev = _CANCEL_EVENTS.get(job_id)
+    if ev is None:
+        ev = threading.Event()
+        with _LOCK:
+            existing = _CANCEL_EVENTS.get(job_id)
+            if existing is not None:
+                return existing
+            _CANCEL_EVENTS[job_id] = ev
+    return ev
+
+
+def request_cancel(job_id: str) -> tuple[bool, dict | None]:
+    """请求取消任务。
+
+    Returns:
+        (ok, job)：ok=False 且 job 非 None = 任务已终态不可取消；
+        job 为 None = 任务不存在。
+    """
+    with _LOCK:
+        job = _JOBS.get(job_id)
+        if job is None:
+            return False, None
+        if job["status"] not in ("pending", "running"):
+            return False, dict(job)
+        job["progress_hint"] = "正在取消计算…"
+        ev = _CANCEL_EVENTS.get(job_id)
+        if ev is None:
+            ev = threading.Event()
+            _CANCEL_EVENTS[job_id] = ev
+    ev.set()
+    _persist()
+    with _LOCK:
+        return True, dict(_JOBS.get(job_id) or {})
+
+
 def _stage_percent(hint: str) -> int:
     """把阶段提示映射为 0-100 进度（关键字分级，供进度条展示）。
 
     阶段细分（与 v1.5.0 需求对齐）：构象生成 0-20 / 结构优化 20-50 /
-    单点能计算 50-80 / 结果汇总 80-100。
+    单点能计算 50-80 / 结果汇总 80-90。100 仅由终态（done/缓存命中）
+    直接写入，绝不因阶段文案带「完成」字样而提前到 100
+    （v1.5.0 修复：如「Psi4 初始化完成」曾误触发 100）。
     """
     text = hint or ""
-    if any(k in text for k in ("完成", "命中缓存")):
-        return 100
     if any(k in text for k in ("排队", "已提交", "准备计算", "恢复任务", "提交计算")):
         return 3
     if any(k in text for k in ("初猜", "构象", "采样", "摆放", "构造", "筛选")):
@@ -259,12 +299,13 @@ def _stage_percent(hint: str) -> int:
     if any(k in text for k in ("单点", "能量", "SCF", "结合能", "BSSE",
                                "counterpoise", "轨道", "偶极", "初始化")):
         return 65
-    if any(k in text for k in ("解析", "汇总", "归档", "写出", "生成")):
+    if any(k in text for k in ("解析", "汇总", "归档", "写出")):
         return 88
     return 50
 
 
 def _run_job(job_id: str) -> None:
+    cancel_ev = cancel_event_for(job_id)
     with _LOCK:
         job = _JOBS[job_id]
     ald_smiles = job["ald_smiles_input"]
@@ -299,6 +340,15 @@ def _run_job(job_id: str) -> None:
     }
 
     try:
+        if cancel_ev.is_set():
+            # 排队期间已被取消：不启动任何子进程，直接终态
+            dft_log.log_dft({**log_base, "status": "cancelled",
+                             "error": "任务已取消"})
+            with _LOCK:
+                job.update(status="cancelled", error="任务已取消",
+                           progress_hint="任务已取消")
+            _persist()
+            return
         if backend == "psi4":
             # 精度档：真 DFT（ωB97X-D3BJ/def2-SVP 或 B3LYP/6-31G(d,p) + BSSE）
             psi4_kwargs: dict = {}
@@ -310,7 +360,8 @@ def _run_job(job_id: str) -> None:
                 result = psi4_backend.compute_pair_binding_psi4(
                     ald_smiles, amine_smiles, method, on_stage=on_stage,
                     n_samples=n_samples,
-                    complex_xyz=job.get("complex_xyz"), **psi4_kwargs)
+                    complex_xyz=job.get("complex_xyz"),
+                    cancel_event=cancel_ev, **psi4_kwargs)
             else:
                 result = psi4_backend.compute_binding_psi4(
                     ald_smiles, amine_smiles, method,
@@ -320,12 +371,14 @@ def _run_job(job_id: str) -> None:
                     amine2_smiles=job.get("amine2_smiles"),
                     custom_smiles=job.get("custom_smiles"),
                     on_stage=on_stage, n_samples=n_samples,
-                    complex_xyz=job.get("complex_xyz"), **psi4_kwargs)
+                    complex_xyz=job.get("complex_xyz"),
+                    cancel_event=cancel_ev, **psi4_kwargs)
         elif mode == "pair":
             # 任意双分子模式：A···B 直接结合，跳过二聚体生成与 X 解析
             result = engine.compute_pair_binding(
                 ald_smiles, amine_smiles, method, on_stage=on_stage,
-                n_samples=n_samples, complex_xyz=job.get("complex_xyz"))
+                n_samples=n_samples, complex_xyz=job.get("complex_xyz"),
+                cancel_event=cancel_ev)
         else:
             result = engine.compute_binding(
                 ald_smiles, amine_smiles, method,
@@ -335,7 +388,8 @@ def _run_job(job_id: str) -> None:
                 amine2_smiles=job.get("amine2_smiles"),
                 custom_smiles=job.get("custom_smiles"),
                 on_stage=on_stage, n_samples=n_samples,
-                complex_xyz=job.get("complex_xyz"))
+                complex_xyz=job.get("complex_xyz"),
+                cancel_event=cancel_ev)
         key = dft_cache.cache_key(
             result["smiles_a"] if mode == "pair" else result["dimer_smiles"],
             result["x_cache_part"], method, mode=mode, backend=backend,
@@ -374,6 +428,13 @@ def _run_job(job_id: str) -> None:
             job.update(status="done", progress_hint="计算完成",
                        progress_percent=100, result=result)
         _persist()
+    except engine.JobCancelledError:
+        dft_log.log_dft({**log_base, "status": "cancelled",
+                         "error": "任务已取消"})
+        with _LOCK:
+            job.update(status="cancelled", error="任务已取消",
+                       progress_hint="任务已取消")
+        _persist()
     except engine.DftError as exc:
         msg = str(exc)
         dft_log.log_dft({**log_base, "status": "failed", "error": msg})
@@ -386,3 +447,6 @@ def _run_job(job_id: str) -> None:
         with _LOCK:
             job.update(status="failed", error=msg, progress_hint="计算失败")
         _persist()
+    finally:
+        with _LOCK:
+            _CANCEL_EVENTS.pop(job_id, None)

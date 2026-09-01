@@ -41,8 +41,8 @@ async function request<T>(path: string, options: { method?: string; body?: unkno
 
 export type DftBackend = 'xtb' | 'psi4';
 export type DftMethod = 'gfnff' | 'gfn2' | 'wb97xd3bj_svp' | 'wb97xd3bj_svp_quick' | 'b3lyp_631gdp';
-/** interrupted = 服务重启后恢复的任务（参数保留，可重新提交） */
-export type DftJobStatus = 'pending' | 'running' | 'done' | 'failed' | 'interrupted';
+/** interrupted = 服务重启后恢复的任务（参数保留，可重新提交）；cancelled = 用户取消 */
+export type DftJobStatus = 'pending' | 'running' | 'done' | 'failed' | 'interrupted' | 'cancelled';
 /** 第三物质 X 类型：自身堆积（默认）/ 溶剂 / 另一组单体的二聚体 / 自定义分子 */
 export type DftXType = 'self_stack' | 'solvent' | 'other_dimer' | 'custom';
 /** 计算模式：dimer（默认，醛胺缩合二聚体·X）| pair（任意双分子 A···B 直接结合） */
@@ -280,6 +280,36 @@ export const createDftJob = (req: DftJobRequest) =>
 /** 轮询任务状态（静默：轮询期间失败由页面统一处理，不每跳弹 toast） */
 export const fetchDftJob = (jobId: string) =>
   request<DftJob>(`/jobs/${encodeURIComponent(jobId)}`, { silent: true });
+
+/** 取消进行中的计算任务（POST /jobs/{id}/cancel；已终态返回 409） */
+export const cancelDftJob = (jobId: string) =>
+  request<DftJob>(`/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST', silent: true });
+
+/** 提交前原子数预估（GET /atom-estimate；含氢口径，与 xyz 真实原子数一致） */
+export interface AtomEstimate {
+  /** pair 模式恒为 null（无二聚体概念） */
+  dimer_atom_count: number | null;
+  x_atom_count: number | null;
+  complex_atom_count: number | null;
+}
+
+/** 提交前原子数预估：任何一步解析失败对应字段为 null（前端据 None 隐藏提示） */
+export const fetchAtomEstimate = (payload: {
+  mode?: DftMode;
+  ald_smiles: string;
+  amine_smiles: string;
+  x_type?: DftXType;
+  solvent_id?: string;
+  ald2_smiles?: string;
+  amine2_smiles?: string;
+  custom_smiles?: string;
+}) => {
+  const params = new URLSearchParams();
+  Object.entries(payload).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
+  });
+  return request<AtomEstimate>(`/atom-estimate?${params.toString()}`, { silent: true });
+};
 
 /** 内置溶剂表（x_type=solvent 下拉选项） */
 export const fetchDftSolvents = async (): Promise<DftSolvent[]> => {

@@ -53,13 +53,15 @@ const TOOLBOX_ITEMS = [
   { to: '/toolbox/dft', label: 'DFT 计算', icon: Atom },
 ];
 
-/** 导航链接通用样式（激活态紫金高亮） */
+/** 导航链接通用样式（激活态紫金高亮）。
+ *  v1.5.0 修复：文字发虚模糊——原 /70 透明度 + font-medium 合成加粗叠加
+ *  宋体衬线位图字形导致；改为 /90 透明度，配合侧栏 font-ui 抗锯齿。 */
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return cn(
     'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
     isActive
       ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-[inset_2px_0_0_0_hsl(var(--gold))]'
-      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+      : 'text-sidebar-foreground/90 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
   );
 }
 
@@ -93,8 +95,8 @@ export default function AppLayout() {
           </span>
         </div>
       )}
-      {/* 左侧固定导航栏 */}
-      <aside className="fixed inset-y-0 left-0 z-30 flex w-60 flex-col bg-sidebar-background text-sidebar-foreground">
+      {/* 左侧固定导航栏（font-ui：界面元素用 UI 字体，避免宋体 14px 发虚） */}
+      <aside className="fixed inset-y-0 left-0 z-30 flex w-60 flex-col bg-sidebar-background font-ui text-sidebar-foreground antialiased">
         {/* Logo 区 */}
         <div className="px-5 pb-4 pt-6">
           <div className="flex items-center gap-2.5">
@@ -128,7 +130,7 @@ export default function AppLayout() {
                 'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                 toolboxActive
                   ? 'text-sidebar-accent-foreground'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                  : 'text-sidebar-foreground/90 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
               )}
             >
               <Toolbox className="h-4 w-4 shrink-0" />
@@ -169,7 +171,7 @@ export default function AppLayout() {
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/90 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             <span>{theme === 'dark' ? '浅色模式' : '暗色模式'}</span>

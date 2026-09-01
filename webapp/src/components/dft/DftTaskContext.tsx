@@ -22,6 +22,7 @@ import {
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
+  cancelDftJob,
   fetchDftDraft,
   fetchDftJob,
   type DftBackend,
@@ -57,6 +58,8 @@ interface DftTaskContextValue {
   task: GlobalDftTask | null;
   /** 登记新任务并启动全局轮询；终态任务仅展示并通知，不轮询 */
   trackTask: (jobId: string, opts?: TrackOptions) => void;
+  /** 取消当前进行中的任务（POST /jobs/{id}/cancel），终态由轮询落定并通知 */
+  cancelTask: () => Promise<void>;
   /** 清除全局任务展示（不取消后端计算） */
   clearTask: () => void;
 }
@@ -64,7 +67,7 @@ interface DftTaskContextValue {
 const DftTaskContext = createContext<DftTaskContextValue | null>(null);
 
 function isTerminal(status: DftJobStatus): boolean {
-  return status === 'done' || status === 'failed' || status === 'interrupted';
+  return status === 'done' || status === 'failed' || status === 'interrupted' || status === 'cancelled';
 }
 
 function notifyCompletion(status: DftJobStatus, cached: boolean, summary: string): void {
@@ -73,10 +76,13 @@ function notifyCompletion(status: DftJobStatus, cached: boolean, summary: string
     msg = cached ? '命中缓存，已返回历史结果' : `「${summary}」DFT 计算完成，可查看结果`;
   } else if (status === 'failed') {
     msg = `「${summary}」DFT 计算失败，请到计算页查看原因`;
+  } else if (status === 'cancelled') {
+    msg = `「${summary}」DFT 任务已取消`;
   } else {
     msg = `「${summary}」DFT 任务已中断，请到计算页确认`;
   }
   if (status === 'done') toast.success(msg);
+  else if (status === 'cancelled') toast.info(msg);
   else toast.error(msg);
   if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
     try {
@@ -176,6 +182,17 @@ export function DftTaskProvider({ children }: { children: ReactNode }) {
     }
   }, [startPolling, stopPolling]);
 
+  const cancelTask = useCallback(async () => {
+    const cur = taskRef.current;
+    if (!cur || isTerminal(cur.status)) return;
+    try {
+      const job = await cancelDftJob(cur.jobId);
+      applyJob(job); // 立即显示「正在取消计算…」；终态（cancelled）由后续轮询落定并通知
+    } catch {
+      // 409（已终态）/网络失败：轮询会兜底收敛到真实终态
+    }
+  }, [applyJob]);
+
   const clearTask = useCallback(() => {
     stopPolling();
     taskRef.current = null;
@@ -218,8 +235,8 @@ export function DftTaskProvider({ children }: { children: ReactNode }) {
   useEffect(() => () => stopPolling(), [stopPolling]);
 
   const value = useMemo<DftTaskContextValue>(
-    () => ({ task, trackTask, clearTask }),
-    [task, trackTask, clearTask],
+    () => ({ task, trackTask, cancelTask, clearTask }),
+    [task, trackTask, cancelTask, clearTask],
   );
 
   return (

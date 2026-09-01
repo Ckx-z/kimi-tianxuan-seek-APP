@@ -43,11 +43,15 @@ try:
     from src.dft import engine
     DimerError = dimer_mod.DimerError
     DftError = engine.DftError
+    JobCancelledError = engine.JobCancelledError
+    _cancel_kwargs = engine._cancel_kwargs
 except ImportError:  # pragma: no cover
     from dft import dimer as dimer_mod  # type: ignore
     from dft import engine  # type: ignore
     DimerError = dimer_mod.DimerError
     DftError = engine.DftError
+    JobCancelledError = engine.JobCancelledError
+    _cancel_kwargs = engine._cancel_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -395,14 +399,17 @@ def _read_xyz_with_atoms(path: Path) -> str | None:
 
 
 def _run_psi4_script(script_text: str, cwd: Path, timeout: int,
-                     on_stage=None) -> dict:
+                     on_stage=None,
+                     cancel_event: threading.Event | None = None) -> dict:
     """在 cwd 下用 psi4-env python 跑生成的脚本，返回 result.json 内容。
 
     stdout 中 '@@PROGRESS@@ <msg>' 行实时触发 on_stage(msg)；超时强杀。
+    cancel_event：任务取消事件，置位后尽快杀掉子进程并抛 JobCancelledError。
 
     Raises:
         Psi4NotInstalledError: psi4-env 不可用
-        DftError: 超时 / 非零退出 / result.json 缺失或带 error
+        DftError: 超时 / 非零退出 / result.json 缺失或带错误
+        JobCancelledError: 任务被取消（DftError 子类）
     """
     det = detect_psi4()
     if not det["installed"]:
@@ -480,17 +487,30 @@ def _run_psi4_script(script_text: str, cwd: Path, timeout: int,
     t_out.start()
     t_err.start()
 
+    # 轮询等待：0.5s 一跳，兼顾取消响应（取消/超时强杀并明确归类）
+    deadline = time.monotonic() + timeout
     try:
-        proc.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        try:
-            proc.wait(timeout=10)
-        except Exception:
-            pass
-        raise DftError(
-            f"Psi4 计算超时（超过 {timeout} 秒仍未完成）：体系过大或优化不收敛，"
-            "可设环境变量 COF_DFT_TIMEOUT_PSI4 放宽超时，或改用 xTB 快速档")
+        while True:
+            if cancel_event is not None and cancel_event.is_set():
+                proc.kill()
+                try:
+                    proc.wait(timeout=10)
+                except Exception:
+                    pass
+                raise JobCancelledError("任务已取消")
+            try:
+                proc.wait(timeout=0.5)
+                break
+            except subprocess.TimeoutExpired:
+                if time.monotonic() >= deadline:
+                    proc.kill()
+                    try:
+                        proc.wait(timeout=10)
+                    except Exception:
+                        pass
+                    raise DftError(
+                        f"Psi4 计算超时（超过 {timeout} 秒仍未完成）：体系过大或优化不收敛，"
+                        "可设环境变量 COF_DFT_TIMEOUT_PSI4 放宽超时，或改用 xTB 快速档")
     finally:
         t_out.join(timeout=5)
         t_err.join(timeout=5)
@@ -543,8 +563,12 @@ def parse_psi4_result(data: dict) -> dict:
 
 # ---------------------------------------------------------------- 主管线
 
-def _xtb_guess(xyz_c: str, work_dir: Path, on_stage) -> str:
-    """xTB 预优化复合物初猜；xtb 不可用或失败时退化为原 UFF 初猜。"""
+def _xtb_guess(xyz_c: str, work_dir: Path, on_stage,
+               cancel_event: threading.Event | None = None) -> str:
+    """xTB 预优化复合物初猜；xtb 不可用或失败时退化为原 UFF 初猜。
+
+    取消（JobCancelledError）必须向上传播，不落入 UFF 退化分支。
+    """
     if engine.xtb_binary() is None:
         on_stage("未找到 xTB，跳过预优化（以力场初猜直接提交 Psi4）…")
         return xyz_c
@@ -552,8 +576,10 @@ def _xtb_guess(xyz_c: str, work_dir: Path, on_stage) -> str:
         on_stage("正在用 xTB 预优化复合物初猜（Psi4 初始几何）…")
         _, opt_xyz = engine._run_xtb(
             xyz_c, engine.METHODS["gfn2"]["args"], work_dir,
-            engine.method_timeout("gfn2"))
+            engine.method_timeout("gfn2"), cancel_event=cancel_event)
         return opt_xyz or xyz_c
+    except JobCancelledError:
+        raise
     except DftError as exc:
         logger.warning("xTB 预优化失败，退化为 UFF 初猜: %s", exc)
         on_stage("xTB 预优化未成功，以力场初猜直接提交 Psi4…")
@@ -614,7 +640,8 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
                          optimize: bool = False,
                          complex_xyz: str | None = None,
                          n_samples: int | None = None,
-                         threads: int | None = None) -> dict:
+                         threads: int | None = None,
+                         cancel_event: threading.Event | None = None) -> dict:
     """「缩合二聚体 D 与第三物质 X」结合能的 Psi4 精度档实现。
 
     参数与返回值口径对齐 engine.compute_binding，多带 backend="psi4" 与
@@ -687,7 +714,8 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
             info = engine.screen_complex_xtb(dimer_smiles, x_smiles,
                                              job_dir / "screen",
                                              n_samples=n_samples,
-                                             on_stage=stage)
+                                             on_stage=stage,
+                                             **_cancel_kwargs(cancel_event))
             xyz_c = info["best_xyz"]
             sampling = {"n_samples": info["n_samples"],
                         "best_kind": info["best_kind"],
@@ -700,7 +728,8 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
             stage(f"体系较大（复合物 {n_atoms} 个原子），Psi4 真 DFT 预计耗时"
                   "较长，请耐心等待…")
 
-        guess = _xtb_guess(xyz_c, job_dir / "xtb_guess", stage)
+        guess = _xtb_guess(xyz_c, job_dir / "xtb_guess", stage,
+                           **_cancel_kwargs(cancel_event))
 
         stage("正在生成 Psi4 输入脚本…")
         script = generate_psi4_script(guess, n_a, method, optimize=optimize,
@@ -708,7 +737,7 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
                                       threads=(threads or runtime_config.psi4_threads()))
         run_dir = job_dir / "psi4"
         data = _run_psi4_script(script, run_dir, psi4_timeout(n_atoms),
-                                on_stage=stage)
+                                on_stage=stage, **_cancel_kwargs(cancel_event))
 
         stage("正在解析计算结果…")
         parsed = parse_psi4_result(data)
@@ -752,7 +781,9 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
                               optimize: bool = False,
                               complex_xyz: str | None = None,
                               n_samples: int | None = None,
-                              threads: int | None = None) -> dict:
+                              threads: int | None = None,
+                              cancel_event: threading.Event | None = None
+                              ) -> dict:
     """任意双分子 A···B 结合能的 Psi4 精度档实现（对齐 engine.compute_pair_binding）。
 
     method 支持 preset 别名：precision（默认 ωB97X-D3BJ/def2-SVP）/
@@ -809,7 +840,8 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
             info = engine.screen_complex_xtb(canon_a, canon_b,
                                              job_dir / "screen",
                                              n_samples=n_samples,
-                                             on_stage=stage)
+                                             on_stage=stage,
+                                             **_cancel_kwargs(cancel_event))
             xyz_c = info["best_xyz"]
             sampling = {"n_samples": info["n_samples"],
                         "best_kind": info["best_kind"],
@@ -822,7 +854,8 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
             stage(f"体系较大（复合物 {n_atoms} 个原子），Psi4 真 DFT 预计耗时"
                   "较长，请耐心等待…")
 
-        guess = _xtb_guess(xyz_c, job_dir / "xtb_guess", stage)
+        guess = _xtb_guess(xyz_c, job_dir / "xtb_guess", stage,
+                           **_cancel_kwargs(cancel_event))
 
         stage("正在生成 Psi4 输入脚本…")
         script = generate_psi4_script(guess, n_a, method, optimize=optimize,
@@ -830,7 +863,7 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
                                       threads=(threads or runtime_config.psi4_threads()))
         run_dir = job_dir / "psi4"
         data = _run_psi4_script(script, run_dir, psi4_timeout(n_atoms),
-                                on_stage=stage)
+                                on_stage=stage, **_cancel_kwargs(cancel_event))
 
         stage("正在解析计算结果…")
         parsed = parse_psi4_result(data)

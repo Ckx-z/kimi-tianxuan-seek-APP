@@ -30,6 +30,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -89,6 +90,15 @@ SOLVENTS: list[dict] = [
 
 class DftError(Exception):
     """计算失败的统一异常，message 为面向用户的中文原因。"""
+
+
+class JobCancelledError(DftError):
+    """任务被用户主动取消（与计算失败区分，终态记为 cancelled）。"""
+
+
+def _cancel_kwargs(cancel_event: threading.Event | None) -> dict:
+    """打包取消事件参数；None 时不透传关键字（兼容旧式测试伪造与外部直调）。"""
+    return {"cancel_event": cancel_event} if cancel_event is not None else {}
 
 
 def method_timeout(method: str) -> int:
@@ -725,9 +735,25 @@ def _classify_failure(stdout: str, stderr: str, returncode: int | None) -> str:
     return f"xtb 退出码 {returncode}，未得到有效能量"
 
 
+def _terminate_subprocess(proc: subprocess.Popen) -> None:
+    """尽力终止并回收子进程（取消/超时共用）。"""
+    try:
+        proc.kill()
+    except Exception:
+        pass
+    try:
+        proc.communicate(timeout=10)
+    except Exception:
+        pass
+
+
 def _run_xtb(xyz_block: str, args: list[str], cwd: Path, timeout: int,
-             opt: bool = True) -> tuple[str, str | None]:
+             opt: bool = True,
+             cancel_event: threading.Event | None = None
+             ) -> tuple[str, str | None]:
     """在 cwd 下跑一次 xtb（opt=True 几何优化；False 单点）。
+
+    cancel_event：任务取消事件，置位后尽快杀掉子进程并抛 JobCancelledError。
 
     Returns:
         (stdout 全文, xtbopt.xyz 内容或 None；单点模式恒为 None)
@@ -751,20 +777,33 @@ def _run_xtb(xyz_block: str, args: list[str], cwd: Path, timeout: int,
     if sys.platform == "win32":
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     try:
-        proc = subprocess.run(
-            cmd, cwd=str(cwd), env=env, capture_output=True, text=True,
-            timeout=timeout, creationflags=creationflags, errors="replace")
-    except subprocess.TimeoutExpired:
-        raise DftError(
-            f"计算超时（超过 {timeout} 秒仍未完成）：体系可能过大或优化不收敛，"
-            "可改用「快速」档位或简化单体")
+        proc = subprocess.Popen(
+            cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True, errors="replace",
+            creationflags=creationflags)
     except FileNotFoundError:
         raise DftError("未安装计算引擎：xtb 二进制无法执行，请检查 vendor/xtb 是否完整")
     except OSError as exc:
         raise DftError(f"计算引擎启动失败：{exc}")
 
-    stdout = proc.stdout or ""
-    stderr = proc.stderr or ""
+    # 轮询等待：0.5s 一跳，兼顾取消响应（取消/超时强杀并明确归类）
+    started = time.monotonic()
+    while True:
+        if cancel_event is not None and cancel_event.is_set():
+            _terminate_subprocess(proc)
+            raise JobCancelledError("任务已取消")
+        try:
+            stdout, stderr = proc.communicate(timeout=0.5)
+            break
+        except subprocess.TimeoutExpired:
+            if time.monotonic() - started > timeout:
+                _terminate_subprocess(proc)
+                raise DftError(
+                    f"计算超时（超过 {timeout} 秒仍未完成）：体系可能过大或优化不收敛，"
+                    "可改用「快速」档位或简化单体")
+
+    stdout = stdout or ""
+    stderr = stderr or ""
     # 注意：xtb 的 "normal termination of xtb" 打在 stderr，能量等在 stdout
     if "normal termination of xtb" not in (stdout + stderr):
         raise DftError(_classify_failure(stdout, stderr, proc.returncode))
@@ -781,7 +820,8 @@ def _run_xtb(xyz_block: str, args: list[str], cwd: Path, timeout: int,
 
 def screen_complex_xtb(smiles_a: str, smiles_b: str, workdir: Path,
                        n_samples: int | None = None, seed: int = 42,
-                       on_stage=None) -> dict:
+                       on_stage=None,
+                       cancel_event: threading.Event | None = None) -> dict:
     """MC/模板多样化初猜 → xTB 分级筛选 → 最优复合物几何（对标文献 MC 流程）。
 
     流程：sample_complex_orientations 生成 N 个初猜（基序模板 + Metropolis MC）
@@ -822,7 +862,8 @@ def screen_complex_xtb(smiles_a: str, smiles_b: str, workdir: Path,
         t0 = time.time()
         wd = workdir / f"cand_{i:02d}_{cand['kind']}"
         try:
-            out_ff, xyz_ff = _run_xtb(cand["xyz"], ff_args, wd / "gfnff", t_ff)
+            out_ff, xyz_ff = _run_xtb(cand["xyz"], ff_args, wd / "gfnff", t_ff,
+                                      **_cancel_kwargs(cancel_event))
             e_ff = parse_energy(out_ff)
             xyz_use = xyz_ff or cand["xyz"]
             if e_ff is None:
@@ -830,10 +871,12 @@ def screen_complex_xtb(smiles_a: str, smiles_b: str, workdir: Path,
             e_rank = e_ff
             if use_sp:
                 out_sp, _ = _run_xtb(xyz_use, g2_args, wd / "gfn2sp", t_g2,
-                                     opt=False)
+                                     opt=False, **_cancel_kwargs(cancel_event))
                 e_sp = parse_energy(out_sp)
                 if e_sp is not None:
                     e_rank = e_sp
+        except JobCancelledError:
+            raise
         except DftError as exc:
             trials.append({"kind": cand["kind"], "error": str(exc)[:200],
                            "elapsed_sec": round(time.time() - t0, 1)})
@@ -859,6 +902,17 @@ def _xyz_atom_count(xyz_block: str) -> int:
         return int(xyz_block.strip().splitlines()[0])
     except Exception:
         return 0
+
+
+def atom_count_with_h(smiles: str) -> int | None:
+    """SMILES 的含氢总原子数（与嵌入 xyz 的真实原子数同口径）；解析失败返回 None。"""
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        return Chem.AddHs(mol).GetNumAtoms()
+    except Exception:
+        return None
 
 
 def _use_mc_screening(method: str, n_samples: int | None) -> bool:
@@ -887,7 +941,8 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
                     custom_smiles: str | None = None,
                     on_stage=None, jobs_root: Path | None = None,
                     n_samples: int | None = None,
-                    complex_xyz: str | None = None) -> dict:
+                    complex_xyz: str | None = None,
+                    cancel_event: threading.Event | None = None) -> dict:
     """计算「缩合二聚体 D 与第三物质 X」的结合能与量化描述符。
 
     流程：醛/胺单体 → 亚胺缩合二聚体 D（dimer.make_dimer）→ 解析 X
@@ -970,7 +1025,8 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
         stage("正在生成二聚体的 3D 构象…")
         xyz_d = embed_monomer_xyz(dimer_smiles)
         stage("正在优化二聚体几何…")
-        out_d, _ = _run_xtb(xyz_d, args, job_dir / "dimer", timeout)
+        out_d, _ = _run_xtb(xyz_d, args, job_dir / "dimer", timeout,
+                            **_cancel_kwargs(cancel_event))
 
         if x_smiles == dimer_smiles:
             # 自身堆积：X 即 D，能量与描述符直接复用（省一次 xtb）
@@ -980,7 +1036,8 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
             stage("正在生成 X 的 3D 构象…")
             xyz_x = embed_monomer_xyz(x_smiles)
             stage("正在优化 X 几何…")
-            out_x, _ = _run_xtb(xyz_x, args, job_dir / "x", timeout)
+            out_x, _ = _run_xtb(xyz_x, args, job_dir / "x", timeout,
+                                **_cancel_kwargs(cancel_event))
 
         stage("正在构造 D·X 复合物初猜…")
         sampling = None
@@ -991,7 +1048,8 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
         elif _use_mc_screening(method, n_samples):
             info = screen_complex_xtb(dimer_smiles, x_smiles,
                                       job_dir / "screen",
-                                      n_samples=n_samples, on_stage=stage)
+                                      n_samples=n_samples, on_stage=stage,
+                                      **_cancel_kwargs(cancel_event))
             xyz_c = info["best_xyz"]
             sampling = {"n_samples": info["n_samples"],
                         "best_kind": info["best_kind"],
@@ -1003,7 +1061,8 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
             stage(f"体系较大（复合物 {n_atoms} 个原子），预计耗时较长，请耐心等待…")
         else:
             stage("正在优化 D·X 复合物几何…")
-        out_c, opt_xyz = _run_xtb(xyz_c, args, job_dir / "complex", timeout)
+        out_c, opt_xyz = _run_xtb(xyz_c, args, job_dir / "complex", timeout,
+                                  **_cancel_kwargs(cancel_event))
 
         stage("正在解析计算结果…")
         e_d, e_x, e_c = (parse_energy(out_d), parse_energy(out_x),
@@ -1063,7 +1122,8 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
 def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
                          on_stage=None, jobs_root: Path | None = None,
                          n_samples: int | None = None,
-                         complex_xyz: str | None = None) -> dict:
+                         complex_xyz: str | None = None,
+                         cancel_event: threading.Event | None = None) -> dict:
     """任意双分子模式（选项2）：A···B 复合物结合能，不经过二聚体生成。
 
     E_bind = E(A·B 复合物) − E(A) − E(B)。ald/amine 字段位复用为分子 A/B，
@@ -1116,7 +1176,8 @@ def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
         stage("正在生成分子 A 的 3D 构象…")
         xyz_a = embed_monomer_xyz(canon_a)
         stage("正在优化分子 A 几何…")
-        out_a, _ = _run_xtb(xyz_a, args, job_dir / "a", timeout)
+        out_a, _ = _run_xtb(xyz_a, args, job_dir / "a", timeout,
+                            **_cancel_kwargs(cancel_event))
 
         if canon_b == canon_a:
             # A 与 B 同分子：能量与描述符直接复用（省一次 xtb）
@@ -1126,7 +1187,8 @@ def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
             stage("正在生成分子 B 的 3D 构象…")
             xyz_b = embed_monomer_xyz(canon_b)
             stage("正在优化分子 B 几何…")
-            out_b, _ = _run_xtb(xyz_b, args, job_dir / "b", timeout)
+            out_b, _ = _run_xtb(xyz_b, args, job_dir / "b", timeout,
+                                **_cancel_kwargs(cancel_event))
 
         stage("正在构造 A···B 复合物初猜…")
         sampling = None
@@ -1136,7 +1198,8 @@ def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
             xyz_c = complex_xyz
         elif _use_mc_screening(method, n_samples):
             info = screen_complex_xtb(canon_a, canon_b, job_dir / "screen",
-                                      n_samples=n_samples, on_stage=stage)
+                                      n_samples=n_samples, on_stage=stage,
+                                      **_cancel_kwargs(cancel_event))
             xyz_c = info["best_xyz"]
             sampling = {"n_samples": info["n_samples"],
                         "best_kind": info["best_kind"],
@@ -1148,7 +1211,8 @@ def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
             stage(f"体系较大（复合物 {n_atoms} 个原子），预计耗时较长，请耐心等待…")
         else:
             stage("正在优化 A···B 复合物几何…")
-        out_c, opt_xyz = _run_xtb(xyz_c, args, job_dir / "complex", timeout)
+        out_c, opt_xyz = _run_xtb(xyz_c, args, job_dir / "complex", timeout,
+                                  **_cancel_kwargs(cancel_event))
 
         stage("正在解析计算结果…")
         e_a, e_b, e_c = (parse_energy(out_a), parse_energy(out_b),

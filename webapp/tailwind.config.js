@@ -100,6 +100,17 @@ module.exports = {
           '"Courier New"',
           'monospace',
         ],
+        // UI 界面字体（v1.5.0 修复：导航/按钮等界面元素禁用宋体衬线，
+        // 14px 宋体在 Windows 上以位图字形渲染 + 合成加粗导致发虚模糊）
+        ui: [
+          '"Segoe UI"',
+          'system-ui',
+          '-apple-system',
+          '"Microsoft YaHei UI"',
+          '"微软雅黑"',
+          '"PingFang SC"',
+          'sans-serif',
+        ],
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",

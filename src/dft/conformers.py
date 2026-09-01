@@ -14,9 +14,11 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from . import engine
@@ -166,6 +168,51 @@ def _min_rmsd(xyz_block: str, others: list[str]) -> float:
 
 # ---------------------------------------------------------------- CREST
 
+CREST_DOCKER_IMAGE = "cof-crest:latest"
+_DOCKER_INFO_CACHE: dict = {"ts": 0.0, "ready": False, "bin": None}
+
+
+def _docker_binary() -> str | None:
+    """docker CLI 探测：PATH > Docker Desktop 默认安装路径。"""
+    if _DOCKER_INFO_CACHE["bin"]:
+        return _DOCKER_INFO_CACHE["bin"]
+    cand = shutil.which("docker")
+    if not cand:
+        default = Path(
+            r"C:\Program Files\Docker\Docker\resources\bin\docker.exe")
+        cand = str(default) if default.exists() else None
+    _DOCKER_INFO_CACHE["bin"] = cand
+    return cand
+
+
+def docker_engine_ready() -> bool:
+    """docker daemon 可用（docker info 退出码 0）。结果缓存 60s 避免频繁探测。"""
+    now = time.monotonic()
+    if now - _DOCKER_INFO_CACHE["ts"] < 60:
+        return _DOCKER_INFO_CACHE["ready"]
+    ready = False
+    docker = _docker_binary()
+    if docker:
+        try:
+            proc = subprocess.run(
+                [docker, "info"], capture_output=True, timeout=15,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                if sys.platform == "win32" else 0)
+            ready = proc.returncode == 0
+        except Exception:
+            ready = False
+    _DOCKER_INFO_CACHE.update(ts=now, ready=ready)
+    return ready
+
+
+def crest_mode() -> str | None:
+    """CREST 可用方式：'native'（本机二进制）| 'docker'（容器运行）| None。"""
+    if crest_binary() is not None:
+        return "native"
+    if docker_engine_ready():
+        return "docker"
+    return None
+
 
 def crest_binary() -> Path | None:
     """CREST 可执行文件探测：COF_CREST_BIN > runtime.local.json crest_bin >
@@ -195,12 +242,17 @@ def generate_conformers_crest(xyz_block: str, max_confs: int = DEFAULT_MAX_CONFS
 
     输入单分子 xyz → crest --gfn2 --nci → 解析 crest_conformers.xyz
     （多帧 xyz，帧间以能量注释行分隔，能量升序）。按能量窗口与数量上限过滤。
+    本机无 CREST 二进制但 Docker 引擎可用时，自动回落容器运行
+    （v1.5.0 修复：Windows 无 conda crest 包 / pip 无 wheel 的安装困境）。
 
     Returns:
         与 ETKDG 同构的列表；失败/未安装返回 []。
     """
     crest = crest_binary()
     if crest is None:
+        if docker_engine_ready():
+            return _generate_conformers_crest_docker(
+                xyz_block, max_confs, e_window_kj, timeout)
         return []
     work = Path(tempfile.mkdtemp(prefix="dft_crest_"))
     try:
@@ -222,7 +274,44 @@ def generate_conformers_crest(xyz_block: str, max_confs: int = DEFAULT_MAX_CONFS
     except Exception:
         return []
     finally:
-        import shutil
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def _generate_conformers_crest_docker(xyz_block: str, max_confs: int,
+                                      e_window_kj: float,
+                                      timeout: int) -> list[dict]:
+    """CREST 经 Docker 容器运行（cof-crest 镜像，conda-forge crest）。
+
+    Windows 工作目录挂载到容器 /work（Docker Desktop 自动翻译盘符路径），
+    容器内直接跑 crest input.xyz，产物 crest_conformers.xyz 落回宿主目录。
+    """
+    docker = _docker_binary()
+    if docker is None:
+        return []
+    work = Path(tempfile.mkdtemp(prefix="dft_crest_docker_"))
+    try:
+        inp = work / "input.xyz"
+        inp.write_text(xyz_block, encoding="utf-8")
+        # 盘符路径统一为反斜杠→正斜杠，规避 docker CLI 参数解析问题
+        mount = f"{str(work).replace(chr(92), '/')}:/work"
+        cmd = [docker, "run", "--rm", "-v", mount, "-w", "/work",
+               CREST_DOCKER_IMAGE, "crest", "input.xyz",
+               "--gfn2", "--nci", "--chrg", "0"]
+        try:
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, errors="replace",
+                encoding="utf-8", timeout=timeout,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                if sys.platform == "win32" else 0)
+        except subprocess.TimeoutExpired:
+            return []
+        if proc.returncode != 0:
+            return []
+        return _parse_crest_conformers(
+            work / "crest_conformers.xyz", max_confs, e_window_kj)
+    except Exception:
+        return []
+    finally:
         shutil.rmtree(work, ignore_errors=True)
 
 
@@ -292,14 +381,25 @@ def _parse_crest_conformers(path: Path, max_confs: int,
 
 def conformer_engines() -> dict:
     """引擎可用性（供 GET /api/dft/backends 展示与前端选择器）。"""
+    mode = crest_mode()  # 'native' | 'docker' | None
+    native = crest_binary()
+    docker = _docker_binary() if mode == "docker" else None
     return {
         "etkdg": {"installed": True,
                   "label": "RDKit ETKDG（零安装，轻量）"},
-        "crest": {"installed": crest_binary() is not None,
-                  "path": str(crest_binary()) if crest_binary() else None,
-                  "label": "CREST（推荐，全自动构象搜索，需安装）",
-                  "install_hint": "conda install -c conda-forge crest"
-                                  "（建议装入 psi4-env）"},
+        "crest": {
+            "installed": mode is not None,
+            "mode": mode,
+            "path": str(native) if native else docker,
+            "label": ("CREST（推荐，全自动构象搜索）" if mode == "native"
+                      else "CREST（Docker 容器运行，cof-crest 镜像）"
+                      if mode == "docker"
+                      else "CREST（推荐，全自动构象搜索，需安装）"),
+            "install_hint": (
+                "conda install -c conda-forge crest（建议装入 psi4-env）"
+                "；或本机 Docker：运行 scripts/setup_crest_docker.ps1 构建"
+                " cof-crest 镜像后自动生效"),
+        },
     }
 
 
@@ -309,13 +409,12 @@ def generate_conformers(smiles: str, engine_name: str = "auto",
                         timeout: int = 3600) -> list[dict]:
     """统一入口：engine_name ∈ {auto, etkdg, crest}。
 
-    auto：CREST 可用用 CREST，否则回落 ETKDG。返回空列表表示失败
-    （调用方提示「构象生成失败/引擎未安装」）。
+    auto：CREST 可用（本机二进制或 Docker 容器）用 CREST，否则回落
+    ETKDG。返回空列表表示失败（调用方提示「构象生成失败/引擎未安装」）。
     """
     name = engine_name or "auto"
     if name == "crest":
-        crest = crest_binary()
-        if crest is None:
+        if crest_mode() is None:
             return []
         try:
             xyz = engine.embed_monomer_xyz(smiles)
@@ -323,7 +422,7 @@ def generate_conformers(smiles: str, engine_name: str = "auto",
             return []
         return generate_conformers_crest(xyz, max_confs, e_window_kj, timeout)
     if name == "auto":
-        if crest_binary() is not None:
+        if crest_mode() is not None:
             try:
                 xyz = engine.embed_monomer_xyz(smiles)
             except Exception:

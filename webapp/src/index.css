@@ -287,6 +287,11 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+    /* v1.5.0 修复：全局抗锯齿——宋体衬线在 Windows 上默认走位图字形，
+       无抗锯齿时 14px 界面文字发虚；配合 .font-ui 用于导航等界面元素 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 }
 

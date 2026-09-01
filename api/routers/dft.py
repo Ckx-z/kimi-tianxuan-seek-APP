@@ -9,6 +9,8 @@
 - GET  /api/dft/jobs/{id}/export?format=gaussian|orca  量化软件输入文件下载
 - GET  /api/dft/solvents        内置溶剂表（x_type=solvent 的可选项）
 - GET  /api/dft/dimer-preview   醛/胺单体 → 缩合二聚体预览（SMILES + 多位点标注）
+- GET  /api/dft/atom-estimate   提交前原子数预估（含氢口径，替代前端粗估）
+- POST /api/dft/jobs/{id}/cancel  取消进行中的计算任务（尽快终止子进程）
 - GET  /api/dft/history         计算历史（dft_log.jsonl，新→旧分页）
 """
 
@@ -391,11 +393,74 @@ def dft_dimer_preview(ald_smiles: str, amine_smiles: str):
     }
 
 
+@router.get("/atom-estimate")
+def dft_atom_estimate(mode: str = "dimer", ald_smiles: str = "",
+                      amine_smiles: str = "", x_type: str = "self_stack",
+                      solvent_id: str | None = None,
+                      ald2_smiles: str | None = None,
+                      amine2_smiles: str | None = None,
+                      custom_smiles: str | None = None):
+    """提交前原子数预估（含氢口径，与嵌入 xyz 的真实原子数一致）。
+
+    pair 模式：复合物 = 分子 A + 分子 B；dimer 模式：复合物 = 二聚体 + X
+    （self_stack 时 X=二聚体自身，故复合物为二聚体 2 倍）。任何一步解析
+    失败时对应计数值为 None（前端据 None 隐藏提示），本端点不报错。
+    """
+    def atoms(smiles: str | None) -> int | None:
+        if not smiles:
+            return None
+        return engine.atom_count_with_h(smiles)
+
+    a = atoms(ald_smiles)
+    b = atoms(amine_smiles)
+    if mode == "pair":
+        return {"dimer_atom_count": None,
+                "x_atom_count": b,
+                "complex_atom_count":
+                    (a + b) if a is not None and b is not None else None}
+    try:
+        dim = dimer_mod.make_dimer(ald_smiles, amine_smiles)
+        dimer_smiles = dim["smiles"]
+    except Exception:
+        return {"dimer_atom_count": None, "x_atom_count": None,
+                "complex_atom_count": None}
+    d = atoms(dimer_smiles)
+    x = None
+    if x_type == "self_stack":
+        x = d
+    elif x_type == "solvent":
+        solvent = next((s for s in engine.SOLVENTS if s["id"] == solvent_id),
+                       None)
+        x = atoms(solvent["smiles"]) if solvent else None
+    elif x_type == "other_dimer":
+        try:
+            x = atoms(dimer_mod.make_dimer(ald2_smiles, amine2_smiles)["smiles"])
+        except Exception:
+            x = None
+    elif x_type == "custom":
+        x = atoms(custom_smiles)
+    return {"dimer_atom_count": d,
+            "x_atom_count": x,
+            "complex_atom_count":
+                (d + x) if d is not None and x is not None else None}
+
+
 @router.get("/jobs/{job_id}")
 def get_dft_job(job_id: str):
     job = jobs.get_job(job_id)
     if job is None:
         raise HTTPException(404, f"计算任务 {job_id} 不存在（服务重启后任务不保留）")
+    return _public_job(job)
+
+
+@router.post("/jobs/{job_id}/cancel")
+def cancel_dft_job(job_id: str):
+    """取消进行中的计算任务：置位取消事件 → 子进程尽快终止 → 终态 cancelled。"""
+    ok, job = jobs.request_cancel(job_id)
+    if job is None:
+        raise HTTPException(404, f"计算任务 {job_id} 不存在")
+    if not ok:
+        raise HTTPException(409, "任务已处于终态（完成/失败/已取消），无法取消")
     return _public_job(job)
 
 

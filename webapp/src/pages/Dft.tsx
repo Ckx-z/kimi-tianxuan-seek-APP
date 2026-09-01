@@ -56,9 +56,11 @@ import DftPlacementPanel from '@/components/dft/DftPlacementPanel';
 import { useDftTask } from '@/components/dft/DftTaskContext';
 import {
   buildDftSnapshot,
+  cancelDftJob,
   createDftJob,
   createFavoriteWithDft,
   dftMethodLabel,
+  fetchAtomEstimate,
   fetchDftBackends,
   fetchDftDraft,
   fetchDftHistory,
@@ -67,6 +69,7 @@ import {
   fetchDimerPreview,
   mergeDftToFavorite,
   saveDftDraft,
+  type AtomEstimate,
   type DftBackend,
   type DftBackendsResponse,
   type DftDraft,
@@ -85,16 +88,6 @@ interface PropsState {
   data: MonomerProps | null;
 }
 const emptyProps: PropsState = { loading: false, error: null, data: null };
-
-/**
- * 粗估 SMILES 重原子数（数元素符号：双字母 Br/Cl、大写开头符号、芳香小写
- * c/n/o/s/p）。不求精确，仅供大体系长时提示的阈值判断。
- */
-function estimateHeavyAtoms(smiles: string): number {
-  if (!smiles) return 0;
-  const m = smiles.match(/Br|Cl|[A-Z][a-z]?|[cnosp]/g);
-  return m ? m.length : 0;
-}
 
 /** 历史条目回显 → 拼装成 DftResult（旧条目缺二聚体/X 字段时留空兜底） */
 function resultFromHistory(h: DftHistoryEntry): DftResult {
@@ -163,20 +156,12 @@ export default function Dft() {
   const [backends, setBackends] = useState<DftBackendsResponse['backends'] | null>(null);
   const psi4Installed = backends?.psi4?.installed === true;
 
-  /** 大体系长时提示：粗估复合物总原子数（重原子×2 近似含氢），>50 时提示 */
-  const estTotalAtoms = (() => {
-    const dimerHeavy = estimateHeavyAtoms(monoA.smiles) + estimateHeavyAtoms(monoB.smiles);
-    if (!dimerHeavy) return 0;
-    let heavy = dimerHeavy;
-    if (!isPair) {
-      if (xType === 'self_stack') heavy = dimerHeavy * 2;
-      else if (xType === 'other_dimer')
-        heavy = dimerHeavy + estimateHeavyAtoms(monoA2.smiles) + estimateHeavyAtoms(monoB2.smiles);
-      else if (xType === 'custom') heavy = dimerHeavy + estimateHeavyAtoms(customSmiles);
-      else heavy = dimerHeavy + 10; // 溶剂小分子粗估
-    }
-    return heavy * 2;
-  })();
+  /**
+   * 提交前原子数预估（问题5修复）：后端含氢口径（GET /api/dft/atom-estimate），
+   * 与嵌入 xyz 的真实原子数一致；不再用前端「重原子×2」启发式（曾把
+   * 复合物错估成 60 个原子）。字段为 null 表示尚未取到/解析失败 → 隐藏提示。
+   */
+  const [estAtoms, setEstAtoms] = useState<AtomEstimate | null>(null);
 
   /** URL 预填（收藏详情「重新计算」跳转）：?a=<smiles>&b=<smiles>&an=<名>&bn=<名> */
   const [searchParams] = useSearchParams();
@@ -211,6 +196,10 @@ export default function Dft() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   /** 当前结果对应的任务 id（导出输入文件用；历史回显时为 null） */
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  /** 取消请求进行中（按钮禁用态） */
+  const [cancelling, setCancelling] = useState(false);
+  /** 最近一次任务被取消（显示琥珀提示条，新提交时清除） */
+  const [cancelled, setCancelled] = useState(false);
 
   // ---------- 联动 ----------
   const [aProps, setAProps] = useState<PropsState>(emptyProps);
@@ -297,6 +286,33 @@ export default function Dft() {
     return () => clearTimeout(timer);
   }, [mode, monoA.smiles, monoB.smiles]);
 
+  // ---------- 提交前原子数预估（问题5修复：后端含氢口径，防抖 400ms） ----------
+  useEffect(() => {
+    if (!monoA.smiles || !monoB.smiles) {
+      setEstAtoms(null);
+      return;
+    }
+    const payload = isPair
+      ? { mode: 'pair' as const, ald_smiles: monoA.smiles, amine_smiles: monoB.smiles }
+      : {
+          mode: 'dimer' as const,
+          ald_smiles: monoA.smiles,
+          amine_smiles: monoB.smiles,
+          x_type: xType,
+          solvent_id: xType === 'solvent' ? solventId : undefined,
+          ald2_smiles: xType === 'other_dimer' ? monoA2.smiles : undefined,
+          amine2_smiles: xType === 'other_dimer' ? monoB2.smiles : undefined,
+          custom_smiles: xType === 'custom' ? customSmiles : undefined,
+        };
+    const timer = setTimeout(() => {
+      fetchAtomEstimate(payload)
+        .then(setEstAtoms)
+        .catch(() => setEstAtoms(null));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [mode, isPair, xType, solventId, monoA.smiles, monoB.smiles,
+      monoA2.smiles, monoB2.smiles, customSmiles]);
+
   /** 轮询任务直至 done/failed */
   const startPolling = useCallback((id: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -325,6 +341,15 @@ export default function Dft() {
           setRunning(false);
           setError(job.error || '任务已中断（服务重启），参数已保留，请重新提交');
           setCurrentJobId(null);
+        } else if (job.status === 'cancelled') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          setRunning(false);
+          setError(null);
+          setProgressHint('任务已取消');
+          setCancelled(true);
+          setCurrentJobId(null);
+          refreshHistory();
         }
       } catch {
         // 轮询失败（后端重启等）：停止轮询并提示
@@ -367,6 +392,10 @@ export default function Dft() {
         setCurrentJobId(null);
       } else if (job.status === 'interrupted') {
         setError(job.error || '上次计算任务已中断（服务重启），参数已恢复，请重新提交');
+        setCurrentJobId(null);
+      } else if (job.status === 'cancelled') {
+        setCancelled(true);
+        setProgressHint('任务已取消');
         setCurrentJobId(null);
       } else {
         setRunning(true);
@@ -443,6 +472,7 @@ export default function Dft() {
     setRunning(true);
     setResult(null);
     setError(null);
+    setCancelled(false);
     setAProps(emptyProps);
     setBProps(emptyProps);
     setProgressHint('正在提交计算任务…');
@@ -498,6 +528,20 @@ export default function Dft() {
       // toast 已在 api 辅助中弹出
     }
   };
+
+  /** 取消进行中的计算：POST /jobs/{id}/cancel；终态由轮询落定（cancelled 分支） */
+  const handleCancel = useCallback(async () => {
+    if (!currentJobId || !running) return;
+    setCancelling(true);
+    try {
+      await cancelDftJob(currentJobId);
+      // 后端已登记取消事件；1.5s 轮询会收敛到 cancelled 终态并刷新界面
+    } catch {
+      // 409（已终态）/网络失败：轮询兜底收敛，不重复弹提示（api 层 silent）
+    } finally {
+      setCancelling(false);
+    }
+  }, [currentJobId, running]);
 
   /** 加载两侧性质卡 */
   const loadProps = useCallback((smiles: string, name: string, setter: React.Dispatch<React.SetStateAction<PropsState>>) => {
@@ -1042,9 +1086,14 @@ export default function Dft() {
           </div>
 
           {/* 第三步：开始计算 */}
-          {isPsi4 && estTotalAtoms > 50 && (
+          {isPsi4 && estAtoms?.complex_atom_count != null && estAtoms.complex_atom_count > 50 && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
-              ⏳ 当前组合预估复合物约 {estTotalAtoms} 个原子（&gt;50），Psi4 精度档可能需要 30 分钟以上，请耐心等待；计算在后台进行，期间可切换其他页面。
+              ⏳ 当前组合预估复合物约 {estAtoms.complex_atom_count} 个原子
+              （{isPair
+                ? `分子 A ${estAtoms.x_atom_count != null
+                    ? estAtoms.complex_atom_count - estAtoms.x_atom_count : '?'} + 分子 B ${estAtoms.x_atom_count ?? '?'}`
+                : `二聚体 ${estAtoms.dimer_atom_count ?? '?'} + X ${estAtoms.x_atom_count ?? '?'}`}，含氢口径；&gt;50），
+              Psi4 精度档可能需要 30 分钟以上，请耐心等待；计算在后台进行，期间可切换其他页面。
             </p>
           )}
           {!isPair && xType === 'self_stack' && (
@@ -1131,10 +1180,11 @@ export default function Dft() {
             <div className="rounded-lg border bg-card p-6 text-center shadow-sm">
               <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-gold border-t-transparent" />
               <div className="mx-auto mb-2 w-full max-w-sm">
-                <Progress value={progressPercent} className="h-2" />
+                {/* 进度钳制：终态前最多 99（100 仅由后端终态写入，修复「初始化完成」类文案提前满格） */}
+                <Progress value={Math.min(progressPercent, 99)} className="h-2" />
               </div>
               <p className="text-sm font-medium">
-                {progressPercent > 0 ? `${progressPercent}% · ` : ''}{progressHint || '计算中…'}
+                {progressPercent > 0 ? `${Math.min(progressPercent, 99)}% · ` : ''}{progressHint || '计算中…'}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {isPsi4
@@ -1143,7 +1193,28 @@ export default function Dft() {
                     ? '精确档位通常需要数十秒，二聚体·二聚体等大体系可能数分钟'
                     : '快速档位通常数秒内完成'}
               </p>
+              <div className="mt-4 flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={cancelling}
+                  onClick={() => void handleCancel()}
+                >
+                  {cancelling ? '正在取消…' : '取消计算'}
+                </Button>
+              </div>
             </div>
+          )}
+
+          {/* 取消提示（琥珀，非失败） */}
+          {cancelled && !running && !error && (
+            <Alert className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
+              <AlertTitle className="text-amber-800 dark:text-amber-300">计算已取消</AlertTitle>
+              <AlertDescription className="text-amber-700 dark:text-amber-400">
+                任务已终止，未产生结果；表单参数已保留，可调整后重新提交。
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* 失败原因（中文） */}
