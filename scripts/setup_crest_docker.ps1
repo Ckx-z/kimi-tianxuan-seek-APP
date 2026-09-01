@@ -53,18 +53,50 @@ function Wait-DockerReady([int]$TimeoutSec = 300) {
 }
 
 Step '0. Check WSL2 status'
+# Clean up leftovers from previous stuck runs:
+#  - winget's StagePackageAsync can hang forever on some networks
+#  - a zombie deployment operation blocks the AppX pipeline, so an older
+#    instance of this script must be killed and AppXSvc restarted
+Get-Process winget -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+$cutoff = (Get-Date).AddMinutes(-10)
+Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match 'setup_crest_docker' -and $_.ProcessId -ne $PID -and $_.CreationDate -lt $cutoff } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Write-Output "killed orphan setup process $($_.ProcessId)" }
+try { Restart-Service AppXSvc -Force -ErrorAction SilentlyContinue } catch { Write-Output 'AppXSvc restart skipped' }
+Start-Sleep -Seconds 3
 if (-not (Test-WslReady)) {
     Write-Output 'WSL2 not ready. Enabling Windows features (WSL + VirtualMachinePlatform)...'
     cmd.exe /c 'dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart' | Out-String | Write-Output
     cmd.exe /c 'dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart' | Out-String | Write-Output
-    # Install the modern WSL app if wsl.exe is still the old inbox stub
+    # Install the modern WSL app if wsl.exe is still the old inbox stub.
+    # MSI-first: wsl.2.x.x64.msi installs wsl.exe + WslService + kernel via
+    # plain msiexec, avoiding the AppX deployment pipeline entirely (that
+    # pipeline can hang forever behind a stuck winget StagePackageAsync op).
+    # Fallbacks: local MSIX bundle via Add-AppxPackage, then winget.
     $wslVer = cmd.exe /c "wsl.exe --version 2>nul"
     if (($wslVer -join "`n") -notmatch 'WSL version') {
-        Write-Output 'Old inbox wsl.exe stub detected. Installing modern WSL via winget...'
-        cmd.exe /c 'winget install --id Microsoft.WSL -e --accept-package-agreements --accept-source-agreements --disable-interactivity' | Out-String | Write-Output
+        $msi = Join-Path $env:TEMP 'wsl.2.7.12.0.x64.msi'
+        $bundle = Join-Path $env:TEMP 'Microsoft.WSL_2.7.12.msixbundle'
+        if (Test-Path $msi) {
+            Write-Output 'Local WSL MSI found; installing silently (msiexec, no AppX)...'
+            cmd.exe /c "msiexec.exe /i `"$msi`" /qn /norestart" | Out-String | Write-Output
+        } elseif (Test-Path $bundle) {
+            Write-Output 'Local WSL app bundle found; installing via Add-AppxPackage...'
+            Add-AppxPackage -Path $bundle -ForceUpdateFromAnyVersion
+        } else {
+            Write-Output 'Old inbox wsl.exe stub detected. Installing modern WSL via winget...'
+            cmd.exe /c 'winget install --id Microsoft.WSL -e --accept-package-agreements --accept-source-agreements --disable-interactivity' | Out-String | Write-Output
+        }
     }
-    # Update WSL kernel
-    cmd.exe /c "wsl.exe --update" 2>&1 | Out-String | Write-Output
+    # Update WSL kernel: local MSI first (wsl --update pulls the same file
+    # from GitHub and can stall on the same network path)
+    $kernelMsi = Join-Path $env:TEMP 'wsl.2.7.12.0.x64.msi'
+    if (Test-Path $kernelMsi) {
+        Write-Output 'Local WSL kernel MSI found; installing silently...'
+        cmd.exe /c "msiexec.exe /i `"$kernelMsi`" /qn /norestart" | Out-String | Write-Output
+    } else {
+        cmd.exe /c "wsl.exe --update" 2>&1 | Out-String | Write-Output
+    }
 }
 if (Test-WslReady) {
     Write-Output 'WSL2 is ready.'
