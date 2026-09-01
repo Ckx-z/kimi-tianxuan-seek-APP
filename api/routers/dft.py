@@ -22,7 +22,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 
-from ..schemas import DftDraftPut, DftJobCreate
+from ..schemas import (ConformerGenerate, ConformerManual, DftDraftPut,
+                       DftJobCreate)
 
 try:
     from src import runtime_config
@@ -35,12 +36,14 @@ try:
     from src.dft import export as dft_export
     from src.dft import log as dft_log
     from src.dft import psi4_backend
+    from src.dft import conformers as dft_conformers
 except ImportError:  # pragma: no cover - src 直接在 sys.path 时
     from dft import dimer as dimer_mod  # type: ignore
     from dft import engine, jobs  # type: ignore
     from dft import export as dft_export  # type: ignore
     from dft import log as dft_log  # type: ignore
     from dft import psi4_backend  # type: ignore
+    from dft import conformers as dft_conformers  # type: ignore
 
 router = APIRouter(prefix="/api/dft", tags=["dft"])
 
@@ -119,7 +122,8 @@ def create_dft_job(req: DftJobCreate):
         _check_backend_available(backend)
         job = jobs.create_job(ald, amine, method, mode="pair", backend=backend,
                               n_samples=req.n_samples,
-                              optimize=req.optimize, threads=req.threads)
+                              optimize=req.optimize, threads=req.threads,
+                              complex_xyz=req.complex_xyz)
         return _public_job(job)
 
     if not ald or not amine:
@@ -148,7 +152,8 @@ def create_dft_job(req: DftJobCreate):
         solvent_id=req.solvent_id, ald2_smiles=req.ald2_smiles,
         amine2_smiles=req.amine2_smiles, custom_smiles=req.custom_smiles,
         backend=backend, n_samples=req.n_samples,
-        optimize=req.optimize, threads=req.threads)
+        optimize=req.optimize, threads=req.threads,
+        complex_xyz=req.complex_xyz)
     return _public_job(job)
 
 
@@ -195,6 +200,132 @@ def put_dft_draft(req: DftDraftPut):
         return {"ok": False}
 
 
+@router.get("/conformers/engines")
+def conformer_engines():
+    """构象采样引擎可用性（前端「构象来源」选择器用）。"""
+    return {"engines": dft_conformers.conformer_engines()}
+
+
+@router.post("/conformers/generate")
+def generate_conformers(req: ConformerGenerate):
+    """自动检索低能构象（ETKDG 秒级 / CREST 分钟级，同步返回，前端显示加载态）。"""
+    engine_name = (req.engine or "auto").strip()
+    if engine_name not in ("auto", "etkdg", "crest"):
+        raise HTTPException(400, f"未知的构象引擎：{req.engine}（可选 auto / etkdg / crest）")
+    if engine.canonicalize_smiles(req.smiles) is None:
+        raise HTTPException(400, f"SMILES 无法解析：{req.smiles[:80]}")
+    if engine_name == "crest" and dft_conformers.crest_binary() is None:
+        raise HTTPException(503, "未安装 CREST（conda install -c conda-forge crest，"
+                                 "建议装入 psi4-env）；可改用 etkdg 引擎或自动模式")
+    cached = dft_conformers.load_cached_conformers(
+        req.smiles, engine_name, req.n_gen, req.max_confs, req.e_window_kj)
+    if cached is not None:
+        return {"conformers": cached, "engine": engine_name, "cached": True}
+    confs = dft_conformers.generate_conformers(
+        req.smiles, engine_name, n_gen=req.n_gen,
+        max_confs=req.max_confs, e_window_kj=req.e_window_kj)
+    if not confs:
+        raise HTTPException(422, "构象生成失败：分子过小/无柔性键，或引擎未安装/超时，"
+                                 "请换用其他引擎或分子")
+    dft_conformers.save_cached_conformers(
+        req.smiles, engine_name, req.n_gen, req.max_confs, req.e_window_kj, confs)
+    return {"conformers": confs, "engine": engine_name, "cached": False}
+
+
+@router.post("/conformers/manual")
+def manual_conformer(req: ConformerManual):
+    """手动摆放：主体 + 客体经刚体变换（平移/旋转，可选锚点对齐）合成复合物 xyz。"""
+    import math
+
+    if engine.canonicalize_smiles(req.a_smiles) is None:
+        raise HTTPException(400, f"主体 SMILES 无法解析：{req.a_smiles[:80]}")
+    if engine.canonicalize_smiles(req.b_smiles) is None:
+        raise HTTPException(400, f"客体 SMILES 无法解析：{req.b_smiles[:80]}")
+    try:
+        a_xyz = engine.embed_monomer_xyz(req.a_smiles)
+        b_xyz = engine.embed_monomer_xyz(req.b_smiles)
+    except engine.DftError as exc:
+        raise HTTPException(422, f"几何生成失败：{exc}")
+    b_atoms = _xyz_atoms_list(b_xyz)
+    if not b_atoms:
+        raise HTTPException(422, "客体几何生成失败")
+
+    # 绕质心旋转（x→y→z 顺序，单位度）再平移
+    cx, cy, cz = (sum(p[1] for p in b_atoms) / len(b_atoms),
+                  sum(p[2] for p in b_atoms) / len(b_atoms),
+                  sum(p[3] for p in b_atoms) / len(b_atoms))
+    rx, ry, rz = (math.radians(req.rx_deg), math.radians(req.ry_deg),
+                  math.radians(req.rz_deg))
+
+    def rotate(x: float, y: float, z: float) -> tuple[float, float, float]:
+        x, y, z = x - cx, y - cy, z - cz
+        if rz:
+            x, y = x * math.cos(rz) - y * math.sin(rz), \
+                   x * math.sin(rz) + y * math.cos(rz)
+        if ry:
+            x, z = x * math.cos(ry) + z * math.sin(ry), \
+                   -x * math.sin(ry) + z * math.cos(ry)
+        if rx:
+            y, z = y * math.cos(rx) - z * math.sin(rx), \
+                   y * math.sin(rx) + z * math.cos(rx)
+        return x + cx + req.tx, y + cy + req.ty, z + cz + req.tz
+
+    b_lines = b_xyz.strip().splitlines()
+    b_n = int(b_lines[0])
+    new_b = [b_lines[0], b_lines[1]]
+    for i, line in enumerate(b_lines[2: 2 + b_n]):
+        parts = line.split()
+        x, y, z = rotate(float(parts[1]), float(parts[2]), float(parts[3]))
+        new_b.append(f"{parts[0]} {x:.6f} {y:.6f} {z:.6f}")
+
+    # 锚点对齐：把客体锚点原子平移到主体锚点原子附近（范德华距离 3.0 Å）
+    if req.anchor_a is not None and req.anchor_b is not None:
+        a_atoms = _xyz_atoms_list(a_xyz)
+        if req.anchor_a < len(a_atoms) and req.anchor_b < len(b_atoms):
+            ax = a_atoms[req.anchor_a][1:4]
+            bx = new_b[2 + req.anchor_b].split()
+            dx, dy, dz = (ax[0] - float(bx[1]), ax[1] - float(bx[2]),
+                          ax[2] - float(bx[3]))
+            # 沿锚点方向拉开 3.0 Å（主体锚点 + 单位方向 × 3.0）
+            norm = math.sqrt(dx * dx + dy * dy + dz * dz) or 1.0
+            shift = 3.0
+            ax_shift = (ax[0] + dx / norm * shift, ax[1] + dy / norm * shift,
+                        ax[2] + dz / norm * shift)
+            tx2, ty2, tz2 = (ax_shift[0] - float(bx[1]), ax_shift[1] - float(bx[2]),
+                             ax_shift[2] - float(bx[3]))
+            new_b = [new_b[0], new_b[1]] + [
+                f"{new_b[2 + i].split()[0]} "
+                f"{float(new_b[2 + i].split()[1]) + tx2:.6f} "
+                f"{float(new_b[2 + i].split()[2]) + ty2:.6f} "
+                f"{float(new_b[2 + i].split()[3]) + tz2:.6f}"
+                for i in range(b_n)]
+
+    a_n = int(a_xyz.strip().splitlines()[0])
+    total = a_n + b_n
+    combined = "\n".join([str(total), "manual complex"] +
+                         a_xyz.strip().splitlines()[2: 2 + a_n] +
+                         new_b[2: 2 + b_n])
+    return {"xyz": combined, "atom_budget": {"a": a_n, "b": b_n,
+                                             "complex": total},
+            "fragment_ranges": {"a": [0, a_n], "b": [a_n, total]}}
+
+
+def _xyz_atoms_list(xyz_block: str) -> list[list]:
+    """xyz 文本 → [[symbol, x, y, z], ...]（表头两行跳过）。"""
+    out = []
+    try:
+        lines = xyz_block.strip().splitlines()
+        n = int(lines[0])
+        for line in lines[2: 2 + n]:
+            parts = line.split()
+            if len(parts) >= 4:
+                out.append([parts[0], float(parts[1]), float(parts[2]),
+                            float(parts[3])])
+    except Exception:
+        pass
+    return out
+
+
 @router.get("/backends")
 def dft_backends():
     """各计算后端的可用状态（前端后端选择器与 Psi4 安装引导用）。"""
@@ -224,7 +355,9 @@ def dft_backends():
                 else psi4_backend.INSTALL_HINT,
                 "reason": det["reason"],
             },
-        }
+        },
+        # 构象采样引擎可用性（v1.5.0：前端「构象来源」选择器用）
+        "conformer_engines": dft_conformers.conformer_engines(),
     }
 
 

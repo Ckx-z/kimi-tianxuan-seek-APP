@@ -134,7 +134,8 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
                custom_smiles: str | None = None, mode: str = "dimer",
                backend: str = "xtb", n_samples: int | None = None,
                optimize: bool | None = None,
-               threads: int | None = None) -> dict:
+               threads: int | None = None,
+               complex_xyz: str | None = None) -> dict:
     """建任务。缓存命中 → 直接 done；否则 pending 并起后台线程。
 
     mode="pair" 时 ald/amine 参数位复用为分子 A/B，忽略 x_type 相关字段。
@@ -142,6 +143,8 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
     n_samples：MC 取向采样数（None=默认；1=旧单取向初猜口径）。
     optimize：仅 psi4 档——是否做 Psi4 全几何优化（None=后端默认 False，单点提速）。
     threads：仅 psi4 档——并行线程数（None=环境变量/配置/默认 4）。
+    complex_xyz：可选外部复合物初猜 xyz（手动摆放/构象采样产物），
+        提供时跳过取向采样与自动初猜（缓存 key 不区分，命中缓存照常返回）。
     """
     job_id = uuid.uuid4().hex[:16]
     job = {
@@ -155,6 +158,7 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
         "n_samples": n_samples,
         "optimize": optimize,
         "threads": threads,
+        "complex_xyz": complex_xyz,
         "ald_smiles_input": ald_smiles,
         "amine_smiles_input": amine_smiles,
         "x_type": x_type,
@@ -305,7 +309,8 @@ def _run_job(job_id: str) -> None:
             if mode == "pair":
                 result = psi4_backend.compute_pair_binding_psi4(
                     ald_smiles, amine_smiles, method, on_stage=on_stage,
-                    n_samples=n_samples, **psi4_kwargs)
+                    n_samples=n_samples,
+                    complex_xyz=job.get("complex_xyz"), **psi4_kwargs)
             else:
                 result = psi4_backend.compute_binding_psi4(
                     ald_smiles, amine_smiles, method,
@@ -314,12 +319,13 @@ def _run_job(job_id: str) -> None:
                     ald2_smiles=job.get("ald2_smiles"),
                     amine2_smiles=job.get("amine2_smiles"),
                     custom_smiles=job.get("custom_smiles"),
-                    on_stage=on_stage, n_samples=n_samples, **psi4_kwargs)
+                    on_stage=on_stage, n_samples=n_samples,
+                    complex_xyz=job.get("complex_xyz"), **psi4_kwargs)
         elif mode == "pair":
             # 任意双分子模式：A···B 直接结合，跳过二聚体生成与 X 解析
             result = engine.compute_pair_binding(
                 ald_smiles, amine_smiles, method, on_stage=on_stage,
-                n_samples=n_samples)
+                n_samples=n_samples, complex_xyz=job.get("complex_xyz"))
         else:
             result = engine.compute_binding(
                 ald_smiles, amine_smiles, method,
@@ -328,7 +334,8 @@ def _run_job(job_id: str) -> None:
                 ald2_smiles=job.get("ald2_smiles"),
                 amine2_smiles=job.get("amine2_smiles"),
                 custom_smiles=job.get("custom_smiles"),
-                on_stage=on_stage, n_samples=n_samples)
+                on_stage=on_stage, n_samples=n_samples,
+                complex_xyz=job.get("complex_xyz"))
         key = dft_cache.cache_key(
             result["smiles_a"] if mode == "pair" else result["dimer_smiles"],
             result["x_cache_part"], method, mode=mode, backend=backend,

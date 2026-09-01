@@ -210,6 +210,34 @@ class DftJobCreate(BaseModel):
     threads: int | None = Field(
         None, ge=1, le=32, description="仅 psi4 档：并行线程数"
                                        "（缺省=环境变量 COF_PSI4_THREADS 或配置或 4）")
+    complex_xyz: str | None = Field(
+        None, description="可选：外部提供的复合物初猜 xyz（手动摆放/构象采样产物），"
+                          "提供时跳过取向采样与自动初猜；原子顺序须为主体在前、客体在后")
+
+
+class ConformerGenerate(BaseModel):
+    """低能构象自动检索请求。"""
+    smiles: str = Field(..., description="分子 SMILES（客体或单体）")
+    engine: str = Field("auto", description="构象引擎：auto（CREST 可用优先，否则 ETKDG）"
+                                            "| etkdg | crest")
+    n_gen: int = Field(50, ge=1, le=200, description="ETKDG 生成尝试数（crest 忽略）")
+    max_confs: int = Field(20, ge=1, le=50, description="保留构象数量上限")
+    e_window_kj: float = Field(10.0, ge=0.0, le=100.0,
+                               description="相对全局最低能的能量窗口（kJ/mol）")
+
+
+class ConformerManual(BaseModel):
+    """手动摆放复合物请求：主体/客体 SMILES + 客体刚体变换（可选锚点对齐）。"""
+    a_smiles: str = Field(..., description="主体（二聚体/分子 A）SMILES")
+    b_smiles: str = Field(..., description="客体（X/分子 B）SMILES")
+    tx: float = Field(0.0, description="客体平移 x（Å）")
+    ty: float = Field(0.0, description="客体平移 y（Å）")
+    tz: float = Field(0.0, description="客体平移 z（Å）")
+    rx_deg: float = Field(0.0, description="客体绕 x 轴旋转（度）")
+    ry_deg: float = Field(0.0, description="客体绕 y 轴旋转（度）")
+    rz_deg: float = Field(0.0, description="客体绕 z 轴旋转（度）")
+    anchor_a: int | None = Field(None, ge=0, description="主体吸附位点原子序号（可选）")
+    anchor_b: int | None = Field(None, ge=0, description="客体锚点原子序号（可选）")
 
 
 class DftDraftPut(BaseModel):

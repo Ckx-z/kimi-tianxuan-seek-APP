@@ -886,7 +886,8 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
                     amine2_smiles: str | None = None,
                     custom_smiles: str | None = None,
                     on_stage=None, jobs_root: Path | None = None,
-                    n_samples: int | None = None) -> dict:
+                    n_samples: int | None = None,
+                    complex_xyz: str | None = None) -> dict:
     """计算「缩合二聚体 D 与第三物质 X」的结合能与量化描述符。
 
     流程：醛/胺单体 → 亚胺缩合二聚体 D（dimer.make_dimer）→ 解析 X
@@ -900,6 +901,9 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
             各 x_type 对应的补充参数
         on_stage: 可选回调 on_stage(hint: str)，用于任务进度提示
         jobs_root: 任务临时目录根（默认 user_data_root()/dft_jobs）
+        complex_xyz: 可选，外部提供的 D·X 复合物初猜 xyz（手动摆放/构象采样
+            产物）；提供时跳过取向采样与自动初猜，直接进入 xTB 优化。
+            原子顺序须为二聚体在前、X 在后。
 
     Returns:
         结果 dict（二聚体 SMILES / X 描述 / 能量 / gap / 偶极矩 /
@@ -980,7 +984,11 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
 
         stage("正在构造 D·X 复合物初猜…")
         sampling = None
-        if _use_mc_screening(method, n_samples):
+        if complex_xyz is not None:
+            # 外部提供的初猜（手动摆放 / 构象采样产物）：跳过取向采样与自动初猜
+            stage("使用外部提供的 D·X 复合物几何（手动摆放 / 构象采样）…")
+            xyz_c = complex_xyz
+        elif _use_mc_screening(method, n_samples):
             info = screen_complex_xtb(dimer_smiles, x_smiles,
                                       job_dir / "screen",
                                       n_samples=n_samples, on_stage=stage)
@@ -1054,13 +1062,16 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
 
 def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
                          on_stage=None, jobs_root: Path | None = None,
-                         n_samples: int | None = None) -> dict:
+                         n_samples: int | None = None,
+                         complex_xyz: str | None = None) -> dict:
     """任意双分子模式（选项2）：A···B 复合物结合能，不经过二聚体生成。
 
     E_bind = E(A·B 复合物) − E(A) − E(B)。ald/amine 字段位复用为分子 A/B，
     结果字段与 compute_binding 对齐（energies/gap/dipole 的 "dimer"/"x" 键
     在 pair 模式下分别对应分子 A / 分子 B），dimer_smiles 置 None，
     x_description 固定为「A···B 直接结合」，x_type 置 None。
+    complex_xyz：可选，外部提供的 A···B 复合物初猜 xyz（手动摆放/构象采样
+    产物），原子顺序须为 A 在前、B 在后。
 
     Raises:
         DftError: 任何一步失败（message 为中文原因）
@@ -1119,7 +1130,11 @@ def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
 
         stage("正在构造 A···B 复合物初猜…")
         sampling = None
-        if _use_mc_screening(method, n_samples):
+        if complex_xyz is not None:
+            # 外部提供的初猜（手动摆放 / 构象采样产物）：跳过取向采样与自动初猜
+            stage("使用外部提供的 A···B 复合物几何（手动摆放 / 构象采样）…")
+            xyz_c = complex_xyz
+        elif _use_mc_screening(method, n_samples):
             info = screen_complex_xtb(canon_a, canon_b, job_dir / "screen",
                                       n_samples=n_samples, on_stage=stage)
             xyz_c = info["best_xyz"]
