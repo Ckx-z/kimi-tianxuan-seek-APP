@@ -154,6 +154,23 @@ class TestThreadsDefaultV151:
         assert runtime_config.psi4_threads() == 8
 
 
+class TestCacheTagV151:
+    """v1.5.1：缓存 key 区分 with_props——仅结合能结果不得顶掉完整性质缓存。"""
+
+    def test_with_props_distinguishes_cache(self):
+        t1 = dft_jobs._sampler_tag("psi4", "wb97xd3bj_svp_quick", 1,
+                                   with_props=True)
+        t2 = dft_jobs._sampler_tag("psi4", "wb97xd3bj_svp_quick", 1,
+                                   with_props=False)
+        assert t1 == "mc1"
+        assert t2 == "mc1|noprops"
+        assert t1 != t2
+
+    def test_xtb_tag_unchanged(self):
+        assert dft_jobs._sampler_tag("xtb", "gfnff", None) is None
+        assert dft_jobs._sampler_tag("xtb", "gfn2", None) == "mc0"
+
+
 # ---------------------------------------------------------------- 输出解析
 
 class TestResultParsing:

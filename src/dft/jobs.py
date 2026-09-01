@@ -121,13 +121,19 @@ def _prune_locked() -> None:
         _JOBS.pop(jid, None)
 
 
-def _sampler_tag(backend: str, method: str, n_samples: int | None
-                 ) -> str | None:
+def _sampler_tag(backend: str, method: str, n_samples: int | None,
+                 with_props: bool | None = None) -> str | None:
     """缓存 key 的采样口径标记：gfnff 不采样（None 保持旧格式）；
-    gfn2/psi4 走 MC 采样，按请求采样数区分（None → "mc0" 默认口径）。"""
+    gfn2/psi4 走 MC 采样，按请求采样数区分（None → "mc0" 默认口径）。
+    psi4 的 with_props=False（仅结合能，缺片段性质/fchk）追加 "|noprops"，
+    避免仅结合能结果顶掉完整性质模式的缓存（v1.5.1）。"""
     if backend == "xtb" and method != "gfn2":
-        return None
-    return f"mc{n_samples if n_samples and n_samples > 0 else 0}"
+        tag = None
+    else:
+        tag = f"mc{n_samples if n_samples and n_samples > 0 else 0}"
+    if backend == "psi4" and with_props is False:
+        tag = (tag or "mc0") + "|noprops"
+    return tag
 
 
 def create_job(ald_smiles: str, amine_smiles: str, method: str,
@@ -184,7 +190,8 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
     # 这里先算出新口径缓存 key 探缓存
     probe = _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
                              solvent_id, ald2_smiles, amine2_smiles,
-                             custom_smiles, mode, backend, n_samples)
+                             custom_smiles, mode, backend, n_samples,
+                             with_props=with_props)
     if probe is not None:
         key, canon_ald, canon_amine = probe
         hit = dft_cache.load_cache(key)
@@ -209,7 +216,7 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
 def _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
                      solvent_id, ald2_smiles, amine2_smiles,
                      custom_smiles, mode="dimer", backend="xtb",
-                     n_samples=None):
+                     n_samples=None, with_props=None):
     """尽力算出 (缓存 key, 规范化 A, 规范化 B)；任一步失败返回 None。"""
     try:
         methods = engine.METHODS if backend == "xtb" else psi4_backend.PSI4_METHODS
@@ -217,7 +224,7 @@ def _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
             if backend == "psi4" else method
         if method not in methods:
             return None
-        tag = _sampler_tag(backend, method, n_samples)
+        tag = _sampler_tag(backend, method, n_samples, with_props=with_props)
         canon_ald = engine.canonicalize_smiles(ald_smiles)
         canon_amine = engine.canonicalize_smiles(amine_smiles)
         if not canon_ald or not canon_amine:
@@ -397,7 +404,8 @@ def _run_job(job_id: str) -> None:
         key = dft_cache.cache_key(
             result["smiles_a"] if mode == "pair" else result["dimer_smiles"],
             result["x_cache_part"], method, mode=mode, backend=backend,
-            sampler_tag=_sampler_tag(backend, method, n_samples))
+            sampler_tag=_sampler_tag(backend, method, n_samples,
+                                     with_props=job.get("with_props")))
         dft_cache.save_cache(key, result)
         result["cached"] = False
         # pair 模式无单体组归属，不做收藏联动
