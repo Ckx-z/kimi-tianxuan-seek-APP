@@ -68,7 +68,30 @@ class TestEtkdg:
 class TestCrest:
     def test_crest_missing_returns_empty(self, monkeypatch, tmp_path):
         monkeypatch.setattr(dft_conformers, "crest_binary", lambda: None)
+        # Docker 引擎在本机已就绪：测试里强制关闭 docker 回退，保持确定性
+        monkeypatch.setattr(dft_conformers, "docker_engine_ready", lambda: False)
         assert dft_conformers.generate_conformers_crest("3\nx\nC 0 0 0\nH 1 0 0\nH 0 1 0\n") == []
+
+    def test_parse_crest3x_bare_energy_format(self, tmp_path):
+        """CREST 3.x 的 crest_conformers.xyz：注释行是裸能量数值（无 energy: 前缀）。"""
+        frame = ("14\n{energy}\n" + "C 0 0 0\n" * 14)
+        content = frame.format(energy="-13.66512776") + frame.format(energy="-13.66000000")
+        path = tmp_path / "crest_conformers.xyz"
+        path.write_text(content, encoding="utf-8")
+        confs = dft_conformers._parse_crest_conformers(path, 5, 30.0)
+        assert len(confs) == 2
+        assert confs[0]["rel_e_kj"] == 0.0
+        # ΔE = 0.00512776 Hartree ≈ 13.46 kJ/mol
+        assert confs[1]["rel_e_kj"] == pytest.approx(0.00512776 * 2625.5, abs=0.01)
+
+    def test_parse_legacy_energy_label_format(self, tmp_path):
+        frame = ("14\nenergy: {energy}\n" + "C 0 0 0\n" * 14)
+        content = frame.format(energy="-13.66512776") + frame.format(energy="-13.66000000")
+        path = tmp_path / "crest_conformers.xyz"
+        path.write_text(content, encoding="utf-8")
+        confs = dft_conformers._parse_crest_conformers(path, 5, 30.0)
+        assert len(confs) == 2
+        assert confs[0]["rel_e_kj"] == 0.0
 
     def test_engines_report(self):
         engines = dft_conformers.conformer_engines()

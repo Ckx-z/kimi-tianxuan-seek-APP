@@ -14,11 +14,13 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 from . import engine
@@ -282,42 +284,68 @@ def _generate_conformers_crest_docker(xyz_block: str, max_confs: int,
                                       timeout: int) -> list[dict]:
     """CREST 经 Docker 容器运行（cof-crest 镜像，conda-forge crest）。
 
-    Windows 工作目录挂载到容器 /work（Docker Desktop 自动翻译盘符路径），
-    容器内直接跑 crest input.xyz，产物 crest_conformers.xyz 落回宿主目录。
+    输入/产物经 docker cp 在容器与宿主间搬运（不用绑定挂载）：容器以
+    root 写入挂载目录时，DrvFS 的 ACL 映射偶尔把产物映射成宿主用户不可读
+    （PermissionError），docker cp 恒以宿主当前用户写入，确定性可读。
     """
     docker = _docker_binary()
     if docker is None:
         return []
     work = Path(tempfile.mkdtemp(prefix="dft_crest_docker_"))
+    container = f"cof-crest-{uuid.uuid4().hex[:12]}"
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) \
+        if sys.platform == "win32" else 0
+
+    def _run(cmd: list[str], timeout_s: int) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            cmd, capture_output=True, text=True, errors="replace",
+            encoding="utf-8", timeout=timeout_s, creationflags=flags)
+
     try:
         inp = work / "input.xyz"
         inp.write_text(xyz_block, encoding="utf-8")
-        # 盘符路径统一为反斜杠→正斜杠，规避 docker CLI 参数解析问题
-        mount = f"{str(work).replace(chr(92), '/')}:/work"
-        cmd = [docker, "run", "--rm", "-v", mount, "-w", "/work",
-               CREST_DOCKER_IMAGE, "crest", "input.xyz",
-               "--gfn2", "--nci", "--chrg", "0"]
+        crest_args = ["crest", "input.xyz", "--gfn2", "--nci", "--chrg", "0"]
         try:
-            proc = subprocess.run(
-                cmd, capture_output=True, text=True, errors="replace",
-                encoding="utf-8", timeout=timeout,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                if sys.platform == "win32" else 0)
+            create = _run([docker, "create", "--name", container, "-w", "/work",
+                           CREST_DOCKER_IMAGE, *crest_args], 60)
+            if create.returncode != 0:
+                return []
+            cp_in = _run([docker, "cp", str(inp),
+                          f"{container}:/work/input.xyz"], 60)
+            if cp_in.returncode != 0:
+                return []
+            proc = _run([docker, "start", "-a", container], timeout)
         except subprocess.TimeoutExpired:
             return []
-        if proc.returncode != 0:
+        ok = proc.returncode == 0
+        if ok:
+            out = work / "crest_conformers.xyz"
+            cp_out = _run([docker, "cp",
+                           f"{container}:/work/crest_conformers.xyz",
+                           str(out)], 120)
+            ok = cp_out.returncode == 0
+        if not ok:
             return []
         return _parse_crest_conformers(
             work / "crest_conformers.xyz", max_confs, e_window_kj)
     except Exception:
         return []
     finally:
+        try:
+            _run([docker, "rm", "-f", container], 60)
+        except Exception:
+            pass
         shutil.rmtree(work, ignore_errors=True)
 
 
 def _parse_crest_conformers(path: Path, max_confs: int,
                             e_window_kj: float) -> list[dict]:
-    """解析 crest_conformers.xyz：能量升序多帧 xyz（帧间注释行含能量）。"""
+    """解析 crest_conformers.xyz：能量升序多帧 xyz。
+
+    注释行（帧头后第 2 行）两种格式均支持：
+    - CREST 2.x：含 "energy: -12.3456" / "Erel = ..." 字样
+    - CREST 3.x：裸能量数值（Hartree）
+    """
     if not path.is_file():
         return []
     text = path.read_text(encoding="utf-8", errors="replace")
@@ -332,14 +360,17 @@ def _parse_crest_conformers(path: Path, max_confs: int,
         if len(current_lines) == 0:
             current_lines.append(stripped)
             continue
-        # 注释行（帧头后第 2 行）：可能含能量（形如 "energy: -12.3456" 或空白）
+        # 注释行（帧头后第 2 行）：解析能量
         if len(current_lines) == 1:
             current_lines.append(stripped)
-            if "energy" in stripped.lower():
+            low = stripped.lower()
+            if "energy" in low or "erel" in low:
+                m = re.search(r"(?:energy|erel)\s*[=:]?\s*([-+]?\d*\.?\d+)", low)
+                current_e = float(m.group(1)) if m else None
+            else:
+                # CREST 3.x：裸能量数值
                 try:
-                    current_e = float(stripped.lower().split("energy")[1]
-                                      .split(":")[-1].replace("=", "")
-                                      .strip().split()[0])
+                    current_e = float(stripped.split()[0])
                 except Exception:
                     current_e = None
             continue

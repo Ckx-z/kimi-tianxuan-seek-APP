@@ -216,9 +216,11 @@ def generate_conformers(req: ConformerGenerate):
         raise HTTPException(400, f"未知的构象引擎：{req.engine}（可选 auto / etkdg / crest）")
     if engine.canonicalize_smiles(req.smiles) is None:
         raise HTTPException(400, f"SMILES 无法解析：{req.smiles[:80]}")
-    if engine_name == "crest" and dft_conformers.crest_binary() is None:
+    if engine_name == "crest" and dft_conformers.crest_mode() is None:
         raise HTTPException(503, "未安装 CREST（conda install -c conda-forge crest，"
-                                 "建议装入 psi4-env）；可改用 etkdg 引擎或自动模式")
+                                 "建议装入 psi4-env；或本机 Docker：运行 "
+                                 "scripts/setup_crest_docker.ps1 构建 cof-crest 镜像）；"
+                                 "可改用 etkdg 引擎或自动模式")
     cached = dft_conformers.load_cached_conformers(
         req.smiles, engine_name, req.n_gen, req.max_confs, req.e_window_kj)
     if cached is not None:
