@@ -144,4 +144,6 @@ class TestExportBundle:
                         json={"favorite_ids": [fid, fid]})
         assert r.status_code == 200
         text = _docx_text(r.content)
-        assert text.count("苯甲醛 + 苯胺") == 1
+        # 组标题出现在「目录」与正文各 1 次；去重验证看记录正文只出现 1 次
+        assert text.count("苯甲醛 + 苯胺") == 2
+        assert text.count("实验记录 A5") == 1

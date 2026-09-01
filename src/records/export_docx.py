@@ -22,7 +22,11 @@ import re
 from datetime import datetime
 
 from docx import Document
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.shared import Cm, Pt
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +91,93 @@ def _set_style_cn_fonts(doc: Document) -> None:
         rpr.get_or_add_rFonts().set(qn("w:eastAsia"), _CN_FONT)
 
 
+def _apply_layout_spec(doc: Document) -> None:
+    """v1.5.0 版式规范：
+    - 中文字体宋体 / 西文 Times New Roman；正文小四 12pt、1.5 倍行距；
+    - 段前/段后 0.5 行（Pt 6）；页面边距上下 2.54cm、左右 3.17cm；
+    - 一级标题黑体加粗小四、二级标题宋体加粗小四；文档标题黑体 16pt 加粗。
+    """
+    normal = doc.styles["Normal"]
+    normal.font.name = "Times New Roman"
+    normal.font.size = Pt(12)
+    normal.element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:eastAsia"), "宋体")
+    pf = normal.paragraph_format
+    pf.line_spacing = 1.5
+    pf.space_before = Pt(6)
+    pf.space_after = Pt(6)
+
+    try:
+        title = doc.styles["Title"]
+        title.font.name = "Times New Roman"
+        title.font.size = Pt(16)
+        title.font.bold = True
+        title.element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:eastAsia"), "黑体")
+    except KeyError:
+        pass
+    for style_name, cn_font in (("Heading 1", "黑体"), ("Heading 2", "宋体")):
+        try:
+            st = doc.styles[style_name]
+        except KeyError:
+            continue
+        st.font.name = "Times New Roman"
+        st.font.size = Pt(12)
+        st.font.bold = True
+        st.element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:eastAsia"), cn_font)
+
+    for section in doc.sections:
+        section.top_margin = Cm(2.54)
+        section.bottom_margin = Cm(2.54)
+        section.left_margin = Cm(3.17)
+        section.right_margin = Cm(3.17)
+
+
+def _set_cell_border(cell, **edges) -> None:
+    """给单元格设置边框（edges: {top|bottom|left|right: (sz, val)}）。"""
+    tc_pr = cell._tc.get_or_add_tcPr()
+    borders = tc_pr.find(qn("w:tcBorders"))
+    if borders is None:
+        borders = OxmlElement("w:tcBorders")
+        tc_pr.append(borders)
+    for edge, (sz, val) in edges.items():
+        el = borders.find(qn(f"w:{edge}"))
+        if el is None:
+            el = OxmlElement(f"w:{edge}")
+            borders.append(el)
+        el.set(qn("w:val"), val)
+        if val != "none":
+            el.set(qn("w:sz"), str(sz))
+            el.set(qn("w:color"), "000000")
+
+
+def _three_line_table(doc: Document, rows: list[list[str]],
+                      header: bool = True) -> None:
+    """三线表：仅顶线/底线（1.5pt）+ 表头下线（0.75pt）；表头加粗居中。"""
+    n_cols = len(rows[0]) if rows else 2
+    table = doc.add_table(rows=len(rows), cols=n_cols)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for i, row in enumerate(rows):
+        for j, val in enumerate(row):
+            cell = table.rows[i].cells[j]
+            cell.text = str(val)
+            p = cell.paragraphs[0]
+            p.paragraph_format.line_spacing = 1.5
+            p.paragraph_format.space_before = Pt(2)
+            p.paragraph_format.space_after = Pt(2)
+            for run in p.runs:
+                _cn_run(run)
+            is_head = header and i == 0
+            if is_head:
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in p.runs:
+                    run.font.bold = True
+            _set_cell_border(
+                cell,
+                top=(12, "single") if (is_head or not header) else (0, "none"),
+                bottom=(12, "single") if i == len(rows) - 1
+                       else ((6, "single") if is_head else (0, "none")))
+    return table
+
+
 def _cn_run(run) -> None:
     """run 级中文字体双保险（正文段落显式指定宋体 + eastAsia）。"""
     run.font.name = _CN_FONT
@@ -103,12 +194,84 @@ def _add_text(doc: Document, text: str) -> None:
 
 
 def _kv_table(doc: Document, rows: list[tuple[str, str]]) -> None:
-    """两列「字段 | 值」Table Grid 表。"""
-    table = doc.add_table(rows=len(rows), cols=2)
-    table.style = "Table Grid"
-    for i, (k, v) in enumerate(rows):
-        table.rows[i].cells[0].text = str(k)
-        table.rows[i].cells[1].text = str(v)
+    """两列「字段 | 值」三线表（表头=字段列加粗）。"""
+    if not rows:
+        return
+    _three_line_table(doc, [[str(k), str(v)] for k, v in rows], header=False)
+
+
+def _add_structure_image(doc: Document, smiles: str, caption: str,
+                         fig_no: list[int], width_cm: float = 6.0) -> bool:
+    """RDKit 绘制 2D 结构图并嵌入（居中 + 图号图注，图注五号宋体）。
+
+    返回是否成功（SMILES 不可解析时返回 False，调用方写占位说明）。
+    """
+    if not smiles:
+        return False
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import Draw
+    except Exception:
+        return False
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return False
+    try:
+        img = Draw.MolToImage(mol, size=(700, 320))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+    except Exception:
+        return False
+    fig_no[0] += 1
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run()
+    run.add_picture(buf, width=Cm(width_cm))
+    cap = doc.add_paragraph()
+    cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    cr = cap.add_run(f"图{fig_no[0]}　{caption}")
+    cr.font.size = Pt(10.5)
+    _cn_run(cr)
+    return True
+
+
+def _format_ref_gbt7714(ref: dict) -> str:
+    """GB/T 7714 统一编号制（[J] 期刊）。缺字段降级为「题名 + DOI」。"""
+    ref = ref if isinstance(ref, dict) else {}
+    authors = ref.get("authors") or []
+    title = str(ref.get("title") or "").strip()
+    journal = str(ref.get("journal") or "").strip()
+    year = str(ref.get("year") or "").strip()
+    volume = str(ref.get("volume") or "").strip()
+    issue = str(ref.get("issue") or "").strip()
+    pages = str(ref.get("pages") or "").strip()
+    doi = str(ref.get("doi") or "").strip()
+    if authors and title and journal and year:
+        a = ", ".join(str(x) for x in authors[:3])
+        if len(authors) > 3:
+            a += "，等"
+        vol_issue = volume + (f"({issue})" if issue else "")
+        pages_part = f": {pages}" if pages else ""
+        return f"{a}. {title}[J]. {journal}, {year}, {vol_issue}{pages_part}."
+    if title and doi:
+        return f"{title}. DOI: {doi}."
+    if title:
+        return f"{title}."
+    return str(ref.get("paper_id") or "（未命名文献）")
+
+
+def _favorite_data(rec: dict) -> dict | None:
+    """读取记录关联收藏（只读 + 容错），供结构图/参考文献/DFT 快照复用。"""
+    fav_id = rec.get("favorite_id")
+    if not fav_id:
+        return None
+    try:
+        from favorites import store as favorites_store
+        fav = favorites_store.get_favorite(fav_id)
+        return fav if isinstance(fav, dict) else None
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +361,7 @@ def build_record_docx(rec: dict, version: str = "") -> bytes:
     """生成单条实验记录 Word 报告，返回 docx 字节串。"""
     doc = Document()
     _set_style_cn_fonts(doc)
+    _apply_layout_spec(doc)
 
     doc.add_heading("实验记录", 0)
     _build_record_body(doc, rec, base_level=1)
@@ -222,6 +386,7 @@ def _build_record_body(doc: Document, rec: dict, base_level: int = 1) -> None:
     （单条导出用 1，汇总导出在组标题/记录标题之下用 3）。
     """
     rec = rec if isinstance(rec, dict) else {}
+    fig_no = [0]  # 图号计数器（结构图与附件图共享，按出现顺序编号）
     record_id = str(rec.get("record_id") or "")
     experiment_no = str(rec.get("experiment_no") or "").strip()
     status = _STATUS_LABELS.get(str(rec.get("status") or ""), str(rec.get("status") or ""))
@@ -244,19 +409,44 @@ def _build_record_body(doc: Document, rec: dict, base_level: int = 1) -> None:
         p = doc.add_paragraph()
         _cn_run(p.add_run(f"备注：{notes}"))
 
-    # 单体信息表
+    # 单体信息表（三线表）
     doc.add_heading("单体信息", level=base_level)
-    table = doc.add_table(rows=4, cols=3)
-    table.style = "Table Grid"
-    for j, head in enumerate(("单体", "醛单体", "胺单体")):
-        table.rows[0].cells[j].text = head
     ald = rec.get("aldehyde") if isinstance(rec.get("aldehyde"), dict) else {}
     amine = rec.get("amine") if isinstance(rec.get("amine"), dict) else {}
-    for i, field in enumerate(("name", "smiles", "cas"), start=1):
-        label = {"name": "名称", "smiles": "SMILES", "cas": "CAS"}[field]
-        table.rows[i].cells[0].text = label
-        table.rows[i].cells[1].text = str(ald.get(field) or "—")
-        table.rows[i].cells[2].text = str(amine.get(field) or "—")
+    mono_rows = [["", "醛单体", "胺单体"]]
+    for field, label in (("name", "名称"), ("smiles", "SMILES"), ("cas", "CAS")):
+        mono_rows.append([label, str(ald.get(field) or "—"),
+                          str(amine.get(field) or "—")])
+    _three_line_table(doc, mono_rows)
+
+    # 结构图（v1.5.0）：单体 2D 结构式 + 二聚体（标注 X 与结合能口径）
+    doc.add_heading("化学结构", level=base_level)
+    fav = _favorite_data(rec)
+    got_ald = _add_structure_image(
+        doc, str(ald.get("smiles") or ""), "醛单体结构式", fig_no)
+    got_amine = _add_structure_image(
+        doc, str(amine.get("smiles") or ""), "胺单体结构式", fig_no)
+    dimer_smiles = ""
+    dimer_note = ""
+    if isinstance(fav, dict):
+        dft_entries = fav.get("dft_entries") or []
+        snap = fav.get("dft_snapshot")
+        if isinstance(dft_entries, list) and dft_entries:
+            latest = dft_entries[-1] if isinstance(dft_entries[-1], dict) else None
+        else:
+            latest = snap if isinstance(snap, dict) else None
+        if isinstance(latest, dict):
+            dimer_smiles = str(latest.get("dimer_smiles") or "")
+            x_desc = str(latest.get("x_description") or "—")
+            e_bind = latest.get("e_bind_kj")
+            e_text = f"{float(e_bind):.1f} kJ/mol" if isinstance(e_bind, (int, float)) else "—"
+            dimer_note = (f"缩合二聚体（计算对象：二聚体与「{x_desc}」的结合能 "
+                          f"{e_text}；吸附位点见 DFT 结果的 3D 结合构象与片段着色）")
+    if dimer_smiles:
+        _add_structure_image(doc, dimer_smiles,
+                             dimer_note or "缩合二聚体结构式", fig_no)
+    if not (got_ald or got_amine or dimer_smiles):
+        doc.add_paragraph("（未记录单体 SMILES，结构图略）")
 
     # 模型打分（关联收藏 latest_prediction / 记录快照 / 未打分）
     doc.add_heading("模型打分", level=base_level)
@@ -307,25 +497,89 @@ def _build_record_body(doc: Document, rec: dict, base_level: int = 1) -> None:
     else:
         doc.add_paragraph("（未填写）")
 
-    # 时间线（按时间排序：时间 | 过程记录 | 附件名）
+    # 时间线（按时间排序：时间 | 过程记录 | 附件名；三线表）
     doc.add_heading("时间线", level=base_level)
     timeline = _sorted_timeline(rec.get("timeline") or [])
     if timeline:
-        table = doc.add_table(rows=len(timeline) + 1, cols=3)
-        table.style = "Table Grid"
-        for j, head in enumerate(("时间", "过程记录", "附件名")):
-            table.rows[0].cells[j].text = head
-        for i, entry in enumerate(timeline, start=1):
+        rows = [["时间", "过程记录", "附件名"]]
+        for entry in timeline:
             atts = [
                 str(m.get("filename") or m.get("attachment_id") or "")
                 for m in entry.get("attachments") or []
                 if isinstance(m, dict)
             ]
-            table.rows[i].cells[0].text = str(entry.get("time_label") or "—")
-            table.rows[i].cells[1].text = str(entry.get("description") or "—")
-            table.rows[i].cells[2].text = "；".join(a for a in atts if a) or "—"
+            rows.append([str(entry.get("time_label") or "—"),
+                         str(entry.get("description") or "—"),
+                         "；".join(a for a in atts if a) or "—"])
+        _three_line_table(doc, rows)
     else:
         doc.add_paragraph("（无时间点记录）")
+
+    # 附件图片（v1.5.0）：时间线全部图片附件按时间序嵌入（居中 + 图注）
+    image_atts: list[tuple[str, dict]] = []
+    for entry in timeline:
+        for m in entry.get("attachments") or []:
+            if isinstance(m, dict) and (m.get("ext") or "").lower() in (
+                    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"):
+                image_atts.append((str(entry.get("time_label") or "—"), m))
+    if image_atts:
+        doc.add_heading("实验记录图片", level=base_level)
+        try:
+            from records import store as records_store
+        except Exception:
+            records_store = None
+        embedded = 0
+        for time_label, meta in image_atts:
+            path = None
+            if records_store is not None:
+                try:
+                    found = records_store.get_attachment_path(
+                        record_id, str(meta.get("attachment_id") or ""))
+                    path = found[0] if found else None
+                except Exception:
+                    path = None
+            if not path or not path.is_file():
+                continue
+            try:
+                fig_no[0] += 1
+                p = doc.add_paragraph()
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p.add_run().add_picture(str(path), width=Cm(12))
+                cap = doc.add_paragraph()
+                cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                cr = cap.add_run(
+                    f"图{fig_no[0]}　{meta.get('filename') or '附件图片'}（时间点：{time_label}）")
+                cr.font.size = Pt(10.5)
+                _cn_run(cr)
+                embedded += 1
+            except Exception:
+                continue
+        if not embedded:
+            doc.add_paragraph("（附件图片缺失，无法嵌入）")
+
+    # 参考文献（v1.5.0：GB/T 7714 统一编号制；无全文元数据时降级为题名+DOI）
+    refs: list[dict] = []
+    if isinstance(fav, dict):
+        refs = [r for r in fav.get("references") or [] if isinstance(r, dict)]
+    if refs:
+        doc.add_heading("参考文献", level=base_level)
+        for i, ref in enumerate(refs, start=1):
+            full = dict(ref)
+            doi = str(full.get("doi") or "").strip()
+            if doi and not full.get("journal"):
+                try:
+                    from literature import resolver as lit_resolver
+                    _, record = lit_resolver.find_by_doi(doi)
+                    if isinstance(record, dict):
+                        for key in ("authors", "journal", "year", "volume",
+                                    "issue", "pages", "title"):
+                            if record.get(key) and not full.get(key):
+                                full[key] = record[key]
+                except Exception:
+                    pass
+            p = doc.add_paragraph()
+            run = p.add_run(f"[{i}] {_format_ref_gbt7714(full)}")
+            _cn_run(run)
 
     # 自我总结 / 我认为的失误（有则）
     self_summary = str(rec.get("self_summary") or "").strip()
@@ -352,12 +606,13 @@ def build_bundle_docx(groups: list[dict], version: str = "") -> bytes:
     """按收藏分组导出多组实验记录为一份 Word，返回 docx 字节串。
 
     groups: [{"favorite": fav_dict, "records": [rec_dict, ...]}, ...]
-    （records 由调用方按时间序提供）。封面含标题/导出时间/软件版本；
+    （records 由调用方按时间序提供）。封面含标题/导出时间/软件版本/目录；
     每组一级标题为单体组名称（醛+胺），组内每条记录二级标题后接与单条
-    导出一致的正文；收藏无记录时标注「暂无实验记录」。
+    导出一致的正文（记录间分页符分隔）；收藏无记录时标注「暂无实验记录」。
     """
     doc = Document()
     _set_style_cn_fonts(doc)
+    _apply_layout_spec(doc)
     now = datetime.now().astimezone()
 
     doc.add_heading("实验记录汇总导出", 0)
@@ -369,15 +624,28 @@ def build_bundle_docx(groups: list[dict], version: str = "") -> bytes:
     p = doc.add_paragraph()
     _cn_run(p.add_run(f"收藏分组数：{len(groups)}"))
 
+    # 静态目录（v1.5.0）：按组列出（不含页码；Word 打开后如需页码可插入自动目录）
+    doc.add_heading("目录", level=1)
+    for gi, group in enumerate(groups, start=1):
+        group = group if isinstance(group, dict) else {}
+        fav = group.get("favorite") if isinstance(group.get("favorite"), dict) else {}
+        records = [r for r in (group.get("records") or []) if isinstance(r, dict)]
+        tp = doc.add_paragraph()
+        _cn_run(tp.add_run(f"{gi}. {_group_title(fav)}（{len(records)} 条记录）"))
+
     for group in groups:
         group = group if isinstance(group, dict) else {}
         fav = group.get("favorite") if isinstance(group.get("favorite"), dict) else {}
         records = [r for r in (group.get("records") or []) if isinstance(r, dict)]
+        doc.add_page_break()
         doc.add_heading(_group_title(fav), level=1)
         if not records:
             doc.add_paragraph("暂无实验记录")
             continue
-        for rec in records:
+        for idx, rec in enumerate(records):
+            if idx > 0:
+                # 每份记录之间用分页符分隔（版式一致、独立成页）
+                doc.add_page_break()
             no = str(rec.get("experiment_no") or "").strip()
             rec_id = str(rec.get("record_id") or "")
             label = f"实验记录 {no}" if no else f"实验记录 {rec_id}"

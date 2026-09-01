@@ -51,6 +51,8 @@ import {
 } from '@/components/query/api';
 import { appendDftEntry } from '@/components/mine/api';
 import DftResultPanel from '@/components/dft/DftResultPanel';
+import ConformerGallery from '@/components/dft/ConformerGallery';
+import DftPlacementPanel from '@/components/dft/DftPlacementPanel';
 import { useDftTask } from '@/components/dft/DftTaskContext';
 import {
   buildDftSnapshot,
@@ -179,6 +181,21 @@ export default function Dft() {
   /** URL 预填（收藏详情「重新计算」跳转）：?a=<smiles>&b=<smiles>&an=<名>&bn=<名> */
   const [searchParams] = useSearchParams();
 
+  // ---------- 构象来源推导（v1.5.0：手动摆放 / 自动检索的主体与客体 SMILES） ----------
+  /** 主体：pair=分子 A；dimer=缩合二聚体（需先完成二聚体预览） */
+  const subjectSmiles = isPair ? monoA.smiles : (dimerPreview?.dimer_smiles ?? '');
+  const solventSmiles = solvents.find((s) => s.id === solventId)?.smiles ?? '';
+  /** 客体：pair=分子 B；dimer=custom/溶剂/二聚体自身；other_dimer 暂不支持检索 */
+  const guestSmiles = isPair
+    ? monoB.smiles
+    : xType === 'custom'
+      ? customSmiles.trim()
+      : xType === 'solvent'
+        ? solventSmiles
+        : xType === 'self_stack'
+          ? (dimerPreview?.dimer_smiles ?? '')
+          : '';
+
   // ---------- 后端状态 ----------
   const [backendDown, setBackendDown] = useState(false);
   const [library, setLibrary] = useState<MonomerLibrary>({ aldehydes: [], amines: [] });
@@ -213,6 +230,10 @@ export default function Dft() {
   const draftHydratedRef = useRef(false);
   /** 全局任务状态（跨页面进度徽标 + 完成通知） */
   const { trackTask } = useDftTask();
+  /** 构象来源（v1.5.0）：auto（MC 自动初猜，默认）/ manual（手动摆放）/ retrieve（自动检索） */
+  const [conformerSource, setConformerSource] = useState<'auto' | 'manual' | 'retrieve'>('auto');
+  /** 手动摆放/构象检索选定的复合物几何（提交时注入 complex_xyz） */
+  const [placedXyz, setPlacedXyz] = useState<string | null>(null);
 
   const refreshHistory = useCallback(() => {
     fetchDftHistory().then(setHistory).catch(() => {});
@@ -435,6 +456,7 @@ export default function Dft() {
             amine_smiles: monoB.smiles,
             method: isPsi4 ? psi4Method : method,
             backend,
+            complex_xyz: placedXyz ?? undefined,
           }
           : {
             ald_smiles: monoA.smiles,
@@ -446,6 +468,7 @@ export default function Dft() {
             custom_smiles: xType === 'custom' ? customSmiles.trim() : undefined,
             method: isPsi4 ? psi4Method : method,
             backend,
+            complex_xyz: placedXyz ?? undefined,
           },
       );
       setCurrentJobId(job.job_id);
@@ -969,6 +992,54 @@ export default function Dft() {
               </p>
             </div>
           )}
+
+          {/* 构象来源（v1.5.0）：自动初猜 / 手动摆放 / 自动检索低能构象 */}
+          <div className="space-y-2 rounded-lg border p-3">
+            <Label className="text-sm font-medium">复合物初猜来源（高级）</Label>
+            <RadioGroup
+              value={conformerSource}
+              onValueChange={(v) => {
+                setConformerSource(v as 'auto' | 'manual' | 'retrieve');
+                setPlacedXyz(null);
+              }}
+              disabled={running}
+              className="flex flex-wrap gap-4"
+            >
+              <span className="flex items-center gap-1.5">
+                <RadioGroupItem value="auto" id="cs-auto" />
+                <Label htmlFor="cs-auto" className="text-xs">自动初猜（MC 采样）</Label>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <RadioGroupItem value="manual" id="cs-manual" />
+                <Label htmlFor="cs-manual" className="text-xs">手动摆放</Label>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <RadioGroupItem value="retrieve" id="cs-retrieve" disabled={!guestSmiles} />
+                <Label htmlFor="cs-retrieve" className="text-xs">自动检索低能构象</Label>
+              </span>
+            </RadioGroup>
+            {conformerSource === 'manual' && (
+              <DftPlacementPanel
+                aSmiles={subjectSmiles}
+                bSmiles={guestSmiles}
+                disabled={running}
+                onApply={setPlacedXyz}
+              />
+            )}
+            {conformerSource === 'retrieve' && guestSmiles && (
+              <ConformerGallery
+                aSmiles={subjectSmiles}
+                bSmiles={guestSmiles}
+                disabled={running}
+                onApply={setPlacedXyz}
+              />
+            )}
+            {placedXyz && (
+              <p className="text-xs text-muted-foreground">
+                ✓ 已选定外部复合物几何，提交时将跳过自动取向采样，直接按该几何优化计算。
+              </p>
+            )}
+          </div>
 
           {/* 第三步：开始计算 */}
           {isPsi4 && estTotalAtoms > 50 && (

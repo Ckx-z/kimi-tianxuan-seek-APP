@@ -187,6 +187,8 @@ export interface DftJobRequest {
   optimize?: boolean;
   /** 仅 psi4：并行线程数（缺省=后端配置/环境变量/4） */
   threads?: number;
+  /** 可选外部复合物初猜 xyz（手动摆放/构象采样产物，v1.5.0） */
+  complex_xyz?: string;
 }
 
 /** 历史条目（dft_log.jsonl；2.0 起含二聚体与 X 字段，旧条目可能缺失） */
@@ -307,6 +309,57 @@ export const fetchDftHistory = async (limit = 50): Promise<DftHistoryEntry[]> =>
 /** 读计算页草稿（静默：页面初始化用，失败由页面兜底） */
 export const fetchDftDraft = () =>
   request<{ draft: DftDraft | null }>('/draft', { silent: true });
+
+// ---------- 构象采样（v1.5.0） ----------
+
+/** 单个低能构象 */
+export interface ConformerItem {
+  id: string;
+  xyz: string;
+  rel_e_kj: number;
+  rel_e_kcal: number;
+  boltzmann_w: number;
+}
+
+export interface ConformerEnginesResponse {
+  engines: {
+    etkdg: { installed: boolean; label: string };
+    crest: { installed: boolean; path?: string | null; label: string; install_hint?: string | null };
+  };
+}
+
+/** 构象引擎可用性（静默：选择器初始化用） */
+export const fetchConformerEngines = () =>
+  request<ConformerEnginesResponse>('/conformers/engines', { silent: true });
+
+/** 自动检索低能构象（ETKDG 秒级 / CREST 分钟级，同步返回） */
+export const generateConformers = (payload: {
+  smiles: string;
+  engine: 'auto' | 'etkdg' | 'crest';
+  n_gen?: number;
+  max_confs?: number;
+  e_window_kj?: number;
+}) => request<{ conformers: ConformerItem[]; engine: string; cached: boolean }>(
+  '/conformers/generate', { method: 'POST', body: payload });
+
+/** 手动摆放：主体 + 客体经刚体变换合成复合物 xyz（b_xyz 可注入指定构象） */
+export const manualConformer = (payload: {
+  a_smiles: string;
+  b_smiles: string;
+  tx?: number;
+  ty?: number;
+  tz?: number;
+  rx_deg?: number;
+  ry_deg?: number;
+  rz_deg?: number;
+  anchor_a?: number | null;
+  anchor_b?: number | null;
+  b_xyz?: string | null;
+}) => request<{
+  xyz: string;
+  atom_budget: { a: number; b: number; complex: number };
+  fragment_ranges: { a: [number, number]; b: [number, number] };
+}>('/conformers/manual', { method: 'POST', body: payload });
 
 /** 保存计算页草稿（静默：防抖自动保存，失败不打扰用户） */
 export const saveDftDraft = (draft: DftDraft) =>

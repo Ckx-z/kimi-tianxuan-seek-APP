@@ -238,6 +238,9 @@ class ConformerManual(BaseModel):
     rz_deg: float = Field(0.0, description="客体绕 z 轴旋转（度）")
     anchor_a: int | None = Field(None, ge=0, description="主体吸附位点原子序号（可选）")
     anchor_b: int | None = Field(None, ge=0, description="客体锚点原子序号（可选）")
+    b_xyz: str | None = Field(
+        None, description="可选：客体的指定构象 xyz（如构象检索选中项）；"
+                          "提供时跳过客体 3D 生成，直接对其做刚体变换")
 
 
 class DftDraftPut(BaseModel):

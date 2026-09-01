@@ -243,7 +243,11 @@ def manual_conformer(req: ConformerManual):
         raise HTTPException(400, f"客体 SMILES 无法解析：{req.b_smiles[:80]}")
     try:
         a_xyz = engine.embed_monomer_xyz(req.a_smiles)
-        b_xyz = engine.embed_monomer_xyz(req.b_smiles)
+        if req.b_xyz:
+            # 客体的指定构象（构象检索选中项）：直接使用，跳过 3D 生成
+            b_xyz = req.b_xyz
+        else:
+            b_xyz = engine.embed_monomer_xyz(req.b_smiles)
     except engine.DftError as exc:
         raise HTTPException(422, f"几何生成失败：{exc}")
     b_atoms = _xyz_atoms_list(b_xyz)
