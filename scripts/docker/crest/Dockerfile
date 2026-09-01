@@ -1,21 +1,34 @@
-# cof-crest 镜像：CREST 构象搜索（conda-forge crest + xtb，Linux/amd64）
-# 用途：Windows 本机无法直接安装 CREST（conda 无 win-64 包、pip 无 wheel），
-#       经 Docker Desktop(WSL2) 以容器运行，由 src/dft/conformers.py 自动挂载调用。
-# 构建：docker build -t cof-crest:latest .
-# 验证：docker run --rm cof-crest:latest crest --version
-FROM condaforge/miniforge3:latest
+# cof-crest image: CREST conformer search (conda-forge crest + xtb, linux/amd64)
+# Purpose: Windows hosts cannot install CREST natively (no win-64 conda package,
+#           no pip wheel); run it in a container instead. src/dft/conformers.py
+#           mounts the host workdir and invokes `crest` inside this image.
+# Build (China networks: pass mirror build-args, see setup_crest_docker.ps1):
+#   docker build -t cof-crest:latest .
+#   docker build \
+#     --build-arg BASE_IMAGE=docker.m.daocloud.io/condaforge/miniforge3:latest \
+#     --build-arg CONDA_CHANNEL=https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge \
+#     -t cof-crest:latest .
+# Verify: docker run --rm cof-crest:latest crest --version
 
-# conda-forge 的 crest 包自带 xtb / xtb-python 依赖（Linux x86_64 可用）
-RUN conda install -y -c conda-forge crest xtb \
+# Base image: official Docker Hub by default; override via BASE_IMAGE for
+# networks where registry-1.docker.io is unreachable (e.g. mainland China)
+ARG BASE_IMAGE=condaforge/miniforge3:latest
+FROM ${BASE_IMAGE}
+
+# conda-forge `crest` pulls xtb / xtb-python as dependencies (linux x86_64)
+# CONDA_CHANNEL override for mirror usage (e.g. TUNA conda-forge mirror)
+ARG CONDA_CHANNEL=https://conda.anaconda.org/conda-forge
+RUN conda install -y --override-channels -c ${CONDA_CHANNEL} crest xtb \
     && conda clean -afy
 
 ENV PATH=/opt/conda/bin:$PATH
-# xtb 参数文件位置（容器内直接执行 crest/xtb 时必需，等效 conda activate）
+# xtb parameter files location (required when invoking crest/xtb directly
+# inside the container, equivalent to conda activate)
 ENV XTBPATH=/opt/conda/share/xtb
 ENV OMP_NUM_THREADS=4
 ENV OMP_STACKSIZE=1G
 
-# 宿主工作目录挂载点：crest 在 /work 下读写 input.xyz / crest_conformers.xyz
+# Host workdir mount point: crest reads/writes input.xyz / crest_conformers.xyz here
 WORKDIR /work
 
 CMD ["crest", "--version"]

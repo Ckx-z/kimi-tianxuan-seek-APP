@@ -36,8 +36,11 @@ function Wsl-StatusText {
 }
 
 function Test-WslReady {
-    $s = Wsl-StatusText
-    return ($s -match 'WSL2|kernel version')
+    # wsl.exe (modern) may emit UTF-16 text that looks garbled under cmd;
+    # use the exit code instead: old inbox stub returns non-zero for
+    # --status, modern WSL returns 0
+    & wsl.exe --status *> $null
+    return ($LASTEXITCODE -eq 0)
 }
 
 function Wait-DockerReady([int]$TimeoutSec = 300) {
@@ -73,8 +76,9 @@ if (-not (Test-WslReady)) {
     # plain msiexec, avoiding the AppX deployment pipeline entirely (that
     # pipeline can hang forever behind a stuck winget StagePackageAsync op).
     # Fallbacks: local MSIX bundle via Add-AppxPackage, then winget.
-    $wslVer = cmd.exe /c "wsl.exe --version 2>nul"
-    if (($wslVer -join "`n") -notmatch 'WSL version') {
+    cmd.exe /c "wsl.exe --version >nul 2>nul" | Out-Null
+    $wslModern = ($LASTEXITCODE -eq 0)
+    if (-not $wslModern) {
         $msi = Join-Path $env:TEMP 'wsl.2.7.12.0.x64.msi'
         $bundle = Join-Path $env:TEMP 'Microsoft.WSL_2.7.12.msixbundle'
         if (Test-Path $msi) {
@@ -132,7 +136,13 @@ if (-not (Test-Path $dockerfile)) {
 }
 & $dockerExe image inspect cof-crest:latest *> $null
 if ($LASTEXITCODE -ne 0) {
-    & $dockerExe build -t cof-crest:latest (Split-Path $dockerfile)
+    # China networks: registry-1.docker.io is often unreachable and
+    # anaconda.org is slow; mirror build-args keep the build working
+    # (daocloud mirrors Docker Hub, TUNA mirrors conda-forge).
+    & $dockerExe build `
+        --build-arg BASE_IMAGE=docker.m.daocloud.io/condaforge/miniforge3:latest `
+        --build-arg CONDA_CHANNEL=https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge `
+        -t cof-crest:latest (Split-Path $dockerfile)
 } else {
     Write-Output 'cof-crest image already exists, skipping build (rebuild: docker rmi cof-crest:latest).'
 }
