@@ -58,6 +58,7 @@ def _public_job(job: dict) -> dict:
         "result": job.get("result"),
         "error": job.get("error"),
         "created_at": job.get("created_at"),
+        "progress_percent": job.get("progress_percent", 0),
         "input": {
             "ald_smiles": job.get("ald_smiles_input"),
             "amine_smiles": job.get("amine_smiles_input"),
@@ -117,7 +118,8 @@ def create_dft_job(req: DftJobCreate):
             raise HTTPException(400, f"分子 B 的 SMILES 无法解析：{amine[:80]}")
         _check_backend_available(backend)
         job = jobs.create_job(ald, amine, method, mode="pair", backend=backend,
-                              n_samples=req.n_samples)
+                              n_samples=req.n_samples,
+                              optimize=req.optimize, threads=req.threads)
         return _public_job(job)
 
     if not ald or not amine:
@@ -145,7 +147,8 @@ def create_dft_job(req: DftJobCreate):
         ald, amine, method, x_type=req.x_type,
         solvent_id=req.solvent_id, ald2_smiles=req.ald2_smiles,
         amine2_smiles=req.amine2_smiles, custom_smiles=req.custom_smiles,
-        backend=backend, n_samples=req.n_samples)
+        backend=backend, n_samples=req.n_samples,
+        optimize=req.optimize, threads=req.threads)
     return _public_job(job)
 
 

@@ -194,6 +194,7 @@ class DftJobCreate(BaseModel):
     custom_smiles: str | None = Field(None, description="x_type=custom 时的自定义 SMILES")
     method: str = Field("gfn2", description="backend=xtb：gfnff（快速）| gfn2（精确，默认）；"
                                             "backend=psi4：wb97xd3bj_svp（默认，别名 precision）"
+                                            "| wb97xd3bj_svp_quick（批量快速档）"
                                             "| b3lyp_631gdp（别名 literature）")
     backend: str = Field(
         "xtb",
@@ -203,6 +204,12 @@ class DftJobCreate(BaseModel):
         None, ge=1, le=64,
         description="复合物取向 MC 采样数（缺省=环境变量 COF_DFT_MC_SAMPLES 或 12；"
                     "1=旧单取向 UFF 初猜口径；仅 gfn2/psi4 档生效）")
+    optimize: bool | None = Field(
+        None, description="仅 psi4 档：是否做 Psi4 全几何优化（缺省 False——"
+                          "初猜已是 xTB 预优化几何，直接单点 CP 提速）")
+    threads: int | None = Field(
+        None, ge=1, le=32, description="仅 psi4 档：并行线程数"
+                                       "（缺省=环境变量 COF_PSI4_THREADS 或配置或 4）")
 
 
 class DftDraftPut(BaseModel):

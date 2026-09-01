@@ -36,6 +36,8 @@ export interface GlobalDftTask {
   jobId: string;
   status: DftJobStatus;
   progressHint: string;
+  /** 0-100 进度（后端按阶段分级回传） */
+  progressPercent: number;
   /** 展示用摘要（如「苯甲醛 × 苯胺」） */
   summary: string;
   backend?: DftBackend;
@@ -107,6 +109,7 @@ export function DftTaskProvider({ children }: { children: ReactNode }) {
       ...prev,
       status: job.status,
       progressHint: job.progress_hint || prev.progressHint,
+      progressPercent: job.progress_percent ?? prev.progressPercent,
     };
     // 通知只在「非终态 → 终态」转变时触发（StrictMode 下也不会重复）
     const transitioned = isTerminal(job.status) && !isTerminal(prev.status);
@@ -154,6 +157,7 @@ export function DftTaskProvider({ children }: { children: ReactNode }) {
       progressHint: opts.initialStatus === 'done'
         ? (opts.cached ? '命中缓存，直接返回历史结果' : '计算完成')
         : '已提交，排队中…',
+      progressPercent: opts.initialStatus === 'done' ? 100 : 1,
       summary: opts.summary ?? 'DFT 计算',
       backend: opts.backend,
       submittedAt: Date.now(),
@@ -191,6 +195,7 @@ export function DftTaskProvider({ children }: { children: ReactNode }) {
           jobId,
           status: 'pending',
           progressHint: '恢复任务状态…',
+          progressPercent: 1,
           summary: 'DFT 计算',
           submittedAt: Date.now(),
         };

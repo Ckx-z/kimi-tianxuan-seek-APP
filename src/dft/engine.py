@@ -1035,6 +1035,10 @@ def compute_binding(ald_smiles: str, amine_smiles: str, method: str = "gfn2",
                              "x": parse_dipole_debye(out_x),
                              "complex": parse_dipole_debye(out_c)},
             "complex_atom_count": n_atoms,
+            # 原子计数口径：复合物 = 二聚体 + X；self_stack 时 X=二聚体自身 → complex = 2×dimer
+            "atom_budget": {"dimer": _xyz_atom_count(xyz_d),
+                            "x": n_atoms - _xyz_atom_count(xyz_d),
+                            "complex": n_atoms},
             "complex_xyz": opt_xyz or xyz_c,
             # 复合物 xyz 片段区间：a=二聚体 [0,n_d)，b=X [n_d,total)
             "fragment_ranges": _fragment_ranges(_xyz_atom_count(xyz_d), n_atoms),
@@ -1165,6 +1169,10 @@ def compute_pair_binding(smiles_a: str, smiles_b: str, method: str = "gfn2",
                              "x": parse_dipole_debye(out_b),
                              "complex": parse_dipole_debye(out_c)},
             "complex_atom_count": n_atoms,
+            # pair 模式口径：复合物 = 分子 A + 分子 B（无二聚体生成、不扩大结构）
+            "atom_budget": {"dimer": _xyz_atom_count(xyz_a),
+                            "x": n_atoms - _xyz_atom_count(xyz_a),
+                            "complex": n_atoms},
             "complex_xyz": opt_xyz or xyz_c,
             # 复合物 xyz 片段区间：a=分子 A [0,n_a)，b=分子 B [n_a,total)
             "fragment_ranges": _fragment_ranges(_xyz_atom_count(xyz_a), n_atoms),

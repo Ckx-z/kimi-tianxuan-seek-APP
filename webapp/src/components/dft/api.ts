@@ -40,7 +40,7 @@ async function request<T>(path: string, options: { method?: string; body?: unkno
 // ---------- 类型（与后端契约对齐） ----------
 
 export type DftBackend = 'xtb' | 'psi4';
-export type DftMethod = 'gfnff' | 'gfn2' | 'wb97xd3bj_svp' | 'b3lyp_631gdp';
+export type DftMethod = 'gfnff' | 'gfn2' | 'wb97xd3bj_svp' | 'wb97xd3bj_svp_quick' | 'b3lyp_631gdp';
 /** interrupted = 服务重启后恢复的任务（参数保留，可重新提交） */
 export type DftJobStatus = 'pending' | 'running' | 'done' | 'failed' | 'interrupted';
 /** 第三物质 X 类型：自身堆积（默认）/ 溶剂 / 另一组单体的二聚体 / 自定义分子 */
@@ -115,6 +115,8 @@ export interface DftResult {
   gap_ev: { dimer: number | null; x: number | null; complex: number | null };
   dipole_debye: { dimer: number | null; x: number | null; complex: number | null };
   complex_atom_count?: number;
+  /** 原子计数口径（v1.5.0）：dimer=二聚体原子数，x=第三物质原子数，complex=复合物（两者之和） */
+  atom_budget?: { dimer: number; x: number; complex: number } | null;
   complex_xyz: string;
   fragment_ranges?: DftFragmentRanges | null;
   elapsed_sec: number;
@@ -152,6 +154,8 @@ export interface DftJob {
   job_id: string;
   status: DftJobStatus;
   progress_hint: string;
+  /** 0-100 进度（v1.5.0：构象生成 0-20 / 优化 20-50 / 单点 50-80 / 汇总 80-100） */
+  progress_percent?: number;
   method: DftMethod;
   mode?: DftMode;
   backend?: DftBackend;
@@ -179,6 +183,10 @@ export interface DftJobRequest {
   backend?: DftBackend;
   /** 复合物取向 MC 采样数（缺省后端默认 12；1=旧单取向口径；仅 gfn2/psi4 生效） */
   n_samples?: number;
+  /** 仅 psi4：是否 Psi4 全几何优化（缺省 false——单点 CP 提速） */
+  optimize?: boolean;
+  /** 仅 psi4：并行线程数（缺省=后端配置/环境变量/4） */
+  threads?: number;
 }
 
 /** 历史条目（dft_log.jsonl；2.0 起含二聚体与 X 字段，旧条目可能缺失） */
@@ -240,6 +248,7 @@ export interface DftBackendsResponse {
 export function dftMethodLabel(backend: DftBackend | undefined, method: string, recorded?: string | null): string {
   if (recorded) return recorded;
   if (method === 'b3lyp_631gdp') return 'B3LYP/6-31G(d,p)（文献口径）';
+  if (method === 'wb97xd3bj_svp_quick') return 'ωB97X-D3BJ/def2-SV(P)（批量快速档）';
   if (backend === 'psi4' || method === 'wb97xd3bj_svp') return 'ωB97X-D3BJ/def2-SVP（真 DFT）';
   return method === 'gfnff' ? 'GFN-FF 力场（快速）' : 'GFN2-xTB（精确）';
 }

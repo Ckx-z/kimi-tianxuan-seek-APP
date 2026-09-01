@@ -35,6 +35,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CircleHelp } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 import MonomerInput, { type MonomerValue } from '@/components/query/MonomerInput';
 import StructureSketcher from '@/components/common/StructureSketcher';
 import MonomerPropsCard from '@/components/query/MonomerPropsCard';
@@ -185,6 +186,8 @@ export default function Dft() {
 
   // ---------- 任务状态 ----------
   const [progressHint, setProgressHint] = useState('');
+  /** 0-100 进度（后端按阶段分级：构象生成 0-20 / 优化 20-50 / 单点 50-80 / 汇总 80-100） */
+  const [progressPercent, setProgressPercent] = useState(0);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<DftResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -280,6 +283,7 @@ export default function Dft() {
       try {
         const job = await fetchDftJob(id);
         setProgressHint(job.progress_hint);
+        setProgressPercent(job.progress_percent ?? 0);
         if (job.status === 'done' && job.result) {
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
@@ -346,6 +350,7 @@ export default function Dft() {
       } else {
         setRunning(true);
         setProgressHint(job.progress_hint || '恢复计算任务…');
+        setProgressPercent(job.progress_percent ?? 0);
         startPolling(jobId);
       }
     } catch {
@@ -420,6 +425,7 @@ export default function Dft() {
     setAProps(emptyProps);
     setBProps(emptyProps);
     setProgressHint('正在提交计算任务…');
+    setProgressPercent(1);
     try {
       const job = await createDftJob(
         isPair
@@ -460,6 +466,7 @@ export default function Dft() {
         setProgressHint('');
       } else {
         setProgressHint(job.progress_hint);
+        setProgressPercent(job.progress_percent ?? 0);
         startPolling(job.job_id);
       }
     } catch {
@@ -951,6 +958,10 @@ export default function Dft() {
                   <RadioGroupItem value="b3lyp_631gdp" id="pm-literature" />
                   <Label htmlFor="pm-literature">文献口径（B3LYP/6-31G(d,p)，对齐已发表 COF 吸附计算）</Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="wb97xd3bj_svp_quick" id="pm-batch" />
+                  <Label htmlFor="pm-batch">批量快速档（ωB97X-D3BJ/def2-SV(P)，多构象初筛用，速度更快）</Label>
+                </div>
               </RadioGroup>
               <p className="text-xs text-muted-foreground">
                 结合能经 counterpoise（BSSE）校正；复合物几何经 Monte Carlo 多取向采样 + xTB 筛选
@@ -963,6 +974,11 @@ export default function Dft() {
           {isPsi4 && estTotalAtoms > 50 && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
               ⏳ 当前组合预估复合物约 {estTotalAtoms} 个原子（&gt;50），Psi4 精度档可能需要 30 分钟以上，请耐心等待；计算在后台进行，期间可切换其他页面。
+            </p>
+          )}
+          {!isPair && xType === 'self_stack' && (
+            <p className="text-xs text-muted-foreground">
+              口径说明：自身堆积的复合物 = 二聚体·二聚体（X 取二聚体自身），复合物原子数约为二聚体的 2 倍——该 2 倍来自自堆积定义本身（结合能表征自聚集/结晶成膜驱动力），并非扩大计算结构。
             </p>
           )}
           <Button
@@ -1043,7 +1059,12 @@ export default function Dft() {
           {running && (
             <div className="rounded-lg border bg-card p-6 text-center shadow-sm">
               <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-gold border-t-transparent" />
-              <p className="text-sm font-medium">{progressHint || '计算中…'}</p>
+              <div className="mx-auto mb-2 w-full max-w-sm">
+                <Progress value={progressPercent} className="h-2" />
+              </div>
+              <p className="text-sm font-medium">
+                {progressPercent > 0 ? `${progressPercent}% · ` : ''}{progressHint || '计算中…'}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {isPsi4
                   ? 'Psi4 真 DFT 精度档通常需要数分钟（大体系可能更久），期间可离开本页，完成后从历史记录查看'

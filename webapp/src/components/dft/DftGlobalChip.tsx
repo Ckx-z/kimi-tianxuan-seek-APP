@@ -35,7 +35,9 @@ export default function DftGlobalChip() {
         ? `DFT 失败 · ${task.summary}`
         : task.status === 'interrupted'
           ? `DFT 已中断 · ${task.summary}`
-          : `DFT 计算中 · ${task.progressHint}`;
+          : task.progressPercent > 0
+            ? `DFT 计算中 ${task.progressPercent}% · ${task.progressHint}`
+            : `DFT 计算中 · ${task.progressHint}`;
 
   return (
     <div

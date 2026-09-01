@@ -3,29 +3,123 @@
 @tailwind utilities;
 
 /*
- * 学术紫金主题 design tokens（v1.3.0 精修版，方向 A）
- * 设计哲学：学术权威感 + 温暖克制
- * - 主紫降饱和：#6d28d9(263 70% 50%) → 柔和紫 258 52% 46%
- * - 金色转暖：#d4af37 系 → 暖金 43 62% 45%
- * - 新增语义三色：success / warning / info（此前散落在组件里写死）
- * - 阴影带紫味、更柔和（对齐 2025-2026 温暖柔和趋势）
- * - 亮色 / 暗色双套，通过 <html class="dark"> 切换
+ * 三主题体系（v1.5.0）：
+ * - 默认：暖纸松石（Warm Paper Teal）——暖纸底 + 松石绿主色 + 赭石强调
+ * - 额外：石墨仪器（Graphite Lab）——石墨靛主色 + 青色强调，科学仪表感
+ * - 保留：学术紫金（Purple Gold，v1.3.0 精修版）
+ * 每主题含亮/暗两套。html 上以 data-theme 属性选择主题、
+ * .dark class 选择明暗（两者正交）。
+ * 语义色 success/warning/info、柔和阴影、数据等宽工具类为三主题共享结构。
  */
 @layer base {
+  /* ============ 暖纸松石（默认）· 亮色 ============ */
   :root {
+    --background: 40 33% 96%;
+    --foreground: 30 20% 16%;
+    --card: 40 45% 99%;
+    --card-foreground: 30 20% 16%;
+    --popover: 40 45% 99%;
+    --popover-foreground: 30 20% 16%;
+    /* 松石绿主色 #15826B 系 */
+    --primary: 168 66% 30%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 42 20% 90%;
+    --secondary-foreground: 168 40% 24%;
+    --muted: 40 22% 92%;
+    --muted-foreground: 30 10% 42%;
+    --accent: 42 26% 88%;
+    --accent-foreground: 168 50% 24%;
+    --destructive: 0 65% 46%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 40 16% 80%;
+    --input: 40 16% 74%;
+    --ring: 168 66% 30%;
+    /* 强调色（gold 键位复用于 CTA）：赭石暖橙 #B4551F 系 */
+    --gold: 22 68% 42%;
+    --gold-foreground: 40 40% 98%;
+    --gold-muted: 40 45% 88%;
+    /* 语义三色 */
+    --success: 152 55% 32%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 90% 38%;
+    --warning-foreground: 0 0% 100%;
+    --info: 205 70% 42%;
+    --info-foreground: 0 0% 100%;
+    /* 柔和阴影（暖纸：暖棕调） */
+    --shadow-soft: 0 1px 2px rgb(94 64 32 / 0.06), 0 2px 6px -1px rgb(94 64 32 / 0.06);
+    --shadow-card: 0 4px 12px -2px rgb(94 64 32 / 0.10), 0 2px 4px -1px rgb(94 64 32 / 0.06);
+    --shadow-pop: 0 12px 28px -8px rgb(94 64 32 / 0.16);
+    --radius: 0.625rem;
+    /* 侧栏：深暖墨底 + 松石高亮 */
+    --sidebar-background: 24 22% 13%;
+    --sidebar-foreground: 40 18% 88%;
+    --sidebar-primary: 168 55% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 24 18% 20%;
+    --sidebar-accent-foreground: 168 50% 64%;
+    --sidebar-border: 24 16% 24%;
+    --sidebar-ring: 168 50% 52%;
+  }
+
+  /* ============ 石墨仪器 · 亮色 ============ */
+  :root[data-theme="graphite-lab"] {
+    --background: 220 20% 97%;
+    --foreground: 223 25% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 223 25% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 223 25% 16%;
+    /* 石墨靛主色 #3B4A6B 系 */
+    --primary: 223 29% 33%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 18% 92%;
+    --secondary-foreground: 223 28% 26%;
+    --muted: 220 16% 93%;
+    --muted-foreground: 220 10% 42%;
+    --accent: 220 20% 90%;
+    --accent-foreground: 223 28% 26%;
+    --destructive: 0 65% 46%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 14% 82%;
+    --input: 220 14% 76%;
+    --ring: 223 29% 33%;
+    /* 强调色：青 #0E7C7B 系 */
+    --gold: 179 80% 27%;
+    --gold-foreground: 0 0% 100%;
+    --gold-muted: 179 35% 88%;
+    --success: 152 55% 32%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 90% 38%;
+    --warning-foreground: 0 0% 100%;
+    --info: 210 70% 40%;
+    --info-foreground: 0 0% 100%;
+    --shadow-soft: 0 1px 2px rgb(40 55 90 / 0.06), 0 2px 6px -1px rgb(40 55 90 / 0.06);
+    --shadow-card: 0 4px 12px -2px rgb(40 55 90 / 0.10), 0 2px 4px -1px rgb(40 55 90 / 0.06);
+    --shadow-pop: 0 12px 28px -8px rgb(40 55 90 / 0.16);
+    --radius: 0.625rem;
+    --sidebar-background: 222 28% 15%;
+    --sidebar-foreground: 220 18% 88%;
+    --sidebar-primary: 179 60% 38%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 24% 22%;
+    --sidebar-accent-foreground: 179 50% 66%;
+    --sidebar-border: 222 20% 26%;
+    --sidebar-ring: 179 50% 52%;
+  }
+
+  /* ============ 学术紫金（保留）· 亮色 ============ */
+  :root[data-theme="purple-gold"] {
     --background: 252 25% 97%;
     --foreground: 258 24% 16%;
     --card: 0 0% 100%;
     --card-foreground: 258 24% 16%;
     --popover: 0 0% 100%;
     --popover-foreground: 258 24% 16%;
-    /* 主紫（柔和，可访问） */
     --primary: 258 52% 46%;
     --primary-foreground: 0 0% 100%;
     --secondary: 258 30% 93%;
     --secondary-foreground: 258 55% 30%;
     --muted: 252 22% 92%;
-    /* 浅色模式次要文字（约 5.8:1，满足 WCAG AA） */
     --muted-foreground: 258 12% 40%;
     --accent: 258 35% 90%;
     --accent-foreground: 258 55% 32%;
@@ -34,23 +128,19 @@
     --border: 258 16% 78%;
     --input: 258 16% 72%;
     --ring: 258 52% 46%;
-    /* 暖金点缀（界面作文字用时为暗金系，保证可读） */
     --gold: 43 62% 45%;
     --gold-foreground: 40 30% 10%;
     --gold-muted: 46 42% 90%;
-    /* 语义三色（新增） */
     --success: 152 55% 35%;
     --success-foreground: 0 0% 100%;
     --warning: 38 90% 40%;
     --warning-foreground: 0 0% 100%;
     --info: 210 70% 45%;
     --info-foreground: 0 0% 100%;
-    /* 柔和阴影（带紫味，暖调） */
     --shadow-soft: 0 1px 2px rgb(88 60 160 / 0.06), 0 2px 6px -1px rgb(88 60 160 / 0.06);
     --shadow-card: 0 4px 12px -2px rgb(88 60 160 / 0.10), 0 2px 4px -1px rgb(88 60 160 / 0.06);
     --shadow-pop: 0 12px 28px -8px rgb(88 60 160 / 0.16);
     --radius: 0.625rem;
-    /* 侧栏（深紫底，与主紫同相） */
     --sidebar-background: 258 42% 15%;
     --sidebar-foreground: 252 22% 88%;
     --sidebar-primary: 258 62% 62%;
@@ -61,7 +151,94 @@
     --sidebar-ring: 45 62% 52%;
   }
 
+  /* ============ 暖纸松石（默认）· 暗色 ============ */
   .dark {
+    --background: 24 20% 10%;
+    --foreground: 40 20% 90%;
+    --card: 24 18% 13%;
+    --card-foreground: 40 20% 90%;
+    --popover: 24 18% 13%;
+    --popover-foreground: 40 20% 90%;
+    --primary: 168 55% 45%;
+    --primary-foreground: 168 60% 10%;
+    --secondary: 24 16% 19%;
+    --secondary-foreground: 40 18% 86%;
+    --muted: 24 14% 17%;
+    --muted-foreground: 40 10% 64%;
+    --accent: 24 16% 22%;
+    --accent-foreground: 40 22% 88%;
+    --destructive: 0 66% 56%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 24 14% 24%;
+    --input: 24 14% 28%;
+    --ring: 168 55% 45%;
+    --gold: 22 65% 52%;
+    --gold-foreground: 22 70% 10%;
+    --gold-muted: 24 22% 22%;
+    --success: 152 50% 48%;
+    --success-foreground: 152 60% 10%;
+    --warning: 38 92% 54%;
+    --warning-foreground: 38 80% 10%;
+    --info: 205 75% 58%;
+    --info-foreground: 205 70% 10%;
+    --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.30);
+    --shadow-card: 0 4px 12px -2px rgb(0 0 0 / 0.45);
+    --shadow-pop: 0 12px 28px -8px rgb(0 0 0 / 0.55);
+    --sidebar-background: 24 22% 8%;
+    --sidebar-foreground: 40 16% 84%;
+    --sidebar-primary: 168 55% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 24 16% 17%;
+    --sidebar-accent-foreground: 168 48% 62%;
+    --sidebar-border: 24 14% 20%;
+    --sidebar-ring: 168 48% 58%;
+  }
+
+  /* ============ 石墨仪器 · 暗色 ============ */
+  .dark[data-theme="graphite-lab"] {
+    --background: 222 25% 8%;
+    --foreground: 220 16% 90%;
+    --card: 222 22% 11%;
+    --card-foreground: 220 16% 90%;
+    --popover: 222 22% 11%;
+    --popover-foreground: 220 16% 90%;
+    --primary: 222 40% 66%;
+    --primary-foreground: 222 40% 10%;
+    --secondary: 222 20% 18%;
+    --secondary-foreground: 220 16% 86%;
+    --muted: 222 18% 16%;
+    --muted-foreground: 220 10% 62%;
+    --accent: 222 22% 20%;
+    --accent-foreground: 220 18% 88%;
+    --destructive: 0 66% 56%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 222 18% 22%;
+    --input: 222 18% 26%;
+    --ring: 222 40% 66%;
+    --gold: 179 60% 45%;
+    --gold-foreground: 179 70% 10%;
+    --gold-muted: 179 22% 20%;
+    --success: 152 50% 48%;
+    --success-foreground: 152 60% 10%;
+    --warning: 38 92% 54%;
+    --warning-foreground: 38 80% 10%;
+    --info: 210 75% 58%;
+    --info-foreground: 210 70% 10%;
+    --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.30);
+    --shadow-card: 0 4px 12px -2px rgb(0 0 0 / 0.45);
+    --shadow-pop: 0 12px 28px -8px rgb(0 0 0 / 0.55);
+    --sidebar-background: 222 30% 10%;
+    --sidebar-foreground: 220 16% 84%;
+    --sidebar-primary: 179 60% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 24% 18%;
+    --sidebar-accent-foreground: 179 50% 62%;
+    --sidebar-border: 222 20% 22%;
+    --sidebar-ring: 179 50% 58%;
+  }
+
+  /* ============ 学术紫金 · 暗色 ============ */
+  .dark[data-theme="purple-gold"] {
     --background: 258 30% 8%;
     --foreground: 252 20% 92%;
     --card: 258 26% 12%;
@@ -81,7 +258,6 @@
     --border: 258 22% 24%;
     --input: 258 22% 28%;
     --ring: 258 62% 68%;
-    /* 暗色下金色提亮 */
     --gold: 45 68% 58%;
     --gold-foreground: 40 32% 10%;
     --gold-muted: 46 30% 20%;
@@ -91,7 +267,6 @@
     --warning-foreground: 38 80% 12%;
     --info: 210 75% 60%;
     --info-foreground: 210 70% 12%;
-    /* 暗色阴影更重（黑系，带透明度） */
     --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.30);
     --shadow-card: 0 4px 12px -2px rgb(0 0 0 / 0.45);
     --shadow-pop: 0 12px 28px -8px rgb(0 0 0 / 0.55);
@@ -115,7 +290,7 @@
   }
 }
 
-/* 紫金渐变装饰条（Logo 区、标题装饰用） */
+/* 主题渐变装饰条（Logo 区、标题装饰用）——随主题色自动变化 */
 @layer utilities {
   .gradient-royal {
     background-image: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--gold)));

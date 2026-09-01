@@ -62,12 +62,21 @@ PSI4_METHODS: dict[str, dict] = {
         "basis": "def2-svp",
         "label": "ωB97X-D3BJ/def2-SVP（真 DFT）",
         "preset": "precision",
+        "e_convergence": 1e-6,
+    },
+    "wb97xd3bj_svp_quick": {
+        "psi4_name": "wb97x-d3bj",
+        "basis": "def2-SV(P)",
+        "label": "ωB97X-D3BJ/def2-SV(P)（批量快速档）",
+        "preset": "batch",
+        "e_convergence": 3e-6,
     },
     "b3lyp_631gdp": {
         "psi4_name": "b3lyp",
         "basis": "6-31g(d,p)",
         "label": "B3LYP/6-31G(d,p)（文献口径）",
         "preset": "literature",
+        "e_convergence": 1e-6,
     },
 }
 DEFAULT_PSI4_METHOD = "wb97xd3bj_svp"
@@ -169,7 +178,8 @@ def _xyz_atoms(xyz_block: str) -> list[tuple[str, float, float, float]]:
 def generate_psi4_script(complex_xyz: str, n_frag_a: int,
                          method_key: str = DEFAULT_PSI4_METHOD,
                          *, optimize: bool = True, same_fragments: bool = False,
-                         threads: int = 4, memory_mb: int = 6000) -> str:
+                         threads: int = 4, memory_mb: int = 6000,
+                         e_convergence: float | None = None) -> str:
     """生成 psi4-env 子进程要跑的 Python 脚本（计算逻辑全在脚本内，结果落 result.json）。
 
     Args:
@@ -178,6 +188,7 @@ def generate_psi4_script(complex_xyz: str, n_frag_a: int,
         method_key: PSI4_METHODS 键
         optimize: True 时先做 psi4 几何优化（初猜已是 xTB 预优化几何）
         threads/memory_mb: psi4 并行与内存上限
+        e_convergence: SCF 能量收敛阈值（缺省取方法档 spec，默认 1e-6）
 
     脚本产物（cwd 下）：result.json（结构化结果）、complex_opt.xyz（优化后几何，
     表头第二行注释带 fragment 边界）、complex.fchk（Gaussian 格式检查点）。
@@ -193,6 +204,8 @@ def generate_psi4_script(complex_xyz: str, n_frag_a: int,
         raise DftError(
             f"片段边界非法：片段 A 原子数 {n_frag_a}，复合物共 {len(atoms)} 个原子")
 
+    e_conv = e_convergence if e_convergence is not None \
+        else spec.get("e_convergence", 1e-6)
     atoms_json = json.dumps(atoms)
     return _SCRIPT_TEMPLATE.format(
         atoms_json=atoms_json,
@@ -204,6 +217,7 @@ def generate_psi4_script(complex_xyz: str, n_frag_a: int,
         same_fragments="True" if same_fragments else "False",
         threads=threads,
         memory_mb=memory_mb,
+        e_convergence=e_conv,
         progress_prefix=PROGRESS_PREFIX,
     )
 
@@ -272,6 +286,7 @@ def main():
         "scf_type": "df",
         "reference": "rks",
         "guess": "sad",
+        "e_convergence": {e_convergence},
     }})
 
     result = {{"method": "{psi4_name}", "basis": "{basis}",
@@ -596,18 +611,21 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
                          amine2_smiles: str | None = None,
                          custom_smiles: str | None = None,
                          on_stage=None, jobs_root: Path | None = None,
-                         optimize: bool = True,
+                         optimize: bool = False,
                          complex_xyz: str | None = None,
-                         n_samples: int | None = None) -> dict:
+                         n_samples: int | None = None,
+                         threads: int | None = None) -> dict:
     """「缩合二聚体 D 与第三物质 X」结合能的 Psi4 精度档实现。
 
     参数与返回值口径对齐 engine.compute_binding，多带 backend="psi4" 与
     psi4_detail（方法/基组/BSSE 口径/未校正结合能/fchk 路径）。
     method 支持 preset 别名：precision（默认 ωB97X-D3BJ/def2-SVP）/
-    literature（B3LYP/6-31G(d,p)，对齐刘璐 2021 等 COF 文献口径）。
+    literature（B3LYP/6-31G(d,p)）/ batch（ωB97X-D3BJ/def2-SV(P) 批量快速档）。
     complex_xyz：可选，外部提供的 D·X 复合物初猜 xyz（如经 xTB 取向筛选后的
-    几何）；提供时跳过取向采样/初猜生成。n_samples：MC 取向采样数
-    （None=默认/环境变量；1=旧单取向 UFF 初猜）。
+    几何或构象采样产物）；提供时跳过取向采样/初猜生成。n_samples：MC 取向采样数
+    optimize：默认 False——初猜已是 xTB 预优化几何，直接单点 CP（大幅提速且
+    S66 验证误差达标）；显式 True 才做 Psi4 全优化。
+    threads：并行线程数；None 时取 runtime_config.psi4_threads()。
 
     Raises:
         Psi4NotInstalledError: psi4-env 未安装
@@ -686,7 +704,8 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
 
         stage("正在生成 Psi4 输入脚本…")
         script = generate_psi4_script(guess, n_a, method, optimize=optimize,
-                                      same_fragments=(x_smiles == dimer_smiles))
+                                      same_fragments=(x_smiles == dimer_smiles),
+                                      threads=(threads or runtime_config.psi4_threads()))
         run_dir = job_dir / "psi4"
         data = _run_psi4_script(script, run_dir, psi4_timeout(n_atoms),
                                 on_stage=stage)
@@ -713,6 +732,8 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
                 "custom_smiles": custom_smiles if x_type == "custom" else None,
             },
             "complex_atom_count": n_atoms,
+            # 原子计数口径：复合物 = 二聚体 + X；self_stack 时 X=二聚体自身 → complex = 2×dimer
+            "atom_budget": {"dimer": n_a, "x": n_atoms - n_a, "complex": n_atoms},
             "fragment_ranges": {"a": [0, n_a], "b": [n_a, n_atoms]},
             "sampling": sampling,
         }
@@ -728,16 +749,19 @@ def compute_binding_psi4(ald_smiles: str, amine_smiles: str,
 def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
                               method: str = DEFAULT_PSI4_METHOD,
                               on_stage=None, jobs_root: Path | None = None,
-                              optimize: bool = True,
+                              optimize: bool = False,
                               complex_xyz: str | None = None,
-                              n_samples: int | None = None) -> dict:
+                              n_samples: int | None = None,
+                              threads: int | None = None) -> dict:
     """任意双分子 A···B 结合能的 Psi4 精度档实现（对齐 engine.compute_pair_binding）。
 
     method 支持 preset 别名：precision（默认 ωB97X-D3BJ/def2-SVP）/
-    literature（B3LYP/6-31G(d,p)，对齐刘璐 2021 等 COF 文献口径）。
+    literature（B3LYP/6-31G(d,p)）/ batch（ωB97X-D3BJ/def2-SV(P) 批量快速档）。
     complex_xyz：可选，外部提供的 A···B 复合物初猜 xyz（如经 xTB 取向筛选后的
     几何）；提供时跳过取向采样/初猜生成。原子顺序须为 A 片段在前、B 片段
     在后。n_samples：MC 取向采样数（None=默认/环境变量；1=旧单取向初猜）。
+    optimize：默认 False（初猜已是 xTB 预优化几何，直接单点 CP 提速）；
+    threads：并行线程数；None 时取 runtime_config.psi4_threads()。
 
     Raises:
         Psi4NotInstalledError / DftError（中文原因）
@@ -802,7 +826,8 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
 
         stage("正在生成 Psi4 输入脚本…")
         script = generate_psi4_script(guess, n_a, method, optimize=optimize,
-                                      same_fragments=(canon_b == canon_a))
+                                      same_fragments=(canon_b == canon_a),
+                                      threads=(threads or runtime_config.psi4_threads()))
         run_dir = job_dir / "psi4"
         data = _run_psi4_script(script, run_dir, psi4_timeout(n_atoms),
                                 on_stage=stage)
@@ -825,6 +850,8 @@ def compute_pair_binding_psi4(smiles_a: str, smiles_b: str,
             "x_request": {"solvent_id": None, "ald2_smiles": None,
                           "amine2_smiles": None, "custom_smiles": None},
             "complex_atom_count": n_atoms,
+            # 原子计数口径：复合物 = 二聚体 + X；self_stack 时 X=二聚体自身 → complex = 2×dimer
+            "atom_budget": {"dimer": n_a, "x": n_atoms - n_a, "complex": n_atoms},
             "fragment_ranges": {"a": [0, n_a], "b": [n_a, n_atoms]},
             "sampling": sampling,
         }

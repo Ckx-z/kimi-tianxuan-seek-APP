@@ -195,6 +195,21 @@ def psi4_scratch_dir() -> Path:
     return user_data_root() / "psi4_scratch"
 
 
+def psi4_threads() -> int:
+    """Psi4 精度档并行线程数。解析顺序（高 → 低）：
+    1. 环境变量 COF_PSI4_THREADS（1–32）
+    2. config/runtime.local.json 顶层 "psi4_threads"（1–32）
+    3. 默认 4
+    """
+    val = os.environ.get("COF_PSI4_THREADS", "").strip()
+    if val.isdigit() and 1 <= int(val) <= 32:
+        return int(val)
+    cfg_val = load_local_config().get("psi4_threads")
+    if isinstance(cfg_val, int) and 1 <= cfg_val <= 32:
+        return cfg_val
+    return 4
+
+
 def gnn_project_root() -> Path:
     """旧 GNN 项目根（predict_pair.py 所在目录）。
 

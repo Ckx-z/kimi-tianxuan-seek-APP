@@ -36,6 +36,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { BackendUnavailableError } from '@/lib/api';
+import { COLOR_SCHEMES, SCHEME_LABELS, useTheme } from '@/hooks/use-theme';
 import {
   fetchLlmSettings,
   saveLlmSettings,
@@ -740,8 +741,40 @@ function AboutCard({
           </div>
         ))}
         <p className="pt-1">
-          界面采用紫金主题——紫色为主色调象征科研理性，金色点缀致敬学术荣光，支持明暗模式自动切换。
+          界面内置三套配色主题（暖纸松石 / 石墨仪器 / 学术紫金），默认每次启动自动轮换，可在「配色主题」卡手动固定；支持明暗模式切换。
         </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** 主题卡：三配色方案选择（手动选择固定主题并停止重启轮换） */
+function ThemeCard() {
+  const { scheme, setScheme } = useTheme();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">配色主题</CardTitle>
+        <CardDescription>
+          默认每次启动自动轮换；手动选择后固定使用该主题。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {COLOR_SCHEMES.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setScheme(s)}
+            className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
+              scheme === s
+                ? 'border-primary bg-primary/10 font-medium text-primary'
+                : 'border-border hover:bg-accent'
+            }`}
+          >
+            <span>{SCHEME_LABELS[s]}</span>
+            {scheme === s && <CheckCircle2 className="h-4 w-4" />}
+          </button>
+        ))}
       </CardContent>
     </Card>
   );
@@ -790,6 +823,7 @@ export default function Settings() {
         <div className="space-y-6">
           <BackendStatusCard health={health} offline={offline} loading={healthLoading} />
           <SoftwareUpdateCard />
+          <ThemeCard />
           <AboutCard health={health} offline={offline} loading={healthLoading} />
         </div>
       </div>
