@@ -20,6 +20,8 @@ interface Props {
   /** 片段标注（dimer 模式：二聚体 / X；pair 模式：分子 A / 分子 B） */
   labelA?: string;
   labelB?: string;
+  /** 折叠标题（默认复合物口径；构象详情等场景可覆盖） */
+  title?: string;
 }
 
 /** 按片段区间把复合物 xyz 拆成两个独立 xyz 文本；区间非法时返回 null */
@@ -35,7 +37,8 @@ function splitXyz(xyz: string, frag: DftFragmentRanges): [string, string] | null
   return [mk(atoms.slice(a0, a1)), mk(atoms.slice(b0, b1))];
 }
 
-export default function DftViewer3D({ xyz, fragmentRanges, labelA = '主体', labelB = '客体' }: Props) {
+export default function DftViewer3D({ xyz, fragmentRanges, labelA = '主体', labelB = '客体',
+  title = '3D 结合构象（两分子相对摆放）' }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +159,7 @@ export default function DftViewer3D({ xyz, fragmentRanges, labelA = '主体', la
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium hover:bg-accent"
       >
-        <span>3D 结合构象（两分子相对摆放）</span>
+        <span>{title}</span>
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
       </button>
       {open && (

@@ -4,11 +4,13 @@
  * 合成复合物几何，回调给页面在提交时注入 complex_xyz。
  */
 import { useState } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Eye, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import ConformerDetail from './ConformerDetail';
 import {
   generateConformers,
   manualConformer,
@@ -33,6 +35,8 @@ export default function ConformerGallery({ aSmiles, bSmiles, disabled, onApply }
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  /** 详情弹层中的构象（v1.5.1：查看 XYZ 与 3D 构象） */
+  const [detailItem, setDetailItem] = useState<ConformerItem | null>(null);
 
   const runGenerate = async () => {
     if (!bSmiles) {
@@ -119,12 +123,12 @@ export default function ConformerGallery({ aSmiles, bSmiles, disabled, onApply }
       {conformers.length > 0 && (
         <ul className="max-h-64 space-y-1 overflow-y-auto text-sm">
           {conformers.map((c) => (
-            <li key={c.id}>
+            <li key={c.id} className="flex items-center gap-1">
               <button
                 type="button"
                 disabled={applying || disabled}
                 onClick={() => void applySelected(c)}
-                className={`w-full rounded px-2 py-1.5 text-left transition-colors ${
+                className={`flex-1 rounded px-2 py-1.5 text-left transition-colors ${
                   selected === c.id
                     ? 'bg-gold-muted font-medium text-gold-foreground'
                     : 'hover:bg-accent'
@@ -136,10 +140,26 @@ export default function ConformerGallery({ aSmiles, bSmiles, disabled, onApply }
                   ΔE {c.rel_e_kj.toFixed(2)} kJ/mol · 占比 {(c.boltzmann_w * 100).toFixed(1)}%
                 </span>
               </button>
+              <button
+                type="button"
+                title="查看 XYZ 坐标与 3D 构象"
+                onClick={() => setDetailItem(c)}
+                className="shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Eye className="h-4 w-4" />
+              </button>
             </li>
           ))}
         </ul>
       )}
+      <Dialog open={detailItem !== null} onOpenChange={(v) => { if (!v) setDetailItem(null); }}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>低能构象详情</DialogTitle>
+          </DialogHeader>
+          {detailItem && <ConformerDetail item={detailItem} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

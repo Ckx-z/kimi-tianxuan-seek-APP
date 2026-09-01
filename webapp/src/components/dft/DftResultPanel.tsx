@@ -182,6 +182,13 @@ export default function DftResultPanel({ result, jobId, compare }: Props) {
               ? '负值：形成复合物在能量上有利，数值越负结合越强。'
               : '正值：该初猜取向下复合物能量高于组分之和，结合不利（或构象未找到有利取向）。'}
             耗时 {result.elapsed_sec.toFixed(1)} s。
+            {result.atom_budget && (
+              <span className="block mt-1">
+                原子计数（含氢口径）：{isPair ? '分子 A' : '二聚体'} {result.atom_budget.dimer}
+                {' · '}X {result.atom_budget.x}
+                {' · '}复合物 {result.atom_budget.complex}。
+              </span>
+            )}
           </p>
         </CardContent>
       </Card>

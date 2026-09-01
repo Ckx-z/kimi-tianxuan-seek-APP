@@ -1237,6 +1237,38 @@ export default function Dft() {
 
         {/* 右侧结果区 */}
         <div className="space-y-4 lg:col-span-2">
+          {/* 原子计数卡片（v1.5.1：常驻拆解，含氢口径，与后端实际 xyz 一致） */}
+          {estAtoms && estAtoms.complex_atom_count != null && (
+            <div className="rounded-lg border bg-card p-3 text-xs text-muted-foreground shadow-sm">
+              <span className="font-medium text-foreground">原子计数（含氢口径）</span>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 tabular-nums">
+                {isPair ? (
+                  <>
+                    <span>分子 A：{estAtoms.x_atom_count != null
+                      ? estAtoms.complex_atom_count - estAtoms.x_atom_count : '?'}</span>
+                    <span>分子 B：{estAtoms.x_atom_count ?? '?'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>二聚体：{estAtoms.dimer_atom_count ?? '?'}</span>
+                    <span>X：{estAtoms.x_atom_count ?? '?'}</span>
+                  </>
+                )}
+                <span>
+                  复合物：<span className="font-medium text-foreground">{estAtoms.complex_atom_count}</span>
+                </span>
+              </div>
+              <div className="mt-1">
+                {isPair
+                  ? '复合物 = 分子 A + 分子 B'
+                  : xType === 'self_stack'
+                    ? '口径：复合物 = 二聚体 × 2（自堆积定义，非结构扩大）'
+                    : '复合物 = 二聚体 + X'}
+                {!isPair && dimerPreview?.multi_site ? '；多位点单体仅缩合第一个位点' : ''}
+              </div>
+            </div>
+          )}
+
           {/* 进行中状态卡 */}
           {running && (
             <div className="rounded-lg border bg-card p-6 text-center shadow-sm">
