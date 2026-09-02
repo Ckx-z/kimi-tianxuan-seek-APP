@@ -196,16 +196,22 @@ def chat_completion(messages, model=None, provider=None, max_tokens=8000,
             last_err = RuntimeError(f'{name} API key 未配置（env 或 secrets.local.json）')
             continue
         try:
+            payload = {
+                'model': model or cfg['chat_model'],
+                'messages': messages,
+                'max_tokens': max_tokens,
+                'temperature': temperature,
+            }
+            # 推理型端点关闭 thinking（与科研助手 src/assistant/llm_bridge.py
+            # 同口径）：否则 deepseek-v4-flash / longcat 会把 max_tokens
+            # 全耗在推理上，message.content 为空 → 迭代建议误降级「LLM 暂不可用」
+            if name in ('settings_page', 'longcat'):
+                payload.update({'thinking': {'type': 'disabled'}})
             r = requests.post(
                 cfg['base_url'].rstrip('/') + '/chat/completions',
                 headers={'Authorization': f"Bearer {cfg['api_key']}",
                          'Content-Type': 'application/json'},
-                json={
-                    'model': model or cfg['chat_model'],
-                    'messages': messages,
-                    'max_tokens': max_tokens,
-                    'temperature': temperature,
-                },
+                json=payload,
                 timeout=timeout,
             )
             r.raise_for_status()

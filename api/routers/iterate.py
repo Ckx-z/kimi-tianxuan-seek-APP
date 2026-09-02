@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -221,10 +222,28 @@ def run_suggest(req: SuggestRequest):
 
     cmd = [ITERATE_PYTHON, str(ITERATE_SCRIPT)] + args
 
+    # 子解释器环境清理（冻结后端运行时的防御性加固）：
+    # PyInstaller 进程环境可能带 PYTHONHOME 或指向冻结包 _internal 的
+    # PYTHONPATH 条目；外部解释器一旦继承，加载 stdlib 扩展时可能命中
+    # 冻结包里的 cp313 .pyd，报 "Module use of python313.dll conflicts
+    # with this version of Python" 而无法调用 LLM。
+    env = os.environ.copy()
+    env.pop('PYTHONHOME', None)
+    _meipass = getattr(sys, '_MEIPASS', '')
+    raw_pp = env.get('PYTHONPATH', '')
+    if _meipass and raw_pp:
+        norm_mp = str(_meipass).replace('\\', '/').rstrip('/') + '/'
+        keep = []
+        for part in raw_pp.split(os.pathsep):
+            norm = part.strip().replace('\\', '/').rstrip('/')
+            if norm and not (norm + '/').startswith(norm_mp):
+                keep.append(part)
+        env['PYTHONPATH'] = os.pathsep.join(keep)
+
     try:
         proc = subprocess.run(
             cmd, cwd=str(PROJECT_ROOT), timeout=ITERATE_TIMEOUT_S,
-            capture_output=True, encoding="utf-8", errors="replace")
+            capture_output=True, encoding="utf-8", errors="replace", env=env)
     except subprocess.TimeoutExpired:
         raise HTTPException(
             504, f"建议生成超时（>{ITERATE_TIMEOUT_S}s）：编排器可能仍在后台"

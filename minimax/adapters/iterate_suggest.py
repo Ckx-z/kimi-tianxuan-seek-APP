@@ -573,8 +573,16 @@ def lookup_dft_context(aldehyde=None, amine=None, favorite=None):
         if not smiles_a or not smiles_b:
             return None, None
         proj_root = HERE.parent.parent  # 项目根（src/ 所在）
-        if str(proj_root) not in sys.path:
-            sys.path.insert(0, str(proj_root))
+        # 仅当项目根确有 src/dft 源码树时才追加到 sys.path（追加在
+        # site-packages 之后，绝不抢占解释器自带 stdlib 目录）。
+        # 打包版里 proj_root 是冻结解释器的 _internal（满是 cp313 .pyd）：
+        # 若按旧做法 insert(0)，外部 3.12 编排器解释器后续 import
+        # _socket/_ssl 等 stdlib 扩展时会先命中 cp313 版本，报
+        # "Module use of python313.dll conflicts with this version of
+        # Python"，导致迭代建议的 LLM 调用崩溃、降级为「LLM 暂不可用」。
+        if (proj_root / 'src' / 'dft').is_dir() \
+                and str(proj_root) not in sys.path:
+            sys.path.append(str(proj_root))
         from src.dft import cache as _dft_cache
         from src.dft import dimer as _dft_dimer
         dim = _dft_dimer.make_dimer(smiles_a, smiles_b)
