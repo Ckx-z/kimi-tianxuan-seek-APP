@@ -355,6 +355,11 @@ export interface ConformerItem {
   boltzmann_w: number;
 }
 
+/** 复合物（A···B）低能构象（v1.5.2：xyz 为 A+B 组合体，含片段区间） */
+export interface ComplexConformerItem extends ConformerItem {
+  fragment_ranges?: DftFragmentRanges | null;
+}
+
 export interface ConformerEnginesResponse {
   engines: {
     etkdg: { installed: boolean; label: string };
@@ -384,6 +389,19 @@ export const generateConformers = (payload: {
   threads?: number;
 }) => request<{ conformers: ConformerItem[]; engine: string; cached: boolean }>(
   '/conformers/generate', { method: 'POST', body: payload });
+
+/** 复合物（A···B）低能构象采样（v1.5.2：B 内部构象 × 相对位姿，分钟级同步） */
+export const generateComplexConformers = (payload: {
+  a_smiles: string;
+  b_smiles: string;
+  engine?: 'auto' | 'etkdg' | 'crest' | 'rigid';
+  n_gen?: number;
+  max_confs?: number;
+  e_window_kj?: number;
+  n_poses?: number;
+  threads?: number;
+}) => request<{ complexes: ComplexConformerItem[]; engine: string; cached: boolean }>(
+  '/conformers/complex', { method: 'POST', body: payload });
 
 /** 手动摆放：主体 + 客体经刚体变换合成复合物 xyz（b_xyz 可注入指定构象） */
 export const manualConformer = (payload: {

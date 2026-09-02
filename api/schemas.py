@@ -233,6 +233,23 @@ class ConformerGenerate(BaseModel):
                                         "（缺省=环境变量 COF_CREST_THREADS 或配置或 24）")
 
 
+class ConformerComplex(BaseModel):
+    """复合物（A···B）低能构象采样请求（v1.5.2）：B 内部构象 × 相对位姿。"""
+    a_smiles: str = Field(..., description="主体（二聚体/分子 A）SMILES")
+    b_smiles: str = Field(..., description="客体（X/分子 B）SMILES")
+    engine: str = Field("auto", description="B 内部构象引擎：auto（CREST 可用优先，"
+                                            "否则 ETKDG）| etkdg | crest | rigid（纯位姿）")
+    n_gen: int = Field(30, ge=1, le=200, description="B 内部构象 ETKDG 生成尝试数")
+    max_confs: int = Field(10, ge=1, le=20, description="保留复合物构象数量上限")
+    e_window_kj: float = Field(20.0, ge=0.0, le=100.0,
+                               description="相对全局最低能的能量窗口（kJ/mol）")
+    n_poses: int = Field(8, ge=1, le=24,
+                         description="每个 B 内部构象的相对位姿采样数")
+    threads: int | None = Field(
+        None, ge=1, le=64, description="CREST 并行线程数"
+                                        "（缺省=环境变量 COF_CREST_THREADS 或配置或 24）")
+
+
 class ConformerManual(BaseModel):
     """手动摆放复合物请求：主体/客体 SMILES + 客体刚体变换（可选锚点对齐）。"""
     a_smiles: str = Field(..., description="主体（二聚体/分子 A）SMILES")

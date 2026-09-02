@@ -24,8 +24,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 
-from ..schemas import (ConformerGenerate, ConformerManual, DftDraftPut,
-                       DftJobCreate)
+from ..schemas import (ConformerComplex, ConformerGenerate, ConformerManual,
+                       DftDraftPut, DftJobCreate)
 
 try:
     from src import runtime_config
@@ -238,6 +238,39 @@ def generate_conformers(req: ConformerGenerate):
     dft_conformers.save_cached_conformers(
         req.smiles, engine_name, req.n_gen, req.max_confs, req.e_window_kj, confs)
     return {"conformers": confs, "engine": engine_name, "cached": False}
+
+
+@router.post("/conformers/complex")
+def generate_complex_conformers(req: ConformerComplex):
+    """复合物（A···B）低能构象采样（v1.5.2）：对两分子相对位姿做采样，
+    输出 A+B 组合体 xyz（含 fragment_ranges），供 complex_xyz 注入计算。
+
+    同步返回（分钟级）；失败 422 中文原因。
+    """
+    engine_name = (req.engine or "auto").strip()
+    if engine_name not in ("auto", "etkdg", "crest", "rigid"):
+        raise HTTPException(400, f"未知的构象引擎：{req.engine}"
+                                 f"（可选 auto / etkdg / crest / rigid）")
+    if engine.canonicalize_smiles(req.a_smiles) is None:
+        raise HTTPException(400, f"分子 A 的 SMILES 无法解析：{req.a_smiles[:80]}")
+    if engine.canonicalize_smiles(req.b_smiles) is None:
+        raise HTTPException(400, f"分子 B 的 SMILES 无法解析：{req.b_smiles[:80]}")
+    cached = dft_conformers.load_cached_complex_conformers(
+        req.a_smiles, req.b_smiles, engine_name, req.n_gen, req.max_confs,
+        req.e_window_kj, req.n_poses)
+    if cached is not None:
+        return {"complexes": cached, "engine": "complex", "cached": True}
+    complexes = dft_conformers.generate_complex_conformers(
+        req.a_smiles, req.b_smiles, engine_name, n_gen=req.n_gen,
+        max_confs=req.max_confs, e_window_kj=req.e_window_kj,
+        n_poses=req.n_poses, threads=req.threads)
+    if not complexes:
+        raise HTTPException(422, "复合物构象采样失败：两分子组合难以采样或 "
+                                 "xTB 引擎不可用，请换用刚性（rigid）引擎或减少位姿数")
+    dft_conformers.save_cached_complex_conformers(
+        req.a_smiles, req.b_smiles, engine_name, req.n_gen, req.max_confs,
+        req.e_window_kj, req.n_poses, complexes)
+    return {"complexes": complexes, "engine": "complex", "cached": False}
 
 
 @router.post("/conformers/manual")

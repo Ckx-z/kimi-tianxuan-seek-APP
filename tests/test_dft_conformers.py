@@ -194,3 +194,56 @@ class TestConformerEndpoints:
         r = client.post("/api/dft/conformers/manual", json={
             "a_smiles": "bad!", "b_smiles": "Oc1ccccc1"})
         assert r.status_code == 400
+
+
+class TestComplexConformersV152:
+    """v1.5.2：复合物（A+B）低能构象采样——输出含两分子的组合体 xyz。"""
+
+    @pytest.fixture()
+    def client(self):
+        from api.main import app
+        return TestClient(app)
+
+    def test_complex_endpoint_returns_ab_complex(self, client, monkeypatch):
+        # B 内部构象固定为一次嵌入（跳过单分子引擎，加速测试）
+        monkeypatch.setattr(
+            dft_conformers, "generate_conformers",
+            lambda smiles, engine_name, n_gen=50, max_confs=20,
+            e_window_kj=10.0, threads=None: [
+                {"id": "x", "xyz": engine.embed_monomer_xyz(smiles),
+                 "rel_e_kj": 0.0, "rel_e_kcal": 0.0, "boltzmann_w": 1.0}])
+        monkeypatch.setattr(engine, "xtb_binary", lambda: "fake-xtb.exe")
+
+        def fake_xtb(xyz_block, args, cwd, timeout, opt=True, cancel_event=None):
+            import hashlib
+            e = -40.0 - 0.001 * (int(hashlib.sha1(xyz_block.encode()).hexdigest(), 16) % 100)
+            return (f"| TOTAL ENERGY {e:.10f} Eh   |\n normal termination of xtb",
+                    None)
+        monkeypatch.setattr(engine, "_run_xtb", fake_xtb)
+
+        r = client.post("/api/dft/conformers/complex", json={
+            "a_smiles": "c1ccccc1", "b_smiles": "Oc1ccccc1",
+            "engine": "rigid", "n_poses": 4, "max_confs": 6})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["engine"] == "complex"
+        assert len(body["complexes"]) >= 1
+        first = body["complexes"][0]
+        lines = first["xyz"].strip().splitlines()
+        assert int(lines[0]) == 25  # 苯 12 + 苯酚 13（A 在前 B 在后）
+        assert first["fragment_ranges"] == {"a": [0, 12], "b": [12, 25]}
+        rels = [c["rel_e_kj"] for c in body["complexes"]]
+        assert rels == sorted(rels)
+        assert rels[0] == 0.0
+        for c in body["complexes"]:
+            assert int(c["xyz"].strip().splitlines()[0]) == 25
+
+    def test_complex_invalid_smiles_400(self, client):
+        r = client.post("/api/dft/conformers/complex", json={
+            "a_smiles": "bad!", "b_smiles": "Oc1ccccc1", "engine": "rigid"})
+        assert r.status_code == 400
+
+    def test_complex_unknown_engine_400(self, client):
+        r = client.post("/api/dft/conformers/complex", json={
+            "a_smiles": "c1ccccc1", "b_smiles": "Oc1ccccc1", "engine": "magic"})
+        assert r.status_code == 400

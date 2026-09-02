@@ -6,13 +6,17 @@ import { useState } from 'react';
 import { Check, Copy, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DftViewer3D from './DftViewer3D';
-import type { ConformerItem } from './api';
+import type { ConformerItem, DftFragmentRanges } from './api';
 
 interface Props {
   item: ConformerItem;
+  /** 复合物片段区间（有则 3D 两色渲染分子 A/B） */
+  fragmentRanges?: DftFragmentRanges | null;
+  labelA?: string;
+  labelB?: string;
 }
 
-export default function ConformerDetail({ item }: Props) {
+export default function ConformerDetail({ item, fragmentRanges, labelA = '分子 A', labelB = '分子 B' }: Props) {
   const [copied, setCopied] = useState(false);
 
   const copyXyz = async () => {
@@ -68,7 +72,13 @@ export default function ConformerDetail({ item }: Props) {
           </Button>
         </span>
       </div>
-      <DftViewer3D xyz={item.xyz} title="3D 构象（拖动旋转 · 滚轮缩放）" />
+      <DftViewer3D
+        xyz={item.xyz}
+        fragmentRanges={fragmentRanges ?? null}
+        labelA={labelA}
+        labelB={labelB}
+        title={fragmentRanges ? '3D 复合物构象（青=分子 A · 品红=分子 B）' : '3D 构象（拖动旋转 · 滚轮缩放）'}
+      />
       <div>
         <p className="mb-1 text-xs font-medium text-muted-foreground">
           XYZ 坐标（{atomCount} 个原子）

@@ -542,6 +542,223 @@ def _parse_crest_conformers(path: Path, max_confs: int,
     return kept
 
 
+# ---------------------------------------------------------------- 复合物采样（v1.5.2）
+
+
+def _complex_rank_with_xtb(candidates: list[dict], n_a: int,
+                           e_window_kj: float, max_confs: int) -> list[dict]:
+    """复合物候选分级排名：gfnff 单点粗筛 → 前若干 gfnff 几何优化松弛 →
+    gfn2 单点复评 → 能量窗口 + 数量上限 → 统一条目格式。"""
+    wd_root = Path(tempfile.mkdtemp(prefix="dft_cplx_"))
+    try:
+        ff_args = engine.METHODS["gfnff"]["args"]
+        g2_args = engine.METHODS["gfn2"]["args"]
+        t_ff = engine.method_timeout("gfnff")
+        t_g2 = engine.method_timeout("gfn2")
+        # 粗筛：全部候选 gfnff 单点（秒级）
+        scored: list[tuple[float, dict]] = []
+        for i, c in enumerate(candidates):
+            try:
+                out, _ = engine._run_xtb(
+                    c["xyz"], ff_args, wd_root / f"sp{i}", t_ff, opt=False)
+                e = engine.parse_energy(out)
+            except Exception:
+                e = None
+            if e is not None:
+                scored.append((e, c))
+        if not scored:
+            return []
+        scored.sort(key=lambda t: t[0])
+        # 松弛：top 8 做 gfnff 几何优化（把两分子拉近到结合位）
+        relaxed: list[dict] = []
+        for rank, (e_sp, c) in enumerate(scored[:8]):
+            try:
+                out, opt_xyz = engine._run_xtb(
+                    c["xyz"], ff_args, wd_root / f"opt{rank}", t_ff)
+                e_ff = engine.parse_energy(out)
+                relaxed.append({"xyz": opt_xyz or c["xyz"], "n_b": c["n_b"],
+                                "e": e_ff if e_ff is not None else e_sp})
+            except Exception:
+                relaxed.append({"xyz": c["xyz"], "n_b": c["n_b"], "e": e_sp})
+        # 复评：gfn2 单点
+        for rank, r in enumerate(relaxed):
+            try:
+                out, _ = engine._run_xtb(
+                    r["xyz"], g2_args, wd_root / f"g2_{rank}", t_g2, opt=False)
+                e2 = engine.parse_energy(out)
+                if e2 is not None:
+                    r["e"] = e2
+            except Exception:
+                pass
+        relaxed.sort(key=lambda r: r["e"])
+        e_min = relaxed[0]["e"]
+        out: list[dict] = []
+        for r in relaxed:
+            rel_kj = (r["e"] - e_min) * 2625.5
+            if rel_kj > e_window_kj:
+                continue
+            if len(out) >= max_confs:
+                break
+            out.append(_complex_item(out, r, n_a, rel_kj))
+        return out
+    finally:
+        shutil.rmtree(wd_root, ignore_errors=True)
+
+
+def _complex_item(out: list[dict], r: dict, n_a: int, rel_kj: float) -> dict:
+    return {
+        "id": f"complex-{len(out):02d}",
+        "xyz": r["xyz"],
+        "rel_e_kj": round(rel_kj, 3),
+        "rel_e_kcal": round(rel_kj / 4.184, 3),
+        "boltzmann_w": round(math.exp(-rel_kj / (KT_KCAL * 4.184)), 6),
+        "fragment_ranges": {"a": [0, n_a], "b": [n_a, n_a + r["n_b"]]},
+    }
+
+
+def generate_complex_conformers(a_smiles: str, b_smiles: str,
+                                engine_name: str = "auto",
+                                n_gen: int = 30,
+                                max_confs: int = 10,
+                                e_window_kj: float = 20.0,
+                                n_poses: int = 8,
+                                timeout: int = 1800,
+                                threads: int | None = None) -> list[dict]:
+    """复合物（A···B）低能构象采样（v1.5.2）：B 内部构象 × 相对位姿。
+
+    设计初衷：对两个分子的相对位置与取向做构象采样，输出 A+B 组合体
+    的 3D 坐标。ETKDG/CREST 只支持单分子，故：
+      1. B 的内部柔性：engine_name ∈ {auto, etkdg, crest} 走单分子引擎
+         （auto=CREST 可用用 CREST 否则 ETKDG），'rigid' 只取一次嵌入；
+      2. 相对位姿：engine._orientations（随机取向 + r_A+r_B+2.6 Å 不重叠
+         摆放）+ UFF 预优化；
+      3. 排名：gfnff 单点粗筛 → top 8 gfnff 优化松弛 → gfn2 单点复评 →
+         能量窗口 + 数量上限。xTB 缺失时按 UFF 能量排序兜底。
+
+    Returns:
+        [{id, xyz(A+B), rel_e_kj, rel_e_kcal, boltzmann_w,
+          fragment_ranges{a,b}}]；失败返回 []。
+    """
+    from rdkit import Chem
+
+    name = engine_name or "auto"
+    if name not in ("auto", "etkdg", "crest", "rigid"):
+        return []
+    try:
+        mol_a = engine._embed_one(a_smiles, seed=42)
+        if mol_a is None:
+            return []
+    except Exception:
+        return []
+    n_a = mol_a.GetNumAtoms()
+
+    # 1) B 的内部构象（上限 4 个，控制候选总数）
+    if name == "rigid":
+        try:
+            b_items = [{"id": "rigid", "xyz": engine.embed_monomer_xyz(b_smiles)}]
+        except Exception:
+            return []
+    else:
+        b_items = generate_conformers(b_smiles, name, n_gen=n_gen,
+                                      max_confs=min(4, max_confs),
+                                      e_window_kj=max(e_window_kj, 10.0),
+                                      threads=threads)
+        if not b_items:
+            try:
+                b_items = [{"id": "rigid",
+                            "xyz": engine.embed_monomer_xyz(b_smiles)}]
+            except Exception:
+                return []
+    b_items = b_items[:4]
+
+    # 2) 相对位姿采样 + UFF 预优化
+    candidates: list[dict] = []
+    for bi, bitem in enumerate(b_items):
+        try:
+            mol_b = Chem.MolFromXYZBlock(bitem["xyz"])
+        except Exception:
+            continue
+        if mol_b is None or mol_b.GetNumAtoms() == 0:
+            continue
+        n_b = mol_b.GetNumAtoms()
+        try:
+            poses = engine._orientations(mol_a, mol_b, max(1, n_poses),
+                                         seed=42 + bi)
+        except Exception:
+            continue
+        for pos_b in poses:
+            try:
+                combined = engine._combined_with_b(mol_a, mol_b, pos_b)
+                uff_e = engine._forcefield_energy(combined, 0)
+                xyz = Chem.MolToXYZBlock(combined, confId=0)
+            except Exception:
+                continue
+            candidates.append({"xyz": xyz, "uff_e": uff_e, "b_id": bitem["id"],
+                               "n_b": n_b})
+
+    if not candidates:
+        return []
+
+    # 3) 排名（xTB 分级；缺失时 UFF 能量兜底）
+    if engine.xtb_binary() is not None:
+        return _complex_rank_with_xtb(candidates, n_a, e_window_kj, max_confs)
+    ordered = sorted(candidates,
+                     key=lambda c: c["uff_e"] if c["uff_e"] is not None else 1e9)
+    ordered = ordered[:max_confs]
+    e_min = ordered[0]["uff_e"] if ordered[0].get("uff_e") is not None else 0.0
+    out: list[dict] = []
+    for c in ordered:
+        rel_kj = ((c["uff_e"] - e_min) * 4.184
+                  if c["uff_e"] is not None else 9999.0)
+        if rel_kj > e_window_kj:
+            continue
+        out.append(_complex_item(out, c, n_a, rel_kj))
+    return out
+
+
+def complex_conformer_cache_key(a_smiles: str, b_smiles: str,
+                                engine_name: str, n_gen: int, max_confs: int,
+                                e_window_kj: float, n_poses: int) -> str:
+    payload = f"{a_smiles}|{b_smiles}|{engine_name}|{n_gen}|{max_confs}|" \
+              f"{e_window_kj}|{n_poses}"
+    return hashlib.sha1(payload.encode()).hexdigest()[:20]
+
+
+def load_cached_complex_conformers(a_smiles: str, b_smiles: str,
+                                   engine_name: str, n_gen: int, max_confs: int,
+                                   e_window_kj: float,
+                                   n_poses: int) -> list[dict] | None:
+    key = complex_conformer_cache_key(a_smiles, b_smiles, engine_name, n_gen,
+                                      max_confs, e_window_kj, n_poses)
+    path = runtime_config.user_data_root() / "dft_artifacts" / "conformers" \
+        / f"complex_{key}.json"
+    try:
+        if not path.is_file():
+            return None
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, list) and all("xyz" in c for c in data):
+            return data
+    except Exception:
+        return None
+    return None
+
+
+def save_cached_complex_conformers(a_smiles: str, b_smiles: str,
+                                   engine_name: str, n_gen: int, max_confs: int,
+                                   e_window_kj: float, n_poses: int,
+                                   complexes: list[dict]) -> None:
+    key = complex_conformer_cache_key(a_smiles, b_smiles, engine_name, n_gen,
+                                      max_confs, e_window_kj, n_poses)
+    path = runtime_config.user_data_root() / "dft_artifacts" / "conformers" \
+        / f"complex_{key}.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(complexes, ensure_ascii=False),
+                        encoding="utf-8")
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------- 入口与缓存
 
 
