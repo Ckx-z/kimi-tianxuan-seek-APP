@@ -790,7 +790,9 @@ def generate_complex_conformers(a_smiles: str, b_smiles: str,
 def complex_conformer_cache_key(a_smiles: str, b_smiles: str,
                                 engine_name: str, n_gen: int, max_confs: int,
                                 e_window_kj: float, n_poses: int) -> str:
-    payload = f"{a_smiles}|{b_smiles}|{engine_name}|{n_gen}|{max_confs}|" \
+    # "v2|" 前缀：采样算法升级（表面接触位姿 + gfn2 松弛）后，
+    # 旧版本缓存的结果不再命中（防止旧边缘位姿被误用）
+    payload = f"v2|{a_smiles}|{b_smiles}|{engine_name}|{n_gen}|{max_confs}|" \
               f"{e_window_kj}|{n_poses}"
     return hashlib.sha1(payload.encode()).hexdigest()[:20]
 

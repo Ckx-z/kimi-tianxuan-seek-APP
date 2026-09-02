@@ -35,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CircleHelp } from 'lucide-react';
+import { CircleHelp, Trash2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import MonomerInput, { type MonomerValue } from '@/components/query/MonomerInput';
 import StructureSketcher from '@/components/common/StructureSketcher';
@@ -58,6 +58,7 @@ import { useDftTask } from '@/components/dft/DftTaskContext';
 import {
   buildDftSnapshot,
   cancelDftJob,
+  clearDftResultCache,
   createDftJob,
   createFavoriteWithDft,
   dftMethodLabel,
@@ -199,6 +200,8 @@ export default function Dft() {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   /** 取消请求进行中（按钮禁用态） */
   const [cancelling, setCancelling] = useState(false);
+  /** 清除缓存请求进行中 */
+  const [clearingCache, setClearingCache] = useState(false);
   /** 最近一次任务被取消（显示琥珀提示条，新提交时清除） */
   const [cancelled, setCancelled] = useState(false);
   /** 仅 psi4：并行线程数（v1.5.1：默认 24；32 核机器大体系 40 分钟级） */
@@ -469,6 +472,37 @@ export default function Dft() {
     return () => clearInterval(timer);
   }, [running]);
 
+  /** 拼装当前表单对应的计算请求（提交与清除缓存共用，保持 key 口径一致） */
+  const buildRequestPayload = useCallback(() => (
+    isPair
+      ? {
+        mode: 'pair' as const,
+        ald_smiles: monoA.smiles,
+        amine_smiles: monoB.smiles,
+        method: isPsi4 ? psi4Method : method,
+        backend,
+        threads: isPsi4 ? psi4Threads : undefined,
+        with_props: isPsi4 ? withProps : undefined,
+        complex_xyz: placedXyz ?? undefined,
+      }
+      : {
+        ald_smiles: monoA.smiles,
+        amine_smiles: monoB.smiles,
+        x_type: xType,
+        solvent_id: xType === 'solvent' ? solventId : undefined,
+        ald2_smiles: xType === 'other_dimer' ? monoA2.smiles : undefined,
+        amine2_smiles: xType === 'other_dimer' ? monoB2.smiles : undefined,
+        custom_smiles: xType === 'custom' ? customSmiles.trim() : undefined,
+        method: isPsi4 ? psi4Method : method,
+        backend,
+        threads: isPsi4 ? psi4Threads : undefined,
+        with_props: isPsi4 ? withProps : undefined,
+        complex_xyz: placedXyz ?? undefined,
+      }
+  ), [isPair, monoA.smiles, monoB.smiles, isPsi4, psi4Method, method, backend,
+      psi4Threads, withProps, placedXyz, xType, solventId, monoA2.smiles,
+      monoB2.smiles, customSmiles]);
+
   /** 提交计算 */
   const handleSubmit = async () => {
     if (!monoA.smiles || !monoB.smiles) {
@@ -500,33 +534,7 @@ export default function Dft() {
     setProgressHint('正在提交计算任务…');
     setProgressPercent(1);
     try {
-      const job = await createDftJob(
-        isPair
-          ? {
-            mode: 'pair',
-            ald_smiles: monoA.smiles,
-            amine_smiles: monoB.smiles,
-            method: isPsi4 ? psi4Method : method,
-            backend,
-            threads: isPsi4 ? psi4Threads : undefined,
-            with_props: isPsi4 ? withProps : undefined,
-            complex_xyz: placedXyz ?? undefined,
-          }
-          : {
-            ald_smiles: monoA.smiles,
-            amine_smiles: monoB.smiles,
-            x_type: xType,
-            solvent_id: xType === 'solvent' ? solventId : undefined,
-            ald2_smiles: xType === 'other_dimer' ? monoA2.smiles : undefined,
-            amine2_smiles: xType === 'other_dimer' ? monoB2.smiles : undefined,
-            custom_smiles: xType === 'custom' ? customSmiles.trim() : undefined,
-            method: isPsi4 ? psi4Method : method,
-            backend,
-            threads: isPsi4 ? psi4Threads : undefined,
-            with_props: isPsi4 ? withProps : undefined,
-            complex_xyz: placedXyz ?? undefined,
-          },
-      );
+      const job = await createDftJob(buildRequestPayload());
       setCurrentJobId(job.job_id);
       void saveDftDraft(buildDraft(job.job_id)); // 立即落盘：切页/刷新后据此恢复任务引用
       // 登记到全局任务状态：其他页面实时可见进度，完成/失败由全局上下文统一通知
@@ -552,6 +560,34 @@ export default function Dft() {
       setRunning(false);
       setProgressHint('');
       // toast 已在 api 辅助中弹出
+    }
+  };
+
+  /** 清除当前组合的结果缓存（v1.5.3：删除后重新提交触发真实重算） */
+  const handleClearCache = async () => {
+    if (!monoA.smiles || !monoB.smiles) {
+      toast.warning(isPair ? '请先填写分子 A 与分子 B 的 SMILES' : '请先填写醛单体与胺单体的 SMILES');
+      return;
+    }
+    setClearingCache(true);
+    try {
+      const payload = buildRequestPayload();
+      const res = await clearDftResultCache({
+        ...payload,
+        complex_xyz: undefined,  // 缓存 key 不含 complex_xyz，删缓存与几何无关
+      });
+      if (res.deleted) {
+        toast.success('该组合的缓存结果已删除，重新提交将触发真实重算');
+        setResult(null);
+        setError(null);
+        setCurrentJobId(null);
+      } else {
+        toast.info('未找到该组合的缓存条目（可能从未缓存过）');
+      }
+    } catch {
+      // toast 已在 api 辅助弹出
+    } finally {
+      setClearingCache(false);
     }
   };
 
@@ -1335,6 +1371,19 @@ export default function Dft() {
           {/* 结果 */}
           {result && !running && (
             <>
+              <div className="flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={clearingCache}
+                  onClick={() => void handleClearCache()}
+                  title="删除该组合的结果缓存（不影响历史记录与其他组合）；重新提交将触发真实重算"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {clearingCache ? '正在清除…' : '清除该结果缓存'}
+                </Button>
+              </div>
               <DftResultPanel result={result} jobId={currentJobId} compare={compareResult} />
 
               {/* 收藏联动（pair 模式无单体组归属，禁用） */}

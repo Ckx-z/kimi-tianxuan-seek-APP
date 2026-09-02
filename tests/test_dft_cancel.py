@@ -122,6 +122,43 @@ class TestCancelEndpoint:
         assert client.post("/api/dft/jobs/nope/cancel").status_code == 404
 
 
+class TestCacheDeleteV153:
+    """v1.5.3：按组合删除 DFT 结果缓存（仅删目标 key，不误删其他）。"""
+
+    @pytest.fixture()
+    def client(self):
+        from api.main import app
+        return TestClient(app)
+
+    def test_delete_cache_endpoint(self, client, monkeypatch, tmp_path):
+        monkeypatch.setattr(dft_jobs.dft_cache, "CACHE_DIR", tmp_path)
+        probe = dft_jobs.probe_cache_key("O=Cc1ccccc1", "Nc1ccccc1", "gfnff",
+                                         x_type="self_stack", mode="dimer",
+                                         backend="xtb")
+        assert probe is not None
+        key = probe[0]
+        (tmp_path / f"{key}.json").write_text("{}", encoding="utf-8")
+        # 另一个组合的缓存不应被误删
+        other = tmp_path / "deadbeef.json"
+        other.write_text("{}", encoding="utf-8")
+
+        r = client.post("/api/dft/cache/delete", json={
+            "ald_smiles": "O=Cc1ccccc1", "amine_smiles": "Nc1ccccc1",
+            "method": "gfnff", "backend": "xtb", "x_type": "self_stack"})
+        assert r.status_code == 200
+        assert r.json()["deleted"] is True
+        assert not (tmp_path / f"{key}.json").exists()
+        assert other.exists()  # 其他任务数据保留
+
+    def test_delete_missing_cache_false(self, client, monkeypatch, tmp_path):
+        monkeypatch.setattr(dft_jobs.dft_cache, "CACHE_DIR", tmp_path)
+        r = client.post("/api/dft/cache/delete", json={
+            "ald_smiles": "O=Cc1ccccc1", "amine_smiles": "Nc1ccccc1",
+            "method": "gfnff", "backend": "xtb", "x_type": "self_stack"})
+        assert r.status_code == 200
+        assert r.json()["deleted"] is False
+
+
 class TestAtomEstimateEndpoint:
     """问题5：后端含氢原子数口径。"""
 

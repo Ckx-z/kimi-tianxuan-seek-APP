@@ -252,6 +252,20 @@ def get_job(job_id: str) -> dict | None:
         return dict(job) if job else None
 
 
+def probe_cache_key(ald_smiles, amine_smiles, method, x_type="self_stack",
+                    solvent_id=None, ald2_smiles=None, amine2_smiles=None,
+                    custom_smiles=None, mode="dimer", backend="xtb",
+                    n_samples=None, with_props=None):
+    """公开的缓存 key 探测（删除缓存端点用，口径与 create_job 探缓存一致）。
+
+    Returns: (key, canon_a, canon_b) 或 None（任一步规范化失败）。
+    """
+    return _cache_probe_key(ald_smiles, amine_smiles, method, x_type,
+                            solvent_id, ald2_smiles, amine2_smiles,
+                            custom_smiles, mode, backend, n_samples,
+                            with_props=with_props)
+
+
 def cancel_event_for(job_id: str) -> threading.Event:
     """取（或登记）任务的取消事件；同一 job 始终复用同一个 Event。"""
     with _LOCK:

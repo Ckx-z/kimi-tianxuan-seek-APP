@@ -39,6 +39,7 @@ try:
     from src.dft import log as dft_log
     from src.dft import psi4_backend
     from src.dft import conformers as dft_conformers
+    from src.dft import cache as dft_cache
 except ImportError:  # pragma: no cover - src 直接在 sys.path 时
     from dft import dimer as dimer_mod  # type: ignore
     from dft import engine, jobs  # type: ignore
@@ -46,6 +47,7 @@ except ImportError:  # pragma: no cover - src 直接在 sys.path 时
     from dft import log as dft_log  # type: ignore
     from dft import psi4_backend  # type: ignore
     from dft import conformers as dft_conformers  # type: ignore
+    from dft import cache as dft_cache  # type: ignore
 
 router = APIRouter(prefix="/api/dft", tags=["dft"])
 
@@ -501,6 +503,36 @@ def cancel_dft_job(job_id: str):
     if not ok:
         raise HTTPException(409, "任务已处于终态（完成/失败/已取消），无法取消")
     return _public_job(job)
+
+
+@router.post("/cache/delete")
+def delete_dft_cache(req: DftJobCreate):
+    """删除指定计算组合的结果缓存（参数与提交一致即命中同一 key）。
+
+    仅删除结果缓存文件；不影响其他组合的缓存、任务历史与草稿。
+    删除后重新提交相同组合将触发真实重算（v1.5.3）。
+    """
+    backend = (req.backend or "xtb").strip()
+    mode = (req.mode or "dimer").strip()
+    ald, amine = _resolve_monomers(req)
+    if backend == "psi4":
+        method = psi4_backend.resolve_method_key(req.method)
+        if method not in psi4_backend.PSI4_METHODS:
+            method = psi4_backend.DEFAULT_PSI4_METHOD
+    else:
+        method = req.method
+    probe = jobs.probe_cache_key(
+        ald, amine, method, x_type=req.x_type,
+        solvent_id=req.solvent_id, ald2_smiles=req.ald2_smiles,
+        amine2_smiles=req.amine2_smiles, custom_smiles=req.custom_smiles,
+        mode=mode, backend=backend, n_samples=req.n_samples,
+        with_props=req.with_props)
+    if probe is None:
+        return {"deleted": False, "key": None,
+                "reason": "参数无法规范化，未定位到缓存条目"}
+    key = probe[0]
+    deleted = dft_cache.delete_cache(key)
+    return {"deleted": deleted, "key": key[:12]}
 
 
 @router.get("/jobs/{job_id}/geometry", response_class=PlainTextResponse)

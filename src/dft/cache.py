@@ -68,3 +68,24 @@ def save_cache(key: str, result: dict) -> None:
             json.dumps(result, ensure_ascii=False), encoding="utf-8")
     except Exception as exc:
         logger.warning("DFT 缓存写入失败: %s", exc)
+
+
+def delete_cache(key: str) -> bool:
+    """删除指定 key 的缓存文件；返回是否确实删除（存在且删除成功）。"""
+    path = CACHE_DIR / f"{key}.json"
+    if not path.is_file():
+        return False
+    try:
+        path.unlink()
+        return True
+    except Exception as exc:
+        logger.warning("DFT 缓存删除失败 %s: %s", path, exc)
+        return False
+
+
+def cache_entry_count() -> int:
+    """当前缓存条目数（诊断/界面反馈用）。"""
+    try:
+        return len(list(CACHE_DIR.glob("*.json")))
+    except Exception:
+        return 0

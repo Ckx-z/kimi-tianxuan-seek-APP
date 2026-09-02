@@ -289,6 +289,11 @@ export const fetchDftJob = (jobId: string) =>
 export const cancelDftJob = (jobId: string) =>
   request<DftJob>(`/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST', silent: true });
 
+/** 删除指定组合的 DFT 结果缓存（POST /cache/delete；参数与提交一致即命中同一 key） */
+export const clearDftResultCache = (req: DftJobRequest) =>
+  request<{ deleted: boolean; key?: string | null; reason?: string }>(
+    '/cache/delete', { method: 'POST', body: req });
+
 /** 提交前原子数预估（GET /atom-estimate；含氢口径，与 xyz 真实原子数一致） */
 export interface AtomEstimate {
   /** pair 模式恒为 null（无二聚体概念） */

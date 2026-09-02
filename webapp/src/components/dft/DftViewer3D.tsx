@@ -7,7 +7,7 @@
  * 懒加载：默认折叠；展开时才动态 import('3dmol') 并初始化 viewer，
  * 避免 3Dmol（约 1MB）拖慢 DFT 页首屏。
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import type { DftFragmentRanges } from './api';
@@ -37,12 +37,17 @@ function splitXyz(xyz: string, frag: DftFragmentRanges): [string, string] | null
   return [mk(atoms.slice(a0, a1)), mk(atoms.slice(b0, b1))];
 }
 
+/** 显示模式：ballstick（默认，键加粗+原子球）| wire（线框）| spacefill（空间填充） */
+type RenderMode = 'ballstick' | 'wire' | 'spacefill';
+
 export default function DftViewer3D({ xyz, fragmentRanges, labelA = '主体', labelB = '客体',
   title = '3D 结合构象（两分子相对摆放）' }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSurface, setShowSurface] = useState(false);
+  const [mode, setModeState] = useState<RenderMode>('ballstick');
+  const modeRef = useRef<RenderMode>('ballstick');
   const containerRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewerRef = useRef<any>(null);
@@ -52,6 +57,42 @@ export default function DftViewer3D({ xyz, fragmentRanges, labelA = '主体', la
   const modelsRef = useRef<{ a: any; b: any } | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const surfacesRef = useRef<any[]>([]);
+
+  /** 按当前显示模式重设样式（v1.5.3：ballstick 键半径 0.22 Å + 原子球，
+   *  修复纯 stick 0.15 Å 过细、键与背景融合看不清的问题） */
+  const applyModeStyle = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    const m = modeRef.current;
+    const styleFor = (scheme?: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const s: any = {};
+      if (m === 'wire') {
+        s.stick = { radius: 0.08, colorscheme: scheme ?? 'default' };
+      } else if (m === 'spacefill') {
+        s.stick = { radius: 0.12, colorscheme: scheme ?? 'default' };
+        s.sphere = { scale: 1.0, colorscheme: scheme ?? 'default' };
+      } else {
+        // ballstick：键明显加粗，原子球适中，端点与球无缝衔接
+        s.stick = { radius: 0.22, colorscheme: scheme ?? 'default' };
+        s.sphere = { scale: 0.3, colorscheme: scheme ?? 'default' };
+      }
+      return s;
+    };
+    if (modelsRef.current) {
+      modelsRef.current.a.setStyle({}, styleFor('cyanCarbon'));
+      modelsRef.current.b.setStyle({}, styleFor('magentaCarbon'));
+    } else {
+      viewer.setStyle({}, styleFor(undefined));
+    }
+    viewer.render();
+  }, []);
+
+  const setMode = (m: RenderMode) => {
+    modeRef.current = m;
+    setModeState(m);
+    applyModeStyle();
+  };
 
   /** 展开时懒加载 3dmol 并初始化 viewer（仅首次） */
   useEffect(() => {
@@ -74,18 +115,16 @@ export default function DftViewer3D({ xyz, fragmentRanges, labelA = '主体', la
         if (parts) {
           const mA = viewer.addModel(parts[0], 'xyz');
           const mB = viewer.addModel(parts[1], 'xyz');
-          mA.setStyle({}, { stick: { radius: 0.15, colorscheme: 'cyanCarbon' } });
-          mB.setStyle({}, { stick: { radius: 0.15, colorscheme: 'magentaCarbon' } });
           modelsRef.current = { a: mA, b: mB };
         } else {
           viewer.addModel(xyz, 'xyz');
-          viewer.setStyle({}, { stick: { radius: 0.15 } });
           modelsRef.current = null;
         }
         viewer.zoomTo();
-        viewer.render();
         viewerRef.current = viewer;
         libRef.current = $3Dmol;
+        applyModeStyle();  // 按当前显示模式（默认 ballstick）上样式
+        viewer.render();
       } catch (e) {
         if (!disposed) {
           setError(`3D 查看器初始化失败：${e instanceof Error ? e.message : '未知错误'}`);
@@ -196,6 +235,22 @@ export default function DftViewer3D({ xyz, fragmentRanges, labelA = '主体', la
               ) : (
                 <span>该结果未记录片段区间，整体单色显示</span>
               )}
+              <div className="flex items-center gap-1 rounded-md border p-0.5">
+                {([['ballstick', '球棍'], ['wire', '线框'], ['spacefill', '空间填充']] as const).map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMode(m)}
+                    className={`rounded px-2 py-0.5 text-xs transition-colors ${
+                      mode === m
+                        ? 'bg-accent font-medium text-accent-foreground'
+                        : 'hover:bg-accent/50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <Button variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={toggleSurface}>
                 {showSurface ? '隐藏表面' : '显示半透明表面'}
               </Button>
