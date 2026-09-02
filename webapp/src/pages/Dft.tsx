@@ -64,6 +64,7 @@ import {
   dftMethodLabel,
   fetchAtomEstimate,
   fetchDftBackends,
+  fetchDftCitations,
   fetchDftDraft,
   fetchDftHistory,
   fetchDftJob,
@@ -74,6 +75,7 @@ import {
   type AtomEstimate,
   type DftBackend,
   type DftBackendsResponse,
+  type DftCitation,
   type DftDraft,
   type DftHistoryEntry,
   type DftMethod,
@@ -83,6 +85,7 @@ import {
   type DftXType,
   type DimerPreview,
 } from '@/components/dft/api';
+import { doiUrl, openExternal } from '@/lib/external';
 
 interface PropsState {
   loading: boolean;
@@ -90,6 +93,41 @@ interface PropsState {
   data: MonomerProps | null;
 }
 const emptyProps: PropsState = { loading: false, error: null, data: null };
+
+/** 方法引用列表（v1.5.4 文献 DOI）：作者/期刊 + 可点击 DOI 直达原文献 */
+function MethodCitationList({ citations }: { citations: DftCitation[] }) {
+  if (!citations || citations.length === 0) return null;
+  return (
+    <div className="mt-2 border-t border-border pt-2">
+      <p className="text-xs font-medium text-muted-foreground">
+        方法引用（点击 DOI 直达原文献）
+      </p>
+      <ul className="mt-1 space-y-1 text-xs leading-relaxed text-muted-foreground">
+        {citations.map((c) => (
+          <li key={c.key}>
+            <span className="text-foreground/90">{c.label}：</span>
+            {c.cite}{' '}
+            {c.doi ? (
+              <button
+                type="button"
+                className="text-gold underline decoration-gold/50 underline-offset-2 hover:decoration-gold"
+                title={`在浏览器打开 https://doi.org/${c.doi}`}
+                onClick={() => {
+                  const url = c.url ?? doiUrl(c.doi);
+                  if (url) openExternal(url);
+                }}
+              >
+                DOI: {c.doi}
+              </button>
+            ) : (
+              <span className="text-muted-foreground/70">（暂无 DOI）</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /** 历史条目回显 → 拼装成 DftResult（旧条目缺二聚体/X 字段时留空兜底） */
 function resultFromHistory(h: DftHistoryEntry): DftResult {
@@ -148,6 +186,13 @@ export default function Dft() {
   const [monoB2, setMonoB2] = useState<MonomerValue>({ smiles: '', name: '' });
   const [customSmiles, setCustomSmiles] = useState('');
   const [method, setMethod] = useState<DftMethod>('gfn2');
+  /** 方法引用注册表（v1.5.4 文献 DOI）：method key → 引用列表；加载失败静默隐藏 */
+  const [citationMap, setCitationMap] = useState<Record<string, DftCitation[]>>({});
+  useEffect(() => {
+    fetchDftCitations()
+      .then((r) => setCitationMap(r.methods ?? {}))
+      .catch(() => setCitationMap({}));
+  }, []);
 
   // ---------- 计算后端：xtb 快速档（默认）| psi4 真 DFT 精度档 ----------
   const [backend, setBackend] = useState<DftBackend>('xtb');
@@ -1056,6 +1101,7 @@ export default function Dft() {
                 <Label htmlFor="m-gfnff">快速（GFN-FF 力场）</Label>
               </div>
             </RadioGroup>
+            <MethodCitationList citations={citationMap[method] ?? []} />
           </div>
           )}
 
@@ -1092,6 +1138,7 @@ export default function Dft() {
                   <Label htmlFor="pm-batch">批量快速档（ωB97X-D3BJ/def2-SV(P)，多构象初筛用，速度更快）</Label>
                 </div>
               </RadioGroup>
+              <MethodCitationList citations={citationMap[psi4Method] ?? []} />
               {/* v1.5.1：并行线程 + 仅结合能模式（大体系 40 分钟级的关键开关） */}
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
                 <div className="flex items-center gap-2">

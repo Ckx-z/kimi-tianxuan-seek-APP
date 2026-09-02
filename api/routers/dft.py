@@ -35,6 +35,7 @@ except ImportError:  # pragma: no cover
 try:
     from src.dft import dimer as dimer_mod
     from src.dft import engine, jobs
+    from src.dft import citations as dft_citations
     from src.dft import export as dft_export
     from src.dft import log as dft_log
     from src.dft import psi4_backend
@@ -43,6 +44,7 @@ try:
 except ImportError:  # pragma: no cover - src 直接在 sys.path 时
     from dft import dimer as dimer_mod  # type: ignore
     from dft import engine, jobs  # type: ignore
+    from dft import citations as dft_citations  # type: ignore
     from dft import export as dft_export  # type: ignore
     from dft import log as dft_log  # type: ignore
     from dft import psi4_backend  # type: ignore
@@ -371,6 +373,16 @@ def _xyz_atoms_list(xyz_block: str) -> list[list]:
     except Exception:
         pass
     return out
+
+
+@router.get("/citations")
+def dft_citations_endpoint():
+    """DFT 引擎/方法文献引用注册表（作者/期刊/DOI）。
+
+    前端「方法说明」与结果面板据此渲染可点击 DOI 链接
+    （https://doi.org/<DOI>）；v1.5.4 文献 DOI 需求。
+    """
+    return dft_citations.registry()
 
 
 @router.get("/backends")

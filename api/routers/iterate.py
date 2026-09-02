@@ -65,6 +65,8 @@ ITERATE_TIMEOUT_S = 300
 
 # 锚定记录 id 格式（与编排器契约一致）：rec_YYYYMMDD_NNN
 _RECORD_ID_RE = re.compile(r"^rec_\d{8}_\d{3}$")
+# 建议 id 格式：sug_YYYYMMDD_NNN（删除接口路径参数校验，防路径穿越）
+_SUGGESTION_ID_RE = re.compile(r"^sug_\d{8}_\d{3}$")
 
 
 def _load_json_list(directory: Path, pattern: str, what: str) -> list[dict]:
@@ -272,6 +274,27 @@ def run_suggest(req: SuggestRequest):
         "count": summary.get("count") or 0,
         "batch": summary.get("batch"),
     }
+
+
+@router.delete("/suggestions/{suggestion_id}")
+def delete_suggestion(suggestion_id: str):
+    """删除单条迭代建议（物理删除文件；v1.5.4 需求）。
+
+    id 格式校验（防路径穿越）→ 不存在 404；删除后列表与后续视图不再出现。
+    已采纳建议删除后，其方案卡不受影响（方案是独立文件）。
+    """
+    if not _SUGGESTION_ID_RE.match(suggestion_id):
+        raise HTTPException(
+            400, f"suggestion_id 格式非法：应为 sug_YYYYMMDD_NNN，收到 {suggestion_id!r}")
+    path = SUGGESTIONS_DIR / f"{suggestion_id}.json"
+    if not path.is_file():
+        raise HTTPException(404, f"建议不存在: {suggestion_id}")
+    try:
+        path.unlink()
+    except OSError as exc:
+        raise HTTPException(
+            500, f"删除失败：{type(exc).__name__}: {exc}")
+    return {"deleted": True, "suggestion_id": suggestion_id}
 
 
 @router.post("/adopt")

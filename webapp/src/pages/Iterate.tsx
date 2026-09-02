@@ -297,7 +297,12 @@ export default function Iterate() {
                   </h3>
                   <div className="space-y-3">
                     {items.map((s) => (
-                      <SuggestionCard key={s.suggestion_id} suggestion={s} onAdopted={refreshLists} />
+                      <SuggestionCard
+                        key={s.suggestion_id}
+                        suggestion={s}
+                        onAdopted={refreshLists}
+                        onDeleted={refreshLists}
+                      />
                     ))}
                   </div>
                 </div>

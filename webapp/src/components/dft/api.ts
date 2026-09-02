@@ -124,6 +124,17 @@ export interface DftResult {
   favorite: DftFavoriteInfo | null;
   /** Psi4 精度档附加信息（backend=psi4 时存在） */
   psi4_detail?: DftPsi4Detail | null;
+  /** 方法引用（作者/期刊/DOI；v1.5.4 文献 DOI 需求） */
+  citations?: DftCitation[] | null;
+}
+
+/** 方法引用（作者/期刊/DOI；v1.5.4 文献 DOI 需求） */
+export interface DftCitation {
+  key: string;
+  label: string;
+  cite: string;
+  doi: string;
+  url: string | null;
 }
 
 /** Psi4 精度档附加信息（方法/基组/BSSE 口径/fchk） */
@@ -450,6 +461,33 @@ function parseDownloadFilename(disposition: string | null, fallback: string): st
     if (plain) return plain[1];
   }
   return fallback;
+}
+
+/**
+ * 方法引用注册表（GET /api/dft/citations）：Dft 页方法说明与结果面板
+ * 渲染 DOI 链接用（v1.5.4 文献 DOI 需求）。
+ */
+export async function fetchDftCitations(): Promise<{
+  methods: Record<string, DftCitation[]>;
+  presets: Record<string, DftCitation[]>;
+}> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/citations`);
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (!res.ok) {
+    const message = `方法引用加载失败（${res.status}）`;
+    toast.error(message);
+    throw new Error(message);
+  }
+  return (await res.json()) as {
+    methods: Record<string, DftCitation[]>;
+    presets: Record<string, DftCitation[]>;
+  };
 }
 
 /**

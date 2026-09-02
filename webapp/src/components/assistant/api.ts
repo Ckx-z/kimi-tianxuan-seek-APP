@@ -307,6 +307,15 @@ export const assistantApi = {
     return request(`/sessions/${encodeURIComponent(sessionId)}`);
   },
 
+  /** 重命名会话标题（v1.5.4）：只改 meta.title，消息内容不动 */
+  renameSession(sessionId: string, title: string): Promise<{ session_id: string; title: string }> {
+    if (ASSISTANT_MOCK) return mockApi.renameSession(sessionId, title);
+    return request(`/sessions/${encodeURIComponent(sessionId)}/title`, {
+      method: 'PATCH',
+      body: { title },
+    });
+  },
+
   /**
    * 发送消息并以 SSE 流式接收回复。
    * 返回解析后的事件流；网络层失败抛 AssistantUnavailableError。

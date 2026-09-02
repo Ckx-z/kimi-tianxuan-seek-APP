@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import cache as dft_cache
+from . import citations
 from . import dimer as dimer_mod
 from . import engine
 from . import log as dft_log
@@ -198,6 +199,12 @@ def create_job(ald_smiles: str, amine_smiles: str, method: str,
         if hit is not None:
             result = dict(hit)
             result["cached"] = True
+            # 旧缓存没有 citations 字段：命中时补方法引用（v1.5.4）
+            _sampling = result.get("sampling")
+            result["citations"] = citations.citations_for(
+                result.get("method"), backend=backend,
+                sampling=_sampling.get("engine")
+                if isinstance(_sampling, dict) else None)
             # pair 模式无单体组归属，不做收藏联动
             result["favorite"] = None if mode == "pair" else \
                 _find_favorite(canon_ald, canon_amine)
@@ -415,6 +422,13 @@ def _run_job(job_id: str) -> None:
                 on_stage=on_stage, n_samples=n_samples,
                 complex_xyz=job.get("complex_xyz"),
                 cancel_event=cancel_ev)
+        # 方法引用（作者/期刊/DOI）：随结果落缓存与任务注册表，
+        # 前端结果面板渲染为可点击 DOI 链接（v1.5.4 文献 DOI 需求）
+        _sampling = result.get("sampling")
+        result["citations"] = citations.citations_for(
+            result.get("method"), backend=backend,
+            sampling=_sampling.get("engine")
+            if isinstance(_sampling, dict) else None)
         key = dft_cache.cache_key(
             result["smiles_a"] if mode == "pair" else result["dimer_smiles"],
             result["x_cache_part"], method, mode=mode, backend=backend,

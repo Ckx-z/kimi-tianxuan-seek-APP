@@ -178,6 +178,16 @@ export const mockApi = {
     };
   },
 
+  async renameSession(sessionId: string, title: string): Promise<{ session_id: string; title: string }> {
+    const s = sessions.get(sessionId);
+    if (!s) throw new Error('会话不存在');
+    const t = title.trim();
+    if (!t) throw new Error('标题不能为空');
+    s.title = t;
+    s.updated_at = nowIso();
+    return { session_id: s.session_id, title: s.title };
+  },
+
   async chatStream(body: {
     session_id?: string;
     message: string;

@@ -100,6 +100,14 @@ export function adoptSuggestion(suggestionId: string, signal?: AbortSignal): Pro
   });
 }
 
+/** 删除单条迭代建议（物理删除；v1.5.4） */
+export function deleteSuggestion(suggestionId: string, signal?: AbortSignal): Promise<{ deleted: boolean; suggestion_id: string }> {
+  return request(`/iterate/suggestions/${encodeURIComponent(suggestionId)}`, {
+    method: 'DELETE',
+    signal,
+  });
+}
+
 /** 已生成方案列表 */
 export async function listPlans(signal?: AbortSignal): Promise<Plan[]> {
   const data = await request<PlansResp | Plan[]>('/iterate/plans', { signal });

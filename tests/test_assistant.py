@@ -113,6 +113,42 @@ def test_get_session_404(client):
 
 
 # ---------------------------------------------------------------------------
+# 会话重命名（v1.5.4）
+# ---------------------------------------------------------------------------
+
+def test_rename_session_success(client):
+    created = client.post("/api/assistant/sessions",
+                          json={"title": "旧标题"}).json()
+    sid = created["session_id"]
+    r = client.patch(f"/api/assistant/sessions/{sid}/title",
+                     json={"title": "COF 结合能讨论"})
+    assert r.status_code == 200
+    assert r.json() == {"session_id": sid, "title": "COF 结合能讨论"}
+    detail = client.get(f"/api/assistant/sessions/{sid}").json()
+    assert detail["title"] == "COF 结合能讨论"
+    assert detail["messages"] == []  # 重命名不影响消息内容
+    lst = client.get("/api/assistant/sessions").json()["sessions"]
+    assert lst[0]["title"] == "COF 结合能讨论"
+
+
+def test_rename_session_validation(client):
+    created = client.post("/api/assistant/sessions",
+                          json={"title": "旧标题"}).json()
+    sid = created["session_id"]
+    # 空标题 / 超长标题 → 400
+    assert client.patch(f"/api/assistant/sessions/{sid}/title",
+                        json={"title": "   "}).status_code == 400
+    assert client.patch(f"/api/assistant/sessions/{sid}/title",
+                        json={"title": "x" * 81}).status_code == 400
+    # 会话不存在 → 404
+    assert client.patch("/api/assistant/sessions/sess_000000000000/title",
+                        json={"title": "新"}).status_code == 404
+    # 原标题保持不变（失败不落盘）
+    detail = client.get(f"/api/assistant/sessions/{sid}").json()
+    assert detail["title"] == "旧标题"
+
+
+# ---------------------------------------------------------------------------
 # chat：LLM 未配置时的友好错误（error 事件，非 500）
 # ---------------------------------------------------------------------------
 

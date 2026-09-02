@@ -10,8 +10,17 @@ GET /api/dft/jobs/{id}/export 下载端点与测试复用。
 
 from __future__ import annotations
 
+try:
+    from src.dft import citations
+except ImportError:  # pragma: no cover
+    from dft import citations  # type: ignore
+
 # 支持导出的格式档位
 FORMATS = ("gaussian", "orca")
+
+# 导出输入文件内嵌的方法引用（B3LYP 路由 + 文献口径对齐文献），
+# 纯文本形式（含 DOI），随输入文件一起提交便于溯源（v1.5.4 文献 DOI 需求）
+_EXPORT_REF_LINES = citations.citations_text("b3lyp_631gdp", backend="psi4")
 
 
 class DftExportError(ValueError):
@@ -48,11 +57,15 @@ def parse_xyz_coords(xyz: str) -> list[str]:
 _GAUSSIAN_TITLE = (
     "COF monomer complex geometry from xTB ({source}) / 由 COF 科研助手导出。\n"
     "默认电荷 0、自旋多重度 1（0 1）；提交前请自行检查电荷与自旋多重度，\n"
-    "必要时调整基组/溶剂模型（当前路由行为 b3lyp/6-31g(d) scrf=smd）。")
+    "必要时调整基组/溶剂模型（当前路由行为 b3lyp/6-31g(d) scrf=smd）。\n"
+    "方法引用：\n"
+    + "\n".join("  " + ln for ln in _EXPORT_REF_LINES))
 
 _ORCA_HEADER_COMMENT = (
     "# COF monomer complex geometry from xTB ({source}) / 由 COF 科研助手导出\n"
-    "# 默认电荷 0、自旋多重度 1；提交前请自行检查电荷与自旋多重度")
+    "# 默认电荷 0、自旋多重度 1；提交前请自行检查电荷与自旋多重度\n"
+    "# 方法引用：\n"
+    + "\n".join("#   " + ln for ln in _EXPORT_REF_LINES))
 
 
 def build_gaussian_input(xyz: str, source: str = "gfn2",

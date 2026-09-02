@@ -137,6 +137,10 @@ class AssistantSessionCreate(BaseModel):
         "amine_smiles?, suggestion_ids?}")
 
 
+class AssistantSessionRename(BaseModel):
+    title: str = Field(..., description="会话新标题（1–80 字，去除首尾空白）")
+
+
 class AssistantChatRequest(BaseModel):
     session_id: str | None = Field(None, description="空则新建会话")
     message: str = Field(..., description="用户消息（有附件时可为空串）")

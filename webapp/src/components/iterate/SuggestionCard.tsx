@@ -23,9 +23,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CheckCircle2, Loader2, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, Loader2, Trash2, TriangleAlert } from 'lucide-react';
 import type { Suggestion } from '@/types';
-import { adoptSuggestion } from './api';
+import { adoptSuggestion, deleteSuggestion } from './api';
 
 /** 建议类型 → 中文徽章 */
 const TYPE_LABEL: Record<string, string> = {
@@ -69,12 +69,16 @@ interface SuggestionCardProps {
   suggestion: Suggestion;
   /** 采纳成功后回调（用于刷新方案列表等） */
   onAdopted?: (planSeq: number | undefined) => void;
+  /** 删除成功后回调（父组件刷新建议列表，移除该项） */
+  onDeleted?: () => void;
 }
 
-export function SuggestionCard({ suggestion, onAdopted }: SuggestionCardProps) {
+export function SuggestionCard({ suggestion, onAdopted, onDeleted }: SuggestionCardProps) {
   const [adopting, setAdopting] = useState(false);
   const [adopted, setAdopted] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const payload = (suggestion.payload ?? {}) as Suggestion['payload'] & {
     adjustments?: Adjustment[];
@@ -105,6 +109,20 @@ export function SuggestionCard({ suggestion, onAdopted }: SuggestionCardProps) {
     }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteSuggestion(suggestion.suggestion_id);
+      setDeleteOpen(false);
+      toast.success('已删除该迭代建议');
+      onDeleted?.();
+    } catch {
+      // 错误 toast 已在 api 层弹出
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Card
       className={
@@ -114,12 +132,12 @@ export function SuggestionCard({ suggestion, onAdopted }: SuggestionCardProps) {
       }
     >
       <CardContent className="space-y-3 p-4">
-        {/* 头部：类型徽章 + 标题 + 置信度 */}
+        {/* 头部：类型徽章 + 标题 + 置信度 + 删除按钮 */}
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="border-primary/40 text-primary">
             {TYPE_LABEL[suggestion.type] ?? suggestion.type}
           </Badge>
-          <span className="font-medium text-foreground">
+          <span className="flex-1 font-medium text-foreground">
             {payload.title || '（无标题建议）'}
           </span>
           {conf?.level && (
@@ -139,6 +157,39 @@ export function SuggestionCard({ suggestion, onAdopted }: SuggestionCardProps) {
               <CheckCircle2 className="mr-1 h-3 w-3" />已采纳
             </Badge>
           )}
+          {/* 删除（v1.5.4）：二次确认防误删 */}
+          <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+                title="删除该建议"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>确认删除该建议？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  将删除「{payload.title || suggestion.suggestion_id}」。删除后不可恢复，
+                  已采纳生成的方案卡不受影响。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="bg-red-600 text-white hover:bg-red-700"
+                >
+                  {deleting && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                  确认删除
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         {/* detail：调整明细 */}

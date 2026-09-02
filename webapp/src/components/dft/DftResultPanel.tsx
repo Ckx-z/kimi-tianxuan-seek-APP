@@ -19,6 +19,7 @@ import {
 import { ChevronDown, Copy, FileDown, FileOutput } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportDftInput, type DftBackend, type DftExportFormat, type DftResult } from './api';
+import { doiUrl, openExternal } from '@/lib/external';
 import DftViewer3D from './DftViewer3D';
 
 interface Props {
@@ -349,6 +350,40 @@ export default function DftResultPanel({ result, jobId, compare }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      {/* 方法引用（v1.5.4：作者/期刊 + DOI 可点击直达原文献） */}
+      {!!result.citations?.length && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">方法引用</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-1.5 text-xs text-muted-foreground">
+              {result.citations.map((c) => (
+                <li key={c.key}>
+                  <span className="text-foreground/90">{c.label}：</span>
+                  {c.cite}{' '}
+                  {c.doi ? (
+                    <button
+                      type="button"
+                      className="text-gold underline decoration-gold/50 underline-offset-2 hover:decoration-gold"
+                      title={`在浏览器打开 https://doi.org/${c.doi}`}
+                      onClick={() => {
+                        const url = c.url ?? doiUrl(c.doi);
+                        if (url) openExternal(url);
+                      }}
+                    >
+                      DOI: {c.doi}
+                    </button>
+                  ) : (
+                    <span className="text-muted-foreground/70">（暂无 DOI）</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 固定红线提示（学术诚信底线，常驻） */}
       <p className="rounded-lg border border-dashed border-gold/50 bg-gold-muted/40 px-4 py-2 text-xs text-muted-foreground">

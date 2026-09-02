@@ -338,6 +338,37 @@ def test_iterate_suggestions_corrupt_file_skipped(isolated_iterate):
     assert r.json()["count"] == 1   # 损坏文件跳过，不影响整体
 
 
+def test_iterate_delete_suggestion_success(isolated_iterate):
+    """删除建议（v1.5.4）：物理删除文件，列表不再出现。"""
+    sugs, _, _ = isolated_iterate
+    _write_suggestion(sugs, suggestion_id="sug_20260722_001")
+    _write_suggestion(sugs, suggestion_id="sug_20260722_002")
+    assert (sugs / "sug_20260722_001.json").is_file()
+    r = client.delete("/api/iterate/suggestions/sug_20260722_001")
+    assert r.status_code == 200
+    assert r.json() == {"deleted": True, "suggestion_id": "sug_20260722_001"}
+    assert not (sugs / "sug_20260722_001.json").exists()
+    r2 = client.get("/api/iterate/suggestions")
+    assert [s["suggestion_id"] for s in r2.json()["suggestions"]] == [
+        "sug_20260722_002"]
+
+
+def test_iterate_delete_suggestion_missing_404(isolated_iterate):
+    isolated_iterate
+    r = client.delete("/api/iterate/suggestions/sug_20260722_999")
+    assert r.status_code == 404
+    assert "不存在" in r.json()["detail"]
+
+
+def test_iterate_delete_suggestion_invalid_id_400(isolated_iterate):
+    """非法 id（不匹配 sug_YYYYMMDD_NNN）→ 400，防路径穿越。"""
+    isolated_iterate
+    for bad in ("anything", "sug_20260722_00A", "sug_.."):
+        r = client.delete(f"/api/iterate/suggestions/{bad}")
+        assert r.status_code == 400, bad
+        assert "格式非法" in r.json()["detail"]
+
+
 def test_iterate_suggest_success(monkeypatch):
     """suggest 成功：subprocess 返回契约末行 JSON → 透传 written/count/batch。"""
     import subprocess as sp

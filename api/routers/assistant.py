@@ -35,7 +35,7 @@ from fastapi.responses import StreamingResponse
 
 from ..schemas import (AssistantChatRequest, AssistantConfirmRequest,
                        AssistantMemoryUpdate, AssistantNudgeDismiss,
-                       AssistantSessionCreate)
+                       AssistantSessionCreate, AssistantSessionRename)
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +140,24 @@ def get_session(session_id: str):
         "context": sess["context"],
         "messages": sess["messages"],
     }
+
+
+@router.patch("/sessions/{session_id}/title")
+def rename_session(session_id: str, req: AssistantSessionRename):
+    """重命名会话标题（v1.5.4）：只改 meta.title，消息内容不动。
+
+    标题 1–80 字；空标题 400；会话不存在 404。返回新标题供前端刷新。
+    """
+    _a, _c, _l, _loop, _m, _r, sessions = _imports()
+    title = (req.title or "").strip()
+    if not title:
+        raise HTTPException(400, "标题不能为空")
+    if len(title) > 80:
+        raise HTTPException(400, "标题过长（最多 80 字）")
+    updated = sessions.update_meta(session_id, title=title)
+    if updated is None:
+        raise HTTPException(404, f"会话不存在: {session_id}")
+    return {"session_id": session_id, "title": updated["title"]}
 
 
 @router.post("/chat")

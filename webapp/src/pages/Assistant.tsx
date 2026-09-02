@@ -9,11 +9,19 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Bot, FileText, Image as ImageIcon, MessageSquarePlus, Paperclip, RefreshCw, Send, Settings as SettingsIcon, X } from 'lucide-react';
+import { Bot, FileText, Image as ImageIcon, MessageSquarePlus, Paperclip, Pencil, RefreshCw, Send, Settings as SettingsIcon, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
   assistantApi,
@@ -445,6 +453,33 @@ export default function Assistant() {
     setCanRetry(false);
   };
 
+  // ---------- 会话重命名（v1.5.4） ----------
+  const [renameTarget, setRenameTarget] = useState<AssistantSessionMeta | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameBusy, setRenameBusy] = useState(false);
+
+  const handleRenameSave = async () => {
+    const sid = renameTarget?.session_id;
+    const title = renameValue.trim();
+    if (!sid || !title) {
+      toast.error('标题不能为空');
+      return;
+    }
+    setRenameBusy(true);
+    try {
+      await assistantApi.renameSession(sid, title);
+      setSessions((prev) =>
+        prev.map((s) => (s.session_id === sid ? { ...s, title } : s)),
+      );
+      setRenameTarget(null);
+      toast.success('会话已重命名');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '重命名失败');
+    } finally {
+      setRenameBusy(false);
+    }
+  };
+
   /** 提醒条点击 → 话术填入输入框并聚焦（不自动发送，用户确认后发） */
   const handleNudgePrefill = useCallback((text: string) => {
     setInput(text);
@@ -536,24 +571,42 @@ export default function Assistant() {
             </p>
           )}
           {sessions.map((s) => (
-            <button
+            <div
               key={s.session_id}
-              type="button"
-              onClick={() => s.session_id !== activeId && !streaming && openSession(s.session_id)}
-              className={cn(
-                'shrink-0 rounded-lg px-3 py-2 text-left text-sm transition-colors',
-                'max-w-40 truncate md:max-w-none',
-                s.session_id === activeId
-                  ? 'bg-accent font-medium text-accent-foreground shadow-[inset_2px_0_0_0_hsl(var(--gold))]'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-              )}
-              title={s.title}
+              className="group relative shrink-0"
             >
-              <span className="block truncate">{s.title || '未命名会话'}</span>
-              <span className="mt-0.5 hidden text-[11px] text-muted-foreground/70 md:block">
-                {s.message_count} 条消息 · {(s.updated_at || '').slice(0, 10)}
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => s.session_id !== activeId && !streaming && openSession(s.session_id)}
+                className={cn(
+                  'w-full rounded-lg px-3 py-2 pr-8 text-left text-sm transition-colors',
+                  'max-w-40 truncate md:max-w-none',
+                  s.session_id === activeId
+                    ? 'bg-accent font-medium text-accent-foreground shadow-[inset_2px_0_0_0_hsl(var(--gold))]'
+                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                )}
+                title={s.title}
+              >
+                <span className="block truncate">{s.title || '未命名会话'}</span>
+                <span className="mt-0.5 hidden text-[11px] text-muted-foreground/70 md:block">
+                  {s.message_count} 条消息 · {(s.updated_at || '').slice(0, 10)}
+                </span>
+              </button>
+              {/* 重命名入口（v1.5.4）：铅笔图标 → 弹窗改标题 */}
+              <button
+                type="button"
+                title="重命名会话"
+                aria-label="重命名会话"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRenameTarget(s);
+                  setRenameValue(s.title || '');
+                }}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100 focus:opacity-100"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
           ))}
         </aside>
 
@@ -694,6 +747,43 @@ export default function Assistant() {
           </div>
         </section>
       </div>
+
+      {/* 会话重命名弹窗（v1.5.4） */}
+      <Dialog open={renameTarget !== null} onOpenChange={(open) => !open && !renameBusy && setRenameTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>重命名会话</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            maxLength={80}
+            placeholder="如：COF 结合能讨论"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void handleRenameSave();
+              }
+            }}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRenameTarget(null)}
+              disabled={renameBusy}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={() => void handleRenameSave()}
+              disabled={renameBusy || !renameValue.trim()}
+            >
+              {renameBusy ? '保存中…' : '保存'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
