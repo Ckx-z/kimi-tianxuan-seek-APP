@@ -542,6 +542,41 @@ def _parse_crest_conformers(path: Path, max_confs: int,
     return kept
 
 
+def _surface_poses(mol_a, mol_b, n: int, seed: int):
+    """B 贴 A 表面的接触位姿：随机选 A 的一个表面原子方向，把 B 沿该方向
+    放到「A 表面 + B 半径 + 1.5 Å」处（接触式初猜，随机旋转 B）。
+
+    对比 engine._orientations 的 r_A+r_B+2.6 Å（质心向外）：对长条状 A
+    而言 B 常被放在远离分子表面的位置，UFF 又缺色散、拉不回来 → 采样
+    出的位姿多为「边缘轻触/半脱离」，结合能系统性偏弱（v1.5.3 修复）。
+    """
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    pos_a = mol_a.GetConformer(0).GetPositions()
+    cen_a = pos_a.mean(axis=0)
+    pos_b0 = mol_b.GetConformer(0).GetPositions()
+    cen_b = pos_b0.mean(axis=0)
+    r_b = float(np.linalg.norm(pos_b0 - cen_b, axis=1).max())
+
+    out = []
+    for _ in range(max(1, n)):
+        idx = int(rng.integers(0, len(pos_a)))
+        surf_dir = pos_a[idx] - cen_a
+        d = float(np.linalg.norm(surf_dir)) + 1e-12
+        direction = surf_dir / d
+        dist = float(d) + r_b + 1.5  # A 表面 + B 半径 + 接触裕量
+        axis = rng.normal(size=3)
+        axis /= np.linalg.norm(axis) + 1e-12
+        theta = rng.uniform(0, 2 * np.pi)
+        k = axis
+        kx = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+        rot = np.eye(3) + np.sin(theta) * kx + (1 - np.cos(theta)) * (kx @ kx)
+        new_b = (pos_b0 - cen_b) @ rot.T + cen_a + direction * dist
+        out.append(new_b)
+    return out
+
+
 # ---------------------------------------------------------------- 复合物采样（v1.5.2）
 
 
@@ -569,17 +604,28 @@ def _complex_rank_with_xtb(candidates: list[dict], n_a: int,
         if not scored:
             return []
         scored.sort(key=lambda t: t[0])
-        # 松弛：top 8 做 gfnff 几何优化（把两分子拉近到结合位）
+        # 松弛：top 4 用 gfn2 优化（含 D4 色散，弱相互作用/卤键/π 堆叠关键），
+        # 其余用 gfnff 优化；两者都会把两分子拉进结合位
         relaxed: list[dict] = []
         for rank, (e_sp, c) in enumerate(scored[:8]):
+            use_g2 = rank < 4
             try:
                 out, opt_xyz = engine._run_xtb(
-                    c["xyz"], ff_args, wd_root / f"opt{rank}", t_ff)
-                e_ff = engine.parse_energy(out)
+                    c["xyz"], g2_args if use_g2 else ff_args,
+                    wd_root / f"opt{rank}", t_g2 if use_g2 else t_ff)
+                e_opt = engine.parse_energy(out)
                 relaxed.append({"xyz": opt_xyz or c["xyz"], "n_b": c["n_b"],
-                                "e": e_ff if e_ff is not None else e_sp})
+                                "e": e_opt if e_opt is not None else e_sp})
             except Exception:
-                relaxed.append({"xyz": c["xyz"], "n_b": c["n_b"], "e": e_sp})
+                # gfn2 松弛失败时退 gfnff 再试一次，再不行用原始几何
+                try:
+                    out, opt_xyz = engine._run_xtb(
+                        c["xyz"], ff_args, wd_root / f"opt{rank}b", t_ff)
+                    e_ff = engine.parse_energy(out)
+                    relaxed.append({"xyz": opt_xyz or c["xyz"], "n_b": c["n_b"],
+                                    "e": e_ff if e_ff is not None else e_sp})
+                except Exception:
+                    relaxed.append({"xyz": c["xyz"], "n_b": c["n_b"], "e": e_sp})
         # 复评：gfn2 单点
         for rank, r in enumerate(relaxed):
             try:
@@ -684,6 +730,31 @@ def generate_complex_conformers(a_smiles: str, b_smiles: str,
         try:
             poses = engine._orientations(mol_a, mol_b, max(1, n_poses),
                                          seed=42 + bi)
+        except Exception:
+            continue
+        for pos_b in poses:
+            try:
+                combined = engine._combined_with_b(mol_a, mol_b, pos_b)
+                uff_e = engine._forcefield_energy(combined, 0)
+                xyz = Chem.MolToXYZBlock(combined, confId=0)
+            except Exception:
+                continue
+            candidates.append({"xyz": xyz, "uff_e": uff_e, "b_id": bitem["id"],
+                               "n_b": n_b})
+
+    # 2b) 补充 A 表面接触位姿（v1.5.3：长条分子上质心外向摆放会系统性
+    #     偏远，表面接触式初猜才能找到真实结合位）
+    for bi, bitem in enumerate(b_items):
+        try:
+            mol_b = Chem.MolFromXYZBlock(bitem["xyz"])
+        except Exception:
+            continue
+        if mol_b is None or mol_b.GetNumAtoms() == 0:
+            continue
+        n_b = mol_b.GetNumAtoms()
+        try:
+            poses = _surface_poses(mol_a, mol_b, max(1, n_poses),
+                                   seed=100 + bi)
         except Exception:
             continue
         for pos_b in poses:

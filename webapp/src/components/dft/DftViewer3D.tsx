@@ -116,7 +116,9 @@ export default function DftViewer3D({ xyz, fragmentRanges, labelA = '主体', la
     }
   }, []);
 
-  /** 半透明 VDW 表面开关（按片段着色，与 stick 一致） */
+  /** 半透明 VDW 表面开关（按片段着色，与 stick 一致）
+   *  v1.5.3 加固：显式十六进制色 + opacity（不依赖 colorscheme 对表面的
+   *  支持差异），异常兜底并回滚开关；两片段分别加表面后统一 render。 */
   const toggleSurface = () => {
     const viewer = viewerRef.current;
     const $3Dmol = libRef.current;
@@ -135,19 +137,21 @@ export default function DftViewer3D({ xyz, fragmentRanges, labelA = '主体', la
       if (modelsRef.current) {
         surfacesRef.current = [
           viewer.addSurface($3Dmol.SurfaceType.VDW,
-            { opacity: 0.3, colorscheme: 'cyanCarbon' },
+            { opacity: 0.35, color: '#22d3ee' },   // cyan-400（分子 A）
             modelsRef.current.a.selectedAtoms({})),
           viewer.addSurface($3Dmol.SurfaceType.VDW,
-            { opacity: 0.3, colorscheme: 'magentaCarbon' },
+            { opacity: 0.35, color: '#e879f9' },   // fuchsia-400（分子 B）
             modelsRef.current.b.selectedAtoms({})),
         ];
       } else {
         surfacesRef.current = [
-          viewer.addSurface($3Dmol.SurfaceType.VDW, { opacity: 0.3 }, {}),
+          viewer.addSurface($3Dmol.SurfaceType.VDW,
+            { opacity: 0.35, color: '#94a3b8' }, {}),
         ];
       }
     } catch {
       setShowSurface(false);
+      surfacesRef.current = [];
     }
     viewer.render();
   };

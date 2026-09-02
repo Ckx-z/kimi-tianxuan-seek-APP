@@ -167,8 +167,8 @@ export default function ConformerGallery({ aSmiles, bSmiles, disabled, onApply }
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        对 A+B 的相对位置与取向采样（每个 B 内部构象 {nPoses} 个位姿，xTB 分级排名）；
-        输出为包含两分子的复合物 3D 坐标。耗时约数十秒到数分钟。
+        对 A+B 的相对位置与取向采样（表面接触位姿 + 随机取向，top 候选经 gfn2 色散校正
+        松弛）；输出为包含两分子的复合物 3D 坐标。小体系数十秒，大体系数分钟。
       </p>
       {crestHint && engine !== 'rigid' && engine !== 'etkdg' && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
