@@ -9,6 +9,8 @@ src/dft/jobs.py 的 _persist() 在任何建任务/状态变迁时都会写 dft_j
 （TestClient 不带 with 时不触发 lifespan）。
 """
 
+import os
+
 import pytest
 
 
@@ -20,3 +22,17 @@ def _isolate_dft_job_store(tmp_path_factory):
     dft_jobs._job_store_path = lambda: store
     yield
     dft_jobs._job_store_path = original
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _no_docker_autostart():
+    """测试会话禁用 CREST Docker 探测的 Docker Desktop 自动拉起
+    （docker_engine_ready 检测到引擎未运行时会尝试启动 Docker Desktop，
+    测试环境不允许这种副作用）。"""
+    old = os.environ.get("COF_CREST_DOCKER_AUTOSTART")
+    os.environ["COF_CREST_DOCKER_AUTOSTART"] = "0"
+    yield
+    if old is None:
+        os.environ.pop("COF_CREST_DOCKER_AUTOSTART", None)
+    else:
+        os.environ["COF_CREST_DOCKER_AUTOSTART"] = old

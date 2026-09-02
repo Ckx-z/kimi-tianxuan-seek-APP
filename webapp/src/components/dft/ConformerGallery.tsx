@@ -2,18 +2,22 @@
  * 低能构象检索画廊（v1.5.0）：自动检索客体构象（ETKDG/CREST/auto），
  * 能量排序列表 + 玻尔兹曼占比；选用某构象后经 manualConformer(b_xyz=选中项)
  * 合成复合物几何，回调给页面在提交时注入 complex_xyz。
+ * v1.5.1：CREST 并行线程输入（默认 24）+ 引擎可用状态与细分安装提示展示。
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ConformerDetail from './ConformerDetail';
 import {
+  fetchConformerEngines,
   generateConformers,
   manualConformer,
+  type ConformerEnginesResponse,
   type ConformerItem,
 } from './api';
 
@@ -37,6 +41,19 @@ export default function ConformerGallery({ aSmiles, bSmiles, disabled, onApply }
   const [selected, setSelected] = useState<string | null>(null);
   /** 详情弹层中的构象（v1.5.1：查看 XYZ 与 3D 构象） */
   const [detailItem, setDetailItem] = useState<ConformerItem | null>(null);
+  /** CREST 并行线程（v1.5.1：空=按分子大小自动 4–24；小分子低线程反而更快） */
+  const [crestThreads, setCrestThreads] = useState('');
+  /** 引擎可用性（挂载时探测：CREST 未安装/引擎未运行/镜像缺失的细分提示） */
+  const [enginesInfo, setEnginesInfo] = useState<ConformerEnginesResponse['engines'] | null>(null);
+
+  useEffect(() => {
+    fetchConformerEngines()
+      .then((r) => setEnginesInfo(r.engines))
+      .catch(() => setEnginesInfo(null));
+  }, []);
+
+  const crestHint = enginesInfo?.crest?.installed === false
+    ? enginesInfo.crest.install_hint : null;
 
   const runGenerate = async () => {
     if (!bSmiles) {
@@ -48,7 +65,12 @@ export default function ConformerGallery({ aSmiles, bSmiles, disabled, onApply }
     setSelected(null);
     onApply(null);
     try {
-      const res = await generateConformers({ smiles: bSmiles, engine });
+      const res = await generateConformers({
+        smiles: bSmiles,
+        engine,
+        threads: engine === 'etkdg' ? undefined
+          : crestThreads ? Number(crestThreads) : undefined,
+      });
       if (res.conformers.length === 0) {
         toast.warning('未检索到低能构象（分子过小或引擎不可用）');
         return;
@@ -107,19 +129,51 @@ export default function ConformerGallery({ aSmiles, bSmiles, disabled, onApply }
             ))}
           </RadioGroup>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void runGenerate()}
-          disabled={loading || disabled || !bSmiles}
-        >
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          检索低能构象
-        </Button>
+        <div className="flex items-end gap-2">
+          <div className="space-y-1">
+            <Label htmlFor="crest-threads" className="text-xs text-muted-foreground">CREST 线程</Label>
+            <Input
+              id="crest-threads"
+              type="number"
+              min={1}
+              max={64}
+              placeholder="自动"
+              value={crestThreads}
+              disabled={loading || disabled}
+              onChange={(e) => {
+                const v = e.target.value.trim();
+                if (v === '') { setCrestThreads(''); return; }
+                const n = Number(v);
+                if (Number.isFinite(n)) setCrestThreads(String(Math.min(64, Math.max(1, Math.round(n)))));
+              }}
+              className="h-8 w-20"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void runGenerate()}
+            disabled={loading || disabled || !bSmiles}
+          >
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            检索低能构象
+          </Button>
+        </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        能量窗口默认 ΔE ≤ 10 kJ/mol、最多 20 个；CREST 需已安装（自动模式在未安装时回落 ETKDG）。
+        能量窗口默认 ΔE ≤ 10 kJ/mol、最多 20 个；CREST 线程留空=按分子大小自动
+        （小分子 4 线程更快，大分子自动用到 24）。
       </p>
+      {crestHint && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          ⚠ CREST 不可用：{crestHint}（自动模式将回落 ETKDG）
+        </p>
+      )}
+      {enginesInfo?.crest?.installed === true && (
+        <p className="text-xs text-muted-foreground">
+          ✓ CREST 就绪（{enginesInfo.crest.mode === 'docker' ? 'Docker 容器运行' : '本机二进制'}）
+        </p>
+      )}
       {conformers.length > 0 && (
         <ul className="max-h-64 space-y-1 overflow-y-auto text-sm">
           {conformers.map((c) => (

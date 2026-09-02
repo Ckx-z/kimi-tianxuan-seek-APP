@@ -16,6 +16,7 @@ for p in (str(PROJECT_ROOT), str(PROJECT_ROOT / "src")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from src import runtime_config  # noqa: E402
 from src.dft import conformers as dft_conformers  # noqa: E402
 from src.dft import engine  # noqa: E402
 
@@ -97,6 +98,49 @@ class TestCrest:
         engines = dft_conformers.conformer_engines()
         assert engines["etkdg"]["installed"] is True
         assert "crest" in engines
+
+
+class TestCrestDetectionV151:
+    """v1.5.1：CREST 检测细分（本机二进制/PATH/conda envs + Docker 镜像门槛）。"""
+
+    def test_crest_mode_requires_image_for_docker(self, monkeypatch):
+        monkeypatch.setattr(dft_conformers, "crest_binary", lambda: None)
+        monkeypatch.setattr(dft_conformers, "docker_engine_ready", lambda: True)
+        monkeypatch.setattr(dft_conformers, "docker_crest_image_ready",
+                            lambda: True)
+        assert dft_conformers.crest_mode() == "docker"
+        monkeypatch.setattr(dft_conformers, "docker_crest_image_ready",
+                            lambda: False)
+        assert dft_conformers.crest_mode() is None  # 引擎在但镜像缺 → 不可用
+
+    def test_engines_hint_image_missing(self, monkeypatch):
+        monkeypatch.setattr(dft_conformers, "crest_binary", lambda: None)
+        monkeypatch.setattr(dft_conformers, "docker_engine_ready", lambda: True)
+        monkeypatch.setattr(dft_conformers, "docker_crest_image_ready",
+                            lambda: False)
+        monkeypatch.setattr(dft_conformers, "_docker_binary", lambda: "docker.exe")
+        engines = dft_conformers.conformer_engines()
+        assert engines["crest"]["installed"] is False
+        assert "缺少 cof-crest 镜像" in (engines["crest"]["install_hint"] or "")
+
+    def test_engines_hint_engine_down(self, monkeypatch):
+        monkeypatch.setattr(dft_conformers, "crest_binary", lambda: None)
+        monkeypatch.setattr(dft_conformers, "docker_engine_ready", lambda: False)
+        monkeypatch.setattr(dft_conformers, "docker_crest_image_ready",
+                            lambda: False)
+        monkeypatch.setattr(dft_conformers, "_docker_binary", lambda: "docker.exe")
+        engines = dft_conformers.conformer_engines()
+        assert engines["crest"]["installed"] is False
+        assert "引擎未运行" in (engines["crest"]["install_hint"] or "")
+
+    def test_crest_threads_default_24(self, monkeypatch):
+        monkeypatch.delenv("COF_CREST_THREADS", raising=False)
+        monkeypatch.setattr(runtime_config, "load_local_config", lambda: {})
+        assert runtime_config.crest_threads() == 24
+
+    def test_crest_threads_env_override(self, monkeypatch):
+        monkeypatch.setenv("COF_CREST_THREADS", "32")
+        assert runtime_config.crest_threads() == 32
 
 
 class TestConformerEndpoints:

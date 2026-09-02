@@ -228,6 +228,9 @@ class ConformerGenerate(BaseModel):
     max_confs: int = Field(20, ge=1, le=50, description="保留构象数量上限")
     e_window_kj: float = Field(10.0, ge=0.0, le=100.0,
                                description="相对全局最低能的能量窗口（kJ/mol）")
+    threads: int | None = Field(
+        None, ge=1, le=64, description="CREST 并行线程数"
+                                        "（缺省=环境变量 COF_CREST_THREADS 或配置或 24）")
 
 
 class ConformerManual(BaseModel):

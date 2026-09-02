@@ -358,7 +358,14 @@ export interface ConformerItem {
 export interface ConformerEnginesResponse {
   engines: {
     etkdg: { installed: boolean; label: string };
-    crest: { installed: boolean; path?: string | null; label: string; install_hint?: string | null };
+    crest: {
+      installed: boolean;
+      /** 'native'（本机二进制）| 'docker'（容器+镜像齐备）| null（不可用） */
+      mode?: 'native' | 'docker' | null;
+      path?: string | null;
+      label: string;
+      install_hint?: string | null;
+    };
   };
 }
 
@@ -373,6 +380,8 @@ export const generateConformers = (payload: {
   n_gen?: number;
   max_confs?: number;
   e_window_kj?: number;
+  /** CREST 并行线程数（缺省=后端配置，默认 24） */
+  threads?: number;
 }) => request<{ conformers: ConformerItem[]; engine: string; cached: boolean }>(
   '/conformers/generate', { method: 'POST', body: payload });
 

@@ -211,6 +211,22 @@ def psi4_threads() -> int:
     return 24
 
 
+def crest_threads() -> int:
+    """CREST 构象搜索并行线程数（经 OMP_NUM_THREADS 传递给容器/本机进程）。
+    解析顺序（高 → 低）：
+    1. 环境变量 COF_CREST_THREADS（1–64）
+    2. config/runtime.local.json 顶层 "crest_threads"（1–64）
+    3. 默认 24（v1.5.1：此前容器镜像硬编码 4 线程，iMTD-GC 大幅偏慢）
+    """
+    val = os.environ.get("COF_CREST_THREADS", "").strip()
+    if val.isdigit() and 1 <= int(val) <= 64:
+        return int(val)
+    cfg_val = load_local_config().get("crest_threads")
+    if isinstance(cfg_val, int) and 1 <= cfg_val <= 64:
+        return cfg_val
+    return 24
+
+
 def gnn_project_root() -> Path:
     """旧 GNN 项目根（predict_pair.py 所在目录）。
 

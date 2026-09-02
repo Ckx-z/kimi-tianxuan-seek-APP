@@ -219,17 +219,19 @@ def generate_conformers(req: ConformerGenerate):
     if engine.canonicalize_smiles(req.smiles) is None:
         raise HTTPException(400, f"SMILES 无法解析：{req.smiles[:80]}")
     if engine_name == "crest" and dft_conformers.crest_mode() is None:
-        raise HTTPException(503, "未安装 CREST（conda install -c conda-forge crest，"
-                                 "建议装入 psi4-env；或本机 Docker：运行 "
-                                 "scripts/setup_crest_docker.ps1 构建 cof-crest 镜像）；"
-                                 "可改用 etkdg 引擎或自动模式")
+        # 细分原因提示（引擎未运行/镜像缺失/真未安装），见 conformer_engines
+        engines = dft_conformers.conformer_engines()
+        hint = (engines.get("crest") or {}).get("install_hint")
+        raise HTTPException(503, f"未安装 CREST：{hint}"
+                                 f"；可改用 etkdg 引擎或自动模式")
     cached = dft_conformers.load_cached_conformers(
         req.smiles, engine_name, req.n_gen, req.max_confs, req.e_window_kj)
     if cached is not None:
         return {"conformers": cached, "engine": engine_name, "cached": True}
     confs = dft_conformers.generate_conformers(
         req.smiles, engine_name, n_gen=req.n_gen,
-        max_confs=req.max_confs, e_window_kj=req.e_window_kj)
+        max_confs=req.max_confs, e_window_kj=req.e_window_kj,
+        threads=req.threads)
     if not confs:
         raise HTTPException(422, "构象生成失败：分子过小/无柔性键，或引擎未安装/超时，"
                                  "请换用其他引擎或分子")
