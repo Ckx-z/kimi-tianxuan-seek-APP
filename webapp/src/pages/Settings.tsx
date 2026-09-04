@@ -6,7 +6,7 @@
  * - 后端未连接时优雅降级，不白屏
  */
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, Loader2, PlugZap, Brain, Eye, Trash2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, PlugZap, Brain, Eye, Globe, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,9 +45,12 @@ import {
   fetchAssistantMemory,
   updateAssistantMemory,
   clearAssistantMemory,
+  fetchSearchSettings,
+  saveSearchSettings,
   type LlmSettings,
   type HealthInfo,
   type AssistantMemoryInfo,
+  type WebSearchSettings,
 } from '@/components/settings/api';
 
 /** 配置来源中文标签 */
@@ -252,6 +255,125 @@ function LlmSettingsCard({ offline }: { offline: boolean }) {
                 <span>{testResult.message}</span>
               </div>
             )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** 联网搜索配置卡（v1.6.0 P0）：开关 + provider + key */
+function WebSearchSettingsCard({ offline }: { offline: boolean }) {
+  const [settings, setSettings] = useState<WebSearchSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [enabled, setEnabled] = useState(false);
+  const [provider, setProvider] = useState('tavily');
+  const [apiKey, setApiKey] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const s = await fetchSearchSettings();
+      setSettings(s);
+      setEnabled(s.enabled);
+      setProvider(s.provider);
+    } catch {
+      /* api 层已 toast */
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!offline) void load();
+    else setLoading(false);
+  }, [offline, load]);
+
+  async function handleSave() {
+    if (enabled && !apiKey.trim() && !settings?.configured) {
+      toast.error('开启联网搜索需要填写 API key');
+      return;
+    }
+    setSaving(true);
+    try {
+      await saveSearchSettings({
+        enabled,
+        provider,
+        api_key: apiKey.trim(), // 空串=保留旧 key
+      });
+      toast.success('联网搜索配置已保存');
+      setApiKey('');
+      await load();
+    } catch {
+      /* 已 toast */
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Globe className="h-4 w-4 text-gold" />
+          联网搜索（深度研究）
+        </CardTitle>
+        <CardDescription>
+          为科研助手提供实时联网与学术检索能力（Tavily / Serper 任选；
+          学术检索 arXiv / PubMed / Semantic Scholar / Crossref 免费直连无需配置）。
+          默认关闭，未配置时助手自动隐藏联网工具。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="ws-enabled">启用联网搜索</Label>
+                <p className="text-xs text-muted-foreground">
+                  {settings?.configured
+                    ? `已配置（key ${settings.api_key_masked}）`
+                    : settings?.reason || '未配置'}
+                </p>
+              </div>
+              <Switch
+                id="ws-enabled"
+                checked={enabled}
+                onCheckedChange={setEnabled}
+              />
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="ws-provider">搜索供应商</Label>
+              <select
+                id="ws-provider"
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              >
+                <option value="tavily">Tavily（推荐，面向 AI Agent）</option>
+                <option value="serper">Serper（Google 搜索）</option>
+              </select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="ws-key">API Key</Label>
+              <Input
+                id="ws-key"
+                type="password"
+                placeholder={settings?.configured ? '留空表示保留现有 key' : '粘贴搜索 API key'}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+              />
+            </div>
+
+            <Button onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              保存联网搜索配置
+            </Button>
           </>
         )}
       </CardContent>
@@ -818,6 +940,7 @@ export default function Settings() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-6">
           <LlmSettingsCard offline={offline} />
+          <WebSearchSettingsCard offline={offline} />
           <AssistantMemoryCard offline={offline} />
         </div>
         <div className="space-y-6">

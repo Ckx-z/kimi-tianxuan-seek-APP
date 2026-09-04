@@ -105,6 +105,13 @@ class LLMSettings(BaseModel):
     model: str = ""
 
 
+class WebSearchSettings(BaseModel):
+    """联网搜索配置（v1.6.0 P0）：开关 + provider + key（空串=保留旧 key）。"""
+    enabled: bool = Field(False, description="联网搜索总开关（默认关，离线分发纪律）")
+    provider: str = Field("tavily", description="搜索供应商：tavily | serper")
+    api_key: str = Field("", description="搜索 API key（空串表示保留旧值，不回显）")
+
+
 class SuggestRequest(BaseModel):
     question: str = Field(..., description="迭代问题原文（自然语言）")
     favorite_id: str | None = Field(
@@ -171,6 +178,12 @@ class AssistantMemoryUpdate(BaseModel):
 class AssistantNudgeDismiss(BaseModel):
     """连续失败提醒的"知道了"登记：该收藏当日不再提醒。"""
     favorite_id: str = Field(..., description="被 dismiss 的收藏条目 ID")
+
+
+class AssistantResearchRequest(BaseModel):
+    """深度研究（v1.6.0 P1）：复杂问题走 plan→execute→critic→report。"""
+    question: str = Field(..., description="研究问题（自然语言，复杂问题）")
+    allow_web: bool = Field(True, description="是否允许联网检索（工具仍按配置裁剪）")
 
 
 class DftJobCreate(BaseModel):

@@ -26,7 +26,7 @@ from typing import Iterator
 
 from . import confirm as confirm_module
 from . import context as context_module
-from . import llm_bridge, memory as memory_module, persona, registry
+from . import llm_bridge, memory as memory_module, persona, registry, verify
 from .llm_bridge import FunctionCallingUnsupported, LLMCallError
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,14 @@ _PLAN_PROMPT = (
 _PLAN_RETRY_HINT = (
     "格式错误。请严格只输出一个 JSON 对象（不要任何其他文字）："
     "{\"tool\": \"工具名\", \"args\": {...}} 或 {\"reply\": \"回答\"}。"
+)
+
+# 引用核验打回提示（v1.6.0 P0）：发现回答引用了本轮检索未证实的内容
+_REWRITE_PROMPT = (
+    "（系统引用校验）你的上一条回答引用了以下未经本轮检索证实的内容："
+    "{desc}。请遵守引用纪律：删除或改述这些引用；确实无法回避时，"
+    "如实说明「该信息来自模型既有知识，未在本轮检索中核实」。"
+    "不要编造新的引用，直接重新输出完整回答。"
 )
 
 
@@ -217,7 +225,8 @@ def _confirm_gate(session_id: str, name: str, args: dict) -> dict | None:
             "impact": impact, "expires_in": confirm_module.TTL_SECONDS}
 
 
-def _final_answer(messages: list[dict]) -> Iterator[dict]:
+def _final_answer(messages: list[dict],
+                  tool_results: list[dict] | None = None) -> Iterator[dict]:
     """工具轮次用尽后的收尾：逼模型基于已获取信息直接作答。"""
     closing = list(messages) + [{
         "role": "user",
@@ -226,16 +235,51 @@ def _final_answer(messages: list[dict]) -> Iterator[dict]:
     }]
     text = llm_bridge.chat_text(closing)
     if text and text.strip():
-        yield from _stream_text(text.strip())
+        closing.append({"role": "assistant", "content": text.strip()})
+        yield from _emit_verified(closing, text.strip(), tool_results)
     else:
         yield from _stream_text(
             "已达到本次对话的工具调用上限，且收尾回答生成失败。"
             "已获取的工具结果见上方过程记录，可换个问法继续。")
 
 
+def _emit_verified(work: list[dict], text: str,
+                   tool_results: list[dict] | None) -> Iterator[dict]:
+    """引用核验（v1.6.0 P0）：回答中的 CAS/DOI/URL 必须能回溯到本轮工具结果。
+
+    违规 → 发 critic_note 事件 → 打回重写一轮（不调工具）→ 重写仍违规或
+    重写失败 → 原回答 + 显式警示（诚实降级，不静默）。
+    """
+    refs = verify.collect_refs(tool_results or [])
+    violations = verify.check_answer(text, refs)
+    if not violations:
+        yield from _stream_text(text)
+        return
+    desc = verify.describe_violations(violations)
+    yield {"type": "critic_note",
+           "text": f"引用校验发现未经本轮检索核实的内容（{desc}），正在修正…"}
+    rewrite_work = _sanitize_for_plain(work) + [{
+        "role": "user", "content": _REWRITE_PROMPT.format(desc=desc)}]
+    rewritten = llm_bridge.chat_text(rewrite_work)
+    if rewritten and rewritten.strip():
+        rewritten = rewritten.strip()
+        left = verify.check_answer(rewritten, refs)
+        if not left:
+            yield from _stream_text(rewritten)
+            return
+        yield from _stream_text(
+            rewritten + "\n\n⚠️ 注：以上回答仍含未经本轮检索核实的内容（"
+            + verify.describe_violations(left) + "），请谨慎采信。")
+        return
+    yield from _stream_text(
+        text + "\n\n⚠️ 注：系统引用校验发现未经本轮检索核实的内容（"
+        + desc + "），且自动修正失败，请谨慎采信。")
+
+
 def _run_function_calling(messages: list[dict],
                           session_id: str = "") -> Iterator[dict]:
     """路径 A：OpenAI function calling。"""
+    tool_results: list[dict] = []
     for _ in range(MAX_TOOL_ROUNDS):
         resp = llm_bridge.chat_completion_with_tools(
             messages, registry.list_tool_schemas())
@@ -244,7 +288,8 @@ def _run_function_calling(messages: list[dict],
             content = str(resp.get("content") or "").strip()
             if not content:
                 raise FunctionCallingUnsupported("响应无 content（格式乱）")
-            yield from _stream_text(content)
+            messages.append({"role": "assistant", "content": content})
+            yield from _emit_verified(messages, content, tool_results)
             return
         messages.append({
             "role": "assistant",
@@ -265,10 +310,11 @@ def _run_function_calling(messages: list[dict],
                 yield gate
                 return  # 挂起等确认，工具未执行
             result = registry.execute(tc["name"], tc["args"])
+            tool_results.append(result)
             yield from _tool_event_pair(tc["name"], tc["args"], result)
             messages.append({"role": "tool", "tool_call_id": tc["id"],
                              "content": result["text"]})
-    yield from _final_answer(messages)
+    yield from _final_answer(messages, tool_results)
 
 
 def _parse_directive(text: str) -> dict | None:
@@ -344,6 +390,7 @@ def _run_plan_execute(messages: list[dict],
     work = _sanitize_for_plain(messages) + [
         {"role": "system", "content": _PLAN_PROMPT}]
     retried = False
+    tool_results: list[dict] = []
     for _ in range(MAX_TOOL_ROUNDS):
         text = llm_bridge.chat_text(work)
         if text is None:
@@ -359,11 +406,13 @@ def _run_plan_execute(messages: list[dict],
                 work.append({"role": "user", "content": _PLAN_RETRY_HINT})
                 continue
             # 重问仍乱格式：把原文当回答吐出（不空转、不丢内容）
-            yield from _stream_text(text.strip())
+            work.append({"role": "assistant", "content": text})
+            yield from _emit_verified(work, text.strip(), tool_results)
             return
         reply = directive.get("reply")
         if reply is not None:
-            yield from _stream_text(str(reply))
+            work.append({"role": "assistant", "content": str(reply)})
+            yield from _emit_verified(work, str(reply), tool_results)
             return
         name = str(directive.get("tool") or "").strip()
         args = directive.get("args")
@@ -374,13 +423,14 @@ def _run_plan_execute(messages: list[dict],
             yield gate
             return  # 挂起等确认，工具未执行
         result = registry.execute(name, args)
+        tool_results.append(result)
         yield from _tool_event_pair(name, args, result)
         work.append({"role": "assistant", "content": text})
         work.append({
             "role": "user",
             "content": f"工具 {name} 返回：\n{result['text']}\n\n"
                        "请继续：输出下一个 JSON 指令。"})
-    yield from _final_answer(work)
+    yield from _final_answer(work, tool_results)
 
 
 def run(session: dict, user_message: str,

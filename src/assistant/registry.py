@@ -24,6 +24,11 @@ from .tools.predict import predict_film
 from .tools.records import (draft_experiment_record,
                             draft_experiment_record_impact,
                             read_experiment_records)
+# v1.6.0 P0：联网搜索 / 学术检索 / 网页抓取 / 补齐工具
+from .tools.academic import academic_search
+from .tools.extra import cas_resolve, get_monomer_props, lookup_paper_doi
+from .tools.fetch import fetch_page
+from .tools.web import web_search
 
 logger = logging.getLogger(__name__)
 
@@ -301,18 +306,171 @@ TOOLS: dict = {
             },
         },
     },
+    # ---------------- v1.6.0 P0：联网 / 学术 / 抓取 / 补齐工具 ----------------
+    "web_search": {
+        "handler": lambda args: web_search(
+            args.get("query", ""), args.get("n") or 5),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": "联网搜索最新公开信息（网页）。涉及“最新进展、"
+                               "近两年、新闻、时事”等系统内没有的外部知识时先调它；"
+                               "文献类问题优先用 academic_search。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string",
+                                  "description": "搜索关键词（英文效果更好）"},
+                        "n": {"type": "integer",
+                              "description": "返回条数（默认 5，上限 8）"},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+    },
+    "academic_search": {
+        "handler": lambda args: academic_search(
+            args.get("query", ""), args.get("source") or "all",
+            args.get("n") or 5),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "academic_search",
+                "description": "学术文献检索（arXiv / PubMed / Semantic Scholar "
+                               "/ Crossref，均免费直连）。涉及论文、文献、方法学"
+                               "对比时优先调它；返回带 DOI 的真实文献元数据与"
+                               "摘要，可用于进一步 fetch_page 或 lookup_paper_doi。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string",
+                                  "description": "检索词（标题/关键词，英文更准）"},
+                        "source": {"type": "string",
+                                   "enum": ["arxiv", "pubmed",
+                                            "semanticscholar", "crossref", "all"],
+                                   "description": "检索源（默认 all 聚合）"},
+                        "n": {"type": "integer",
+                              "description": "每源条数（默认 5，上限 5）"},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+    },
+    "fetch_page": {
+        "handler": lambda args: fetch_page(args.get("url", "")),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "fetch_page",
+                "description": "抓取指定网页正文（http/https 公网地址，仅提取"
+                               "正文文本）。搜索结果只有摘要不够时，用它读全文；"
+                               "纯 JS 渲染页面可能抓不到，可换其他来源。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string",
+                                "description": "网页 URL（来自搜索结果等）"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+    },
+    "get_monomer_props": {
+        "handler": lambda args: get_monomer_props(
+            args.get("smiles", ""), args.get("name") or ""),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "get_monomer_props",
+                "description": "单体物化性质（分子量/LogP/TPSA/氢键等 RDKit "
+                               "事实 + 可选解读）。涉及单体性质、溶解性推测的"
+                               "问题先调它。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "smiles": {"type": "string", "description": "单体 SMILES"},
+                        "name": {"type": "string",
+                                 "description": "单体名称（可选）"},
+                    },
+                    "required": ["smiles"],
+                },
+            },
+        },
+    },
+    "cas_resolve": {
+        "handler": lambda args: cas_resolve(args.get("cas", "")),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "cas_resolve",
+                "description": "CAS 号 → SMILES/名称（内置库→缓存→PubChem→"
+                               "LLM 四路）。用户给了 CAS 但没有 SMILES 时先调它。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cas": {"type": "string", "description": "CAS 号"},
+                    },
+                    "required": ["cas"],
+                },
+            },
+        },
+    },
+    "lookup_paper_doi": {
+        "handler": lambda args: lookup_paper_doi(args.get("doi", "")),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "lookup_paper_doi",
+                "description": "按 DOI 查文献元数据（本机文献库优先，Crossref "
+                               "兜底），返回标题/作者/期刊/年份与可点击 DOI。"
+                               "需要核实某篇文献的出处时调它。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "doi": {"type": "string",
+                                "description": "DOI（形如 10.xxxx/...）"},
+                    },
+                    "required": ["doi"],
+                },
+            },
+        },
+    },
 }
 
 
+def _available_tools() -> dict:
+    """按运行环境裁剪工具表：web_search 未开开关/未配 key 时整体缺席。
+
+    其余联网工具（academic_search / fetch_page / lookup_paper_doi）不依赖
+    key，始终注册；运行时失败会走 is_error 结果让 LLM 换路。
+    """
+    tools = dict(TOOLS)
+    try:
+        from src.llm import client as _llm_client
+    except ImportError:  # pragma: no cover
+        from llm import client as _llm_client  # type: ignore
+    try:
+        ok, _reason = _llm_client.web_search_available()
+    except Exception:  # 配置读取异常按不可用处理
+        ok = False
+    if not ok:
+        tools.pop("web_search", None)
+    return tools
+
+
 def list_tool_schemas() -> list[dict]:
-    """OpenAI tools 参数格式的 schema 列表（路径 A 用）。"""
-    return [t["schema"] for t in TOOLS.values()]
+    """OpenAI tools 参数格式的 schema 列表（路径 A 用；按环境裁剪）。"""
+    return [t["schema"] for t in _available_tools().values()]
 
 
 def describe_tools() -> str:
-    """工具清单的自然语言描述（路径 B 两段式提示词内嵌用）。"""
+    """工具清单的自然语言描述（路径 B 两段式提示词内嵌用；按环境裁剪）。"""
     lines = []
-    for name, t in TOOLS.items():
+    for name, t in _available_tools().items():
         fn = t["schema"]["function"]
         props = fn["parameters"].get("properties", {})
         required = set(fn["parameters"].get("required", []))

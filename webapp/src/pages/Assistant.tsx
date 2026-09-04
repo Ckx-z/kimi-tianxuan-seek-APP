@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Bot, FileText, Image as ImageIcon, MessageSquarePlus, Paperclip, Pencil, RefreshCw, Send, Settings as SettingsIcon, X } from 'lucide-react';
+import { Bot, CheckCircle2, Circle, FileText, Image as ImageIcon, MessageSquarePlus, Microscope, Paperclip, Pencil, RefreshCw, Send, Settings as SettingsIcon, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import {
   assistantApi,
   parseSseStream,
+  researchDocxUrl,
   uploadAttachment,
   validateAttachmentFile,
   AssistantUnavailableError,
@@ -36,6 +37,7 @@ import {
   type AssistantContext,
   type AssistantSessionMeta,
   type AssistantStatus,
+  type ResearchReportMeta,
   type ToolEvent,
 } from '@/components/assistant/api';
 import { MessageBubble, type ChatMessageView } from '@/components/assistant/MessageBubble';
@@ -80,6 +82,32 @@ export default function Assistant() {
   /** 最近一次发送（供网络中断后重试；attachments 为已上传的元信息） */
   const lastSentRef = useRef<{ message: string; attachments?: AssistantAttachmentMeta[] } | null>(null);
   const [canRetry, setCanRetry] = useState(false);
+
+  // ---------- 深度研究模式（v1.6.0 P1） ----------
+  const [researchMode, setResearchMode] = useState(false);
+  /** 研究计划卡（plan 事件后渲染，步骤逐步打勾） */
+  const [researchPlan, setResearchPlan] = useState<{
+    summary?: string;
+    steps: { title: string; note?: string }[];
+  } | null>(null);
+  const [researchStepDone, setResearchStepDone] = useState<Record<number, boolean>>({});
+  /** 研究报告列表弹窗 */
+  const [reportsOpen, setReportsOpen] = useState(false);
+  const [reports, setReports] = useState<ResearchReportMeta[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ResearchReportMeta | null>(null);
+
+  const openReports = useCallback(async () => {
+    setReportsOpen(true);
+    setReportsLoading(true);
+    try {
+      setReports(await assistantApi.listResearchReports());
+    } catch {
+      // api 层已 toast
+    } finally {
+      setReportsLoading(false);
+    }
+  }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const transferConsumedRef = useRef(false);
@@ -181,7 +209,7 @@ export default function Assistant() {
             setMessages((ms) =>
               ms.map((m) => (m.id === asstId ? { ...m, content: m.content + ev.text } : m)),
             );
-          } else if (ev.type === 'tool_call' || ev.type === 'tool_result' || ev.type === 'tool_confirm') {
+          } else if (ev.type === 'tool_call' || ev.type === 'tool_result' || ev.type === 'tool_confirm' || ev.type === 'critic_note') {
             setMessages((ms) =>
               ms.map((m) =>
                 m.id === asstId ? { ...m, toolEvents: [...(m.toolEvents ?? []), ev] } : m,
@@ -254,7 +282,7 @@ export default function Assistant() {
             setMessages((ms) =>
               ms.map((m) => (m.id === asstId ? { ...m, content: m.content + sev.text } : m)),
             );
-          } else if (sev.type === 'tool_call' || sev.type === 'tool_result' || sev.type === 'tool_confirm') {
+          } else if (sev.type === 'tool_call' || sev.type === 'tool_result' || sev.type === 'tool_confirm' || sev.type === 'critic_note') {
             setMessages((ms) =>
               ms.map((m) =>
                 m.id === asstId ? { ...m, toolEvents: [...(m.toolEvents ?? []), sev] } : m,
@@ -313,12 +341,99 @@ export default function Assistant() {
     setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
   }, []);
 
+  // ---------- 深度研究执行（v1.6.0 P1） ----------
+  const runResearch = useCallback(async (question: string) => {
+    setResearchPlan(null);
+    setResearchStepDone({});
+    const asstId = nextId();
+    setMessages((ms) => [
+      ...ms,
+      { id: asstId, role: 'assistant', content: '', toolEvents: [], streaming: true },
+    ]);
+    setStreaming(true);
+    const patch = (p: Partial<LocalMessage>) =>
+      setMessages((ms) => ms.map((m) => (m.id === asstId ? { ...m, ...p } : m)));
+    try {
+      const stream = await assistantApi.researchStream({
+        question,
+        allow_web: true,
+      });
+      for await (const sev of parseSseStream(stream)) {
+        if (sev.type === 'plan') {
+          setResearchPlan({ summary: sev.summary, steps: sev.steps });
+        } else if (sev.type === 'step_start' || sev.type === 'step_done') {
+          setResearchStepDone((m) => ({
+            ...m,
+            [sev.index]: sev.type === 'step_done',
+          }));
+        } else if (sev.type === 'token') {
+          setMessages((ms) =>
+            ms.map((m) => (m.id === asstId ? { ...m, content: m.content + sev.text } : m)),
+          );
+        } else if (
+          sev.type === 'tool_call' || sev.type === 'tool_result' ||
+          sev.type === 'critic_note'
+        ) {
+          setMessages((ms) =>
+            ms.map((m) =>
+              m.id === asstId ? { ...m, toolEvents: [...(m.toolEvents ?? []), sev] } : m,
+            ),
+          );
+        } else if (sev.type === 'report') {
+          setMessages((ms) =>
+            ms.map((m) =>
+              m.id === asstId
+                ? {
+                    ...m,
+                    toolEvents: [
+                      ...(m.toolEvents ?? []),
+                      {
+                        type: 'research_report',
+                        report_id: sev.report_id,
+                        title: sev.title,
+                      } as ToolEvent,
+                    ],
+                  }
+                : m,
+            ),
+          );
+        } else if (sev.type === 'error') {
+          patch({ error: `深度研究出错：${sev.message}`, streaming: false });
+        }
+      }
+      patch({ streaming: false });
+    } catch (e) {
+      patch({
+        streaming: false,
+        error:
+          e instanceof AssistantUnavailableError
+            ? '连接中断，请检查网络或后端服务后重试。'
+            : e instanceof Error
+              ? e.message
+              : '深度研究失败，请重试。',
+      });
+    } finally {
+      setStreaming(false);
+    }
+  }, []);
+
   const sendMessage = useCallback(
     async (raw: string) => {
       const message = raw.trim();
       const files = pendingFiles;
       if ((!message && files.length === 0) || streaming || uploading) return;
       setInput('');
+
+      // 深度研究模式：不走会话流，直接发研究请求
+      if (researchMode) {
+        if (!message) return;
+        setMessages((ms) => [
+          ...ms,
+          { id: nextId(), role: 'user', content: message },
+        ]);
+        await runResearch(message);
+        return;
+      }
 
       // 先上传附件（失败则中止本次发送，输入与附件保留在输入区）
       let metas: AssistantAttachmentMeta[] = [];
@@ -383,7 +498,7 @@ export default function Assistant() {
       }
       await runStream(sid, effective, activeContext, metas);
     },
-    [activeId, activeContext, pendingFiles, runStream, streaming, uploading],
+    [activeId, activeContext, pendingFiles, researchMode, runResearch, runStream, streaming, uploading],
   );
 
   // 网络中断重试：复用上一条用户消息（含已上传附件的 upload_id），直接重发流
@@ -543,6 +658,26 @@ export default function Assistant() {
         </div>
         <Button
           size="sm"
+          variant={researchMode ? 'default' : 'outline'}
+          onClick={() => !streaming && setResearchMode((v) => !v)}
+          disabled={streaming}
+          className="shrink-0"
+          title="深度研究：复杂问题走 计划→检索→批判→报告（联网+学术库）"
+        >
+          <Microscope className="mr-1.5 h-4 w-4" />
+          深度研究{researchMode ? '（开）' : ''}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void openReports()}
+          className="shrink-0"
+        >
+          <FileText className="mr-1.5 h-4 w-4" />
+          研究报告
+        </Button>
+        <Button
+          size="sm"
           variant="outline"
           onClick={handleNewSession}
           disabled={streaming}
@@ -619,6 +754,27 @@ export default function Assistant() {
               {activeContext.favorite_id ? `：收藏 ${activeContext.favorite_id}` : ''}
               {Array.isArray(activeContext.suggestion_ids) &&
                 ` · ${activeContext.suggestion_ids.length} 条迭代建议`}
+            </div>
+          )}
+
+          {/* 深度研究计划卡（v1.6.0：步骤逐步打勾） */}
+          {researchMode && researchPlan && (
+            <div className="border-b border-gold/30 bg-gold-muted/40 px-4 py-2 text-xs">
+              <p className="font-medium text-gold-foreground">
+                研究计划{researchPlan.summary ? `：${researchPlan.summary}` : ''}
+              </p>
+              <ol className="mt-1 space-y-0.5 text-muted-foreground">
+                {researchPlan.steps.map((s, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    {researchStepDone[i] ? (
+                      <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+                    ) : (
+                      <Circle className="mt-0.5 h-3 w-3 shrink-0" />
+                    )}
+                    <span>{s.title}{s.note ? ` — ${s.note}` : ''}</span>
+                  </li>
+                ))}
+              </ol>
             </div>
           )}
 
@@ -780,6 +936,95 @@ export default function Assistant() {
               disabled={renameBusy || !renameValue.trim()}
             >
               {renameBusy ? '保存中…' : '保存'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 研究报告列表弹窗（v1.6.0 P1） */}
+      <Dialog open={reportsOpen} onOpenChange={(open) => !open && setReportsOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>研究报告</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+            {reportsLoading ? (
+              <Skeleton className="h-16 w-full" />
+            ) : reports.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                还没有研究报告。切换「深度研究」模式提问即可生成。
+              </p>
+            ) : (
+              reports.map((r) => (
+                <div
+                  key={r.report_id}
+                  className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate text-sm font-medium text-foreground"
+                      title={r.title}
+                    >
+                      {r.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {r.created_at.slice(0, 10)} · {r.ref_count} 条引用
+                    </p>
+                  </div>
+                  <a
+                    href={researchDocxUrl(r.report_id)}
+                    className="inline-flex shrink-0 items-center gap-1 rounded border border-gold/40 px-2 py-1 text-xs text-gold hover:bg-gold/10"
+                    title="下载 Word 版（含参考文献与 DOI）"
+                  >
+                    <FileText className="h-3 w-3" />
+                    Word
+                  </a>
+                  <button
+                    type="button"
+                    title="删除该报告"
+                    className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
+                    onClick={() => setPendingDelete(r)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除研究报告确认（复用 Dialog 二次确认） */}
+      <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>确认删除该报告？</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            将删除「{pendingDelete?.title ?? ''}」。删除后不可恢复。
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingDelete(null)}>
+              取消
+            </Button>
+            <Button
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={async () => {
+                const target = pendingDelete;
+                if (!target) return;
+                try {
+                  await assistantApi.deleteResearchReport(target.report_id);
+                  toast.success('研究报告已删除');
+                  setReports((prev) =>
+                    prev.filter((x) => x.report_id !== target.report_id),
+                  );
+                  setPendingDelete(null);
+                } catch {
+                  // 已 toast
+                }
+              }}
+            >
+              确认删除
             </Button>
           </DialogFooter>
         </DialogContent>

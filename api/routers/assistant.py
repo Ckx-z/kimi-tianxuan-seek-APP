@@ -29,13 +29,15 @@ from __future__ import annotations
 
 import json
 import logging
+import urllib.parse
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from ..schemas import (AssistantChatRequest, AssistantConfirmRequest,
                        AssistantMemoryUpdate, AssistantNudgeDismiss,
-                       AssistantSessionCreate, AssistantSessionRename)
+                       AssistantResearchRequest, AssistantSessionCreate,
+                       AssistantSessionRename)
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,16 @@ def _brief():
     except ImportError:  # pragma: no cover
         from assistant import brief  # type: ignore
     return brief
+
+
+def _research():
+    """延迟 import 深度研究模块（v1.6.0 P1）。"""
+    from .. import deps  # noqa: F401
+    try:
+        from src.assistant import research
+    except ImportError:  # pragma: no cover
+        from assistant import research  # type: ignore
+    return research
 
 
 def _finalize_previous_session(sessions, memory) -> None:
@@ -421,6 +433,89 @@ def dismiss_nudge(req: AssistantNudgeDismiss):
     brief.dismiss_nudge(fid)
     return {"dismissed": True, "favorite_id": fid,
             "nudges": brief.list_nudges()}
+
+
+# ---------------------------------------------------------------------------
+# 深度研究（v1.6.0 P1）：SSE 研究流 + 报告 CRUD + docx 导出
+# ---------------------------------------------------------------------------
+
+@router.post("/research")
+def research_chat(req: AssistantResearchRequest):
+    """深度研究：plan → 逐子问题检索 → 批判补搜 → 带引用报告（SSE）。
+
+    事件契约见 src/assistant/research.py 头注释：plan / step_start /
+    tool_call / tool_result / step_done / critic_note / token / report /
+    done / error。任何失败都走 error 事件，HTTP 恒 200。
+    """
+    question = (req.question or "").strip()
+    if not question:
+        def _empty():
+            yield _sse({"type": "error", "message": "question 不能为空"})
+        return StreamingResponse(
+            _empty(), media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    def gen():
+        try:
+            research = _research()
+            for ev in research.run_research(question, allow_web=req.allow_web):
+                yield _sse(ev)
+        except Exception as exc:  # 兜底：任何意外都走 error 事件
+            logger.exception("research 异常")
+            yield _sse({"type": "error",
+                        "message": f"深度研究内部错误：{type(exc).__name__}: {exc}"})
+
+    return StreamingResponse(
+        gen(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/research/reports")
+def research_reports():
+    """研究报告列表（created_at 倒序，含引用条数）。"""
+    research = _research()
+    reports = research.list_reports()
+    return {"reports": reports, "count": len(reports)}
+
+
+@router.get("/research/reports/{report_id}")
+def research_report_detail(report_id: str):
+    """研究报告详情（含 Markdown 全文与参考文献清单）。"""
+    research = _research()
+    rep = research.load_report(report_id)
+    if rep is None:
+        raise HTTPException(404, f"研究报告不存在: {report_id}")
+    return rep
+
+
+@router.delete("/research/reports/{report_id}")
+def research_report_delete(report_id: str):
+    """删除研究报告（物理删除；id 格式校验防路径穿越）。"""
+    research = _research()
+    if not research.delete_report(report_id):
+        raise HTTPException(404, f"研究报告不存在: {report_id}")
+    return {"deleted": True, "report_id": report_id}
+
+
+@router.get("/research/reports/{report_id}/export.docx")
+def research_report_export(report_id: str):
+    """研究报告导出 Word（含参考文献与 DOI）。"""
+    from fastapi.responses import Response
+    research = _research()
+    rep = research.load_report(report_id)
+    if rep is None:
+        raise HTTPException(404, f"研究报告不存在: {report_id}")
+    try:
+        blob = research.report_to_docx(rep)
+    except Exception as exc:
+        raise HTTPException(500, f"Word 导出失败：{type(exc).__name__}: {exc}")
+    filename = f"COF研究报告_{report_id}.docx"
+    return Response(
+        content=blob,
+        media_type="application/vnd.openxmlformats-officedocument"
+                   ".wordprocessingml.document",
+        headers={"Content-Disposition":
+                 f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"})
 
 
 def _sse(event: dict) -> str:

@@ -40,11 +40,16 @@ export interface AssistantSessionMeta {
 
 /** SSE / 历史消息中的工具事件 */
 export interface ToolEvent {
-  type: 'tool_call' | 'tool_result' | 'tool_confirm';
-  name: string;
+  type: 'tool_call' | 'tool_result' | 'tool_confirm' | 'critic_note' | 'research_report';
+  name?: string;
   args?: Record<string, unknown>;
   summary?: string;
   is_error?: boolean;
+  /** critic_note：引用核验说明（v1.6.0） */
+  text?: string;
+  /** research_report：深度研究报告落盘事件（v1.6.0） */
+  report_id?: string;
+  title?: string;
   /** tool_confirm：二次确认令牌（一次性、5 分钟过期） */
   confirm_token?: string;
   /** tool_confirm：影响说明 */
@@ -132,6 +137,19 @@ export interface AssistantNudge {
   suggestion: string;
 }
 
+/** 深度研究报告（v1.6.0 P1）列表条目 */
+export interface ResearchReportMeta {
+  report_id: string;
+  title: string;
+  created_at: string;
+  ref_count: number;
+}
+
+/** 深度研究报告 Word 导出地址（浏览器直接下载） */
+export function researchDocxUrl(reportId: string): string {
+  return `${BASE_URL}/research/reports/${encodeURIComponent(reportId)}/export.docx`;
+}
+
 // ---------- SSE 事件 ----------
 export type AssistantSseEvent =
   | { type: 'token'; text: string }
@@ -147,7 +165,13 @@ export type AssistantSseEvent =
       expires_in?: number;
     }
   | { type: 'done'; session_id?: string }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | { type: 'critic_note'; text: string }
+  // 深度研究（v1.6.0 P1）
+  | { type: 'plan'; summary?: string; steps: { title: string; note?: string }[] }
+  | { type: 'step_start'; index: number; title: string }
+  | { type: 'step_done'; index: number; title: string; summary?: string }
+  | { type: 'report'; report_id: string; title: string };
 
 /** 后端未连接错误（网络层失败），页面据此显示重试 */
 export class AssistantUnavailableError extends Error {
@@ -313,6 +337,50 @@ export const assistantApi = {
     return request(`/sessions/${encodeURIComponent(sessionId)}/title`, {
       method: 'PATCH',
       body: { title },
+    });
+  },
+
+  /** 深度研究（v1.6.0 P1）：SSE 研究流（plan → 检索 → 批判 → 报告） */
+  async researchStream(body: {
+    question: string;
+    allow_web?: boolean;
+  }): Promise<ReadableStream<Uint8Array>> {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/research`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new AssistantUnavailableError();
+    }
+    if (!res.ok) {
+      let message = `请求失败（${res.status}）`;
+      try {
+        const data = await res.json();
+        if (typeof data?.detail === 'string') message = data.detail;
+        else if (typeof data?.message === 'string') message = data.message;
+      } catch {
+        /* 保留默认 */
+      }
+      throw new Error(message);
+    }
+    if (!res.body) throw new AssistantUnavailableError('响应不含数据流');
+    return res.body;
+  },
+
+  /** 研究报告列表（created_at 倒序） */
+  async listResearchReports(): Promise<ResearchReportMeta[]> {
+    const data = await request<{ reports: ResearchReportMeta[] }>(
+      '/research/reports');
+    return data.reports ?? [];
+  },
+
+  /** 删除研究报告 */
+  deleteResearchReport(reportId: string): Promise<{ deleted: boolean; report_id: string }> {
+    return request(`/research/reports/${encodeURIComponent(reportId)}`, {
+      method: 'DELETE',
     });
   },
 

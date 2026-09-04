@@ -60,6 +60,29 @@ export const saveLlmSettings = (body: { base_url: string; api_key: string; model
     body: JSON.stringify(body),
   });
 
+/** 联网搜索配置（v1.6.0 P0；GET /api/llm/search-settings 响应） */
+export interface WebSearchSettings {
+  enabled: boolean;
+  provider: string;
+  api_key_masked: string;
+  configured: boolean;
+  available: boolean;
+  reason: string;
+}
+
+export const fetchSearchSettings = () =>
+  request<WebSearchSettings>('/llm/search-settings');
+
+export const saveSearchSettings = (body: {
+  enabled: boolean;
+  provider: string;
+  api_key: string;
+}) =>
+  request<WebSearchSettings>('/llm/search-settings', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
 export const testLlmConnection = () =>
   request<{ ok: boolean; message: string }>('/llm/test', { method: 'POST' });
 

@@ -155,6 +155,71 @@ def save_settings(base_url: str, api_key: str, model: str) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# 联网搜索配置（v1.6.0 深度研究 P0）：provider + api_key + 总开关
+# 与 LLM 配置同文件（llm_settings.local.json 的 web_search 字段），
+# 读-改-写互不覆盖；api_key 绝不回显原文（get 返回掩码）。
+# ---------------------------------------------------------------------------
+
+SEARCH_PROVIDERS = ("tavily", "serper")
+
+
+def get_search_settings() -> dict:
+    """读联网搜索配置 {enabled, provider, api_key}（原始 key，仅内部用）。"""
+    payload = _read_json(LOCAL_SETTINGS)
+    s = payload.get("web_search") or {}
+    provider = str(s.get("provider") or "tavily").strip()
+    if provider not in SEARCH_PROVIDERS:
+        provider = "tavily"
+    return {
+        "enabled": bool(s.get("enabled")),
+        "provider": provider,
+        "api_key": str(s.get("api_key") or "").strip(),
+    }
+
+
+def get_search_settings_public() -> dict:
+    """设置页口径：{enabled, provider, api_key_masked, configured}。"""
+    cfg = get_search_settings()
+    return {
+        "enabled": cfg["enabled"],
+        "provider": cfg["provider"],
+        "api_key_masked": _mask(cfg["api_key"]),
+        "configured": bool(cfg["enabled"] and cfg["api_key"]),
+    }
+
+
+def save_search_settings(enabled: bool, provider: str, api_key: str) -> dict:
+    """写联网搜索配置；api_key 为空串时保留旧 key（只改开关/供应商场景）。"""
+    LOCAL_SETTINGS.parent.mkdir(parents=True, exist_ok=True)
+    payload = _read_json(LOCAL_SETTINGS)
+    old = (payload.get("web_search") or {}).get("api_key") or ""
+    provider = provider.strip() if provider in SEARCH_PROVIDERS else "tavily"
+    key = (api_key or "").strip() or old
+    payload["web_search"] = {
+        "enabled": bool(enabled),
+        "provider": provider,
+        "api_key": key,
+    }
+    LOCAL_SETTINGS.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return get_search_settings_public()
+
+
+def web_search_available() -> tuple[bool, str]:
+    """web_search 工具可用性（供注册表动态裁剪与 env-status 口径）。
+
+    返回 (可用, 原因)；可用 = 开关开 + key 已配置。
+    """
+    cfg = get_search_settings()
+    if not cfg["enabled"]:
+        return False, "联网搜索未开启（设置页开启并配置 provider/key 后可用）"
+    if not cfg["api_key"]:
+        return False, "联网搜索已开启但未配置 API key"
+    return True, "ok"
+
+
 def _chat_url(base_url: str) -> str:
     return base_url.rstrip("/") + "/chat/completions"
 

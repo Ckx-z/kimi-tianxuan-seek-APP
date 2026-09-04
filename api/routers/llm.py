@@ -1,10 +1,10 @@
-"""LLM 配置路由：查看 / 保存 / 连通性测试。"""
+"""LLM 配置路由：查看 / 保存 / 连通性测试 / 联网搜索配置。"""
 
 from __future__ import annotations
 
 from fastapi import APIRouter
 
-from ..schemas import LLMSettings
+from ..schemas import LLMSettings, WebSearchSettings
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])
 
@@ -23,6 +23,24 @@ def put_settings(req: LLMSettings):
     return {"saved": True, "configured": client.is_configured()}
 
 
+@router.get("/search-settings")
+def get_search_settings():
+    """联网搜索配置（key 掩码）；附带可用性口径供 env-status/设置页展示。"""
+    from llm import client
+    pub = client.get_search_settings_public()
+    ok, reason = client.web_search_available()
+    return pub | {"available": ok, "reason": reason}
+
+
+@router.put("/search-settings")
+def put_search_settings(req: WebSearchSettings):
+    from llm import client
+    pub = client.save_search_settings(
+        req.enabled, (req.provider or "tavily").strip(), req.api_key)
+    ok, reason = client.web_search_available()
+    return {"saved": True, **pub, "available": ok, "reason": reason}
+
+
 @router.post("/test")
 def test_connection():
     from llm import client
@@ -34,8 +52,9 @@ def test_connection():
 def env_status():
     """运行环境能力总览（供前端设置页展示，不触发任何重活）。
 
-    返回 {tree, gnn, graphrag, llm}：各项为 "ok" 或
-    "disabled: <原因>"；llm 为 "configured"/"not_configured"。
+    返回 {tree, gnn, graphrag, llm, search}：各项为 "ok" 或
+    "disabled: <原因>"；llm 为 "configured"/"not_configured"；
+    search 为 "configured"/"disabled: <原因>"（v1.6.0 联网搜索口径）。
     """
     from llm import client
     try:
@@ -44,4 +63,6 @@ def env_status():
         import runtime_config  # type: ignore
     status = runtime_config.capability_status()
     status["llm"] = "configured" if client.is_configured() else "not_configured"
+    ok, reason = client.web_search_available()
+    status["search"] = "configured" if ok else f"disabled: {reason}"
     return status

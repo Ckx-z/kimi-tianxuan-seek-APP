@@ -4,10 +4,10 @@
  * tool_confirm → 写操作二次确认卡（影响说明 + 「确认执行」「取消」按钮）。
  */
 import { useState } from 'react';
-import { ChevronRight, Loader2, Wrench, CircleCheck, CircleAlert, ShieldAlert } from 'lucide-react';
+import { ChevronRight, FileDown, Loader2, Wrench, CircleCheck, CircleAlert, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { ToolEvent } from './api';
+import { researchDocxUrl, type ToolEvent } from './api';
 
 /** 工具名 → 中文标签（未知工具回退原名） */
 const TOOL_LABEL: Record<string, string> = {
@@ -24,6 +24,12 @@ const TOOL_LABEL: Record<string, string> = {
   generate_plan_card: '生成方案卡',
   draft_experiment_record: '起草实验记录',
   query_dft: 'DFT 计算',
+  web_search: '联网搜索',
+  academic_search: '学术检索',
+  fetch_page: '阅读网页',
+  get_monomer_props: '单体性质',
+  cas_resolve: 'CAS 解析',
+  lookup_paper_doi: '文献 DOI 查询',
 };
 
 export type ConfirmDecision = 'confirm' | 'cancel';
@@ -45,7 +51,42 @@ export function ToolEventCard({
   confirmBusy = false,
 }: ToolEventCardProps) {
   const [open, setOpen] = useState(false);
-  const label = TOOL_LABEL[event.name] ?? event.name;
+  const label = TOOL_LABEL[event.name ?? ''] ?? event.name;
+
+  // ---------- 引用核验说明（v1.6.0 critic_note） ----------
+  if (event.type === 'critic_note') {
+    return (
+      <div className="rounded-lg border border-gold/60 bg-gold-muted/50 px-3 py-2 text-xs">
+        <span className="font-medium text-gold-foreground">引用校验</span>
+        <p className="mt-0.5 leading-relaxed text-muted-foreground">
+          {event.text || '系统正在校验回答中的引用…'}
+        </p>
+      </div>
+    );
+  }
+
+  // ---------- 深度研究报告落盘（v1.6.0 research_report） ----------
+  if (event.type === 'research_report') {
+    const rid = event.report_id ?? '';
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-gold/60 bg-gold-muted/50 px-3 py-2 text-xs">
+        <CircleCheck className="h-3.5 w-3.5 shrink-0 text-gold" />
+        <span className="truncate font-medium text-gold-foreground">
+          研究报告已生成：{event.title || rid}
+        </span>
+        {rid && (
+          <a
+            href={researchDocxUrl(rid)}
+            className="ml-auto inline-flex shrink-0 items-center gap-1 rounded border border-gold/40 px-2 py-1 text-gold hover:bg-gold/10"
+            title="下载 Word 版（含参考文献与 DOI）"
+          >
+            <FileDown className="h-3 w-3" />
+            下载 Word
+          </a>
+        )}
+      </div>
+    );
+  }
 
   // ---------- 写操作二次确认卡 ----------
   if (event.type === 'tool_confirm') {
