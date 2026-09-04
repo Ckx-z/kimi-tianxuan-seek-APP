@@ -25,6 +25,7 @@ def _predict_one(ald: str, amine: str, source: str) -> dict:
             "arm": payload.get("tree_model_name") or "",
             "ood": payload.get("ood"),
             "score_policy": payload.get("score_policy"),
+            "score_flags": payload.get("score_flags"),
             "tree_score": payload.get("tree_score"),
             "gnn_score": payload.get("gnn_score"),
         })

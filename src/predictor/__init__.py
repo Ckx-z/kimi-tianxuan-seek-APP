@@ -91,6 +91,15 @@ class FilmPredictor:
         """
         result = {"ald_smiles": ald_smiles, "amine_smiles": amine_smiles}
 
+        # 组合级训练覆盖（v1.6.1）：单体见过不代表组合见过；组合未见时
+        # GNN 外推可信度低，主分口径对 GNN 分量收缩（见 api/deps.headline_score）
+        try:
+            from .pair_pool import pair_seen
+            result["pair_seen"] = pair_seen(ald_smiles, amine_smiles)
+        except Exception as e:
+            result["pair_seen"] = True
+            result["pair_pool_error"] = str(e)
+
         # OOD 检测（三级制；官能团检查不依赖模型，始终执行）
         try:
             from .ood import check_ood

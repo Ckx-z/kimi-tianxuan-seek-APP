@@ -149,27 +149,17 @@ def _log_prediction(record: dict) -> bool:
 
 
 def _headline_score(pred_result: dict) -> tuple[float | None, str | None]:
-    """主分数统一口径（两模型较高值）：主展示分数 = max(路由树模型分, GNN 分)。
+    """主分数统一口径（v1.6.1 保守修订：红线/分歧/外推收缩）。
 
-    返回 (score, source)：source ∈ {"both", "tree", "gnn", None}——
-    两模型均出分时取较高者（source="both"）；仅一方出分时用出分者，
-    由展示层标注来源；都未出分返回 (None, None)，由展示层明确提示。
-
-    属乐观召回口径：高分需结合 OOD 与不确定度判断；OOD=out 时由调用方
-    保证不出分（⛔ 优先于打分）。综合分（两者平均）仅对照展示，不作主分数。
+    与 api.deps 共用 src/predictor/fusion.py（单一事实来源）。返回
+    (score, source)：source ∈ {"both", "tree", "gnn", None}；OOD=out 时由
+    调用方保证不出分（⛔ 优先于打分）。
     """
-    pred_result = pred_result or {}
-    tree = pred_result.get("tree_probability")
-    gnn = pred_result.get("gnn_probability")
-    tree = tree if isinstance(tree, (int, float)) else None
-    gnn = gnn if isinstance(gnn, (int, float)) else None
-    if tree is not None and gnn is not None:
-        return max(tree, gnn), "both"
-    if tree is not None:
-        return tree, "tree"
-    if gnn is not None:
-        return gnn, "gnn"
-    return None, None
+    try:
+        from src.predictor.fusion import headline_score
+    except ImportError:  # pragma: no cover
+        from predictor.fusion import headline_score  # type: ignore
+    return headline_score(pred_result)
 
 
 def _build_log_record(ald_smiles: str, amine_smiles: str, pred_result: dict,
@@ -187,7 +177,7 @@ def _build_log_record(ald_smiles: str, amine_smiles: str, pred_result: dict,
         "ald_smiles": ald_smiles,
         "amine_smiles": amine_smiles,
         "score": None if ood.get("level") == "out" else score,
-        "score_policy": "max_tree_gnn",
+        "score_policy": "max_tree_gnn_redline",
         "tree_score": pred_result.get("tree_probability"),
         "gnn_score": pred_result.get("gnn_probability"),
         "std": pred_result.get("score_std"),
@@ -842,7 +832,7 @@ def _snapshot_payload(pred: dict) -> dict:
         "std": pred.get("score_std"),
         "arm": pred.get("tree_model_name", ""),
         "ood": level,
-        "score_policy": "max_tree_gnn",
+        "score_policy": "max_tree_gnn_redline",
         "tree_score": pred.get("tree_probability"),
         "gnn_score": pred.get("gnn_probability"),
     }
@@ -1742,7 +1732,9 @@ def _snapshot_markdown(fav: dict) -> str:
     score, std, ood_level, date = _fav_snapshot(fav)
     date_txt = f"（{date}）" if date else ""
     snap = fav.get("latest_prediction") or fav.get("prediction_snapshot") or {}
-    policy_txt = ("　口径：两模型较高值"
+    policy_txt = ("　口径：两模型较高值（低交联度红线 + 组合外推收缩）"
+                  if snap.get("score_policy") == "max_tree_gnn_redline"
+                  else "　口径：两模型较高值"
                   if snap.get("score_policy") == "max_tree_gnn" else "")
     if ood_level == "out":
         return f"**最新预测快照**：⛔ OOD 不适用（不出分）{date_txt}"
@@ -1761,8 +1753,14 @@ def _pred_snapshot_markdown(pred: dict) -> str:
     score, _ = _headline_score(pred)
     if not isinstance(score, (int, float)):
         return "*重新打分未出分（两模型均未出分）。*"
+    _nb = ((pred.get("ood") or {}).get("checks") or {}).get("networkability") or {}
+    _nb_d = _nb.get("details") if isinstance(_nb.get("details"), dict) else {}
+    _can_net = bool(_nb_d.get("can_network", _nb.get("can_network", True)))
+    policy_txt = ("口径：低交联度红线（保守收缩）"
+                  if not _can_net
+                  else "口径：两模型较高值")
     return (f"**最新预测快照**：{_big_score_html(score, pred.get('score_std'))}　"
-            f"口径：两模型较高值　OOD：{_ood_label(level)}（刚刚）")
+            f"{policy_txt}　OOD：{_ood_label(level)}（刚刚）")
 
 
 def show_favorite_detail(fid: str):

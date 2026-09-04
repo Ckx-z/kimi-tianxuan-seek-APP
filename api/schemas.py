@@ -34,6 +34,7 @@ class FavoriteCreate(BaseModel):
     std: float | None = None
     ood: str | None = None
     score_policy: str | None = None
+    score_flags: dict | None = None
     tree_score: float | None = None
     gnn_score: float | None = None
 

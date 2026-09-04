@@ -202,6 +202,7 @@ def _snapshot_from_log(ald_smiles: str, amine_smiles: str) -> dict | None:
         "date": str(best.get("timestamp") or ""),
     }
     for k, src in (("score_policy", "score_policy"),
+                   ("score_flags", "score_flags"),
                    ("tree_score", "tree_score"),
                    ("gnn_score", "gnn_score")):
         if best.get(src) is not None:
@@ -574,7 +575,7 @@ def add_favorite(
             "ood": prediction.get("ood", "none") or "none",
             "date": _now_iso(),
         }
-        for k in ("score_policy", "tree_score", "gnn_score"):
+        for k in ("score_policy", "score_flags", "tree_score", "gnn_score"):
             if prediction.get(k) is not None:
                 latest_prediction[k] = prediction[k]
     fav = {
@@ -723,7 +724,7 @@ def update_prediction_snapshot(fav_id: str, prediction: dict) -> dict:
         "ood": prediction.get("ood", ""),
         "date": _now_iso(),
     }
-    for k in ("score_policy", "tree_score", "gnn_score"):
+    for k in ("score_policy", "score_flags", "tree_score", "gnn_score"):
         if prediction.get(k) is not None:
             fav["latest_prediction"][k] = prediction[k]
     return _write(fav)

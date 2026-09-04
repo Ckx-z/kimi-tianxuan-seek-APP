@@ -122,6 +122,46 @@ def check_functional_groups(ald_smiles: str, amine_smiles: str) -> dict:
     }
 
 
+def check_networkability(ald_smiles: str, amine_smiles: str) -> dict:
+    """交联度/成网能力检测（d 类，v1.6.1 红线）：min 官能度不足 → warning。
+
+    COF 亚胺成网必要条件：醛位点数 ≥2 且 胺位点数 ≥2，或任一侧 ≥3 且另一侧
+    ≥1（2D 交联网络需要至少一侧三官能或两侧双官能）。单官能×单官能只能形成
+    端基席夫碱小分子，化学上不可能成膜——命中时主分按保守口径收缩
+    （见 api/deps.headline_score），并给出 warning 提示。
+    位点数复用 functional_group 的 SMARTS 口径（醛基 C(=O)H / 伯胺+仲胺）。
+    """
+    f_ald, f_amine = 0, 0
+    ald_mol = Chem.MolFromSmiles(ald_smiles)
+    if ald_mol is not None:
+        f_ald = len(ald_mol.GetSubstructMatches(_PATTERNS["aldehyde"]))
+    am_mol = Chem.MolFromSmiles(amine_smiles)
+    if am_mol is not None:
+        f_amine = len(am_mol.GetSubstructMatches(_PATTERNS["primary_amine"])) \
+            + len(am_mol.GetSubstructMatches(_PATTERNS["secondary_amine"]))
+
+    can_network = (f_ald >= 2 and f_amine >= 2) \
+        or (f_ald >= 3 and f_amine >= 1) \
+        or (f_amine >= 3 and f_ald >= 1)
+    details = {
+        "n_aldehyde_sites": f_ald,
+        "n_amine_sites": f_amine,
+        "min_functionality": min(f_ald, f_amine),
+        "can_network": can_network,
+    }
+    if can_network:
+        return {"level": LEVEL_NONE, "reasons": [], "details": details}
+    return {
+        "level": LEVEL_WARNING,
+        "reasons": [
+            f"低交联度：醛 {f_ald} 个反应位点 + 胺 {f_amine} 个反应位点，"
+            "不足以形成 2D 交联网络（COF 成膜的必要条件），该组合在化学上"
+            "难以成膜，打分已按保守口径收缩，请勿据此安排成膜实验"
+        ],
+        "details": details,
+    }
+
+
 def check_novelty(ald_smiles: str, amine_smiles: str, pool) -> dict:
     """单体新颖性检测（b 类）。双未见 → warning（与路由臂联动）。
 
@@ -204,9 +244,10 @@ def check_feature_drift(ald_smiles: str, amine_smiles: str,
 
 def check_ood(ald_smiles: str, amine_smiles: str, pool=None,
               envelope: dict | None = None) -> dict:
-    """OOD 综合检测：三类合并，等级取最高，原因合并（中文）。"""
+    """OOD 综合检测：四类合并，等级取最高，原因合并（中文）。"""
     checks = {
         "functional_group": check_functional_groups(ald_smiles, amine_smiles),
+        "networkability": check_networkability(ald_smiles, amine_smiles),
         "novelty": check_novelty(ald_smiles, amine_smiles, pool),
         "feature_drift": check_feature_drift(ald_smiles, amine_smiles, envelope),
     }

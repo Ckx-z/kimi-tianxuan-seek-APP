@@ -237,6 +237,7 @@ export default function Query() {
         std: result?.tree_std ?? undefined,
         ood: result?.ood?.level,
         score_policy: result?.score_policy,
+        score_flags: result?.score_flags,
         tree_score: result?.tree_score ?? undefined,
         gnn_score: result?.gnn_score ?? undefined,
       });

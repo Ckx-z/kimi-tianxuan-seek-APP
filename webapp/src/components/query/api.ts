@@ -44,6 +44,12 @@ export interface PredictResult {
   score: number | null;
   score_policy: string;
   score_source?: string;
+  /** v1.6.1 主分决策标志：redline 低交联度 / divergence 模型分歧 / gnn_pair_unseen 组合未见 */
+  score_flags?: {
+    redline?: boolean;
+    divergence?: boolean;
+    gnn_pair_unseen?: boolean;
+  };
   tree_score: number | null;
   tree_std: number | null;
   tree_model_name?: string | null;
@@ -182,6 +188,7 @@ export const createFavorite = async (payload: {
   std?: number | null;
   ood?: string;
   score_policy?: string;
+  score_flags?: { redline?: boolean; divergence?: boolean; gnn_pair_unseen?: boolean };
   tree_score?: number | null;
   gnn_score?: number | null;
 }): Promise<unknown> => {

@@ -647,13 +647,13 @@ class TestMainScoreContract:
     def test_snapshot_payload_is_max_with_policy(self):
         payload = gradio_app._snapshot_payload(self._pred("A", "B"))
         assert payload["score"] == 0.90
-        assert payload["score_policy"] == "max_tree_gnn"
+        assert payload["score_policy"] == "max_tree_gnn_redline"
         assert payload["tree_score"] == 0.30 and payload["gnn_score"] == 0.90
 
     def test_log_record_is_max_with_policy(self):
         rec = gradio_app._build_log_record("A", "B", self._pred("A", "B"), "single")
         assert rec["score"] == 0.90
-        assert rec["score_policy"] == "max_tree_gnn"
+        assert rec["score_policy"] == "max_tree_gnn_redline"
         assert rec["tree_score"] == 0.30 and rec["gnn_score"] == 0.90
 
     def test_log_record_ood_out_null_score(self):

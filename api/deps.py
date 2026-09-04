@@ -29,22 +29,15 @@ def get_predictor():
 
 
 def headline_score(pred_result: dict) -> tuple[float | None, str | None]:
-    """主分数 = max(路由树模型分, GNN 分)（D29 口径，与 gradio_app 一致）。
+    """主分数（v1.6.1 保守口径：红线/分歧/外推收缩，见 src/predictor/fusion.py）。"""
+    from predictor.fusion import headline_score as _hs
+    return _hs(pred_result)
 
-    返回 (score, source)，source ∈ {"both", "tree", "gnn", None}。
-    """
-    pred_result = pred_result or {}
-    tree = pred_result.get("tree_probability")
-    gnn = pred_result.get("gnn_probability")
-    tree = tree if isinstance(tree, (int, float)) else None
-    gnn = gnn if isinstance(gnn, (int, float)) else None
-    if tree is not None and gnn is not None:
-        return max(tree, gnn), "both"
-    if tree is not None:
-        return tree, "tree"
-    if gnn is not None:
-        return gnn, "gnn"
-    return None, None
+
+def _score_flags(pred_result: dict) -> dict:
+    """主分决策标志（红/分歧/外推收缩），随 payload 透出供前端展示。"""
+    from predictor.fusion import score_flags
+    return score_flags(pred_result)
 
 
 def build_prediction_payload(ald_smiles: str, amine_smiles: str,
@@ -58,12 +51,14 @@ def build_prediction_payload(ald_smiles: str, amine_smiles: str,
     ood = (pred_result or {}).get("ood") or {}
     ood_out = ood.get("level") == "out"
     score, score_source = headline_score(pred_result)
+    flags = _score_flags(pred_result)
     return {
         "ald_smiles": ald_smiles,
         "amine_smiles": amine_smiles,
         "score": None if ood_out else score,
         "score_source": score_source,
-        "score_policy": "max_tree_gnn",
+        "score_policy": "max_tree_gnn_redline",
+        "score_flags": flags,
         "tree_score": None if ood_out else pred_result.get("tree_probability"),
         "tree_std": None if ood_out else pred_result.get("tree_std"),
         "tree_model_name": pred_result.get("tree_model_name"),
@@ -87,6 +82,7 @@ def log_prediction(payload: dict) -> None:
             "amine_smiles": payload["amine_smiles"],
             "score": payload["score"],
             "score_policy": payload["score_policy"],
+            "score_flags": payload.get("score_flags") or {},
             "tree_score": payload["tree_score"],
             "gnn_score": payload["gnn_score"],
             "std": payload.get("tree_std"),

@@ -94,11 +94,23 @@ export default function ResultCard({ result, loading }: Props) {
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center justify-between gap-2">
           <span>打分结果</span>
-          {result.score_policy === 'max_tree_gnn' && (
-            <span className="text-xs font-normal text-muted-foreground">
-              取分策略 score_policy=max_tree_gnn（两模型较高值）
-            </span>
-          )}
+          <span className="text-xs font-normal text-muted-foreground">
+            {result.score_policy === 'max_tree_gnn'
+              ? '取分策略 max_tree_gnn（两模型较高值）'
+              : result.score_policy === 'max_tree_gnn_redline'
+                ? '取分策略 max_tree_gnn_redline（低交联度红线 + 组合外推收缩）'
+                : `取分策略 ${result.score_policy}`}
+            {result.score_flags?.divergence && (
+              <span className="ml-2 text-amber-600 dark:text-amber-400">
+                ⚠ 两模型分歧较大，已按保守口径取分
+              </span>
+            )}
+            {result.score_flags?.gnn_pair_unseen && (
+              <span className="ml-2 text-amber-600 dark:text-amber-400">
+                ⚠ 该组合未在训练集中出现，GNN 分已收缩
+              </span>
+            )}
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

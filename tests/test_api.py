@@ -72,7 +72,7 @@ def test_predict_single_contract():
     assert r.status_code == 200
     d = r.json()
     assert d["score"] == 0.65
-    assert d["score_policy"] == "max_tree_gnn"
+    assert d["score_policy"] == "max_tree_gnn_redline"
     assert d["score_source"] == "tree"      # 仅树出分
     assert d["ood"]["level"] == "none"
 
