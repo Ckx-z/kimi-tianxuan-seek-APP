@@ -155,7 +155,7 @@ class TestEnsemble:
 
     def test_ensemble_std_positive(self, ens_predictor):
         r = ens_predictor.predict(TP, PA)
-        assert r["tree_model_name"] == "tree_v4_ens"
+        assert r["tree_model_name"] == "tree_v5_ens"
         assert 0.0 <= r["tree_probability"] <= 1.0
         assert r["score_std"] > 0  # bagging 成员分歧（认知不确定度）
         assert r["tree_std"] == r["score_std"]

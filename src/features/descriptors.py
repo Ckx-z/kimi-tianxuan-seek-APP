@@ -40,6 +40,28 @@ def _get_reactive_sites(smiles: str, role: str = "aldehyde") -> int:
         return 1
 
 
+# 成网能力特征用的精确官能度（v1.6.1 阶段二，与 src/predictor/ood.py 同口径）：
+# 醛基 [CX3H](=O)（排除酮/羧酸/酰胺）；胺 = 伯胺+仲胺（排除酰胺/硝基）
+_PATT_ALDEHYDE_ACC = Chem.MolFromSmarts("[CX3H](=O)")
+_PATT_AMINE_PRI_ACC = Chem.MolFromSmarts("[NX3H2;!$(N[C,S]=O);!$(NO);!$(N=O)]")
+_PATT_AMINE_SEC_ACC = Chem.MolFromSmarts(
+    "[NX3H1;!$(N[C,S]=O);!$(NO);!$(N=O)]([#6])[#6]")
+
+
+def _accurate_functionality(smiles: str, role: str) -> int:
+    """精确官能度：醛侧=醛基 C(=O)H 数；胺侧=伯胺+仲胺数（排除酰胺等）。"""
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return 0
+    try:
+        if role == "aldehyde":
+            return len(mol.GetSubstructMatches(_PATT_ALDEHYDE_ACC))
+        return (len(mol.GetSubstructMatches(_PATT_AMINE_PRI_ACC))
+                + len(mol.GetSubstructMatches(_PATT_AMINE_SEC_ACC)))
+    except Exception:
+        return 0
+
+
 def _safe_ratio(numerator: float, denominator: float) -> float:
     """安全除法，返回比例。"""
     if denominator == 0 or pd.isna(denominator):
@@ -158,6 +180,17 @@ def compute_pair_features(ald_smiles: str, amine_smiles: str,
         "logp_diff": abs(ald.get("logp", 0) - amine.get("logp", 0)),
         "tpsa_diff": abs(ald.get("tpsa", 0) - amine.get("tpsa", 0)),
     }
+
+    # 成网能力特征（v1.6.1 阶段二）：交联度是 COF 成膜的必要条件。
+    # 用精确官能度（排除酮/酰胺误计），不改动既有 n_reactive_sites 语义
+    f_ald_acc = _accurate_functionality(ald_smiles, "aldehyde")
+    f_amine_acc = _accurate_functionality(amine_smiles, "amine")
+    _can_net = (f_ald_acc >= 2 and f_amine_acc >= 2) \
+        or (f_ald_acc >= 3 and f_amine_acc >= 1) \
+        or (f_amine_acc >= 3 and f_ald_acc >= 1)
+    pair_features["min_functionality"] = float(min(f_ald_acc, f_amine_acc))
+    pair_features["max_functionality"] = float(max(f_ald_acc, f_amine_acc))
+    pair_features["can_network"] = 1.0 if _can_net else 0.0
 
     # 3. 醛-胺 Hadamard 交互特征
     interact_features = {}

@@ -21,7 +21,8 @@ except ImportError:  # src/ 直接上 sys.path 的兜底
     import runtime_config  # type: ignore
 
 OLD_PROJECT_ROOT = runtime_config.gnn_project_root()
-DEFAULT_CHECKPOINT = OLD_PROJECT_ROOT / "models" / "v5.3" / "v5_model.pt"
+# v1.6.1 阶段二：切换 v5.4（全局虚拟节点 + 组合级加权 Focal + Isotonic 校准）
+DEFAULT_CHECKPOINT = OLD_PROJECT_ROOT / "models" / "v5.4" / "v5_model.pt"
 # 模块级常量保留以便排查/测试 monkeypatch；None 表示 GNN 环境不可用
 DPHUANJING_PYTHON = runtime_config.gnn_python()
 
@@ -114,7 +115,7 @@ class GNNFilmPredictor:
         return {
             "probability": prob,
             "std": std,
-            "model": "gnn_v5.3",
+            "model": "gnn_v5.4",
         }
 
     def predict(self, ald_smiles: str, amine_smiles: str) -> float:

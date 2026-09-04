@@ -24,9 +24,11 @@ from pathlib import Path
 from .tree_model import MODELS_DIR, TreeFilmPredictor
 
 # 路由资产默认路径（stage15 起切换为 5 种子 bagging 集成，D27：
-# 预测输出 mean ± std，std 作为认知不确定度；单模型 pkl 保留可显式回退）
-POOL_MODEL_PATH = MODELS_DIR / "tree_v4_ens.pkl"
-EXTRAP_MODEL_PATH = MODELS_DIR / "tree_v4_noTE_ens.pkl"
+# 预测输出 mean ± std，std 作为认知不确定度；单模型 pkl 保留可显式回退。
+# v1.6.1 阶段二：切换为 tree_v5（v6 数据 + 成网特征；CV 对比 MAE 0.0260
+# vs v4 基线 0.0306，PR-AUC 持平 0.9895 ≈ 0.9899）
+POOL_MODEL_PATH = MODELS_DIR / "tree_v5_ens.pkl"
+EXTRAP_MODEL_PATH = MODELS_DIR / "tree_v5_noTE_ens.pkl"
 MONOMER_POOL_PATH = MODELS_DIR / "monomer_pool.json"
 
 # 路由键
@@ -37,10 +39,10 @@ ROUTE_BOTH_UNSEEN = "both_unseen"
 
 # 路由原因（中文，供 App 前端展示）
 _ROUTE_REASONS_ZH = {
-    ROUTE_IN_POOL: "已知单体组合 → tree_v4 集成（含历史先验，5 种子 bagging）",
-    ROUTE_ALD_UNSEEN: "含未见单体（醛）但非双未见 → tree_v4 集成（沿用池内模型）",
-    ROUTE_AMINE_UNSEEN: "含未见单体（胺）但非双未见 → tree_v4 集成（沿用池内模型）",
-    ROUTE_BOTH_UNSEEN: "双未见单体（醛/胺均未见）→ tree_v4_noTE 集成（外推模式）",
+    ROUTE_IN_POOL: "已知单体组合 → tree_v5 集成（含历史先验，5 种子 bagging）",
+    ROUTE_ALD_UNSEEN: "含未见单体（醛）但非双未见 → tree_v5 集成（沿用池内模型）",
+    ROUTE_AMINE_UNSEEN: "含未见单体（胺）但非双未见 → tree_v5 集成（沿用池内模型）",
+    ROUTE_BOTH_UNSEEN: "双未见单体（醛/胺均未见）→ tree_v5_noTE 集成（外推模式）",
 }
 
 
