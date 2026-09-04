@@ -2,11 +2,11 @@
 
 > 输入两组单体（醛 / 胺）的 SMILES 或 CAS 号，预测 COF 成膜概率，输出打分理由、化学结构图与实验方案建议。面向课题组实验人员的桌面应用。
 
-- **最新版本**：**v1.5.4** → 📥 [GitHub Release 下载页](https://github.com/Ckx-z/kimi-tianxuan-seek-APP/releases/latest)
+- **最新版本**：**v1.6.0** → 📥 [GitHub Release 下载页](https://github.com/Ckx-z/kimi-tianxuan-seek-APP/releases/latest)
 - **分发形态**：Windows NSIS 安装包，开箱即用，无需安装 Python；支持自动更新（v0.2.5 起端到端可用）
 - **使用文档**：📖 [docs/用户手册.md](docs/用户手册.md)（实验人员）｜📦 [docs/分发说明.md](docs/分发说明.md)（负责转发的同学）
-- **核心能力**：成膜概率预测（tree 模型内置必可用，GNN 可选增强自动降级）+ 打分理由 + OOD 三级判定 + 批量排序 + **DFT 计算（内置 xTB 引擎，二聚体结合能）** + 收藏夹 + 实验记录（草稿/时间线/附件/复盘字段/导出 Word）+ LLM 实验方案卡 + GraphRAG 方案迭代（基于用户实验数据闭环）+ 科研助手 Agent（对话式，9 工具读写闭环 + 记忆编译）+ 文献体系（收藏/引用带真实 DOI 链接，支持 DOI/标题/**PDF 上传**三种录入方式，LLM 提取元数据 + 人工审核入库）
-- **致谢**：本项目（含本次 v1.5.4 更新）由 DeepSeek 协助完成。
+- **核心能力**：成膜概率预测（tree 模型内置必可用，GNN 可选增强自动降级）+ 打分理由 + OOD 三级判定 + 批量排序 + **DFT 计算（内置 xTB 引擎，二聚体结合能）** + 收藏夹 + 实验记录（草稿/时间线/附件/复盘字段/导出 Word）+ LLM 实验方案卡 + GraphRAG 方案迭代（基于用户实验数据闭环）+ 科研助手 Agent（对话式，9 工具读写闭环 + 记忆编译）+ **科研助手深度研究（v1.6.0：联网搜索 / 学术检索 arXiv·PubMed·Semantic Scholar·Crossref / 网页全文阅读 / 计划-检索-批判-报告循环，带 DOI 引用与 Word 导出）+ 引用核验 + 技能方法论 + 按单体组记忆** + 文献体系（收藏/引用带真实 DOI 链接，支持 DOI/标题/**PDF 上传**三种录入方式，LLM 提取元数据 + 人工审核入库）
+- **致谢**：本项目（含本次 v1.6.0 更新）由 DeepSeek 协助完成。
 
 ---
 
