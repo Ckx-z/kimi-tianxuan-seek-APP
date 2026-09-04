@@ -131,7 +131,7 @@ def build_messages(session: dict, user_message: str,
     messages = [{"role": "system",
                  "content": persona.build_system_prompt(
                      context_block,
-                     memory_block=memory_module.injection_block())}]
+                     memory_block=memory_module.injection_block(session))}]
     messages.extend(_history_block(session))
     messages.append({
         "role": "user",
@@ -471,7 +471,7 @@ def _resume_messages(session: dict, name: str, args: dict,
     messages = [{"role": "system",
                  "content": persona.build_system_prompt(
                      context_block,
-                     memory_block=memory_module.injection_block())}]
+                     memory_block=memory_module.injection_block(session))}]
     messages.extend(_history_block(session))
     if rejected:
         brief = json.dumps(args or {}, ensure_ascii=False, default=str)[:300]

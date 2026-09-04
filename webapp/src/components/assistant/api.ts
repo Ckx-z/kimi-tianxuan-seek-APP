@@ -128,13 +128,33 @@ export interface DailyBrief {
   commentary: string | null;
 }
 
-/** GET /nudges 的单条连续失败提醒 */
+/** GET /nudges 的单条提醒（v1.6.0 P2 起分两类） */
 export interface AssistantNudge {
+  /** consecutive_failure=连续失败 | new_mistake=新失误记录 */
+  kind?: 'consecutive_failure' | 'new_mistake';
   favorite_id: string;
   monomers: string;
-  consecutive_failures: number;
+  consecutive_failures?: number;
   latest_mistakes: string;
   suggestion: string;
+  /** new_mistake：触发的记录 id */
+  record_id?: string;
+}
+
+/** 按单体组记忆（v1.6.0 P2）清单条目 */
+export interface PairMemoryMeta {
+  key: string;
+  label: string;
+  updated_at: string;
+  entries: number;
+}
+
+/** 技能（v1.6.0 P2）条目 */
+export interface AssistantSkill {
+  name: string;
+  description: string;
+  enabled: boolean;
+  source: 'user' | 'builtin';
 }
 
 /** 深度研究报告（v1.6.0 P1）列表条目 */
@@ -479,5 +499,32 @@ export const assistantApi = {
       body: { favorite_id: favoriteId },
     });
     return data.nudges ?? [];
+  },
+
+  /** 按单体组记忆清单（v1.6.0 P2） */
+  async pairMemories(): Promise<PairMemoryMeta[]> {
+    const data = await request<{ memories: PairMemoryMeta[] }>('/pair-memories');
+    return data.memories ?? [];
+  },
+
+  /** 删除某组记忆（v1.6.0 P2） */
+  deletePairMemory(key: string): Promise<{ deleted: boolean; key: string }> {
+    return request(`/pair-memories/${encodeURIComponent(key)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /** 技能清单（v1.6.0 P2） */
+  async skills(): Promise<AssistantSkill[]> {
+    const data = await request<{ skills: AssistantSkill[] }>('/skills');
+    return data.skills ?? [];
+  },
+
+  /** 切换技能开关（v1.6.0 P2） */
+  setSkillEnabled(name: string, enabled: boolean): Promise<{ saved: boolean; name: string; skills: AssistantSkill[] }> {
+    return request(`/skills/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: { enabled },
+    });
   },
 };

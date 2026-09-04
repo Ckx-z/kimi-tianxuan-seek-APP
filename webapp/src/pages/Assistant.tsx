@@ -48,10 +48,12 @@ interface LocalMessage extends ChatMessageView {
   id: string;
 }
 
-/** 方案迭代页转入时携带的 location.state 结构 */
+/** 方案迭代页/提醒条转入时携带的 location.state 结构 */
 interface TransferState {
   assistantContext?: AssistantContext;
   openingMessage?: string;
+  /** v1.6.0 P2：直接开启深度研究模式并预填问题 */
+  researchMode?: boolean;
 }
 
 let msgSeq = 0;
@@ -516,14 +518,26 @@ export default function Assistant() {
     await runStream(sid, last.message, activeContext, last.attachments);
   }, [activeId, activeContext, runStream, sendMessage, streaming]);
 
-  // ---------- 方案迭代转入：自动建会话 + 开场消息 ----------
+  // ---------- 转入：深度研究模式（v1.6.0 P2） / 方案迭代自动建会话 ----------
   useEffect(() => {
     if (transferConsumedRef.current) return;
     const state = location.state as TransferState | null;
-    if (!state?.assistantContext || !status?.enabled) return;
+    if (!state || !status?.enabled) return;
     transferConsumedRef.current = true;
     // 清空 state，避免刷新/返回重复触发
     navigate(location.pathname, { replace: true, state: null });
+
+    // P2：提醒条「深度研究」转入 → 开启研究模式 + 预填问题（不自动发送）
+    if (state.researchMode) {
+      setResearchMode(true);
+      if (state.openingMessage?.trim()) {
+        setInput(state.openingMessage.trim());
+        inputRef.current?.focus();
+      }
+      return;
+    }
+    if (!state.assistantContext) return;
+
     const ctx = state.assistantContext;
     const opening = state.openingMessage?.trim() || '我想深入讨论这组单体的迭代建议';
     (async () => {

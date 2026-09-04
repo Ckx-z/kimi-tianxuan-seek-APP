@@ -106,3 +106,37 @@ export const updateAssistantMemory = (body: { enabled?: boolean; content?: strin
 
 export const clearAssistantMemory = () =>
   request<{ cleared: boolean } & AssistantMemoryInfo>('/assistant/memory', { method: 'DELETE' });
+
+/** 按单体组记忆（v1.6.0 P2）清单条目 */
+export interface PairMemoryMeta {
+  key: string;
+  label: string;
+  updated_at: string;
+  entries: number;
+}
+
+export const fetchPairMemories = () =>
+  request<{ memories: PairMemoryMeta[]; count: number }>('/assistant/pair-memories');
+
+export const deletePairMemory = (key: string) =>
+  request<{ deleted: boolean; key: string }>(
+    `/assistant/pair-memories/${encodeURIComponent(key)}`,
+    { method: 'DELETE' },
+  );
+
+/** 技能（v1.6.0 P2）条目 */
+export interface AssistantSkill {
+  name: string;
+  description: string;
+  enabled: boolean;
+  source: 'user' | 'builtin';
+}
+
+export const fetchSkills = () =>
+  request<{ skills: AssistantSkill[]; count: number }>('/assistant/skills');
+
+export const setSkillEnabled = (name: string, enabled: boolean) =>
+  request<{ saved: boolean; name: string; skills: AssistantSkill[] }>(
+    `/assistant/skills/${encodeURIComponent(name)}`,
+    { method: 'PUT', body: JSON.stringify({ enabled }) },
+  );

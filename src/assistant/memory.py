@@ -38,6 +38,11 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 MEMORY_PATH = runtime_config.user_data_root() / "assistant" / "memory.md"
+# 按单体组隔离记忆（v1.6.0 P2）：agent_memory/<pair_key>.md
+PAIR_DIR = runtime_config.user_data_root() / "assistant" / "agent_memory"
+_KEY_RE = re.compile(r"^[A-Za-z0-9_\-]{1,100}$")
+MAX_PAIR_ENTRIES = 60       # 单组记忆条目上限（超出丢弃最旧）
+INJECT_PAIR_ENTRIES = 20    # 开局注入该组最近条数
 
 MAX_ENTRIES = 100       # 超过即触发合并去重（下一次编译前）
 INJECT_ENTRIES = 30     # 开局注入的最近条数
@@ -159,19 +164,181 @@ def append_entries(texts: list[str]) -> int:
 # 开局注入
 # ---------------------------------------------------------------------------
 
-def injection_block() -> str:
-    """system prompt 的「用户记忆」段（最近 INJECT_ENTRIES 条）。
-
-    开关关闭 / 无记忆 / 读取失败 → 空串（不注入）。
-    """
-    if not is_enabled():
-        return ""
+def _global_injection_block() -> str:
+    """全局 memory.md 的「用户记忆」段（最近 INJECT_ENTRIES 条）。"""
     entries = load_entries()[-INJECT_ENTRIES:]
     if not entries:
         return ""
     lines = [f"- [{e['date']}] {e['text']}" for e in entries]
     return ("# 用户记忆（历史会话提炼，供参考；与本轮指令冲突时以本轮为准）\n"
             + "\n".join(lines))
+
+
+def injection_block(session: dict | None = None) -> str:
+    """system prompt 的记忆段 =（可选）该单体组专属记忆 + 全局用户记忆。
+
+    开关关闭 / 无记忆 / 读取失败 → 空串（不注入）。
+    session 提供 context 时优先注入该组的 agent_memory（v1.6.0 P2）。
+    """
+    if not is_enabled():
+        return ""
+    blocks: list[str] = []
+    if isinstance(session, dict):
+        pair = pair_from_context(session.get("context") or {})
+        if pair:
+            key, label = pair
+            content = read_pair_memory(key)
+            entries = _parse_dated_lines(content)[-INJECT_PAIR_ENTRIES:]
+            if entries:
+                lines = [f"- [{e['date']}] {e['text']}" for e in entries]
+                blocks.append(
+                    f"# 「{label}」单体组专属记忆（历史讨论提炼，供参考）\n"
+                    + "\n".join(lines))
+    global_block = _global_injection_block()
+    if global_block:
+        blocks.append(global_block)
+    return "\n\n".join(blocks)
+
+
+# ---------------------------------------------------------------------------
+# 按单体组记忆（v1.6.0 P2）
+# ---------------------------------------------------------------------------
+
+def _clean_smiles(smiles: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]", "", str(smiles or "")).lower()[:40]
+
+
+def _pair_key(ald_cas: str, amine_cas: str,
+              ald_smiles: str, amine_smiles: str) -> str | None:
+    """组 key：优先双 CAS（可读可查），否则 SMILES 摘要；非法字符已过滤。"""
+    if ald_cas and amine_cas:
+        key = f"{ald_cas}_{amine_cas}"
+    elif ald_smiles and amine_smiles:
+        key = f"smiles_{_clean_smiles(ald_smiles)}_{_clean_smiles(amine_smiles)}"
+    else:
+        return None
+    return key if _KEY_RE.match(key) else None
+
+
+def pair_from_context(context: dict) -> tuple[str, str] | None:
+    """会话 context → (pair_key, 展示名)；无法定位单体组返回 None。
+
+    context 可用 favorite_id（查收藏拿醛/胺）或直接 ald_cas/amine_cas/
+    ald_smiles/amine_smiles。任何一步失败静默返回 None（不影响对话）。
+    """
+    context = context if isinstance(context, dict) else {}
+    fav = None
+    fid = str(context.get("favorite_id") or "").strip()
+    if fid:
+        try:
+            from src.favorites import store as fav_store
+        except ImportError:  # pragma: no cover
+            from favorites import store as fav_store  # type: ignore
+        try:
+            fav = fav_store.get_favorite(fid)
+        except Exception as exc:
+            logger.warning("按组记忆查收藏失败（已跳过）: %s", exc)
+    ald = (fav or {}).get("aldehyde") if isinstance(fav, dict) else {}
+    amine = (fav or {}).get("amine") if isinstance(fav, dict) else {}
+    if not isinstance(ald, dict):
+        ald = {}
+    if not isinstance(amine, dict):
+        amine = {}
+    ald_cas = str(ald.get("cas") or context.get("ald_cas") or "").strip()
+    amine_cas = str(amine.get("cas") or context.get("amine_cas") or "").strip()
+    ald_smiles = str(ald.get("smiles") or context.get("ald_smiles") or "").strip()
+    amine_smiles = str(amine.get("smiles") or
+                       context.get("amine_smiles") or "").strip()
+    key = _pair_key(ald_cas, amine_cas, ald_smiles, amine_smiles)
+    if not key:
+        return None
+    a = ald.get("name") or ald_cas or "醛"
+    b = amine.get("name") or amine_cas or "胺"
+    return key, f"{a} + {b}"
+
+
+def _pair_path(key: str) -> Path:
+    return PAIR_DIR / f"{key}.md"
+
+
+def read_pair_memory(key: str) -> str:
+    """读某组记忆原文；key 非法或不存在返回空串。"""
+    if not _KEY_RE.match(key or ""):
+        return ""
+    try:
+        p = _pair_path(key)
+        return p.read_text(encoding="utf-8") if p.is_file() else ""
+    except Exception as exc:
+        logger.warning("按组记忆读取失败 %s: %s", key, exc)
+        return ""
+
+
+def _parse_dated_lines(content: str) -> list[dict]:
+    out: list[dict] = []
+    for line in (content or "").splitlines():
+        m = _ENTRY_RE.match(line.strip())
+        if m and m.group(2).strip():
+            out.append({"date": m.group(1), "text": m.group(2).strip()})
+    return out
+
+
+def append_pair_memory(key: str, label: str, texts: list[str]) -> int:
+    """向某组记忆追加条目（带日期 + 首行 label 注释），返回追加条数。"""
+    if not _KEY_RE.match(key or ""):
+        return 0
+    items = [t.strip() for t in texts if isinstance(t, str) and t.strip()]
+    if not items:
+        return 0
+    PAIR_DIR.mkdir(parents=True, exist_ok=True)
+    path = _pair_path(key)
+    existing = read_pair_memory(key)
+    entries = _parse_dated_lines(existing)
+    date = _today()
+    entries += [{"date": date, "text": t} for t in items]
+    if len(entries) > MAX_PAIR_ENTRIES:
+        entries = entries[-MAX_PAIR_ENTRIES:]  # 丢弃最旧
+    header = f"# label: {label}\n" if label else ""
+    body = header + "".join(f"- [{e['date']}] {e['text']}\n" for e in entries)
+    path.write_text(body, encoding="utf-8")
+    return len(items)
+
+
+def list_pair_memories() -> list[dict]:
+    """全部按组记忆清单 [{key, label, updated_at, entries}]（新→旧）。"""
+    out: list[dict] = []
+    if not PAIR_DIR.is_dir():
+        return out
+    for p in PAIR_DIR.glob("*.md"):
+        if not _KEY_RE.match(p.stem):
+            continue
+        content = read_pair_memory(p.stem)
+        entries = _parse_dated_lines(content)
+        label = ""
+        for line in content.splitlines()[:3]:
+            m = re.match(r"^#\s*label:\s*(.*)$", line.strip())
+            if m:
+                label = m.group(1).strip()
+                break
+        try:
+            updated = datetime.fromtimestamp(p.stat().st_mtime).astimezone() \
+                .isoformat(timespec="seconds")
+        except OSError:
+            updated = ""
+        out.append({"key": p.stem, "label": label or p.stem,
+                    "updated_at": updated, "entries": len(entries)})
+    out.sort(key=lambda x: x["updated_at"], reverse=True)
+    return out
+
+
+def clear_pair_memory(key: str) -> bool:
+    """删除某组记忆文件；key 非法/不存在返回 False。"""
+    if not _KEY_RE.match(key or ""):
+        return False
+    p = _pair_path(key)
+    if not p.is_file():
+        return False
+    p.unlink()
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +437,16 @@ def compile_session(session: dict, *, force: bool = False) -> int:
                 write_text("".join(
                     f"- [{e['date']}] {e['text']}\n" for e in merged))
                 logger.info("记忆合并去重：%d → %d 条", len(entries), len(merged))
-        return append_entries(items)
+        appended = append_entries(items)
+        # v1.6.0 P2：同批要点按会话所在单体组镜像一份（组专属记忆）
+        pair = pair_from_context(session.get("context") or {})
+        if appended and pair:
+            key, label = pair
+            try:
+                append_pair_memory(key, label, items)
+            except Exception as exc:
+                logger.warning("按组记忆追加失败（已跳过）: %s", exc)
+        return appended
     except Exception as exc:  # 兜底：编译绝不拖垮对话
         logger.warning("记忆编译失败（已跳过）: %s", exc)
         return 0

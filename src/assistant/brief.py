@@ -415,6 +415,7 @@ def compute_failure_nudges() -> list[dict]:
             or ""
         )
         nudges.append({
+            "kind": "consecutive_failure",
             "favorite_id": fid,
             "monomers": monomers,
             "consecutive_failures": streak,
@@ -427,6 +428,49 @@ def compute_failure_nudges() -> list[dict]:
         })
     nudges.sort(key=lambda n: (-n["consecutive_failures"], n["favorite_id"]))
     return nudges
+
+
+def compute_new_mistake_nudges() -> list[dict]:
+    """新失误记录提醒（v1.6.0 P2）：今天（文件 mtime）更新了 mistakes 字段的
+    正式记录 → 提醒复盘/深度研究；同日同收藏经 dismiss 只提醒一次。"""
+    try:
+        recs_with_mtime = _records_with_mtime()
+        fav_store = _fav_store()
+    except Exception as exc:
+        logger.warning("失误提醒读取数据失败: %s", exc)
+        return []
+    out: list[dict] = []
+    for rec, mdate in recs_with_mtime:
+        if mdate != _today():
+            continue
+        if str(rec.get("status") or "") == "draft":
+            continue
+        mistakes = str(rec.get("mistakes") or "").strip()
+        if not mistakes:
+            continue
+        fid = str(rec.get("favorite_id") or "")
+        if not fid:
+            continue
+        monomers = _record_label(rec)
+        try:
+            fav = fav_store.get_favorite(fid)
+            if fav:
+                monomers = _fav_label(fav)
+        except Exception:
+            pass
+        out.append({
+            "kind": "new_mistake",
+            "favorite_id": fid,
+            "record_id": rec.get("record_id"),
+            "monomers": monomers,
+            "latest_mistakes": _cut(mistakes),
+            "suggestion": (
+                f"「{monomers}」最近一次实验填写了失误记录。建议复盘这组的"
+                "历史讨论，或发起一次深度研究做失败归因。"
+            ),
+        })
+    out.sort(key=lambda n: n["favorite_id"])
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -473,8 +517,10 @@ def dismiss_nudge(favorite_id: str, date: str | None = None) -> None:
 
 
 def list_nudges(date: str | None = None) -> list[dict]:
-    """当日应展示的提醒列表：全量命中 − 当日已 dismiss。"""
+    """当日应展示的提醒列表：连续失败 + 新失误记录（v1.6.0 P2），
+    已 dismiss 的收藏当日过滤。"""
     target = (date or "").strip() or _today()
     dismissed = _dismissed_ids(target)
-    return [n for n in compute_failure_nudges()
-            if n["favorite_id"] not in dismissed]
+    merged = compute_failure_nudges() + compute_new_mistake_nudges()
+    # 同收藏可能两类提醒并存：dismiss 按 favorite_id 记，两类同隐
+    return [n for n in merged if n["favorite_id"] not in dismissed]

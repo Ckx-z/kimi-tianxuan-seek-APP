@@ -47,10 +47,16 @@ import {
   clearAssistantMemory,
   fetchSearchSettings,
   saveSearchSettings,
+  fetchPairMemories,
+  deletePairMemory,
+  fetchSkills,
+  setSkillEnabled,
   type LlmSettings,
   type HealthInfo,
   type AssistantMemoryInfo,
   type WebSearchSettings,
+  type PairMemoryMeta,
+  type AssistantSkill,
 } from '@/components/settings/api';
 
 /** 配置来源中文标签 */
@@ -391,11 +397,17 @@ function AssistantMemoryCard({ offline }: { offline: boolean }) {
   const [savingContent, setSavingContent] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
+  // v1.6.0 P2：按单体组记忆 + 技能
+  const [pairMems, setPairMems] = useState<PairMemoryMeta[]>([]);
+  const [skills, setSkills] = useState<AssistantSkill[]>([]);
+  const [skillBusy, setSkillBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setInfo(await fetchAssistantMemory());
+      setPairMems((await fetchPairMemories()).memories ?? []);
+      setSkills((await fetchSkills()).skills ?? []);
     } catch {
       /* 离线或失败：api 层已处理 */
     } finally {
@@ -514,6 +526,91 @@ function AssistantMemoryCard({ offline }: { offline: boolean }) {
                 <Trash2 className="mr-1.5 h-4 w-4" />
                 清空记忆
               </Button>
+            </div>
+
+            {/* 按单体组记忆（v1.6.0 P2） */}
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+              <div className="text-sm font-medium text-foreground">
+                按单体组记忆
+                <span className="ml-1.5 text-xs text-muted-foreground">
+                  （讨论该组时自动注入该组专属记忆）
+                </span>
+              </div>
+              {pairMems.length === 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  暂无。在科研助手讨论具体单体组后自动生成。
+                </p>
+              ) : (
+                <ul className="mt-1.5 space-y-1">
+                  {pairMems.map((m) => (
+                    <li key={m.key} className="flex items-center gap-2 text-xs">
+                      <span className="min-w-0 flex-1 truncate text-foreground/90"
+                            title={m.key}>
+                        {m.label}
+                        <span className="ml-1.5 text-muted-foreground">
+                          {m.entries} 条 · {(m.updated_at || '').slice(0, 10)}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        title="清除该组记忆"
+                        className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
+                        onClick={async () => {
+                          try {
+                            await deletePairMemory(m.key);
+                            setPairMems((prev) =>
+                              prev.filter((x) => x.key !== m.key));
+                            toast.success('已清除该组记忆');
+                          } catch {
+                            /* 已 toast */
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* 技能（v1.6.0 P2 SKILLS） */}
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+              <div className="text-sm font-medium text-foreground">
+                助手技能
+                <span className="ml-1.5 text-xs text-muted-foreground">
+                  （方法论开关；可在用户数据目录 skills/ 放同名 md 覆盖）
+                </span>
+              </div>
+              <ul className="mt-1.5 space-y-1.5">
+                {skills.map((s) => (
+                  <li key={s.name} className="flex items-center gap-2 text-xs">
+                    <span className="min-w-0 flex-1">
+                      <span className="text-foreground/90">{s.name}</span>
+                      <span className="block truncate text-muted-foreground"
+                            title={s.description}>
+                        {s.description}
+                      </span>
+                    </span>
+                    <Switch
+                      checked={s.enabled}
+                      disabled={skillBusy === s.name}
+                      onCheckedChange={async (v) => {
+                        setSkillBusy(s.name);
+                        try {
+                          const res = await setSkillEnabled(s.name, v);
+                          setSkills(res.skills ?? skills);
+                        } catch {
+                          /* 已 toast */
+                        } finally {
+                          setSkillBusy(null);
+                        }
+                      }}
+                      aria-label={`技能 ${s.name} 开关`}
+                    />
+                  </li>
+                ))}
+              </ul>
             </div>
           </>
         )}

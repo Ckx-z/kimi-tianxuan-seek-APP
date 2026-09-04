@@ -180,6 +180,11 @@ class AssistantNudgeDismiss(BaseModel):
     favorite_id: str = Field(..., description="被 dismiss 的收藏条目 ID")
 
 
+class AssistantSkillUpdate(BaseModel):
+    """技能开关（v1.6.0 P2）：enabled 覆盖 frontmatter 默认值。"""
+    enabled: bool = Field(..., description="启用/停用该技能")
+
+
 class AssistantResearchRequest(BaseModel):
     """深度研究（v1.6.0 P1）：复杂问题走 plan→execute→critic→report。"""
     question: str = Field(..., description="研究问题（自然语言，复杂问题）")

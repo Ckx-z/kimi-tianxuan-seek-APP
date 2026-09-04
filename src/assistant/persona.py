@@ -53,18 +53,26 @@ def _render_identity(raw: str, agent_name: str = "ming",
 def build_system_prompt(context_block: str = "", memory_block: str = "") -> str:
     """拼装完整 system prompt。
 
-    层序：ming 身份卡 → ming 人格定义 → 领域规则 →（可选）用户记忆 →
-    （可选）当前上下文块。记忆层在领域纪律之后、工具说明（路径 B 的
-    计划提示 / 路径 A 的 tools 参数）之前。任一资源缺失跳过该层；
-    人格与规则同时缺失时启用内置兜底规则。
+    层序：ming 身份卡 → ming 人格定义 → 领域规则 → 技能（SKILLS，v1.6.0）
+    →（可选）用户记忆 →（可选）当前上下文块。记忆层在领域纪律之后、
+    工具说明（路径 B 的计划提示 / 路径 A 的 tools 参数）之前。任一资源
+    缺失跳过该层；人格与规则同时缺失时启用内置兜底规则。
     """
     identity = _render_identity(_load("ming_identity.md"))
     ishiki = _load("ming_ishiki.md")
     rules = _load("domain_rules.md")
+    try:
+        from . import skills as skills_module  # noqa: PLC0415
+        skills_text = skills_module.skills_block()
+    except Exception as exc:  # 技能加载失败绝不拖垮人格层
+        logger.warning("技能段加载失败（已跳过）: %s", exc)
+        skills_text = ""
 
     parts = [p for p in (identity, ishiki, rules) if p]
     if not rules:
         parts.append(_FALLBACK_RULES)
+    if skills_text.strip():
+        parts.append(skills_text.strip())
     if memory_block.strip():
         parts.append(memory_block.strip())
     if context_block.strip():

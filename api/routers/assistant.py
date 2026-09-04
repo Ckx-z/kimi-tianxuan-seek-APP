@@ -37,7 +37,7 @@ from fastapi.responses import StreamingResponse
 from ..schemas import (AssistantChatRequest, AssistantConfirmRequest,
                        AssistantMemoryUpdate, AssistantNudgeDismiss,
                        AssistantResearchRequest, AssistantSessionCreate,
-                       AssistantSessionRename)
+                       AssistantSessionRename, AssistantSkillUpdate)
 
 logger = logging.getLogger(__name__)
 
@@ -368,6 +368,62 @@ def delete_memory():
     _a, _c, _l, _loop, memory, _r, _s = _imports()
     memory.clear()
     return {"cleared": True} | _memory_payload(memory)
+
+
+# ---------------------------------------------------------------------------
+# 按单体组记忆（v1.6.0 P2）+ 技能（SKILLS）
+# ---------------------------------------------------------------------------
+
+@router.get("/pair-memories")
+def list_pair_memories():
+    """按单体组记忆清单（key/label/updated_at/entries，新→旧）。"""
+    _a, _c, _l, _loop, memory, _r, _s = _imports()
+    memories = memory.list_pair_memories()
+    return {"memories": memories, "count": len(memories)}
+
+
+@router.get("/pair-memories/{key}")
+def get_pair_memory(key: str):
+    """某组记忆原文（含 label 头与日期条目）。"""
+    _a, _c, _l, _loop, memory, _r, _s = _imports()
+    content = memory.read_pair_memory(key)
+    if not content and not memory._KEY_RE.match(key or ""):
+        raise HTTPException(400, f"key 格式非法: {key!r}")
+    if not content:
+        raise HTTPException(404, f"单体组记忆不存在: {key}")
+    label = key
+    for line in content.splitlines()[:3]:
+        if line.strip().startswith("# label:"):
+            label = line.split(":", 1)[1].strip()
+            break
+    return {"key": key, "label": label, "content": content}
+
+
+@router.delete("/pair-memories/{key}")
+def delete_pair_memory(key: str):
+    """删除某组记忆（物理删除文件；key 格式校验防路径穿越）。"""
+    _a, _c, _l, _loop, memory, _r, _s = _imports()
+    if not memory.clear_pair_memory(key):
+        raise HTTPException(404, f"单体组记忆不存在: {key}")
+    return {"deleted": True, "key": key}
+
+
+@router.get("/skills")
+def list_skills():
+    """技能清单（v1.6.0 P2）：{name, description, enabled, source}。"""
+    from src.assistant import skills as skills_module
+    skills = skills_module.list_skills()
+    return {"skills": skills, "count": len(skills)}
+
+
+@router.put("/skills/{name}")
+def set_skill_enabled(name: str, req: AssistantSkillUpdate):
+    """切换技能开关（写 skills.local.json，改后下次对话即生效）。"""
+    from src.assistant import skills as skills_module
+    if not skills_module.set_enabled(name, req.enabled):
+        raise HTTPException(404, f"技能不存在: {name}")
+    return {"saved": True, "name": name,
+            "skills": skills_module.list_skills()}
 
 
 @router.post("/sessions/{session_id}/compile-memory")
