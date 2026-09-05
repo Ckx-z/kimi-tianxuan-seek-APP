@@ -8,6 +8,11 @@ is_film>0 的样本列入噪声清单；不满足且 is_film==0 为合法负样�
     python scripts/audit_film_labels.py                     # 只出报告
     python scripts/audit_film_labels.py --fix --out data/interim/v6_train_stage1.csv
                                                             # 噪声标签改 0 并写 v6 CSV
+
+注意（v1.6.1 阶段三）：--fix 会把「SMILES 解析失败」的行按官能度 0 处理
+并翻成 0——这会误伤 TFPT（三嗪三醛）等真实成膜行。--fix 之后必须再跑
+    python scripts/fix_tfpt_labels.py
+恢复 TFPT 行标签并修正其 SMILES（幂等，金标准评估依赖该顺序）。
 """
 
 from __future__ import annotations

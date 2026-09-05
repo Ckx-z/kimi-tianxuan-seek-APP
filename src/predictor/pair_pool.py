@@ -4,9 +4,10 @@
 组合未见时 GNN 外推可信度低——FilmPredictor 会标记 pair_seen=False，
 主分口径对 GNN 分量做收缩（见 api/deps.headline_score）。
 
-数据源：data/interim/v5_train_stage1_cond_filled.csv（打包时已随 datas 携带，
-frozen 下同样可读）。加载惰性 + 常驻内存；读取失败降级为「视为见过」
-（不收缩，绝不因此阻塞打分主流程）。
+数据源：data/interim/v6_train_stage1.csv（阶段三起与 tree_v5 实际训练集
+同口径：613 行噪声标签修复 + 600 条硬负样本 + TFPT 行 SMILES/标签修复；
+打包时已随 datas 携带，frozen 下同样可读）。加载惰性 + 常驻内存；读取
+失败降级为「视为见过」（不收缩，绝不因此阻塞打分主流程）。
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 PAIR_POOL_CSV = runtime_config.resource_root() / "data" / "interim" \
-    / "v5_train_stage1_cond_filled.csv"
+    / "v6_train_stage1.csv"
 
 _pair_set: set | None = None
 _load_failed = False

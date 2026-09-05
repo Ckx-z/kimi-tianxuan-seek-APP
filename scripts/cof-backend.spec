@@ -26,10 +26,31 @@ def _files(pattern: str, dest: str):
     return out
 
 
+def _tree(subdir: str, dest: str):
+    """按目录树收集 .py 文件并保持相对子路径（gnn_runtime 推理运行时用）。
+
+    gnn_runtime/predict_pair.py 按「脚本自身目录 + src/ 子包」布局 import，
+    打包时必须保持 src/screening/... 的目录结构，不能拍平。
+    """
+    out = []
+    base = ROOT / subdir
+    if base.is_dir():
+        for p in sorted(base.rglob("*.py")):
+            if "__pycache__" in p.parts:
+                continue
+            rel = p.relative_to(base).parent.as_posix()
+            out.append((str(p), dest if rel == "." else f"{dest}/{rel}"))
+    return out
+
+
 datas = [
     (r"E:/ANACONDA/Lib/site-packages/xgboost/VERSION", "xgboost"),
-    # 模型资产（树模型路由 + OOD 包络 + 单体池）
+    # 模型资产（树模型路由 + OOD 包络 + 单体池 + GNN v5.4 权重与校准器
+    # models/gnn_v5.4/v5_model.pt、calibrator.pkl 随整目录一并打包）
     (str(ROOT / "models"), "models"),
+    # GNN v5.4 推理运行时（随包分发：predict_pair.py + src 子包；
+    # torch/PyG 解释器 dphuanjing 不随包——缺失时 GNN 分量优雅降级）
+    *[x for x in _tree("gnn_runtime", "gnn_runtime")],
     # 前端静态产物（SPA，挂载 /）
     (str(ROOT / "webapp" / "dist"), "webapp/dist"),
     # 图标与运行时配置模板
@@ -41,6 +62,9 @@ datas = [
     (str(ROOT / "data" / "experimental_refs"), "data/experimental_refs"),
     (str(ROOT / "data" / "plan_templates"), "data/plan_templates"),
     (str(ROOT / "data" / "interim" / "v5_train_stage1_cond_filled.csv"),
+     "data/interim"),
+    # 组合级训练池（pair_pool）：v6 与 tree_v5 实际训练集同口径
+    (str(ROOT / "data" / "interim" / "v6_train_stage1.csv"),
      "data/interim"),
     # minimax GraphRAG 链路：编排器 + bridge 模块（真实 .py，importlib 加载）
     (str(ROOT / "minimax" / "experiment"), "minimax/experiment"),

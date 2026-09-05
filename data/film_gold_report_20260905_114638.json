@@ -1,0 +1,695 @@
+{
+  "metrics": {
+    "evaluated_at": "2026-09-05T11:46:38+08:00",
+    "n_total": 39,
+    "n_scored": 39,
+    "a_min": 0.6660939455032349,
+    "a_pass": true,
+    "c_max": 0.04792307689785957,
+    "c_pass": true,
+    "b_span": [
+      0.6186400000000001,
+      0.68
+    ],
+    "mae": 0.09582116966759166,
+    "mae_pass": true,
+    "spearman": 0.862753036437247,
+    "spearman_pass": true,
+    "elapsed_sec": 166.6
+  },
+  "rows": [
+    {
+      "i": 1,
+      "aldehyde_smiles": "O=Cc1c(O)c(C=O)c(O)c(C=O)c1O",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "A",
+      "label": 1.0,
+      "note": "Tp+对苯二胺，COF 经典组合",
+      "score": 0.7864893674850464,
+      "tree_score": 0.7864893674850464,
+      "gnn_score": 0.8,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 2,
+      "aldehyde_smiles": "O=Cc1c(O)c(C=O)c(O)c(C=O)c1O",
+      "amine_smiles": "Nc1ccc(-c2ccc(N)cc2)cc1",
+      "class": "A",
+      "label": 1.0,
+      "note": "Tp+联苯胺，3×2 刚性",
+      "score": 0.6959910988807678,
+      "tree_score": 0.6959910988807678,
+      "gnn_score": 0.7733,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 3,
+      "aldehyde_smiles": "O=Cc1cc(C=O)cc(C=O)c1",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "A",
+      "label": 1.0,
+      "note": "1,3,5-三甲酰苯+对苯二胺",
+      "score": 0.727411150932312,
+      "tree_score": 0.727411150932312,
+      "gnn_score": 0.86,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 4,
+      "aldehyde_smiles": "O=Cc1cc(C=O)cc(C=O)c1",
+      "amine_smiles": "Nc1ccc(-c2ccc(N)cc2)cc1",
+      "class": "A",
+      "label": 1.0,
+      "note": "1,3,5-三甲酰苯+联苯胺",
+      "score": 0.7700669169425964,
+      "tree_score": 0.7700669169425964,
+      "gnn_score": 0.85,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 5,
+      "aldehyde_smiles": "O=Cc1c(O)c(C=O)c(O)c(C=O)c1O",
+      "amine_smiles": "Nc1ccc(-c2nc(-c3ccc(N)cc3)nc(-c3ccc(N)cc3)n2)cc1",
+      "class": "A",
+      "label": 1.0,
+      "note": "Tp+TAPT，3×3 三嗪胺",
+      "score": 0.6886827945709229,
+      "tree_score": 0.6886827945709229,
+      "gnn_score": 0.7733,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 6,
+      "aldehyde_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "A",
+      "label": 1.0,
+      "note": "TFPT+对苯二胺，三嗪三醛",
+      "score": 0.8656831979751587,
+      "tree_score": 0.8656831979751587,
+      "gnn_score": 0.5,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": false,
+        "divergence": true,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 7,
+      "aldehyde_smiles": "O=Cc1cc(C=O)cc(C=O)c1",
+      "amine_smiles": "Nc1ccc(-c2cc(-c3ccc(N)cc3)cc(-c3ccc(N)cc3)c2)cc1",
+      "class": "A",
+      "label": 1.0,
+      "note": "TFP+TAPB，3×3 苯芯胺",
+      "score": 0.6660939455032349,
+      "tree_score": 0.6660939455032349,
+      "gnn_score": 0.5,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": false,
+        "gnn_pair_unseen": false
+      }
+    },
+    {
+      "i": 8,
+      "aldehyde_smiles": "O=Cc1c(O)c(C=O)c(O)c(C=O)c1O",
+      "amine_smiles": "Nc1ccc2C(=O)c3cc(N)ccc3C(=O)c2c1",
+      "class": "A",
+      "label": 1.0,
+      "note": "Tp+2,6-二氨基蒽醌，3×2 刚性稠环",
+      "score": 0.7695925235748291,
+      "tree_score": 0.7695925235748291,
+      "gnn_score": 0.5,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": true,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 9,
+      "aldehyde_smiles": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+      "amine_smiles": "Nc1ccc(-c2ccc(N)cc2)cc1",
+      "class": "A",
+      "label": 1.0,
+      "note": "TFPT+联苯胺",
+      "score": 0.9410799145698547,
+      "tree_score": 0.9410799145698547,
+      "gnn_score": 0.1217,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": false,
+        "divergence": true,
+        "gnn_pair_unseen": false
+      }
+    },
+    {
+      "i": 10,
+      "aldehyde_smiles": "O=Cc1c(O)c(C=O)c(O)c(C=O)c1O",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "A",
+      "label": 1.0,
+      "note": "Tp+对苯二胺（协议复测）",
+      "score": 0.7864893674850464,
+      "tree_score": 0.7864893674850464,
+      "gnn_score": 0.85,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 11,
+      "aldehyde_smiles": "O=Cc1ccc(C=O)cc1",
+      "amine_smiles": "Nc1ccc(Oc2ccc(N)cc2)cc1",
+      "class": "B",
+      "label": 0.5,
+      "note": "对苯二甲醛+4,4'-氧代二苯胺，2×2 柔性醚桥",
+      "score": 0.63056,
+      "tree_score": 0.004322522319853306,
+      "gnn_score": 0.7882,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": true,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 12,
+      "aldehyde_smiles": "O=CCCCC=O",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "B",
+      "label": 0.5,
+      "note": "戊二醛+对苯二胺，2×2 柔性脂肪醛",
+      "score": 0.6606863737106323,
+      "tree_score": 0.6606863737106323,
+      "gnn_score": 0.1217,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": true,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 13,
+      "aldehyde_smiles": "O=Cc1ccc(C=O)cc1",
+      "amine_smiles": "NCCCCCCN",
+      "class": "C",
+      "label": 0.0,
+      "note": "对苯二甲醛+1,6-己二胺，柔性脂肪胺无结晶成膜性",
+      "score": 0.03368,
+      "tree_score": 0.009035853669047356,
+      "gnn_score": 0.0421,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 14,
+      "aldehyde_smiles": "COc1cc(C=O)c(OC)cc1C=O",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "B",
+      "label": 0.5,
+      "note": "2,5-二甲氧基对苯二甲醛+对苯二胺，2×2 甲氧基位阻",
+      "score": 0.6186400000000001,
+      "tree_score": 0.04178651422262192,
+      "gnn_score": 0.7733,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": true,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 15,
+      "aldehyde_smiles": "O=Cc1ccc(C=O)cc1",
+      "amine_smiles": "Cc1cc(-c2ccc(N)c(C)c2)ccc1N",
+      "class": "B",
+      "label": 0.5,
+      "note": "对苯二甲醛+邻联甲苯胺，2×2 邻位甲基位阻",
+      "score": 0.634357750415802,
+      "tree_score": 0.634357750415802,
+      "gnn_score": 0.7733,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 16,
+      "aldehyde_smiles": "O=Cc1ccc(-c2ccc(C=O)cc2)cc1",
+      "amine_smiles": "Nc1ccc(Oc2ccc(N)cc2)cc1",
+      "class": "B",
+      "label": 0.5,
+      "note": "联苯二甲醛+氧代二苯胺，长链柔性",
+      "score": 0.63056,
+      "tree_score": 0.015147916972637177,
+      "gnn_score": 0.7882,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": true,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 17,
+      "aldehyde_smiles": "O=Cc1ccc(C=O)cc1",
+      "amine_smiles": "NCc1ccc(CN)cc1",
+      "class": "B",
+      "label": 0.5,
+      "note": "对苯二甲醛+对苯二甲胺，CH2 铰链柔性",
+      "score": 0.68,
+      "tree_score": 0.19999448955059052,
+      "gnn_score": 0.85,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": true,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 18,
+      "aldehyde_smiles": "O=Cc1c(O)c(C=O)c(O)c(C=O)c1O",
+      "amine_smiles": "Nc1cccc2cc(N)ccc12",
+      "class": "A",
+      "label": 1.0,
+      "note": "Tp+1,5-二氨基萘，3×2 刚性稠环（β-酮烯胺）",
+      "score": 0.7680518627166748,
+      "tree_score": 0.7680518627166748,
+      "gnn_score": 0.8,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 19,
+      "aldehyde_smiles": "O=Cc1ccc(C=O)cc1",
+      "amine_smiles": "Nc1ccc(Nc2ccc(N)cc2)cc1",
+      "class": "B",
+      "label": 0.5,
+      "note": "对苯二甲醛+4,4'-二氨基二苯胺，2×2 胺桥柔性",
+      "score": 0.68,
+      "tree_score": 0.18649592995643616,
+      "gnn_score": 0.85,
+      "ood_level": "none",
+      "score_flags": {
+        "redline": false,
+        "divergence": true,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 20,
+      "aldehyde_smiles": "O=Cc1ccccc1",
+      "amine_smiles": "Nc1ccccc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲醛+苯胺，单×单不可成网",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.2,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 21,
+      "aldehyde_smiles": "O=Cc1ccccc1",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲醛+对苯二胺，单×双不可成网",
+      "score": 0.026592496782541275,
+      "tree_score": 0.05318499356508255,
+      "gnn_score": 0.1217,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": false
+      }
+    },
+    {
+      "i": 22,
+      "aldehyde_smiles": "O=Cc1ccc(C=O)cc1",
+      "amine_smiles": "Nc1ccccc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "对苯二甲醛+苯胺，双×单不可成网",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.8,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": true,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 23,
+      "aldehyde_smiles": "O=Cc1ccccc1",
+      "amine_smiles": "NCCN",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲醛+乙二胺，单官能醛",
+      "score": 0.00365902716293931,
+      "tree_score": 0.00731805432587862,
+      "gnn_score": 0.1217,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 24,
+      "aldehyde_smiles": "O=Cc1ccccc1",
+      "amine_smiles": "NCc1ccccc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲醛+苄胺，单×单",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.1217,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 25,
+      "aldehyde_smiles": "CC(=O)c1ccccc1",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯乙酮（酮非醛）+对苯二胺",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.0,
+      "ood_level": "out",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      },
+      "ood_out_zeroed": true
+    },
+    {
+      "i": 26,
+      "aldehyde_smiles": "O=C(O)c1ccccc1",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲酸（酸非醛）+对苯二胺",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.0,
+      "ood_level": "out",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      },
+      "ood_out_zeroed": true
+    },
+    {
+      "i": 27,
+      "aldehyde_smiles": "Cc1ccccc1",
+      "amine_smiles": "Nc1ccccc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "甲苯（无醛基）+苯胺",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.0,
+      "ood_level": "out",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      },
+      "ood_out_zeroed": true
+    },
+    {
+      "i": 28,
+      "aldehyde_smiles": "O=Cc1ccccc1",
+      "amine_smiles": "CO",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲醛+甲醇（无胺基）",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.0,
+      "ood_level": "out",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      },
+      "ood_out_zeroed": true
+    },
+    {
+      "i": 29,
+      "aldehyde_smiles": "C1CCCCC1",
+      "amine_smiles": "Nc1ccccc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "环己烷+苯胺",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.0,
+      "ood_level": "out",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      },
+      "ood_out_zeroed": true
+    },
+    {
+      "i": 30,
+      "aldehyde_smiles": "O=Cc1ccccc1",
+      "amine_smiles": "CCN(CC)CC",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲醛+三乙胺（叔胺不成键）",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.0,
+      "ood_level": "out",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      },
+      "ood_out_zeroed": true
+    },
+    {
+      "i": 31,
+      "aldehyde_smiles": "O=Cc1ccc(C=O)cc1",
+      "amine_smiles": "Oc1ccccc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "对苯二甲醛+苯酚（无胺基）",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.0,
+      "ood_level": "out",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      },
+      "ood_out_zeroed": true
+    },
+    {
+      "i": 32,
+      "aldehyde_smiles": "CC=O",
+      "amine_smiles": "CN",
+      "class": "C",
+      "label": 0.0,
+      "note": "乙醛+甲胺，小分子单×单",
+      "score": 0.007520000000000001,
+      "tree_score": 0.0643753856420517,
+      "gnn_score": 0.0188,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 33,
+      "aldehyde_smiles": "O=Cc1ccccc1",
+      "amine_smiles": "CN(C)c1ccccc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲醛+N,N-二甲基苯胺（叔胺）",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.0,
+      "ood_level": "out",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      },
+      "ood_out_zeroed": true
+    },
+    {
+      "i": 34,
+      "aldehyde_smiles": "Oc1ccccc1C=O",
+      "amine_smiles": "Nc1ccccc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "水杨醛+苯胺，单×单",
+      "score": 0.0013921456411480904,
+      "tree_score": 0.0027842912822961807,
+      "gnn_score": 0.2889,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": true,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 35,
+      "aldehyde_smiles": "O=Cc1ccc(O)cc1",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "对羟基苯甲醛（单醛）+对苯二胺",
+      "score": 0.04708688706159592,
+      "tree_score": 0.09417377412319183,
+      "gnn_score": 0.2,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 36,
+      "aldehyde_smiles": "COc1ccc(C=O)cc1",
+      "amine_smiles": "Nc1ccc(N)cc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "茴香醛（单醛）+对苯二胺",
+      "score": 0.04792307689785957,
+      "tree_score": 0.09584615379571915,
+      "gnn_score": 0.1217,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 37,
+      "aldehyde_smiles": "O=Cc1ccccc1",
+      "amine_smiles": "O=Cc1ccccc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲醛+苯甲醛（双侧无胺）",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.0,
+      "ood_level": "out",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      },
+      "ood_out_zeroed": true
+    },
+    {
+      "i": 38,
+      "aldehyde_smiles": "O=Cc1ccccc1",
+      "amine_smiles": "Nc1ccc(C(O)=O)cc1",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲醛+对氨基苯甲酸，单×单",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.0188,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    },
+    {
+      "i": 39,
+      "aldehyde_smiles": "O=Cc1ccccc1",
+      "amine_smiles": "Nc1ccccc1N",
+      "class": "C",
+      "label": 0.0,
+      "note": "苯甲醛+邻苯二胺，单×双不可成网",
+      "score": 0.0,
+      "tree_score": 0.0,
+      "gnn_score": 0.2,
+      "ood_level": "warning",
+      "score_flags": {
+        "redline": true,
+        "divergence": false,
+        "gnn_pair_unseen": true
+      }
+    }
+  ],
+  "gold_version": 2
+}

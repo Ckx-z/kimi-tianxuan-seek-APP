@@ -21,10 +21,35 @@ except ImportError:  # src/ 直接上 sys.path 的兜底
     import runtime_config  # type: ignore
 
 OLD_PROJECT_ROOT = runtime_config.gnn_project_root()
-# v1.6.1 阶段二：切换 v5.4（全局虚拟节点 + 组合级加权 Focal + Isotonic 校准）
-DEFAULT_CHECKPOINT = OLD_PROJECT_ROOT / "models" / "v5.4" / "v5_model.pt"
+# 包内 GNN 运行时（v1.6.1 阶段三：随安装包分发，见 gnn_runtime/ 与
+# models/gnn_v5.4/；PyInstaller spec 已带 datas）
+BUNDLED_RUNTIME_DIR = runtime_config.resource_root() / "gnn_runtime"
+BUNDLED_SCRIPT = BUNDLED_RUNTIME_DIR / "predict_pair.py"
+BUNDLED_CHECKPOINT = runtime_config.resource_root() / "models" / "gnn_v5.4" / "v5_model.pt"
+# 旧项目回退（开发机）：老项目目录里的 v5.4 模型与脚本
+LEGACY_CHECKPOINT = OLD_PROJECT_ROOT / "models" / "v5.4" / "v5_model.pt"
+LEGACY_SCRIPT = OLD_PROJECT_ROOT / "predict_pair.py"
+DEFAULT_CHECKPOINT = BUNDLED_CHECKPOINT if BUNDLED_CHECKPOINT.exists() \
+    else LEGACY_CHECKPOINT
 # 模块级常量保留以便排查/测试 monkeypatch；None 表示 GNN 环境不可用
 DPHUANJING_PYTHON = runtime_config.gnn_python()
+
+
+def _resolve_runtime() -> tuple[Path | None, Path | None]:
+    """解析 GNN 推理运行时 (predict_pair 脚本, checkpoint)。
+
+    优先级：包内 gnn_runtime + 包内模型（随包分发）→ 包内脚本 +
+    旧项目模型（开发机）→ 旧项目脚本 + 旧项目模型。都不可用返回
+    (None, None)，由调用方降级。
+    """
+    if BUNDLED_SCRIPT.is_file():
+        ckpt = BUNDLED_CHECKPOINT if BUNDLED_CHECKPOINT.exists() \
+            else LEGACY_CHECKPOINT
+        if ckpt.exists():
+            return BUNDLED_SCRIPT, ckpt
+    if LEGACY_SCRIPT.is_file() and LEGACY_CHECKPOINT.exists():
+        return LEGACY_SCRIPT, LEGACY_CHECKPOINT
+    return None, None
 
 
 def _find_python() -> Path | None:
@@ -67,8 +92,9 @@ class GNNFilmPredictor:
     def predict_single(self, ald_smiles: str, amine_smiles: str, mc_samples: int = 10) -> dict:
         """预测单个单体对，返回概率 + 不确定性。
 
-        GNN 环境（dphuanjing 解释器 / 旧项目目录）缺失时抛出带明确原因的
-        RuntimeError —— FilmPredictor 会捕获并降级为仅 tree 预测。
+        GNN 环境（dphuanjing 解释器）或运行时（包内 gnn_runtime / 旧项目）
+        缺失时抛出带明确原因的 RuntimeError —— FilmPredictor 会捕获并
+        降级为仅 tree 预测。
         """
         python = _find_python()
         if python is None:
@@ -77,28 +103,29 @@ class GNNFilmPredictor:
                 f"（配置值: {DPHUANJING_PYTHON}）。可通过环境变量 "
                 "COF_GNN_PYTHON 或 config/runtime.local.json 指定；"
                 "未配置时 GNN 分量自动降级，不影响树模型预测。")
-        if not OLD_PROJECT_ROOT.exists():
+        script, checkpoint = _resolve_runtime()
+        if script is None or checkpoint is None:
             raise RuntimeError(
-                f"GNN 不可用：旧项目目录不存在: {OLD_PROJECT_ROOT}。"
-                "可通过环境变量 COF_GNN_PROJECT_ROOT 或 "
-                "config/runtime.local.json 的 gnn_project_root 指定。")
-        if not self.checkpoint_path.exists():
-            raise FileNotFoundError(f"找不到 GNN 模型：{self.checkpoint_path}")
+                "GNN 不可用：未找到 GNN 推理运行时与模型"
+                f"（包内 gnn_runtime/ + models/gnn_v5.4/ 或旧项目目录 "
+                f"{OLD_PROJECT_ROOT}）。GNN 分量自动降级，不影响树模型预测。")
+        if self.checkpoint_path.exists():
+            checkpoint = self.checkpoint_path  # 显式传入的 checkpoint 优先
 
         cmd = [
             str(python),
-            str(OLD_PROJECT_ROOT / "predict_pair.py"),
+            str(script),
             "--ald", ald_smiles,
             "--amine", amine_smiles,
-            "--model", str(self.checkpoint_path),
+            "--model", str(checkpoint),
             "--mc", str(mc_samples),
         ]
 
-        # 在旧项目目录下运行，确保相对路径和 import 正确
+        # 在运行时脚本目录下运行，确保相对路径和 import 正确
         # 捕获字节流后手动解码（UTF-8 优先，GBK 回退）
         result = subprocess.run(
             cmd,
-            cwd=OLD_PROJECT_ROOT,
+            cwd=str(script.parent),
             capture_output=True,
             timeout=120,
         )
