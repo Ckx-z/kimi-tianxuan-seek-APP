@@ -119,6 +119,8 @@ hiddenimports = [
     "literature.resolver", "src.literature.resolver",
     "literature.crossref", "src.literature.crossref",
     "literature.pdf_extract", "src.literature.pdf_extract",
+    # 文献图谱（v1.7.0）：literature.figures 同为路由内惰性 import
+    "literature.figures", "src.literature.figures",
     # 实验记录导出（routers/records.py 内惰性 import；docx → lxml 原生依赖
     # 见下方 binaries）
     "records.store", "src.records.store",
