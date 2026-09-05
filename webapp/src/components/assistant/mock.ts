@@ -11,6 +11,7 @@ import type {
   AssistantMessage,
   AssistantSession,
   AssistantSessionMeta,
+  AssistantSseEvent,
   AssistantStatus,
 } from './api';
 
@@ -186,6 +187,45 @@ export const mockApi = {
     s.title = t;
     s.updated_at = nowIso();
     return { session_id: s.session_id, title: s.title };
+  },
+
+  async deleteSession(sessionId: string): Promise<{ deleted: boolean; session_id: string }> {
+    if (!sessions.delete(sessionId)) throw new Error('会话不存在');
+    return { deleted: true, session_id: sessionId };
+  },
+
+  /** 会话综合报告（mock）：流出一份固定结构报告 */
+  async sessionReportStream(sessionId: string): Promise<ReadableStream<Uint8Array>> {
+    if (!sessions.has(sessionId)) throw new Error('会话不存在');
+    const md = [
+      '# Mock 会话综合报告',
+      '## 研究背景',
+      '演示模式下生成的会话综合报告。',
+      '## 核心发现',
+      '- 发现一；',
+      '- 发现二。',
+      '## 详细分析',
+      '演示内容。',
+      '## 结论与建议',
+      '请切换到真实 LLM 配置后重新生成。',
+      '## 参考文献',
+      '本次对话未产生外部引用。',
+      '## 附录：对话时间线',
+      '- 问/答记录',
+    ].join('\n\n');
+    const events: Array<Record<string, unknown>> = [];
+    for (let i = 0; i < md.length; i += 40) {
+      events.push({ type: 'token', text: md.slice(i, i + 40) });
+    }
+    events.push({
+      type: 'report',
+      report_id: `mock-sessrpt-${Date.now()}`,
+      title: 'Mock 会话综合报告',
+      session_id: sessionId,
+      version: 1,
+    });
+    events.push({ type: 'done' });
+    return streamEvents(events as AssistantSseEvent[]);
   },
 
   async chatStream(body: {

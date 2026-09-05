@@ -26,6 +26,7 @@ import {
 import { FavoritesSection } from '@/components/mine/FavoritesSection';
 import { PlansSection } from '@/components/mine/PlansSection';
 import { LiteratureIntakeSection } from '@/components/mine/LiteratureIntakeSection';
+import { LiteratureFiguresPanel } from '@/components/mine/LiteratureFiguresPanel';
 
 /** 导出备份：打包四类数据为 JSON Blob 下载 */
 async function exportBackup() {
@@ -147,6 +148,12 @@ export default function Mine() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">文献录入</h2>
         <LiteratureIntakeSection />
+      </section>
+
+      {/* 文献图谱（v1.7.0，需求三）：结构图/光谱/机理图上传与画廊 */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">文献图谱</h2>
+        <LiteratureFiguresPanel />
       </section>
 
       {/* 导出实验记录：勾选收藏组 → 分组导出 docx */}

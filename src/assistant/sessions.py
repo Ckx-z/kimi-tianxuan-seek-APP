@@ -95,6 +95,7 @@ def _parse(lines: list[dict], session_id: str) -> dict | None:
         "created_at": meta.get("created_at") or "",
         "updated_at": last_at,
         "messages": messages,
+        "report": meta.get("report"),  # v1.7.0：一对话一报告指针（无则 None）
     }
 
 
@@ -168,10 +169,17 @@ def append_message(session_id: str, role: str, content: str,
     return msg
 
 
+_UNSET = object()
+
+
 def update_meta(session_id: str, title: str | None = None,
-                context: dict | None = None, merge_context: bool = True
-                ) -> dict | None:
-    """更新 meta（标题 / context），整体重写文件。会话不存在返回 None。"""
+                context: dict | None = None, merge_context: bool = True,
+                report=_UNSET) -> dict | None:
+    """更新 meta（标题 / context / report 指针），整体重写文件。
+
+    report：dict（写入指针）或 None（清除指针）；缺省 _UNSET 表示不动。
+    会话不存在返回 None。
+    """
     sess = load_session(session_id)
     if sess is None:
         return None
@@ -185,6 +193,13 @@ def update_meta(session_id: str, title: str | None = None,
         "context": new_context,
         "created_at": sess["created_at"] or _now(),
     }
+    if report is not _UNSET:
+        if isinstance(report, dict) and report:
+            meta["report"] = report
+        else:
+            meta.pop("report", None)
+    elif sess.get("report"):
+        meta["report"] = sess["report"]
     lines = [json.dumps(meta, ensure_ascii=False)]
     for m in sess["messages"]:
         row = {
@@ -198,3 +213,21 @@ def update_meta(session_id: str, title: str | None = None,
         lines.append(json.dumps(row, ensure_ascii=False))
     _path(session_id).write_text("\n".join(lines) + "\n", encoding="utf-8")
     return load_session(session_id)
+
+
+def delete_session(session_id: str) -> bool:
+    """删除会话（v1.7.0）：物理删除 jsonl；uploads/ 附件文件保留不删。
+
+    会话不存在 / id 非法返回 False。
+    """
+    if not _valid_id(session_id):
+        return False
+    path = _path(session_id)
+    if not path.is_file():
+        return False
+    try:
+        path.unlink()
+    except Exception as exc:  # 删除失败（占用等）如实返回 False
+        logger.warning("会话删除失败 %s: %s", session_id, exc)
+        return False
+    return True

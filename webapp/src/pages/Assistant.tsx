@@ -9,8 +9,10 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Bot, CheckCircle2, Circle, FileText, Image as ImageIcon, MessageSquarePlus, Microscope, Paperclip, Pencil, RefreshCw, Send, Settings as SettingsIcon, Trash2, X } from 'lucide-react';
+import { Bot, CheckCircle2, Circle, FilePlus2, FileText, Image as ImageIcon, MessageSquarePlus, Microscope, Paperclip, Pencil, RefreshCw, Send, Settings as SettingsIcon, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -99,6 +101,18 @@ export default function Assistant() {
   const [reportsLoading, setReportsLoading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ResearchReportMeta | null>(null);
 
+  // ---------- v1.7.0：话题删除 + 一对话一报告 ----------
+  /** 待删除会话（二次确认弹窗） */
+  const [pendingSessionDelete, setPendingSessionDelete] = useState<AssistantSessionMeta | null>(null);
+  const [newSessionBusy, setNewSessionBusy] = useState(false);
+  /** 当前会话的报告指针（生成/更新后刷新；切会话时重载） */
+  const [activeReport, setActiveReport] = useState<{ report_id: string; version: number } | null>(null);
+  /** 会话综合报告：流式生成中 + 报告预览弹窗 */
+  const [sessionReportStreaming, setSessionReportStreaming] = useState(false);
+  const [sessionReportOpen, setSessionReportOpen] = useState(false);
+  const [sessionReportMd, setSessionReportMd] = useState('');
+  const [sessionReportError, setSessionReportError] = useState<string | null>(null);
+
   const openReports = useCallback(async () => {
     setReportsOpen(true);
     setReportsLoading(true);
@@ -160,6 +174,8 @@ export default function Assistant() {
     try {
       const detail = await assistantApi.getSession(sessionId);
       setActiveContext(detail.context as AssistantContext | undefined);
+      // v1.7.0：同步一对话一报告指针（生成/更新按钮文案据此切换）
+      setActiveReport(detail.report ?? null);
       setMessages(
         (detail.messages ?? [])
           .filter((m) => m.role === 'user' || m.role === 'assistant')
@@ -344,7 +360,7 @@ export default function Assistant() {
   }, []);
 
   // ---------- 深度研究执行（v1.6.0 P1） ----------
-  const runResearch = useCallback(async (question: string) => {
+  const runResearch = useCallback(async (question: string, sessionId?: string) => {
     setResearchPlan(null);
     setResearchStepDone({});
     const asstId = nextId();
@@ -359,6 +375,7 @@ export default function Assistant() {
       const stream = await assistantApi.researchStream({
         question,
         allow_web: true,
+        session_id: sessionId, // v1.7.0：报告计入该会话综合报告
       });
       for await (const sev of parseSseStream(stream)) {
         if (sev.type === 'plan') {
@@ -426,14 +443,37 @@ export default function Assistant() {
       if ((!message && files.length === 0) || streaming || uploading) return;
       setInput('');
 
-      // 深度研究模式：不走会话流，直接发研究请求
+      // 深度研究模式：走研究流（v1.7.0：先确保会话存在，报告归入会话）
       if (researchMode) {
         if (!message) return;
         setMessages((ms) => [
           ...ms,
           { id: nextId(), role: 'user', content: message },
         ]);
-        await runResearch(message);
+        let sid = activeId;
+        if (!sid) {
+          try {
+            const created = await assistantApi.createSession({
+              title: message.slice(0, 16),
+            });
+            sid = created.session_id;
+            setActiveId(sid);
+          } catch (e) {
+            setMessages((ms) => [
+              ...ms,
+              {
+                id: nextId(),
+                role: 'assistant',
+                content: '',
+                error: e instanceof AssistantUnavailableError
+                  ? '连接中断，请检查网络或后端服务后重试。'
+                  : '创建会话失败，请重试。',
+              },
+            ]);
+            return;
+          }
+        }
+        await runResearch(message, sid);
         return;
       }
 
@@ -499,8 +539,18 @@ export default function Assistant() {
         }
       }
       await runStream(sid, effective, activeContext, metas);
+      // v1.7.0：新建即建档后标题为「新会话」，首条消息自动改标题（以服务端为准）
+      try {
+        const detail = await assistantApi.getSession(sid);
+        if (detail.title === '新会话') {
+          await assistantApi.renameSession(sid, effective.slice(0, 20));
+          await refreshSessions();
+        }
+      } catch {
+        // 自动标题失败不影响对话
+      }
     },
-    [activeId, activeContext, pendingFiles, researchMode, runResearch, runStream, streaming, uploading],
+    [activeId, activeContext, pendingFiles, researchMode, refreshSessions, runResearch, runStream, streaming, uploading],
   );
 
   // 网络中断重试：复用上一条用户消息（含已上传附件的 upload_id），直接重发流
@@ -574,13 +624,90 @@ export default function Assistant() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  const handleNewSession = () => {
-    if (streaming) return;
-    setActiveId(null);
-    setActiveContext(undefined);
-    setMessages([]);
-    setCanRetry(false);
-  };
+  // v1.7.0：新建即建档——空会话立即持久化，刷新不丢失
+  const handleNewSession = useCallback(async () => {
+    if (streaming || newSessionBusy) return;
+    setNewSessionBusy(true);
+    try {
+      const created = await assistantApi.createSession({ title: '新会话' });
+      setActiveId(created.session_id);
+      setActiveContext(undefined);
+      setMessages([]);
+      setCanRetry(false);
+      setResearchPlan(null);
+      setResearchStepDone({});
+      setActiveReport(null);
+      await refreshSessions();
+    } catch (e) {
+      toast.error(
+        e instanceof AssistantUnavailableError
+          ? '连接中断，请检查网络或后端服务后重试。'
+          : e instanceof Error
+            ? e.message
+            : '新建会话失败，请重试。',
+      );
+    } finally {
+      setNewSessionBusy(false);
+    }
+  }, [newSessionBusy, refreshSessions, streaming]);
+
+  // v1.7.0：删除会话（二次确认后）
+  const handleDeleteSession = useCallback(async () => {
+    const target = pendingSessionDelete;
+    if (!target) return;
+    try {
+      await assistantApi.deleteSession(target.session_id);
+      setSessions((prev) => prev.filter((s) => s.session_id !== target.session_id));
+      setPendingSessionDelete(null);
+      toast.success('会话已删除');
+      if (activeId === target.session_id) {
+        await handleNewSession();
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '删除会话失败');
+      setPendingSessionDelete(null);
+    }
+  }, [activeId, handleNewSession, pendingSessionDelete]);
+
+  // v1.7.0：一对话一报告——生成/更新会话综合报告（SSE 流式到预览弹窗）
+  const generateSessionReport = useCallback(async () => {
+    const sid = activeId;
+    if (!sid || sessionReportStreaming || streaming) return;
+    setSessionReportStreaming(true);
+    setSessionReportError(null);
+    setSessionReportMd('');
+    setSessionReportOpen(true);
+    let errored = false;
+    try {
+      const stream = await assistantApi.sessionReportStream(sid);
+      for await (const sev of parseSseStream(stream)) {
+        if (sev.type === 'token') {
+          setSessionReportMd((md) => md + sev.text);
+        } else if (sev.type === 'critic_note') {
+          // 引用核验修正提示：追加到预览（简单追加一行）
+          setSessionReportMd((md) => md + `\n\n> ${sev.text}\n`);
+        } else if (sev.type === 'report') {
+          if (sev.version) {
+            setActiveReport({ report_id: sev.report_id, version: sev.version });
+          }
+        } else if (sev.type === 'error') {
+          setSessionReportError(sev.message);
+          errored = true;
+        }
+      }
+      if (!errored) toast.success('会话综合报告已生成');
+    } catch (e) {
+      setSessionReportError(
+        e instanceof AssistantUnavailableError
+          ? '连接中断，请检查网络或后端服务后重试。'
+          : e instanceof Error
+            ? e.message
+            : '报告生成失败，请重试。',
+      );
+    } finally {
+      setSessionReportStreaming(false);
+    }
+  }, [activeId, sessionReportStreaming, streaming]);
 
   // ---------- 会话重命名（v1.5.4） ----------
   const [renameTarget, setRenameTarget] = useState<AssistantSessionMeta | null>(null);
@@ -694,11 +821,11 @@ export default function Assistant() {
           size="sm"
           variant="outline"
           onClick={handleNewSession}
-          disabled={streaming}
+          disabled={streaming || newSessionBusy}
           className="shrink-0"
         >
           <MessageSquarePlus className="mr-1.5 h-4 w-4" />
-          新建会话
+          {newSessionBusy ? '创建中…' : '新建会话'}
         </Button>
       </div>
 
@@ -728,7 +855,7 @@ export default function Assistant() {
                 type="button"
                 onClick={() => s.session_id !== activeId && !streaming && openSession(s.session_id)}
                 className={cn(
-                  'w-full rounded-lg px-3 py-2 pr-8 text-left text-sm transition-colors',
+                  'w-full rounded-lg px-3 py-2 pr-14 text-left text-sm transition-colors',
                   'max-w-40 truncate md:max-w-none',
                   s.session_id === activeId
                     ? 'bg-accent font-medium text-accent-foreground shadow-[inset_2px_0_0_0_hsl(var(--gold))]'
@@ -755,6 +882,19 @@ export default function Assistant() {
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
+              {/* 删除入口（v1.7.0）：✕ 图标 → 二次确认弹窗 */}
+              <button
+                type="button"
+                title="删除会话"
+                aria-label="删除会话"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!streaming) setPendingSessionDelete(s);
+                }}
+                className="absolute right-7 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
           ))}
         </aside>
@@ -768,6 +908,31 @@ export default function Assistant() {
               {activeContext.favorite_id ? `：收藏 ${activeContext.favorite_id}` : ''}
               {Array.isArray(activeContext.suggestion_ids) &&
                 ` · ${activeContext.suggestion_ids.length} 条迭代建议`}
+            </div>
+          )}
+
+          {/* 一对话一报告工具栏（v1.7.0） */}
+          {activeId && (
+            <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
+              <span className="truncate text-xs text-muted-foreground">
+                {activeReport
+                  ? `本会话综合报告 v${activeReport.version}（更新 = 追加新进展）`
+                  : '综合报告：整合本会话全部问答与深度研究产出'}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void generateSessionReport()}
+                disabled={sessionReportStreaming || streaming}
+                className="shrink-0"
+              >
+                <FilePlus2 className="mr-1.5 h-3.5 w-3.5" />
+                {sessionReportStreaming
+                  ? '生成中…'
+                  : activeReport
+                    ? '更新报告'
+                    : '生成综合报告'}
+              </Button>
             </div>
           )}
 
@@ -955,6 +1120,75 @@ export default function Assistant() {
         </DialogContent>
       </Dialog>
 
+      {/* 删除会话确认（v1.7.0：二次确认） */}
+      <Dialog open={pendingSessionDelete !== null} onOpenChange={(open) => !open && setPendingSessionDelete(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>确认删除该会话？</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            将删除「{pendingSessionDelete?.title ?? ''}」及其全部消息。
+            删除后不可恢复。
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingSessionDelete(null)}>
+              取消
+            </Button>
+            <Button
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => void handleDeleteSession()}
+            >
+              确认删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 会话综合报告预览（v1.7.0：流式生成中可见，完成后可导出 Word） */}
+      <Dialog open={sessionReportOpen} onOpenChange={(open) => !open && !sessionReportStreaming && setSessionReportOpen(false)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              会话综合报告
+              {activeReport ? `（v${activeReport.version}）` : ''}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[65vh] overflow-y-auto rounded-lg border border-border bg-muted/20 p-4">
+            {sessionReportError ? (
+              <p className="text-sm text-destructive">{sessionReportError}</p>
+            ) : sessionReportMd ? (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {sessionReportMd}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {sessionReportStreaming ? '正在整合对话内容…' : '报告为空'}
+              </p>
+            )}
+          </div>
+          {activeReport && (
+            <DialogFooter className="flex-row justify-between">
+              <a
+                href={researchDocxUrl(activeReport.report_id)}
+                className="inline-flex items-center gap-1 rounded border border-gold/40 px-2 py-1 text-xs text-gold hover:bg-gold/10"
+                title="下载 Word 版（含参考文献与 DOI）"
+              >
+                <FileText className="h-3 w-3" />
+                导出 Word
+              </a>
+              <Button
+                variant="outline"
+                onClick={() => setSessionReportOpen(false)}
+              >
+                关闭
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* 研究报告列表弹窗（v1.6.0 P1） */}
       <Dialog open={reportsOpen} onOpenChange={(open) => !open && setReportsOpen(false)}>
         <DialogContent className="max-w-lg">
@@ -983,6 +1217,7 @@ export default function Assistant() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {r.created_at.slice(0, 10)} · {r.ref_count} 条引用
+                      {r.kind === 'session' ? ` · 会话报告 v${r.version ?? ''}` : ''}
                     </p>
                   </div>
                   <a

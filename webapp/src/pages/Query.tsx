@@ -5,7 +5,7 @@
  * 后端未连接时显示降级提示，不白屏。
  */
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -95,6 +95,16 @@ export default function Query() {
   const [moveFolderId, setMoveFolderId] = useState('');
   const [moving, setMoving] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // URL 预填（v1.7.0：文献图谱「导入成膜打分」跳转 ?a=<醛>&b=<胺>）
+  useEffect(() => {
+    const preA = searchParams.get('a');
+    const preB = searchParams.get('b');
+    if (preA) setAld({ smiles: preA, name: '' });
+    if (preB) setAmine({ smiles: preB, name: '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** 当前输入组合是否已收藏（返回收藏条目，未收藏为 null；后端为嵌套单体结构） */
   const matchedFavorite = (() => {

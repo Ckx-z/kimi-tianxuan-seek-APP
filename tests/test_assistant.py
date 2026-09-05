@@ -102,9 +102,11 @@ def test_session_crud_shape(client):
     r = client.get(f"/api/assistant/sessions/{sid}")
     assert r.status_code == 200
     detail = r.json()
-    assert set(detail) == {"session_id", "title", "context", "messages"}
+    assert set(detail) == {"session_id", "title", "context", "messages",
+                           "report"}  # v1.7.0：一对话一报告指针
     assert detail["context"]["favorite_id"] == "fav_x"
     assert detail["messages"] == []
+    assert detail["report"] is None
 
 
 def test_get_session_404(client):

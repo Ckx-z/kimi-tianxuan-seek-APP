@@ -87,6 +87,8 @@ export interface AssistantSession {
   title: string;
   context?: Record<string, unknown>;
   messages: AssistantMessage[];
+  /** v1.7.0：一对话一报告指针（无则 null） */
+  report?: { report_id: string; version: number; updated_at?: string } | null;
 }
 
 /** 会话创建上下文（方案迭代页转入时携带） */
@@ -163,6 +165,10 @@ export interface ResearchReportMeta {
   title: string;
   created_at: string;
   ref_count: number;
+  /** v1.7.0：kind=session 为会话综合报告；question 为单问研究（可无，旧数据） */
+  kind?: 'session' | 'question';
+  session_id?: string | null;
+  version?: number | null;
 }
 
 /** 深度研究报告 Word 导出地址（浏览器直接下载） */
@@ -191,7 +197,14 @@ export type AssistantSseEvent =
   | { type: 'plan'; summary?: string; steps: { title: string; note?: string }[] }
   | { type: 'step_start'; index: number; title: string }
   | { type: 'step_done'; index: number; title: string; summary?: string }
-  | { type: 'report'; report_id: string; title: string };
+  | {
+      type: 'report';
+      report_id: string;
+      title: string;
+      /** v1.7.0：会话综合报告携带 */
+      session_id?: string | null;
+      version?: number;
+    };
 
 /** 后端未连接错误（网络层失败），页面据此显示重试 */
 export class AssistantUnavailableError extends Error {
@@ -360,10 +373,46 @@ export const assistantApi = {
     });
   },
 
+  /** 删除会话（v1.7.0）：物理删除 jsonl，附件文件保留 */
+  deleteSession(sessionId: string): Promise<{ deleted: boolean; session_id: string }> {
+    if (ASSISTANT_MOCK) return mockApi.deleteSession(sessionId);
+    return request(`/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /** 会话综合报告（v1.7.0，一对话一报告）：SSE 生成/更新流 */
+  async sessionReportStream(sessionId: string): Promise<ReadableStream<Uint8Array>> {
+    if (ASSISTANT_MOCK) return mockApi.sessionReportStream(sessionId);
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/sessions/${encodeURIComponent(sessionId)}/report`, {
+        method: 'POST',
+      });
+    } catch {
+      throw new AssistantUnavailableError();
+    }
+    if (!res.ok) {
+      let message = `请求失败（${res.status}）`;
+      try {
+        const data = await res.json();
+        if (typeof data?.detail === 'string') message = data.detail;
+        else if (typeof data?.message === 'string') message = data.message;
+      } catch {
+        /* 保留默认 */
+      }
+      throw new Error(message);
+    }
+    if (!res.body) throw new AssistantUnavailableError('响应不含数据流');
+    return res.body;
+  },
+
   /** 深度研究（v1.6.0 P1）：SSE 研究流（plan → 检索 → 批判 → 报告） */
   async researchStream(body: {
     question: string;
     allow_web?: boolean;
+    /** v1.7.0：关联会话（报告计入该会话综合报告） */
+    session_id?: string;
   }): Promise<ReadableStream<Uint8Array>> {
     let res: Response;
     try {

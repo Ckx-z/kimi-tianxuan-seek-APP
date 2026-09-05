@@ -151,7 +151,21 @@ def get_session(session_id: str):
         "title": sess["title"],
         "context": sess["context"],
         "messages": sess["messages"],
+        "report": sess.get("report"),  # v1.7.0：一对话一报告指针（无则 null）
     }
+
+
+@router.delete("/sessions/{session_id}")
+def delete_session(session_id: str):
+    """删除会话（v1.7.0）：物理删除 jsonl，附件文件保留。
+
+    会话不存在 / id 非法 404。删除后前端应刷新列表；若删的是当前会话，
+    前端自动切到新会话。
+    """
+    _a, _c, _l, _loop, _m, _r, sessions = _imports()
+    if not sessions.delete_session(session_id):
+        raise HTTPException(404, f"会话不存在: {session_id}")
+    return {"deleted": True, "session_id": session_id}
 
 
 @router.patch("/sessions/{session_id}/title")
@@ -514,12 +528,46 @@ def research_chat(req: AssistantResearchRequest):
     def gen():
         try:
             research = _research()
-            for ev in research.run_research(question, allow_web=req.allow_web):
+            for ev in research.run_research(question, allow_web=req.allow_web,
+                                            session_id=req.session_id):
                 yield _sse(ev)
         except Exception as exc:  # 兜底：任何意外都走 error 事件
             logger.exception("research 异常")
             yield _sse({"type": "error",
                         "message": f"深度研究内部错误：{type(exc).__name__}: {exc}"})
+
+    return StreamingResponse(
+        gen(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.post("/sessions/{session_id}/report")
+def session_report(session_id: str):
+    """会话综合报告（v1.7.0，一对话一报告）：整合会话全部问答 + 关联的
+    深度研究产出 → 生成/增量更新报告（版本递增，追加不覆盖）。SSE。
+
+    事件契约：token / critic_note（引用核验修正）/ report（report_id,
+    title, version, session_id）/ done / error。任何失败走 error，HTTP 恒 200。
+    """
+    def gen():
+        research = _research()
+        try:
+            from .. import deps  # noqa: F401
+            try:
+                from src.assistant import sessions
+            except ImportError:  # pragma: no cover
+                from assistant import sessions  # type: ignore
+            sess = sessions.load_session(session_id)
+            if sess is None:
+                yield _sse({"type": "error",
+                            "message": f"会话不存在: {session_id}"})
+                return
+            for ev in research.build_session_report(sess):
+                yield _sse(ev)
+        except Exception as exc:  # 兜底：任何意外都走 error 事件
+            logger.exception("session report 异常")
+            yield _sse({"type": "error",
+                        "message": f"会话报告生成失败：{type(exc).__name__}: {exc}"})
 
     return StreamingResponse(
         gen(), media_type="text/event-stream",

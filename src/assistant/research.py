@@ -45,7 +45,10 @@ MAX_STEPS = 5          # 计划子问题上限
 STEP_TOOL_BUDGET = 3   # 每子问题检索轮上限
 CRITIC_GAP_RETRY = 1   # 批判轮缺口补搜次数上限
 _REPORT_ID_RE = re.compile(r"^rpt_[0-9a-f]{12}$")
+# v1.7.0：会话综合报告 sessrpt_<sid12>_v<n>（一个对话一份，版本递增）
+_SESSION_REPORT_RE = re.compile(r"^sessrpt_[0-9a-f]{12}_v\d+$")
 _MAX_EVIDENCE_CHARS = 6000  # 写报告时每类证据注入上限
+_MAX_DIGEST_CHARS = 15000   # 会话报告：对话摘要注入上限（近期消息优先）
 
 # 研究模式工具白名单（只读，无写操作确认流）
 RESEARCH_TOOLS = (
@@ -293,7 +296,8 @@ def _report_path(report_id: str) -> Path:
 
 def save_report(report_id: str, question: str, title: str,
                 markdown: str, refs: list[dict],
-                allow_web: bool = True) -> dict:
+                allow_web: bool = True, session_id: str | None = None,
+                version: int | None = None) -> dict:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     rec = {
         "report_id": report_id,
@@ -303,14 +307,19 @@ def save_report(report_id: str, question: str, title: str,
         "markdown": markdown,
         "refs": refs,
         "allow_web": bool(allow_web),
+        "kind": "session" if version is not None else "question",
+        "session_id": session_id,
     }
+    if version is not None:
+        rec["version"] = version
     _report_path(report_id).write_text(
         json.dumps(rec, ensure_ascii=False, indent=2), encoding="utf-8")
     return rec
 
 
 def load_report(report_id: str) -> dict | None:
-    if not _REPORT_ID_RE.match(report_id or ""):
+    if not (_REPORT_ID_RE.match(report_id or "")
+            or _SESSION_REPORT_RE.match(report_id or "")):
         return None
     p = _report_path(report_id)
     if not p.is_file():
@@ -326,23 +335,28 @@ def list_reports() -> list[dict]:
     out = []
     if not REPORTS_DIR.is_dir():
         return out
-    for p in REPORTS_DIR.glob("rpt_*.json"):
-        if not _REPORT_ID_RE.match(p.stem):
+    for p in REPORTS_DIR.glob("*.json"):
+        stem = p.stem
+        if not (_REPORT_ID_RE.match(stem) or _SESSION_REPORT_RE.match(stem)):
             continue
-        data = load_report(p.stem)
+        data = load_report(stem)
         if data:
             out.append({
                 "report_id": data["report_id"],
                 "title": data["title"],
                 "created_at": data["created_at"],
                 "ref_count": len(data.get("refs") or []),
+                "kind": data.get("kind") or "question",
+                "session_id": data.get("session_id"),
+                "version": data.get("version"),
             })
     out.sort(key=lambda r: r["created_at"], reverse=True)
     return out
 
 
 def delete_report(report_id: str) -> bool:
-    if not _REPORT_ID_RE.match(report_id or ""):
+    if not (_REPORT_ID_RE.match(report_id or "")
+            or _SESSION_REPORT_RE.match(report_id or "")):
         return False
     p = _report_path(report_id)
     if not p.is_file():
@@ -440,8 +454,13 @@ def report_to_docx(report: dict) -> bytes:
 
 # ---------------------------------------------------------------- 主循环
 
-def run_research(question: str, allow_web: bool = True) -> Iterator[dict]:
-    """深度研究主入口（生成器，SSE 事件流）。LLM 未配置先抛 error 事件。"""
+def run_research(question: str, allow_web: bool = True,
+                 session_id: str | None = None) -> Iterator[dict]:
+    """深度研究主入口（生成器，SSE 事件流）。LLM 未配置先抛 error 事件。
+
+    session_id（v1.7.0）：报告落盘时关联会话；会话综合报告（一对话一报告）
+    会把该报告作为来源并入。不传则为独立单问报告（历史行为）。
+    """
     question = (question or "").strip()
     if not question:
         yield {"type": "error", "message": "question 不能为空"}
@@ -504,8 +523,21 @@ def run_research(question: str, allow_web: bool = True) -> Iterator[dict]:
     title = _title_from_markdown(report_md, question)
     refs = _collect_report_refs(all_results)
     rid = _new_id()
-    save_report(rid, question, title, report_md, refs, allow_web=allow_web)
-    yield {"type": "report", "report_id": rid, "title": title}
+    save_report(rid, question, title, report_md, refs, allow_web=allow_web,
+                session_id=session_id)
+    if session_id:
+        # 会话内深度研究：报告计入会话（供一对话一报告合成），并留一条
+        # 助手消息记录。失败不影响研究主流程。
+        try:
+            from . import sessions as sessions_module
+            sessions_module.append_message(
+                session_id, "assistant",
+                f"深度研究完成：《{title}》（报告 ID: {rid}），"
+                "已可作为本会话综合报告的来源。")
+        except Exception as exc:  # pragma: no cover
+            logger.warning("研究完成消息落会话失败（已跳过）: %s", exc)
+    yield {"type": "report", "report_id": rid, "title": title,
+           "session_id": session_id}
     yield {"type": "done"}
 
 
@@ -514,3 +546,179 @@ def loop_verified_stream(work: list[dict], text: str,
     """引用核验 + 流式（复用 loop._emit_verified，事件兼容）。"""
     from .loop import _emit_verified
     yield from _emit_verified(work, text, results)
+
+
+# ---------------------------------------------------------------- 会话综合报告（v1.7.0）
+# 「一个对话 → 一份综合报告」：整合会话内全部问答 + 深度研究产出，生成/
+# 增量更新（版本递增，追加不覆盖）。
+
+_SESSION_WRITER_PROMPT = (
+    "你是科研助手。请把下面这段对话的完整内容整合成一份结构化的深度研究"
+    "报告（Markdown，中文）。结构固定为：\n"
+    "# <简洁标题>\n"
+    "## 研究背景\n## 核心发现\n## 详细分析\n## 结论与建议\n## 参考文献\n"
+    "## 附录：对话时间线\n"
+    "要求：\n"
+    "1. 忠实整合对话内容，不要编造对话中没有的事实；\n"
+    "2. 只引用对话/工具结果中真实出现过的 DOI、URL 或 CAS；对话中确实"
+    "没有可引用文献时，参考文献一节如实写「本次对话未产生外部引用」；\n"
+    "3. 附录按时间顺序列用户问题与结论摘要（一问一答一行）。"
+)
+
+_UPDATE_SUFFIX = (
+    "\n\n以上是第 {v} 版报告的原文。请在此基础上**增量更新**：保留既有章节"
+    "与结论，把对话中新增的进展并入相应章节（不标注版本号）；参考文献取"
+    "并集；附录时间线补充新增问答。输出完整的新版报告。"
+)
+
+
+def _session_report_id(session_id: str, version: int) -> str:
+    """会话报告 ID：sessrpt_<sid 12hex>_v<n>（sid 即 sess_<12hex> 后缀）。"""
+    suffix = (session_id or "").split("_", 1)[-1][:12]
+    return f"sessrpt_{suffix}_v{int(version)}"
+
+
+def _conversation_digest(session: dict) -> str:
+    """对话摘要：近期消息优先，总量受 _MAX_DIGEST_CHARS 约束。"""
+    msgs = list(session.get("messages") or [])
+    parts: list[str] = []
+    total = 0
+    for m in reversed(msgs):
+        role = "用户" if m.get("role") == "user" else "助手"
+        content = str(m.get("content") or "").strip()
+        block = f"{role}：{content[:_MAX_EVIDENCE_CHARS]}\n"
+        for te in (m.get("tool_events") or []):
+            if not isinstance(te, dict):
+                continue
+            if te.get("type") == "tool_call":
+                args = json.dumps(te.get("args"), ensure_ascii=False,
+                                  default=str)[:200]
+                block += f"[调用工具 {te.get('name')}：{args}]\n"
+            elif te.get("type") == "tool_result":
+                summary = str(te.get("summary") or "")[:500]
+                block += f"[工具结果 {te.get('name')}：{summary}]\n"
+        if total + len(block) > _MAX_DIGEST_CHARS:
+            block = block[:_MAX_DIGEST_CHARS - total]
+            if block:
+                parts.append(block)
+            break
+        parts.append(block)
+        total += len(block)
+    parts.reverse()
+    return "\n".join(parts) or "（空对话）"
+
+
+def _conversation_ref_results(session: dict, sub_reports: list[dict]) -> list[dict]:
+    """构造引用核验的「工具结果」：对话文本 + 关联单问研究产出。
+
+    verify.collect_refs 扫描 {text} 字段提取 CAS/DOI/URL，因此把消息正文与
+    tool_result 摘要拼进 text 即可复用同一套核验口径。
+    """
+    results: list[dict] = []
+    for m in (session.get("messages") or []):
+        blob = str(m.get("content") or "")
+        for te in (m.get("tool_events") or []):
+            if isinstance(te, dict) and te.get("type") == "tool_result":
+                blob += "\n" + str(te.get("summary") or "")
+        if blob.strip():
+            results.append({"text": blob, "details": {}})
+    for rep in sub_reports:
+        results.append({"text": rep.get("markdown") or "", "details": {}})
+    return results
+
+
+def _collect_refs_from_results(results: list[dict]) -> list[dict]:
+    """伪工具结果 → 结构化引用清单（与 _collect_report_refs 同口径）。"""
+    refs: list[dict] = []
+    seen: set[str] = set()
+    from . import verify as verify_module
+    pooled = verify_module.collect_refs(results)
+    for doi in sorted(pooled.get("doi") or []):
+        if doi in seen:
+            continue
+        seen.add(doi)
+        refs.append({"title": "", "doi": doi, "url": "", "source": ""})
+    for url in sorted(pooled.get("url") or []):
+        if url in seen:
+            continue
+        seen.add(url)
+        refs.append({"title": "", "doi": "", "url": url, "source": ""})
+    return refs[:20]
+
+
+def _question_reports_of(session_id: str) -> list[dict]:
+    """该会话关联的单问深度研究报告（kind=question，按时间升序）。"""
+    if not REPORTS_DIR.is_dir():
+        return []
+    out = []
+    for p in REPORTS_DIR.glob("rpt_*.json"):
+        data = load_report(p.stem)
+        if data and data.get("session_id") == session_id:
+            out.append(data)
+    out.sort(key=lambda r: r.get("created_at") or "")
+    return out
+
+
+def build_session_report(session: dict, hint: str | None = None) -> Iterator[dict]:
+    """会话综合报告（生成/增量更新，SSE 事件流）。
+
+    事件：token（流式）/ critic_note（引用核验修正）/
+    report（{report_id, title, version, session_id}）/ done / error。
+    """
+    from . import sessions as sessions_module
+    sid = session["session_id"]
+    if not llm_bridge.is_configured():
+        yield {"type": "error",
+               "message": "LLM 未配置：请到设置页填写 base_url / api_key / "
+                          "model 后再生成研究报告。"}
+        return
+
+    sub_reports = _question_reports_of(sid)
+    prev = session.get("report") if isinstance(session.get("report"), dict) else None
+    prev_data = load_report(prev["report_id"]) if prev else None
+    base_version = int((prev or {}).get("version") or 0)
+
+    digest = _conversation_digest(session)
+    for i, rep in enumerate(sub_reports, 1):
+        digest += (f"\n\n【深度研究产出 {i}：{rep.get('title') or ''}】\n"
+                   + (rep.get("markdown") or "")[:_MAX_EVIDENCE_CHARS])
+
+    user_content = (f"会话标题：{session.get('title')}\n\n"
+                    f"【对话内容】\n{digest}")
+    if hint:
+        user_content += f"\n\n用户额外要求：{hint.strip()[:500]}"
+    work = [{"role": "system", "content": _SESSION_WRITER_PROMPT}]
+    if prev_data:
+        user_content += _UPDATE_SUFFIX.format(v=base_version)
+        work.append({"role": "user",
+                     "content": prev_data.get("markdown") or ""})
+    work.append({"role": "user", "content": user_content})
+
+    text = llm_bridge.chat_text(work, max_tokens=8000)
+    if text is None:
+        yield {"type": "error", "message": "报告生成失败（LLM 无响应），请重试。"}
+        return
+    report_md = text.strip()
+
+    # 引用核验：对话 + 既有报告中的引用均为「已核实」来源
+    ref_results = _conversation_ref_results(session, sub_reports)
+    if prev_data:
+        ref_results.append({"text": prev_data.get("markdown") or "",
+                            "details": {}})
+    yield from loop_verified_stream(work, report_md, ref_results)
+
+    version = base_version + 1
+    report_id = _session_report_id(sid, version)
+    title = _title_from_markdown(report_md, session.get("title") or "会话报告")
+    refs = _collect_refs_from_results(ref_results)
+    save_report(report_id, question=(hint or "会话综合报告"), title=title,
+                markdown=report_md, refs=refs, allow_web=True,
+                session_id=sid, version=version)
+    pointer = {"report_id": report_id, "version": version, "updated_at": _now()}
+    try:
+        sessions_module.update_meta(sid, report=pointer)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("会话报告指针更新失败（报告已落盘）: %s", exc)
+    yield {"type": "report", "report_id": report_id, "title": title,
+           "version": version, "session_id": sid}
+    yield {"type": "done"}

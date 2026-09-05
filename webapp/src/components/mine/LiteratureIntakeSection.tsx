@@ -489,6 +489,7 @@ export function LiteratureIntakeSection() {
             </div>
             <p className="text-xs">
               该文献仅入文献库：不入训练集、暂不入图谱（GraphRAG），收藏夹引用与助手检索现在即可解析它。
+              可在下方「文献图谱」为其上传结构式/光谱/机理图。
               {result.url && (
                 <>
                   {' '}

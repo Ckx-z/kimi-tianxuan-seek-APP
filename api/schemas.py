@@ -187,9 +187,14 @@ class AssistantSkillUpdate(BaseModel):
 
 
 class AssistantResearchRequest(BaseModel):
-    """深度研究（v1.6.0 P1）：复杂问题走 plan→execute→critic→report。"""
+    """深度研究（v1.6.0 P1）：复杂问题走 plan→execute→critic→report。
+
+    session_id（v1.7.0）：给定则报告关联会话，计入「一对话一报告」综合。
+    """
     question: str = Field(..., description="研究问题（自然语言，复杂问题）")
     allow_web: bool = Field(True, description="是否允许联网检索（工具仍按配置裁剪）")
+    session_id: str | None = Field(
+        None, description="可选：关联的会话 ID（报告计入该会话综合报告）")
 
 
 class DftJobCreate(BaseModel):
@@ -312,3 +317,19 @@ class LiteratureConfirm(BaseModel):
     abstract: str | None = None
     source: str = Field("crossref", description="草稿来源（审计记录用）")
     reviewed_by: str = Field("", description="审核人（审计记录用）")
+
+
+class LiteratureFigureFromSmiles(BaseModel):
+    """文献图谱（v1.7.0）：SMILES → 2D 结构图入库。"""
+    paper_id: str = Field(..., description="关联文献 paper_id")
+    smiles: str = Field(..., description="单体 SMILES（RDKit 渲染 2D 结构图）")
+    caption: str | None = Field(None, description="图注（如：TFPT 结构式）")
+
+
+class LiteratureFigureUpdate(BaseModel):
+    """图谱标注更新：caption/tags/meta/score_note，至少一项非 None。"""
+    caption: str | None = Field(None, description="图注")
+    tags: list[str] | None = Field(None, description="标签列表（整体覆盖）")
+    meta: dict | None = Field(None, description="类型元数据（smiles/technique/conditions/peaks）")
+    score_note: str | None = Field(
+        None, description="与成膜打分联动回写备注（如：本系统打分 0.85）")
