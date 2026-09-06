@@ -36,6 +36,10 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(gnn_jobs, "JOBS_DIR", tmp_path / "gnn_jobs")
     monkeypatch.setattr(gnn_jobs, "REGISTRY_PATH",
                         tmp_path / "gnn_models" / "registry.json")
+    # 隔离随包 registry（v1.8.0 双通道：models/gnn_feedback/registry.json
+    # 存在时会被 load_registry 读到，测试必须指向 tmp）
+    monkeypatch.setattr(gnn_jobs, "BUNDLED_FEEDBACK_DIR",
+                        tmp_path / "models_feedback")
     yield tmp_path
 
 
