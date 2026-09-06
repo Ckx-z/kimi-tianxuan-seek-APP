@@ -24,6 +24,13 @@ BUNDLED_CKPT = PROJECT_ROOT / "models" / "gnn_v5.4" / "v5_model.pt"
 CALIBRATOR = PROJECT_ROOT / "models" / "gnn_v5.4" / "calibrator.pkl"
 
 
+@pytest.fixture(autouse=True)
+def _isolate_dynamic_resolution(monkeypatch):
+    """v1.8.0：隔离 registry/env 动态解析（测试只针对包内/旧项目回退逻辑）。"""
+    monkeypatch.setattr(gnn_model, "_env_checkpoint", lambda: None)
+    monkeypatch.setattr(gnn_model, "_active_retrained_checkpoint", lambda: None)
+
+
 # ---------------------------------------------------------------- 包内资产护栏
 
 def test_bundled_assets_present():

@@ -35,6 +35,10 @@ sys.path.insert(0, str(_REPO))
 sys.path.insert(0, str(_REPO / "src"))
 
 TOL = 0.01
+# min/max 统计（a_min/c_max）受树模型 3D 构象随机噪声影响（实测 ±0.014，
+# 见 v1.8.0 pilot：同一 v5.4 模型两次运行 c_max 0.0479 ↔ 0.0615），
+# 容差放宽到 0.03；聚合指标（mae/spearman）稳定，保持 0.01。
+_TOL_PER_METRIC = {"a_min": 0.03, "c_max": 0.03, "mae": 0.01, "spearman": 0.01}
 GOLD_PATH = _REPO / "data" / "film_gold_standard.json"
 
 
@@ -163,8 +167,9 @@ def main() -> None:
             b, c = baseline.get(key), current.get(key)
             if b is None or c is None:
                 continue
-            if dirn * (c - b) > TOL:
-                regress.append(f"{key}: {b} → {c}")
+            tol = _TOL_PER_METRIC.get(key, TOL)
+            if dirn * (c - b) > tol:
+                regress.append(f"{key}: {b} → {c}（容差 {tol}）")
         gold_pass = not regress
         note = "; ".join(regress) if regress else "四项指标未回退"
     report["checks"]["gold"] = {

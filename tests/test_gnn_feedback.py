@@ -132,6 +132,35 @@ def test_registry_active_version_used(monkeypatch, tmp_path):
     assert script == gnn_model.BUNDLED_SCRIPT or script == gnn_model.LEGACY_SCRIPT
 
 
+def test_no_default_checkpoint_override_bug(monkeypatch, tmp_path):
+    """v1.8.0 回归：未显式传 checkpoint 时，predict_single 不得用
+    DEFAULT_CHECKPOINT 覆盖 registry/动态解析结果（pilot 真机 bug：
+    版本名显示新版本、实际权重仍是 v5.4）。"""
+    script = tmp_path / "gnn_runtime" / "predict_pair.py"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text("")
+    active = tmp_path / "gnn_models" / "v55" / "v5_model.pt"
+    active.parent.mkdir(parents=True, exist_ok=True)
+    active.write_text("")
+    monkeypatch.setattr(gnn_model, "_find_python", lambda: tmp_path / "py.exe")
+    monkeypatch.setattr(gnn_model, "_resolve_runtime", lambda: (script, active))
+
+    captured = {}
+
+    def fake_run(cmd, cwd, capture_output, timeout):
+        captured["cmd"] = cmd
+        from types import SimpleNamespace
+        return SimpleNamespace(returncode=0,
+                               stdout="成膜概率: 0.9\n不确定性: ±0.01\n".encode(),
+                               stderr=b"")
+
+    monkeypatch.setattr(gnn_model.subprocess, "run", fake_run)
+    p = gnn_model.GNNFilmPredictor()  # 无显式 checkpoint
+    assert p.checkpoint_path is None
+    p.predict_single("O=Cc1ccccc1", "Nc1ccccc1")
+    assert Path(captured["cmd"][7]) == active  # --model 必须用动态解析结果
+
+
 # ---------------------------------------------------------------- API
 
 def test_feedback_api_crud(client):

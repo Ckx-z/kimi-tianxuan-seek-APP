@@ -124,7 +124,10 @@ class GNNFilmPredictor:
     """基于旧项目 GNN 的 COF 成膜概率预测器（subprocess 封装）。"""
 
     def __init__(self, checkpoint_path: str | Path | None = None):
-        self.checkpoint_path = Path(checkpoint_path) if checkpoint_path else DEFAULT_CHECKPOINT
+        # v1.8.0：只有「显式传入」的路径才算覆盖；缺省时不落 DEFAULT_CHECKPOINT，
+        # 让 predict_single 走动态解析（registry 激活版本 / env 钩子 / 包内 /
+        # 旧项目），否则包内 v5.4 恒存在会把 registry 解析结果覆盖回去。
+        self.checkpoint_path = Path(checkpoint_path) if checkpoint_path else None
 
     def _parse_probability(self, output: str) -> tuple[float, float]:
         """从 predict_pair.py 的输出中解析成膜概率和不确定性。"""
@@ -156,7 +159,7 @@ class GNNFilmPredictor:
                 "GNN 不可用：未找到 GNN 推理运行时与模型"
                 f"（包内 gnn_runtime/ + models/gnn_v5.4/ 或旧项目目录 "
                 f"{OLD_PROJECT_ROOT}）。GNN 分量自动降级，不影响树模型预测。")
-        if self.checkpoint_path.exists():
+        if self.checkpoint_path is not None and self.checkpoint_path.exists():
             checkpoint = self.checkpoint_path  # 显式传入的 checkpoint 优先
 
         cmd = [
