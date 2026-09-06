@@ -1,0 +1,25 @@
+{
+  "version": "gnn_v5.5_20260906_094822",
+  "base_version": "gnn_v5.4",
+  "base_ckpt": "C:\\Users\\ckx\\Desktop\\全新机器学习实验\\models\\gnn_v5.4\\v5_model.pt",
+  "feedback_keys": [
+    "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1 | Nc1ccc(C(F)(F)F)cc1-c1ccc(N)cc1C(F)(F)F"
+  ],
+  "freeze": [
+    "encoder.encoder.input_proj"
+  ],
+  "params": {
+    "lr": 0.0001,
+    "epochs": 60,
+    "batch_size": 64,
+    "patience": 10,
+    "feedback_pos_w": 20.0,
+    "feedback_neg_w": 3.0
+  },
+  "metrics": {
+    "val_pr_auc": 0.9746,
+    "n_train": 6227,
+    "n_val": 327
+  },
+  "calibrator": true
+}

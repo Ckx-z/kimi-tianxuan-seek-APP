@@ -1,0 +1,40 @@
+{
+  "ckpt": "C:\\Users\\ckx\\Desktop\\全新机器学习实验\\data\\gnn_models\\gnn_v5.5_20260906_094822\\v5_model.pt",
+  "passed": true,
+  "checks": {
+    "feedback": {
+      "passed": true,
+      "positive": [
+        {
+          "ald": "O=Cc1ccc(-c2nc(-c3ccc(C=O)cc3)nc(-c3ccc(C=O)cc3)n2)cc1",
+          "amine": "Nc1ccc(C(F)(F)F)cc1-c1ccc(N)cc1C(F)(F)F",
+          "label": 1.0,
+          "gnn_cal": 0.85
+        }
+      ],
+      "negative": [],
+      "pos_pass": true,
+      "neg_pass": true
+    },
+    "gold": {
+      "passed": true,
+      "baseline": {
+        "evaluated_at": "2026-09-05",
+        "source": "data/film_gold_report_20260905_114638.json（v1.6.1 终评，tree_v5 重训 + GNN v5.4）",
+        "n": 39,
+        "a_min": 0.6661,
+        "c_max": 0.0479,
+        "mae": 0.0958,
+        "spearman": 0.8628
+      },
+      "current": {
+        "n": 39,
+        "a_min": 0.6660939455032349,
+        "c_max": 0.04792307689785957,
+        "mae": 0.09582116966759166,
+        "spearman": 0.862753036437247
+      },
+      "note": "四项指标未回退"
+    }
+  }
+}
