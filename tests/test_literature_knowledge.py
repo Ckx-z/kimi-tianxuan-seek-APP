@@ -153,11 +153,16 @@ def test_group_by():
 # ---------------------------------------------------------------- 解析降级与设置
 
 def test_parse_disabled_falls_back_to_smiles_scan():
+    from rdkit import Chem
     res = llm_extract.parse_text(f"体系含 {TFPT} 与 {B5} 缩聚。")
     assert res["llm_used"] is False
     assert any(e["kind"] == "monomer_pair" for e in res["entries"])
     pair = next(e for e in res["entries"] if e["kind"] == "monomer_pair")
-    assert pair["ald_smiles"] == TFPT and pair["amine_smiles"] == B5
+    # 扫描输出 canonical SMILES，按 canonical 比较
+    assert Chem.MolToSmiles(Chem.MolFromSmiles(pair["ald_smiles"])) == \
+        Chem.MolToSmiles(Chem.MolFromSmiles(TFPT))
+    assert Chem.MolToSmiles(Chem.MolFromSmiles(pair["amine_smiles"])) == \
+        Chem.MolToSmiles(Chem.MolFromSmiles(B5))
 
 
 def test_settings_save_get_masked(tmp_path):
