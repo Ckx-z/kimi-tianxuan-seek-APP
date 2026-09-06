@@ -38,6 +38,7 @@ import {
 import { BackendUnavailableError } from '@/lib/api';
 import { COLOR_SCHEMES, SCHEME_LABELS, useTheme } from '@/hooks/use-theme';
 import { GnnEvolutionPanel } from '@/components/settings/GnnEvolutionPanel';
+import { LiteratureLlmSettingsCard } from '@/components/settings/LiteratureLlmSettingsCard';
 import {
   fetchLlmSettings,
   saveLlmSettings,
@@ -1040,6 +1041,7 @@ export default function Settings() {
           <LlmSettingsCard offline={offline} />
           <WebSearchSettingsCard offline={offline} />
           <AssistantMemoryCard offline={offline} />
+          <LiteratureLlmSettingsCard offline={offline} />
           <GnnEvolutionPanel />
         </div>
         <div className="space-y-6">

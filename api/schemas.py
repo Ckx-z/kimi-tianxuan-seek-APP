@@ -367,3 +367,26 @@ class GnnRetrainRequest(BaseModel):
     patience: int = Field(5, ge=2, le=20)
     feedback_pos_w: float = Field(5.0, ge=1.0, le=50.0,
                                   description="反馈正样本加权系数")
+
+
+class LiteratureEntriesBatch(BaseModel):
+    """科研知识库（v1.9.0）：审核后的结构化条目批量入库。"""
+    entries: list[dict] = Field(..., description="条目列表（schema 见 knowledge.py）")
+
+
+class LiteratureEntryUpdate(BaseModel):
+    """条目编辑：整体替换（重校验）。"""
+    entry: dict = Field(..., description="编辑后的条目（不含 entry_id/paper_id）")
+
+
+class LiteratureLlmSettingsUpdate(BaseModel):
+    """文献解析 LLM 独立设置（与助手 LLM 隔离）。"""
+    enabled: bool | None = Field(None, description="解析开关（默认关→正则降级）")
+    base_url: str | None = Field(None, description="OpenAI 兼容端点")
+    api_key: str | None = Field(None, description="API key（掩码则不改）")
+    model: str | None = Field(None, description="模型名")
+    embedding_provider: str | None = Field(
+        None, description="embedding 提供方：off|local|online")
+    embedding_model: str | None = Field(
+        None, description="本地模型名/路径（如 Qwen/Qwen3-Embedding-0.6B）")
+    embedding_api_key: str | None = Field(None, description="在线提供方 key（掩码则不改）")

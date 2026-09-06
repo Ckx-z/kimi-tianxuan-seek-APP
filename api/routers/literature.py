@@ -12,13 +12,18 @@ user_data_root/literature/（见 src/literature/figures.py）。
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from ..schemas import (LiteratureConfirm, LiteratureFigureFromSmiles,
-                       LiteratureFigureUpdate, LiteratureLookup)
+from ..schemas import (LiteratureConfirm, LiteratureEntriesBatch,
+                       LiteratureEntryUpdate, LiteratureFigureFromSmiles,
+                       LiteratureFigureUpdate, LiteratureLlmSettingsUpdate,
+                       LiteratureLookup)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/literature", tags=["literature"])
 
@@ -41,6 +46,16 @@ def _pdf_extract():
 def _figures():
     from literature import figures
     return figures
+
+
+def _knowledge():
+    from literature import knowledge
+    return knowledge
+
+
+def _llm_extract():
+    from literature import llm_extract
+    return llm_extract
 
 
 def _titles_module():
@@ -294,3 +309,214 @@ def delete_figure(fig_id: str):
     if not f.delete_figure(fig_id):
         raise HTTPException(404, f"图谱不存在: {fig_id}")
     return {"deleted": True, "fig_id": fig_id}
+
+
+# ---------------------------------------------------------------------------
+# 科研知识库（v1.9.0）：结构化提取 / 条目库 / 文献解析 LLM 设置
+# ---------------------------------------------------------------------------
+
+@router.post("/{paper_id}/parse")
+async def parse_paper(paper_id: str,
+                      file: UploadFile | None = File(None),
+                      text: str | None = Form(None)):
+    """全维度解析：上传 PDF（或直接给全文文本）→ LLM 结构化条目预览。
+
+    文献解析 LLM 未启用时降级为 SMILES 正则扫描（llm_used=false）。
+    """
+    r = _resolver()
+    if r.resolve_paper(paper_id) is None:
+        raise HTTPException(404, f"文献不存在: {paper_id}")
+    body = (text or "").strip()
+    if file is not None:
+        data = await file.read()
+        if not data:
+            raise HTTPException(400, "上传文件为空")
+        try:
+            import fitz
+            doc = fitz.open(stream=data, filetype="pdf")
+            body = "\n".join(page.get_text() for page in doc)
+            doc.close()
+        except Exception as exc:
+            raise HTTPException(400, f"PDF 解析失败：{exc}")
+    if not body:
+        raise HTTPException(400, "请提供 PDF 文件或 text 全文")
+    ext = _llm_extract()
+    return {"paper_id": paper_id, **ext.parse_text(body)}
+
+
+@router.post("/{paper_id}/entries", status_code=201)
+def add_entries(paper_id: str, req: LiteratureEntriesBatch):
+    """审核后的结构化条目批量入库（原子：校验全部通过才写）。"""
+    r = _resolver()
+    if r.resolve_paper(paper_id) is None:
+        raise HTTPException(404, f"文献不存在: {paper_id}")
+    k = _knowledge()
+    try:
+        entries = k.add_entries(paper_id, req.entries)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    # 入图（组级同步；失败不阻塞入库：条目 graph_indexed=false，可重试）
+    try:
+        from literature import graph_ingest
+        n_synced = graph_ingest.sync_groups(entries)
+        for e in entries:
+            k.mark_graph_indexed(e["entry_id"], True)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("条目入图失败（已入库，可重试）: %s", exc)
+        n_synced = 0
+    # 向量化（off/失败跳过，不阻塞）
+    try:
+        from literature import embedding
+        n_vec = embedding.sync_entries(entries)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("条目向量化失败（已入库）: %s", exc)
+        n_vec = 0
+    return {"entries": entries, "count": len(entries),
+            "graph_synced": n_synced, "embedded": n_vec}
+
+
+@router.get("/{paper_id}/entries")
+def paper_entries(paper_id: str):
+    """某文献的条目（按 group_id 分组）。"""
+    k = _knowledge()
+    entries = k.list_entries(paper_id=paper_id)
+    return {"entries": entries, "count": len(entries),
+            "groups": k.group_by(entries)}
+
+
+@router.get("/entries")
+def search_entries(paper_id: str | None = None, kind: str | None = None,
+                   technique: str | None = None, film_label: float | None = None,
+                   metric: str | None = None, min: float | None = None,
+                   max: float | None = None):
+    """跨文献条目检索（含数值范围，如 metric=PLQY&min=20）。"""
+    k = _knowledge()
+    entries = k.list_entries(paper_id=paper_id, kind=kind, technique=technique,
+                             film_label=film_label, metric=metric,
+                             min_value=min, max_value=max)
+    return {"entries": entries, "count": len(entries)}
+
+
+@router.patch("/entries/{entry_id}")
+def update_entry(entry_id: str, req: LiteratureEntryUpdate):
+    """编辑条目（整体重校验后替换；旧组/新组分别同步侧车图）。"""
+    k = _knowledge()
+    old = k.get_entry(entry_id)
+    if old is None:
+        raise HTTPException(404, f"条目不存在: {entry_id}")
+    try:
+        rec = k.update_entry(entry_id, req.entry)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    try:
+        from literature import graph_ingest
+        graph_ingest.sync_group(str(old.get("paper_id")),
+                                str(old.get("group_id")))
+        graph_ingest.sync_group(str(rec.get("paper_id")),
+                                str(rec.get("group_id")))
+        k.mark_graph_indexed(entry_id, True)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("条目改后同步入图失败: %s", exc)
+    return rec
+
+
+@router.delete("/entries/{entry_id}")
+def delete_entry(entry_id: str):
+    """删除条目（同步该组侧车图节点：组内无剩余条目则移除节点）。"""
+    k = _knowledge()
+    removed = k.delete_entry(entry_id)
+    if removed is None:
+        raise HTTPException(404, f"条目不存在: {entry_id}")
+    try:
+        from literature import graph_ingest
+        graph_ingest.sync_group(str(removed.get("paper_id")),
+                                str(removed.get("group_id")))
+    except Exception as exc:  # pragma: no cover
+        logger.warning("条目撤图失败（不影响删除）: %s", exc)
+    try:
+        from literature import embedding
+        embedding.remove_entry(entry_id)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("条目向量移除失败（不影响删除）: %s", exc)
+    return {"deleted": True, "entry_id": entry_id}
+
+
+@router.post("/entries/{entry_id}/to-gnn-feedback", status_code=201)
+def entry_to_gnn_feedback(entry_id: str):
+    """film_outcome 条目 → GNN 反馈队列（v1.8.0 机制）。"""
+    k = _knowledge()
+    rec = k.get_entry(entry_id)
+    if rec is None:
+        raise HTTPException(404, f"条目不存在: {entry_id}")
+    if rec.get("kind") != "film_outcome":
+        raise HTTPException(400, "仅 film_outcome 条目可转入 GNN 反馈")
+    try:
+        from src.predictor import gnn_feedback
+    except ImportError:  # pragma: no cover
+        from predictor import gnn_feedback  # type: ignore
+    try:
+        fb = gnn_feedback.submit(
+            rec["ald_smiles"], rec["amine_smiles"],
+            float(rec.get("film_label")),
+            note=f"文献条目 {entry_id}：{rec.get('evidence') or ''}"[:300],
+            source="literature_pdf")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return fb
+
+
+@router.post("/entries/{entry_id}/to-dft")
+def entry_to_dft(entry_id: str):
+    """单体对条目 → DFT 页预填参数（/toolbox/dft?a=&b=）。"""
+    k = _knowledge()
+    rec = k.get_entry(entry_id)
+    if rec is None:
+        raise HTTPException(404, f"条目不存在: {entry_id}")
+    if not rec.get("ald_smiles") or not rec.get("amine_smiles"):
+        raise HTTPException(400, "该条目不含单体对，无法预填 DFT")
+    from urllib.parse import quote
+    return {
+        "ald_smiles": rec["ald_smiles"],
+        "amine_smiles": rec["amine_smiles"],
+        "url": f"/toolbox/dft?a={quote(rec['ald_smiles'])}"
+               f"&b={quote(rec['amine_smiles'])}",
+    }
+
+
+@router.get("/llm-settings")
+def get_llm_settings():
+    """文献解析 LLM 设置（key 只回显掩码）。"""
+    return _llm_extract().get_settings()
+
+
+@router.put("/llm-settings")
+def put_llm_settings(req: LiteratureLlmSettingsUpdate):
+    """保存文献解析 LLM 设置（只改传入字段）。"""
+    body = req.model_dump(exclude_unset=True)
+    return _llm_extract().save_settings(
+        enabled=body.get("enabled"), base_url=body.get("base_url"),
+        api_key=body.get("api_key"), model=body.get("model"),
+        embedding_provider=body.get("embedding_provider"),
+        embedding_model=body.get("embedding_model"),
+        embedding_api_key=body.get("embedding_api_key"))
+
+
+@router.post("/llm-settings/test")
+def test_llm_settings():
+    """测试文献解析 LLM 连接。"""
+    return _llm_extract().test_connection()
+
+
+@router.get("/embedding-status")
+def embedding_status():
+    """本地/在线 embedding 提供方可用性（设置页展示）。"""
+    from literature import embedding
+    return embedding.status()
+
+
+@router.get("/entries/vector-search")
+def vector_search(q: str, top_k: int = 5):
+    """向量检索（embedding 关闭时返回空列表）。"""
+    from literature import embedding
+    top_k = max(1, min(int(top_k), 20))
+    return {"entries": embedding.search(q, top_k=top_k)}

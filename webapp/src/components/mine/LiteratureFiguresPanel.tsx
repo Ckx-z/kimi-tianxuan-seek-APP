@@ -97,8 +97,11 @@ export function figureFileUrl(figId: string): string {
 
 export function LiteratureFiguresPanel({
   initialPaperId,
+  fixedPaperId,
 }: {
   initialPaperId?: string;
+  /** v1.9.0：嵌入文献卡片时固定 paper_id（隐藏自己的选择器） */
+  fixedPaperId?: string;
 }) {
   const navigate = useNavigate();
 
@@ -134,6 +137,13 @@ export function LiteratureFiguresPanel({
   }, []);
 
   useEffect(() => {
+    if (fixedPaperId) {
+      // v1.9.0：固定文献模式（由文献卡片传入），不加载选择器
+      setPaperId(fixedPaperId);
+      void refreshFigures(fixedPaperId);
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         const data = await request<{ papers: PaperMeta[] }>('/papers');
@@ -257,18 +267,20 @@ export function LiteratureFiguresPanel({
           <>
             {/* 选择文献 + 类型筛选 + 上传入口 */}
             <div className="flex flex-wrap items-center gap-2">
-              <Select value={paperId} onValueChange={(v) => void switchPaper(v)}>
-                <SelectTrigger className="max-w-[420px]" aria-label="选择文献">
-                  <SelectValue placeholder="选择文献" />
-                </SelectTrigger>
-                <SelectContent>
-                  {papers.map((p) => (
-                    <SelectItem key={p.paper_id} value={p.paper_id} title={p.title}>
-                      #{p.paper_id} {p.title.slice(0, 40)}{p.title.length > 40 ? '…' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {!fixedPaperId && (
+                <Select value={paperId} onValueChange={(v) => void switchPaper(v)}>
+                  <SelectTrigger className="max-w-[420px]" aria-label="选择文献">
+                    <SelectValue placeholder="选择文献" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {papers.map((p) => (
+                      <SelectItem key={p.paper_id} value={p.paper_id} title={p.title}>
+                        #{p.paper_id} {p.title.slice(0, 40)}{p.title.length > 40 ? '…' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {(['all', 'structure', 'spectra', 'mechanism'] as const).map((t) => (
                 <Button
                   key={t}

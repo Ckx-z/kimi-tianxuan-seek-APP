@@ -58,14 +58,28 @@ def _role(smiles: str) -> str | None:
 
 
 def _scan_smiles_candidates(text: str) -> list[dict]:
-    """RDKit 正则兜底：扫出 SMILES 并按角色归类。"""
+    """RDKit 正则兜底：扫出 SMILES 并按角色归类。
+
+    令牌可能带外侧括号/标点（SMILES 内部才合法），逐变体尝试解析。
+    """
     from rdkit import Chem
     alds, amines, seen = [], [], set()
     for m in _SMILES_TOKEN.finditer(text or ""):
-        s = m.group(0).rstrip(".,;:)")
-        if len(s) > 400 or s in seen:
+        raw = m.group(0)
+        if raw in seen:
             continue
-        seen.add(s)
+        seen.add(raw)
+        mol = None
+        for cand in (raw, raw.strip("()[]"), raw.rstrip(".,;:)"),
+                     raw.strip("()[]").rstrip(".,;:)")):
+            if len(cand) > 400:
+                continue
+            mol = Chem.MolFromSmiles(cand)
+            if mol is not None:
+                break
+        if mol is None:
+            continue
+        s = Chem.MolToSmiles(mol)
         role = _role(s)
         if role == "aldehyde":
             alds.append(s)
