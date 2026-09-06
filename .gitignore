@@ -148,3 +148,6 @@ data/feedback/
 data/gnn_jobs/
 data/gnn_models/
 data/research/
+# 科研知识库运行时数据（v1.9.0：侧车图/向量/结构化条目，用户数据）
+data/graphrag_user/
+data/literature/
