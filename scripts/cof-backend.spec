@@ -82,6 +82,9 @@ datas += _files("minimax/bridge/graphrag_v2/*.py", "minimax/bridge/graphrag_v2")
 # GNN 反馈微调编排（v1.8.0）：finetune/run_job/guard_eval/compare_versions
 # 为真实 .py 随包携带（frozen 下由 ANACONDA/dphuanjing 解释器执行）
 datas += _files("gnn_training/*.py", "gnn_training")
+# 本地 embedding worker（v1.9.0）：由 dphuanjing 以文件方式执行
+datas.append((str(ROOT / "src" / "literature" / "_embed_worker.py"),
+              "src/literature"))
 # xTB 计算引擎（DFT 模块）：目录存在才打包；frozen 下引擎路径解析到
 # _MEIPASS/vendor/xtb（见 src/dft/engine.py 的 xtb_binary/xtb_share_dir）
 if (ROOT / "vendor" / "xtb" / "bin" / "xtb.exe").is_file():
@@ -127,6 +130,13 @@ hiddenimports = [
     "literature.pdf_extract", "src.literature.pdf_extract",
     # 文献图谱（v1.7.0）：literature.figures 同为路由内惰性 import
     "literature.figures", "src.literature.figures",
+    # 科研知识库（v1.9.0）：路由内惰性 import 的新模块
+    "literature.knowledge", "src.literature.knowledge",
+    "literature.llm_extract", "src.literature.llm_extract",
+    "literature.graph_ingest", "src.literature.graph_ingest",
+    "literature.embedding", "src.literature.embedding",
+    # 侧车图/图谱检索（graph_ingest/助手 query_graphrag 运行时依赖）
+    "networkx",
     # 实验记录导出（routers/records.py 内惰性 import；docx → lxml 原生依赖
     # 见下方 binaries）
     "records.store", "src.records.store",

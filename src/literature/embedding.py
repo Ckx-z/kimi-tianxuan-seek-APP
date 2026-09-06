@@ -1,4 +1,4 @@
-﻿"""科研知识库 embedding（v1.9.0）：三态提供方（off / local / online）。
+"""科研知识库 embedding（v1.9.0）：三态提供方（off / local / online）。
 
 - off（默认）：不向量化，检索走图路径 + 文本匹配兜底；
 - local：dphuanjing + sentence-transformers 加载本地模型（默认
@@ -29,7 +29,8 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 EMB_PATH = runtime_config.user_data_root() / "graphrag_user" / "literature_emb.jsonl"
-_WORKER = Path(__file__).resolve().parent / "_embed_worker.py"
+# worker 由 dphuanjing 以文件方式执行：源码态=本模块旁；frozen=随包 datas
+_WORKER = runtime_config.resource_root() / "src" / "literature" / "_embed_worker.py"
 _DASHSCOPE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"
 
 
