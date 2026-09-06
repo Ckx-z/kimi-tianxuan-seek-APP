@@ -385,3 +385,59 @@ def test_embedding_status_api(client):
     r = client.get("/api/literature/embedding-status")
     assert r.status_code == 200
     assert r.json()["provider"] == "off"
+
+
+# ---------------------------------------------------------------- 图谱导入（v1.9.2）
+
+def test_import_from_graph_idempotent(monkeypatch):
+    """图谱反应节点 → 条目（film/crystal/powder 映射 + 幂等）。"""
+    nodes = [
+        {"paper_id": "101", "group_id": "1",
+         "aldehyde_smiles": TFPT, "amine_smiles": B5,
+         "aldehyde_name": "TFPT", "amine_name": "B5",
+         "stoichiometry": "3:2", "synthesis_mode": "管壁",
+         "solvent": "甲苯/氯仿", "temperature": "120 °C",
+         "catalyst": "乙酸", "outcome": "film", "source_db": "v3"},
+        {"paper_id": "101", "group_id": "2",
+         "aldehyde_smiles": TFPT, "amine_smiles": B5,
+         "outcome": "crystal", "source_db": "v3"},
+        {"paper_id": "101", "group_id": "3",
+         "aldehyde_smiles": TFPT, "amine_smiles": B5,
+         "outcome": "powder", "source_db": "v3"},
+        {"paper_id": "102", "group_id": "4",
+         "aldehyde_smiles": TFPT, "amine_smiles": B5,
+         "outcome": "unknown", "source_db": "v3"},  # 无成膜结论 → 仅单体对
+    ]
+    monkeypatch.setattr(knowledge, "_graph_nodes", lambda: nodes)
+    stats = knowledge.import_from_graph()
+    assert stats["imported"] >= 6  # 3×film_outcome + monomer_pair + conditions…
+    assert stats["total_entries"] == stats["imported"]
+    # 幂等：重跑 0 新增
+    stats2 = knowledge.import_from_graph()
+    assert stats2["imported"] == 0
+    # 成膜结论映射正确
+    film = [e for e in knowledge.list_entries(kind="film_outcome")
+            if e["paper_id"] == "101"]
+    labels = {e["group_id"]: e["film_label"] for e in film}
+    assert labels["1"] == 1.0 and labels["2"] == 0.5 and labels["3"] == 0.0
+    # unknown 节点只出单体对、无成膜结论
+    assert all(e["kind"] != "film_outcome"
+               for e in knowledge.list_entries() if e["paper_id"] == "102")
+    # 全部标记 graph_indexed（无需重复入侧车图）
+    assert all(e["graph_indexed"] for e in knowledge.list_entries()
+               if e["source"] == "graph_import")
+
+
+def test_import_from_graph_api(client, monkeypatch):
+    monkeypatch.setattr(knowledge, "_graph_nodes", lambda: [{
+        "paper_id": "1", "group_id": "1",
+        "aldehyde_smiles": TFPT, "amine_smiles": B5,
+        "outcome": "film", "source_db": "v3"}])
+    r = client.post("/api/literature/entries/import-from-graph")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["imported"] >= 1
+    assert body["total_entries"] >= body["imported"]
+    # 幂等
+    r2 = client.post("/api/literature/entries/import-from-graph")
+    assert r2.json()["imported"] == 0

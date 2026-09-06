@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -331,3 +332,151 @@ def group_by(entries: list[dict]) -> dict[str, list[dict]]:
     for e in entries:
         groups.setdefault(str(e.get("group_id") or "未分组"), []).append(e)
     return groups
+
+
+# ---------------------------------------------------------------- 图谱历史导入（v1.9.2）
+
+# 旧图谱 outcome → 成膜三档（film=明确成膜；crystal=结晶但未明确成膜；
+# powder=粉末未成膜；unknown=不导入成膜结论）
+_OUTCOME_LABEL = {"film": 1.0, "crystal": 0.5, "powder": 0.0}
+
+
+def _graph_nodes() -> list[dict]:
+    """加载随包知识图谱（graph_v2.pkl，不含用户侧车图）的反应节点。"""
+    import sys
+    from src import runtime_config
+    bridge = runtime_config.resource_root() / "minimax" / "bridge"
+    if str(bridge) not in sys.path:
+        sys.path.insert(0, str(bridge))
+    import query_graphrag  # noqa: F401  # 确保 bridge 路径可用
+    graph_path = bridge / "graphrag" / "graph_v2.pkl"
+    if not graph_path.is_file():
+        return []
+    import pickle
+    with open(graph_path, "rb") as f:
+        G = pickle.load(f)
+    out = []
+    for n, d in G.nodes(data=True):
+        if d.get("node_type") != "reaction":
+            continue
+        rec = dict(d)
+        # 大量节点 group_id 属性为空字符串但 id 形如 R-<paper>-<group>，
+        # 兜底解析；尾部为空（如 R-aug_848-）则用 id 哈希生成稳定组号
+        if not rec.get("group_id"):
+            parts = str(n).split("-", 2)
+            g = parts[2].strip() if len(parts) == 3 else ""
+            rec["group_id"] = g or ("imp-" + hashlib.md5(
+                str(n).encode()).hexdigest()[:8])
+        if not rec.get("paper_id"):
+            parts = str(n).split("-", 2)
+            if len(parts) >= 2:
+                rec["paper_id"] = parts[1]
+        if rec.get("paper_id"):
+            out.append(rec)
+    return out
+
+
+def import_from_graph(limit: int | None = None) -> dict:
+    """把随包知识图谱的反应节点转换为结构化条目（幂等：可重复执行）。
+
+    - film/crystal/powder → film_outcome（1.0/0.5/0.0），unknown 跳过成膜结论；
+    - 每个反应 → monomer_pair（名称/计量比/合成模式）+ condition
+      （溶剂/温度/催化剂/界面类型）；
+    - 图谱节点自身已在包内图中：导入条目标记 graph_indexed=true，
+      不再重复同步侧车图；
+    - 去重键 (paper_id, group_id, kind, source=graph_import)。
+    返回统计 {graph_nodes, papers, imported, skipped}。
+    """
+    nodes = _graph_nodes()
+    if limit:
+        nodes = nodes[:limit]
+    existing_keys: set[tuple] = set()
+    for r in _load():
+        if r.get("source") == "graph_import":
+            existing_keys.add((str(r.get("paper_id")), str(r.get("group_id")),
+                               str(r.get("kind"))))
+    now = _now()
+    imported = 0
+    new_rows: list[dict] = []
+    pending_keys: set[tuple] = set()
+    for node in nodes:
+        paper_id = str(node.get("paper_id") or "")
+        group_id = str(node.get("group_id") or "")
+        if not paper_id:
+            continue
+        ald = str(node.get("aldehyde_smiles") or "").strip()
+        amine = str(node.get("amine_smiles") or "").strip()
+        a_name = str(node.get("aldehyde_name") or "").strip()
+        b_name = str(node.get("amine_name") or "").strip()
+        experiment = (f"{a_name} + {b_name}" if a_name or b_name
+                      else "图谱导入体系")
+        evidence = ("知识图谱历史条目（构建自旧结构化文献库 "
+                    f"{node.get('source_db') or ''}；yaml: "
+                    f"{node.get('yaml_lid') or ''}）")[:300]
+        outcome = str(node.get("outcome") or "unknown").strip()
+
+        def _emit(kind: str, extra: dict) -> None:
+            nonlocal imported
+            key = (paper_id, group_id, kind)
+            if key in existing_keys or key in pending_keys:
+                return
+            pending_keys.add(key)
+            rec = {
+                "kind": kind,
+                "group_id": group_id,
+                "experiment": experiment,
+                "evidence": evidence,
+                "source": "graph_import",
+                "status": "confirmed",
+                "graph_indexed": True,
+                **extra,
+            }
+            try:
+                validated = validate_entry(rec)
+            except ValueError:
+                return
+            validated["entry_id"] = _new_id()
+            validated["paper_id"] = paper_id
+            validated["created_at"] = now
+            validated["updated_at"] = now
+            validated["graph_indexed"] = True  # 图谱节点已在包内图中
+            new_rows.append(validated)
+            imported += 1
+
+        if ald and amine:
+            _emit("monomer_pair", {
+                "ald_smiles": ald, "amine_smiles": amine,
+                "stoichiometry": str(node.get("stoichiometry") or ""),
+                "topology": "",  # 旧图谱无拓扑字段
+                "synthesis_method": str(node.get("synthesis_mode") or ""),
+            })
+            if outcome in _OUTCOME_LABEL:
+                _emit("film_outcome", {
+                    "ald_smiles": ald, "amine_smiles": amine,
+                    "film_label": _OUTCOME_LABEL[outcome],
+                    "stoichiometry": str(node.get("stoichiometry") or ""),
+                    "synthesis_method": str(node.get("synthesis_mode") or ""),
+                })
+        conditions = {
+            "solvent": str(node.get("solvent") or ""),
+            "temperature": str(node.get("temperature") or ""),
+            "catalyst": str(node.get("catalyst") or ""),
+            "interface": str(node.get("interface_type") or ""),
+            "synthesis_mode": str(node.get("synthesis_mode") or ""),
+        }
+        conditions = {k: v for k, v in conditions.items() if v}
+        if conditions:
+            _emit("condition", {"conditions": conditions})
+
+    if new_rows:
+        with _lock:
+            rows = _load()
+            rows.extend(new_rows)
+            _save(rows)
+    return {
+        "graph_nodes": len(nodes),
+        "papers": len({str(n.get("paper_id")) for n in nodes}),
+        "imported": imported,
+        "skipped": len(nodes) * 3 - imported,
+        "total_entries": len(_load()),
+    }

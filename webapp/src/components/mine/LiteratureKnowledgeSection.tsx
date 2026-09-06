@@ -128,6 +128,11 @@ export function LiteratureKnowledgeSection() {
   const [detail, setDetail] = useState<PaperDetail | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
+  // 图谱历史导入（v1.9.2：把随包图谱反应节点导入为条目，幂等）
+  const [importing, setImporting] = useState(false);
+  const [importStats, setImportStats] = useState<{
+    imported: number; total_entries: number;
+  } | null>(null);
 
   // 补解析
   const [parseOpen, setParseOpen] = useState(false);
@@ -284,6 +289,26 @@ export function LiteratureKnowledgeSection() {
     }
   };
 
+  const runGraphImport = async () => {
+    setImporting(true);
+    try {
+      const stats = await req<{
+        graph_nodes: number; papers: number;
+        imported: number; total_entries: number;
+      }>('/entries/import-from-graph', { method: 'POST' });
+      setImportStats(stats);
+      toast.success(
+        stats.imported > 0
+          ? `已导入 ${stats.imported} 条历史图谱条目（共 ${stats.total_entries} 条）`
+          : '历史图谱条目已全部导入（幂等，无需重复）');
+      if (paperId) await loadEntries(paperId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '导入失败');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const filtered = papers.filter((p) =>
     !filter.trim() || p.title.toLowerCase().includes(filter.trim().toLowerCase())
     || String(p.paper_id) === filter.trim());
@@ -300,10 +325,29 @@ export function LiteratureKnowledgeSection() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <BookOpen className="h-4 w-4 text-gold" />
-          科研知识库（结构化条目 · 图谱 · 补解析）
+        <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-lg">
+          <span className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-gold" />
+            科研知识库（结构化条目 · 图谱 · 补解析）
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={importing}
+            onClick={() => void runGraphImport()}
+            title="把随包知识图谱（5713 篇文献的反应节点）导入为结构化条目（幂等）"
+          >
+            {importing
+              ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              : <Play className="mr-1.5 h-3.5 w-3.5" />}
+            导入图谱历史条目
+          </Button>
         </CardTitle>
+        {importStats && (
+          <p className="text-xs text-muted-foreground">
+            图谱历史导入：新增 {importStats.imported} 条 · 当前共 {importStats.total_entries} 条
+          </p>
+        )}
       </CardHeader>
       <CardContent className="p-4 pt-2">
         {loading ? (
@@ -439,7 +483,8 @@ export function LiteratureKnowledgeSection() {
                       ) : entries.length === 0 ? (
                         <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
                           该文献尚未做结构化提取（原文元数据见「原文信息」页）。
-                          点右上「补解析」用 LLM 提取单体/成膜体系/条件/表征
+                          可点右上「补解析」用 LLM 提取，或点左上「导入图谱
+                          历史条目」把随包知识图谱的历史信息一键导入
                           （未配置解析 LLM 时降级 SMILES 扫描）。
                         </p>
                       ) : (

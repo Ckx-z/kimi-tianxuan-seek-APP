@@ -542,3 +542,18 @@ def vector_search(q: str, top_k: int = 5):
     from literature import embedding
     top_k = max(1, min(int(top_k), 20))
     return {"entries": embedding.search(q, top_k=top_k)}
+
+
+@router.post("/entries/import-from-graph")
+def import_entries_from_graph():
+    """把随包知识图谱的历史反应节点导入为结构化条目（幂等）。
+
+    旧图谱（graph_v2.pkl）含 6197 个反应节点（单体/条件/成膜结论），
+    导入后各文献卡片即可看到历史结构化信息；可重复调用，已导入的跳过。
+    """
+    k = _knowledge()
+    try:
+        stats = k.import_from_graph()
+    except Exception as exc:
+        raise HTTPException(500, f"图谱导入失败：{type(exc).__name__}: {exc}")
+    return stats
