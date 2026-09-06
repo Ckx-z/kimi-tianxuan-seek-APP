@@ -1,0 +1,9 @@
+{
+  "evaluated_at": "2026-09-05",
+  "source": "data/film_gold_report_20260905_114638.json（v1.6.1 终评，tree_v5 重训 + GNN v5.4）",
+  "n": 39,
+  "a_min": 0.6661,
+  "c_max": 0.0479,
+  "mae": 0.0958,
+  "spearman": 0.8628
+}

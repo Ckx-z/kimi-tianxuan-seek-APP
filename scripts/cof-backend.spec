@@ -59,6 +59,9 @@ datas = [
     # 只读数据资产
     (str(ROOT / "data" / "builtin_monomers.json"), "data"),
     (str(ROOT / "data" / "paper_titles.json"), "data"),
+    # GNN 验证闸门（v1.8.0）：金标准集 + 基线快照随包（frozen 下 guard 可用）
+    (str(ROOT / "data" / "film_gold_standard.json"), "data"),
+    (str(ROOT / "data" / "film_gold_baseline.json"), "data"),
     (str(ROOT / "data" / "experimental_refs"), "data/experimental_refs"),
     (str(ROOT / "data" / "plan_templates"), "data/plan_templates"),
     (str(ROOT / "data" / "interim" / "v5_train_stage1_cond_filled.csv"),
@@ -76,6 +79,9 @@ datas = [
 datas += _files("minimax/adapters/*.py", "minimax/adapters")
 datas += _files("minimax/bridge/*.py", "minimax/bridge")
 datas += _files("minimax/bridge/graphrag_v2/*.py", "minimax/bridge/graphrag_v2")
+# GNN 反馈微调编排（v1.8.0）：finetune/run_job/guard_eval/compare_versions
+# 为真实 .py 随包携带（frozen 下由 ANACONDA/dphuanjing 解释器执行）
+datas += _files("gnn_training/*.py", "gnn_training")
 # xTB 计算引擎（DFT 模块）：目录存在才打包；frozen 下引擎路径解析到
 # _MEIPASS/vendor/xtb（见 src/dft/engine.py 的 xtb_binary/xtb_share_dir）
 if (ROOT / "vendor" / "xtb" / "bin" / "xtb.exe").is_file():
@@ -130,6 +136,9 @@ hiddenimports = [
     "recommend.plan_templates", "src.recommend.plan_templates",
     "recommend.plan_card", "src.recommend.plan_card",
     "runtime_config", "src.runtime_config",
+    # GNN 反馈/重训（v1.8.0：routers/gnn_feedback.py 内惰性 import）
+    "predictor.gnn_feedback", "src.predictor.gnn_feedback",
+    "predictor.gnn_jobs", "src.predictor.gnn_jobs",
     # PDF 提取（PyMuPDF，原生组件）与 multipart 上传解析
     "fitz", "pymupdf",
     "multipart",

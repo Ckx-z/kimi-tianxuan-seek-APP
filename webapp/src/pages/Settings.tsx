@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { BackendUnavailableError } from '@/lib/api';
 import { COLOR_SCHEMES, SCHEME_LABELS, useTheme } from '@/hooks/use-theme';
+import { GnnEvolutionPanel } from '@/components/settings/GnnEvolutionPanel';
 import {
   fetchLlmSettings,
   saveLlmSettings,
@@ -1039,6 +1040,7 @@ export default function Settings() {
           <LlmSettingsCard offline={offline} />
           <WebSearchSettingsCard offline={offline} />
           <AssistantMemoryCard offline={offline} />
+          <GnnEvolutionPanel />
         </div>
         <div className="space-y-6">
           <BackendStatusCard health={health} offline={offline} loading={healthLoading} />

@@ -65,6 +65,9 @@ def build_prediction_payload(ald_smiles: str, amine_smiles: str,
         "tree_route": pred_result.get("tree_route"),
         "gnn_score": None if ood_out else pred_result.get("gnn_probability"),
         "gnn_std": None if ood_out else pred_result.get("gnn_std"),
+        # v1.8.0：实际激活的 GNN 版本（gnn_v5.4 或反馈微调版本）
+        "gnn_model_version": (pred_result.get("gnn_version")
+                              or "gnn_v5.4") if not ood_out else None,
         "ood": ood,
         "source": source,
         "timestamp": datetime.now().isoformat(timespec="seconds"),

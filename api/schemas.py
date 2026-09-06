@@ -333,3 +333,35 @@ class LiteratureFigureUpdate(BaseModel):
     meta: dict | None = Field(None, description="类型元数据（smiles/technique/conditions/peaks）")
     score_note: str | None = Field(
         None, description="与成膜打分联动回写备注（如：本系统打分 0.85）")
+
+
+class GnnFeedbackCreate(BaseModel):
+    """GNN 打分纠错反馈（v1.8.0）。"""
+    ald_smiles: str = Field(..., description="醛单体 SMILES")
+    amine_smiles: str = Field(..., description="胺单体 SMILES")
+    label: float = Field(..., description="正确档位：1.0 成膜 / 0.5 边界 / 0.0 不成膜")
+    note: str = Field("", description="理由（文献标题/实验编号等）")
+    source: str = Field("score_correction",
+                        description="来源：score_correction|literature_pdf|experiment_csv")
+
+
+class GnnFeedbackUpdate(BaseModel):
+    """反馈修改：label/note 至少一项。"""
+    label: float | None = Field(None, description="档位")
+    note: str | None = Field(None, description="理由")
+
+
+class GnnFeedbackBatchConfirm(BaseModel):
+    """批量确认反馈（import 预览确认后调用）。"""
+    feedback_ids: list[str] = Field(..., description="反馈 id 列表")
+
+
+class GnnRetrainRequest(BaseModel):
+    """启动 GNN 反馈微调（v1.8.0）。"""
+    feedback_ids: list[str] | None = Field(
+        None, description="参与微调的已确认反馈 id；缺省=全部已确认")
+    freeze: int = Field(2, ge=0, le=5, description="冻结的 message-passing 层数")
+    epochs: int = Field(30, ge=3, le=120)
+    lr: float = Field(1e-4, gt=0, le=1e-2)
+    batch_size: int = Field(64, ge=8, le=256)
+    patience: int = Field(5, ge=2, le=20)

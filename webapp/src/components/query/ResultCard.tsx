@@ -1,13 +1,146 @@
 /**
  * 打分结果大卡：主分数 + 树/GNN 分量小卡 + OOD 横幅 + tree_route 路由说明
+ * v1.8.0：新增「反馈打分不合理」入口（三档修正 + 理由 → /api/gnn/feedback）
  */
+import { useState } from 'react';
+import { Flag, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { PredictResult } from './api';
 
 interface Props {
   result: PredictResult | null;
   loading: boolean;
+  /** v1.8.0：当前输入组合（反馈打分不合理用） */
+  aldSmiles?: string;
+  amineSmiles?: string;
+}
+
+const LABEL_OPTIONS = [
+  { value: 1.0, label: '成膜（1.0）', desc: '文献/实验证实可成膜' },
+  { value: 0.5, label: '边界（0.5）', desc: '结果不确定/有条件成膜' },
+  { value: 0.0, label: '不成膜（0.0）', desc: '证实不可成膜' },
+];
+
+/** 反馈打分不合理弹窗：三档修正 + 理由 → 反馈队列 */
+function FeedbackDialog({
+  open, onClose, ald, amine,
+}: {
+  open: boolean;
+  onClose: () => void;
+  ald: string;
+  amine: string;
+}) {
+  const [label, setLabel] = useState<number | null>(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (label == null) {
+      toast.error('请选择正确档位');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch('/api/gnn/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ald_smiles: ald, amine_smiles: amine, label, note: note.trim(),
+          source: 'score_correction',
+        }),
+      });
+      if (!res.ok) {
+        let msg = `提交失败（${res.status}）`;
+        try {
+          const data = await res.json();
+          if (typeof data?.detail === 'string') msg = data.detail;
+        } catch {
+          /* keep */
+        }
+        toast.error(msg);
+        return;
+      }
+      toast.success('已入反馈队列：可在设置页「GNN 模型演进」确认并用于重训');
+      onClose();
+    } catch {
+      toast.error('无法连接后端服务');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>反馈打分不合理</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="truncate text-xs text-muted-foreground" title={`${ald} + ${amine}`}>
+            {ald.slice(0, 30)}… + {amine.slice(0, 30)}…
+          </p>
+          <div className="space-y-1.5">
+            <Label>正确档位</Label>
+            <div className="space-y-1">
+              {LABEL_OPTIONS.map((o) => (
+                <label
+                  key={o.value}
+                  className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
+                    label === o.value
+                      ? 'border-gold bg-gold-muted/40'
+                      : 'border-border hover:bg-muted/40'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="gnn-fb-label"
+                    className="mt-1"
+                    checked={label === o.value}
+                    onChange={() => setLabel(o.value)}
+                  />
+                  <span>
+                    <span className="font-medium">{o.label}</span>
+                    <span className="block text-xs text-muted-foreground">{o.desc}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="fb-note">理由（文献标题/实验编号等，供复核与溯源）</Label>
+            <Textarea
+              id="fb-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="如：文献 10.xxxx/xxxx 报道该组合可成膜"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            取消
+          </Button>
+          <Button onClick={() => void submit()} disabled={busy}>
+            {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            提交反馈
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 /** OOD 横幅：out 红色 / 其他非 in 黄色 */
@@ -52,7 +185,8 @@ function SubScoreCard({ label, score, std }: { label: string; score: number | nu
   );
 }
 
-export default function ResultCard({ result, loading }: Props) {
+export default function ResultCard({ result, loading, aldSmiles, amineSmiles }: Props) {
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   // 加载态
   if (loading) {
     return (
@@ -88,6 +222,7 @@ export default function ResultCard({ result, loading }: Props) {
   }
 
   const noScore = result.score == null;
+  const canFeedback = Boolean(aldSmiles && amineSmiles);
 
   return (
     <Card>
@@ -136,8 +271,28 @@ export default function ResultCard({ result, loading }: Props) {
         {/* 树 / GNN 分量 */}
         <div className="grid grid-cols-2 gap-3">
           <SubScoreCard label="树模型分量" score={result.tree_score} std={result.tree_std} />
-          <SubScoreCard label="GNN 分量" score={result.gnn_score} std={result.gnn_std} />
+          <div>
+            <SubScoreCard label="GNN 分量" score={result.gnn_score} std={result.gnn_std} />
+            {result.gnn_model_version && (
+              <p className="mt-1 text-center text-[11px] text-muted-foreground">
+                {result.gnn_model_version}
+              </p>
+            )}
+          </div>
         </div>
+
+        {/* 反馈打分不合理（v1.8.0） */}
+        {canFeedback && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => setFeedbackOpen(true)}
+          >
+            <Flag className="mr-1.5 h-3.5 w-3.5" />
+            反馈打分不合理（用于 GNN 修正重训）
+          </Button>
+        )}
 
         {/* tree_route 路由说明 */}
         {result.tree_route && (
@@ -147,6 +302,15 @@ export default function ResultCard({ result, loading }: Props) {
           </p>
         )}
       </CardContent>
+
+      {canFeedback && (
+        <FeedbackDialog
+          open={feedbackOpen}
+          onClose={() => setFeedbackOpen(false)}
+          ald={aldSmiles!}
+          amine={amineSmiles!}
+        />
+      )}
     </Card>
   );
 }

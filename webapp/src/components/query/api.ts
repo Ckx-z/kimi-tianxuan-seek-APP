@@ -56,6 +56,8 @@ export interface PredictResult {
   tree_route?: string | null;
   gnn_score: number | null;
   gnn_std: number | null;
+  /** v1.8.0：实际激活的 GNN 版本（gnn_v5.4 或反馈微调版本） */
+  gnn_model_version?: string | null;
   ood: { level: string; reasons: string[] };
   explanation?: ScoreExplanation;
 }

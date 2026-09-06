@@ -388,7 +388,12 @@ export default function Query() {
 
         {/* 右侧结果区（2/3） */}
         <div className="space-y-4 lg:col-span-2">
-          <ResultCard result={result} loading={predicting} />
+          <ResultCard
+            result={result}
+            loading={predicting}
+            aldSmiles={ald.smiles}
+            amineSmiles={amine.smiles}
+          />
 
           {/* 收藏按钮（有打分结果后出现）；已收藏则置灰显示，可再次点击取消 */}
           {result && !predicting && (

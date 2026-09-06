@@ -142,3 +142,9 @@ data/dft_jobs.json.tmp
 data/dft_draft.json
 data/dft_draft.json.tmp
 timer.dat
+
+# GNN 反馈/重训运行时数据（v1.8.0：用户数据，不入库）
+data/feedback/
+data/gnn_jobs/
+data/gnn_models/
+data/research/

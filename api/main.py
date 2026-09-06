@@ -19,8 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .routers import (assistant, dft, favorite_folders, favorites, iterate,
-                      literature, llm, monomers, plan, predict, records)
+from .routers import (assistant, dft, favorite_folders, favorites, gnn_feedback,
+                      iterate, literature, llm, monomers, plan, predict, records)
 
 # frozen（PyInstaller onedir）时资源在 sys._MEIPASS（exe 旁 _internal）
 if getattr(sys, "frozen", False):
@@ -61,7 +61,8 @@ app.add_middleware(
 
 for r in (predict.router, favorites.router, favorite_folders.router,
           records.router, monomers.router, plan.router, llm.router,
-          iterate.router, assistant.router, dft.router, literature.router):
+          iterate.router, assistant.router, dft.router, literature.router,
+          gnn_feedback.router):
     app.include_router(r)
 
 

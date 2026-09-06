@@ -11,6 +11,7 @@ FilmPredictor 捕获后记 gnn_error 并继续 tree 预测（优雅降级）。
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -34,14 +35,60 @@ DEFAULT_CHECKPOINT = BUNDLED_CHECKPOINT if BUNDLED_CHECKPOINT.exists() \
 # 模块级常量保留以便排查/测试 monkeypatch；None 表示 GNN 环境不可用
 DPHUANJING_PYTHON = runtime_config.gnn_python()
 
+# v1.8.0：反馈微调版本 registry（激活版本优先于基础 v5.4）
+try:
+    from src.predictor import gnn_jobs as _gnn_jobs
+except ImportError:  # pragma: no cover
+    from predictor import gnn_jobs as _gnn_jobs  # type: ignore
+
+
+def _env_checkpoint() -> Path | None:
+    """COF_GNN_CHECKPOINT 环境变量钩子（验证闸门/测试用，最优先级）。"""
+    val = os.environ.get("COF_GNN_CHECKPOINT", "").strip()
+    if val:
+        p = Path(val)
+        if p.is_file():
+            return p
+    return None
+
+
+def _active_retrained_checkpoint() -> Path | None:
+    """反馈微调 registry 激活版本（非 base）的 checkpoint；无/缺失返回 None。"""
+    try:
+        ckpt = _gnn_jobs.active_checkpoint()
+        return ckpt if ckpt is not None and ckpt.is_file() else None
+    except Exception:
+        return None
+
+
+def _active_model_name() -> str:
+    """当前 GNN 版本名（透出给 predict 响应 gnn_model_version）。"""
+    try:
+        ver = _gnn_jobs.active_version()
+        if ver and ver != "gnn_v5.4" and _active_retrained_checkpoint() is not None:
+            return ver
+    except Exception:
+        pass
+    return "gnn_v5.4"
+
 
 def _resolve_runtime() -> tuple[Path | None, Path | None]:
     """解析 GNN 推理运行时 (predict_pair 脚本, checkpoint)。
 
-    优先级：包内 gnn_runtime + 包内模型（随包分发）→ 包内脚本 +
-    旧项目模型（开发机）→ 旧项目脚本 + 旧项目模型。都不可用返回
-    (None, None)，由调用方降级。
+    优先级：COF_GNN_CHECKPOINT 环境变量（闸门/测试）→ 反馈微调 registry
+    激活版本（用户目录）→ 包内 gnn_runtime + 包内模型（随包分发）→
+    包内脚本 + 旧项目模型（开发机）→ 旧项目脚本 + 旧项目模型。
+    都不可用返回 (None, None)，由调用方降级。
     """
+    env = _env_checkpoint()
+    if env is not None:
+        script = BUNDLED_SCRIPT if BUNDLED_SCRIPT.is_file() else LEGACY_SCRIPT
+        return (script, env) if script.is_file() else (None, None)
+    active = _active_retrained_checkpoint()
+    if active is not None:
+        script = BUNDLED_SCRIPT if BUNDLED_SCRIPT.is_file() else LEGACY_SCRIPT
+        if script.is_file():
+            return script, active
     if BUNDLED_SCRIPT.is_file():
         ckpt = BUNDLED_CHECKPOINT if BUNDLED_CHECKPOINT.exists() \
             else LEGACY_CHECKPOINT
@@ -142,7 +189,7 @@ class GNNFilmPredictor:
         return {
             "probability": prob,
             "std": std,
-            "model": "gnn_v5.4",
+            "model": _active_model_name(),  # v1.8.0：实际激活版本名
         }
 
     def predict(self, ald_smiles: str, amine_smiles: str) -> float:

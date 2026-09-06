@@ -114,6 +114,7 @@ class FilmPredictor:
                 gnn_res = self.gnn.predict_single(ald_smiles, amine_smiles)
                 result["gnn_probability"] = gnn_res["probability"]
                 result["gnn_std"] = gnn_res["std"]
+                result["gnn_version"] = gnn_res.get("model")  # v1.8.0：版本透出
             except Exception as e:
                 result["gnn_error"] = str(e)
                 self.gnn_available = False
