@@ -267,6 +267,17 @@ def test_llm_settings_api(client):
     assert test.json()["ok"] is False  # 假端点不可达 → 连接失败
 
 
+def test_paper_detail_api(client):
+    """老文献自带的结构化元数据（作者/期刊/摘要）可完整取回（v1.9.1）。"""
+    r = client.get("/api/literature/papers/1")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["title"] == "TFPT 文献"
+    assert d["doi"] == "10.1000/xyz"
+    assert d["url"] == "https://doi.org/10.1000/xyz"
+    assert client.get("/api/literature/papers/999").status_code == 404
+
+
 # ---------------------------------------------------------------- 入图（P1）
 
 def test_graph_sync_creates_lit_nodes_and_edges():

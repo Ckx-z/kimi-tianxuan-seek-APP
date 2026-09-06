@@ -34,6 +34,19 @@ interface PaperMeta {
   year?: number | null;
 }
 
+interface PaperDetail {
+  paper_id: string;
+  title: string;
+  authors: string[];
+  journal: string;
+  year?: number | null;
+  doi: string;
+  url: string;
+  abstract?: string | null;
+  source?: string;
+  added_at?: string;
+}
+
 interface Entry {
   entry_id: string;
   paper_id: string;
@@ -112,6 +125,7 @@ export function LiteratureKnowledgeSection() {
   const [filter, setFilter] = useState('');
   const [paperId, setPaperId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [detail, setDetail] = useState<PaperDetail | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
 
@@ -162,7 +176,13 @@ export function LiteratureKnowledgeSection() {
   }, []);
 
   useEffect(() => {
-    if (paperId) void loadEntries(paperId);
+    if (paperId) {
+      void loadEntries(paperId);
+      // 加载原文元数据（老文献的结构化信息：作者/期刊/摘要等）
+      req<PaperDetail>(`/papers/${encodeURIComponent(paperId)}`)
+        .then(setDetail)
+        .catch(() => setDetail(null));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId]);
 
@@ -336,15 +356,16 @@ export function LiteratureKnowledgeSection() {
               ) : (
                 <>
                   <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
-                    <p className="min-w-0 flex-1 text-sm">
-                      <span className="font-medium">#{paper.paper_id}</span>{' '}
-                      {paper.title}
-                    </p>
-                    {paper.doi && (
-                      <span className="text-xs text-muted-foreground">
-                        {paper.doi}
-                      </span>
-                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm">
+                        <span className="font-medium">#{paper.paper_id}</span>{' '}
+                        {paper.title}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[paper.journal, paper.year, paper.doi]
+                          .filter(Boolean).join(' · ') || '（元数据见「原文信息」页）'}
+                      </p>
+                    </div>
                     <Button size="sm" variant="outline"
                             onClick={() => {
                               setParseText('');
@@ -356,21 +377,70 @@ export function LiteratureKnowledgeSection() {
                     </Button>
                   </div>
 
-                  <Tabs defaultValue="entries">
+                  <Tabs defaultValue="meta">
                     <TabsList>
+                      <TabsTrigger value="meta">原文信息</TabsTrigger>
                       <TabsTrigger value="entries">
                         结构化条目（{entries.length}）
                       </TabsTrigger>
                       <TabsTrigger value="figures">图谱</TabsTrigger>
                     </TabsList>
 
+                    {/* 原文信息：老文献自带的结构化元数据（非 LLM 提取条目） */}
+                    <TabsContent value="meta" className="space-y-2 pt-2">
+                      {detail ? (
+                        <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                          <p className="font-medium">{detail.title}</p>
+                          {detail.authors.length > 0 && (
+                            <p className="text-muted-foreground">
+                              作者：{detail.authors.join('；')}
+                            </p>
+                          )}
+                          <p className="text-muted-foreground">
+                            {[detail.journal, detail.year].filter(Boolean).join(' · ') || '期刊信息缺失'}
+                          </p>
+                          {detail.doi && (
+                            <p className="text-muted-foreground">
+                              DOI：{' '}
+                              <a
+                                href={detail.url || `https://doi.org/${detail.doi}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary underline-offset-2 hover:underline"
+                              >
+                                {detail.doi}
+                              </a>
+                            </p>
+                          )}
+                          {detail.abstract ? (
+                            <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
+                              {detail.abstract}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              （无摘要：可点右上「补解析」上传全文提取）
+                            </p>
+                          )}
+                          {(detail.source || detail.added_at) && (
+                            <p className="text-xs text-muted-foreground/70">
+                              来源：{detail.source || '—'}
+                              {detail.added_at ? ` · 入库 ${detail.added_at.slice(0, 10)}` : ''}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      )}
+                    </TabsContent>
+
                     <TabsContent value="entries" className="space-y-3 pt-2">
                       {entriesLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : entries.length === 0 ? (
                         <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                          尚无结构化条目：点右上「补解析」用 LLM 提取文献中的
-                          单体/成膜体系/条件/表征（未配置解析 LLM 时降级 SMILES 扫描）。
+                          该文献尚未做结构化提取（原文元数据见「原文信息」页）。
+                          点右上「补解析」用 LLM 提取单体/成膜体系/条件/表征
+                          （未配置解析 LLM 时降级 SMILES 扫描）。
                         </p>
                       ) : (
                         groups.map(([gid, rows]) => (

@@ -208,6 +208,28 @@ def list_papers():
     return {"papers": out, "count": len(out)}
 
 
+@router.get("/papers/{paper_id}")
+def paper_detail(paper_id: str):
+    """文献完整元数据（标题/作者/期刊/年份/DOI/摘要/来源），供卡片展示。"""
+    t = _titles_module()
+    entry = t.resolve_entry(paper_id)
+    if entry is None:
+        raise HTTPException(404, f"文献不存在: {paper_id}")
+    return {
+        "paper_id": str(paper_id),
+        "title": str(entry.get("title") or ""),
+        "authors": entry.get("authors") or [],
+        "journal": str(entry.get("journal") or ""),
+        "year": entry.get("year"),
+        "doi": str(entry.get("doi") or ""),
+        "url": str(entry.get("url") or "") or (
+            f"https://doi.org/{entry['doi']}" if entry.get("doi") else ""),
+        "abstract": entry.get("abstract") or None,
+        "source": str(entry.get("source") or ""),
+        "added_at": str(entry.get("added_at") or ""),
+    }
+
+
 @router.post("/figures/from-smiles", status_code=201)
 def figure_from_smiles(req: LiteratureFigureFromSmiles):
     """SMILES → RDKit 2D 结构图（structure 类）入库。"""
