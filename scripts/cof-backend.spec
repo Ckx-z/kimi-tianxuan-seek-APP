@@ -139,6 +139,14 @@ hiddenimports = [
     # GNN 反馈/重训（v1.8.0：routers/gnn_feedback.py 内惰性 import）
     "predictor.gnn_feedback", "src.predictor.gnn_feedback",
     "predictor.gnn_jobs", "src.predictor.gnn_jobs",
+    # v1.8.0 frozen 真机：predict 链路惰性 import（predictor.fusion 等）
+    # 在双命名空间下的别名解析补齐（No module named 'predictor.fusion'）
+    "predictor.fusion", "src.predictor.fusion",
+    "predictor.ood", "src.predictor.ood",
+    "predictor.pair_pool", "src.predictor.pair_pool",
+    "predictor.gnn_model", "src.predictor.gnn_model",
+    "predictor.routing", "src.predictor.routing",
+    "predictor.tree_model", "src.predictor.tree_model",
     # PDF 提取（PyMuPDF，原生组件）与 multipart 上传解析
     "fitz", "pymupdf",
     "multipart",
