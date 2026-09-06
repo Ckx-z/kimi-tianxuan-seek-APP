@@ -433,8 +433,10 @@ export default function Assistant() {
       });
     } finally {
       setStreaming(false);
+      // v1.8.1：研究问答已落会话（后端持久化），刷新侧栏消息计数
+      refreshSessions();
     }
-  }, []);
+  }, [refreshSessions]);
 
   const sendMessage = useCallback(
     async (raw: string) => {

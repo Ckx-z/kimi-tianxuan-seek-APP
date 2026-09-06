@@ -472,6 +472,14 @@ def run_research(question: str, allow_web: bool = True,
         return
     tools = available_research_tools()
 
+    # v1.8.1：会话内深度研究先落用户提问（此前只渲染前端本地，刷新即丢）
+    if session_id:
+        try:
+            from . import sessions as sessions_module
+            sessions_module.append_message(session_id, "user", question)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("研究问题落会话失败（已跳过）: %s", exc)
+
     # 1. 计划
     plan = plan_steps(question)
     yield {"type": "plan",
@@ -481,11 +489,15 @@ def run_research(question: str, allow_web: bool = True,
 
     # 2. 逐子问题执行（_result 内部事件收集完整工具结果供引用核验）
     all_results: list[dict] = []
+    tool_events: list[dict] = []  # v1.8.1：随助手消息落会话的检索过程
     for i, step in enumerate(plan["steps"]):
         for ev in _execute_step(i, step, tools):
             if ev.get("type") == "_result":
                 all_results.append(ev["result"])
                 continue
+            if session_id and ev.get("type") in ("tool_call", "tool_result",
+                                                 "critic_note"):
+                tool_events.append(ev)
             yield ev
 
     # 3. 批判补搜（缺口 ≤1 轮，最多补 2 个缺口）
@@ -498,10 +510,14 @@ def run_research(question: str, allow_web: bool = True,
         name = "web_search" if "web_search" in tools else "academic_search"
         result = registry.execute(name, {"query": q})
         all_results.append(result)
-        yield {"type": "tool_call", "name": name, "args": {"query": q}}
-        yield {"type": "tool_result", "name": name,
-               "summary": registry.summary_of(result),
-               "is_error": bool(result.get("is_error"))}
+        ev_call = {"type": "tool_call", "name": name, "args": {"query": q}}
+        ev_result = {"type": "tool_result", "name": name,
+                     "summary": registry.summary_of(result),
+                     "is_error": bool(result.get("is_error"))}
+        if session_id:
+            tool_events.extend([ev_call, ev_result])
+        yield ev_call
+        yield ev_result
 
     # 4. 撰写报告（含引用核验打回）
     work = [
@@ -526,14 +542,14 @@ def run_research(question: str, allow_web: bool = True,
     save_report(rid, question, title, report_md, refs, allow_web=allow_web,
                 session_id=session_id)
     if session_id:
-        # 会话内深度研究：报告计入会话（供一对话一报告合成），并留一条
-        # 助手消息记录。失败不影响研究主流程。
+        # v1.8.1：研究正文（报告全文 + 检索过程）落会话，替换此前的
+        # 「仅标记消息」——修复刷新/切换会话后聊天内容丢失。
         try:
             from . import sessions as sessions_module
             sessions_module.append_message(
                 session_id, "assistant",
-                f"深度研究完成：《{title}》（报告 ID: {rid}），"
-                "已可作为本会话综合报告的来源。")
+                f"深度研究完成：《{title}》（报告 ID: {rid}）\n\n{report_md}",
+                tool_events=tool_events)
         except Exception as exc:  # pragma: no cover
             logger.warning("研究完成消息落会话失败（已跳过）: %s", exc)
     yield {"type": "report", "report_id": rid, "title": title,

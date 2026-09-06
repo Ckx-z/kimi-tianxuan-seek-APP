@@ -51,6 +51,10 @@ def _sse_events(resp) -> list[dict]:
     return events
 
 
+def roles_count(sess: dict, role: str) -> int:
+    return sum(1 for m in sess.get("messages") or [] if m.get("role") == role)
+
+
 class _Queue:
     """按顺序吐 LLM 回复的桩；耗尽返回 None。"""
 
@@ -206,9 +210,13 @@ def test_question_report_linked_to_session(monkeypatch):
     assert rep_ev["session_id"] == sid
     rec = research.load_report(rep_ev["report_id"])
     assert rec["kind"] == "question" and rec["session_id"] == sid
-    # 会话内已留「深度研究完成」消息
+    # v1.8.1：用户提问 + 研究正文（报告全文）都落会话（刷新/切会话不丢）
     sess = sessions.load_session(sid)
-    assert any("深度研究完成" in (m.get("content") or "")
-               for m in sess["messages"])
+    assert roles_count(sess, "user") == 2  # 原会话提问 + 研究问题
+    assert any("TFPT 能成膜吗" in (m.get("content") or "")
+               for m in sess["messages"] if m["role"] == "user")
+    done_msg = next(m for m in sess["messages"]
+                    if "深度研究完成" in (m.get("content") or ""))
+    assert "单问报告" in done_msg["content"]  # 报告正文落会话
     # 单问报告会被会话综合报告收集
     assert research._question_reports_of(sid)[0]["report_id"] == rep_ev["report_id"]
