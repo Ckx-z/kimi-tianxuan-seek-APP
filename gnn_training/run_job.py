@@ -59,6 +59,7 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--patience", type=int, default=5)
+    ap.add_argument("--feedback-pos-w", type=float, default=5.0)
     ap.add_argument("--baseline",
                     default=str(_REPO / "data" / "film_gold_baseline.json"))
     args = ap.parse_args()
@@ -88,9 +89,18 @@ def main() -> None:
            "--epochs", str(args.epochs),
            "--lr", str(args.lr),
            "--batch-size", str(args.batch_size),
-           "--patience", str(args.patience)]
+           "--patience", str(args.patience),
+           "--feedback-pos-w", str(args.feedback_pos_w)]
     print(f"[runner] 微调启动: {' '.join(cmd)}", flush=True)
-    r = subprocess.run(cmd, cwd=str(_REPO), timeout=6 * 3600)
+    # runner 由 start_retrain 以 DETACHED|NO_WINDOW 启动（无控制台），
+    # 子进程必须显式带同款 flags + stdout 指向日志，否则 torch import 阶段
+    # 会被 0xC000013A 杀掉（Windows 控制台初始化问题，真机踩坑）。
+    flags = (subprocess.CREATE_NEW_PROCESS_GROUP
+             | subprocess.DETACHED_PROCESS
+             | getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    r = subprocess.run(cmd, cwd=str(_REPO), timeout=6 * 3600,
+                       stdout=sys.stdout, stderr=subprocess.STDOUT,
+                       creationflags=flags)
     if r.returncode != 0:
         _status(jobdir, status="failed", phase="failed",
                 error=f"微调失败（exit {r.returncode}），见 train.log")

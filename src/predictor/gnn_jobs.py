@@ -165,7 +165,8 @@ def env_ready() -> dict:
 
 def start_retrain(feedback_ids: list[str] | None = None,
                   freeze: int = 2, epochs: int = 30, lr: float = 1e-4,
-                  batch_size: int = 64, patience: int = 5) -> dict:
+                  batch_size: int = 64, patience: int = 5,
+                  feedback_pos_w: float = 5.0) -> dict:
     """启动微调 job。返回 job 记录；环境缺失/已有运行中 job 抛 RuntimeError。"""
     from . import gnn_feedback as fb
 
@@ -195,7 +196,8 @@ def start_retrain(feedback_ids: list[str] | None = None,
         "status": "starting",
         "phase": "starting",
         "params": {"freeze": freeze, "epochs": epochs, "lr": lr,
-                   "batch_size": batch_size, "patience": patience},
+                   "batch_size": batch_size, "patience": patience,
+                   "feedback_pos_w": feedback_pos_w},
         "feedback_ids": [r["feedback_id"] for r in rows],
         "feedback_count": len(rows),
         "created_at": _now(),
@@ -221,6 +223,7 @@ def start_retrain(feedback_ids: list[str] | None = None,
         "--version", version,
         "--freeze", str(freeze), "--epochs", str(epochs), "--lr", str(lr),
         "--batch-size", str(batch_size), "--patience", str(patience),
+        "--feedback-pos-w", str(feedback_pos_w),
     ]
     log_path = jobdir / "train.log"
     with open(log_path, "a", encoding="utf-8") as logf:

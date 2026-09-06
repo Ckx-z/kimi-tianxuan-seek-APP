@@ -42,6 +42,16 @@ def _load_gold() -> list[dict]:
     return json.loads(GOLD_PATH.read_text(encoding="utf-8"))["pairs"]
 
 
+def _decode_output(raw: bytes) -> str:
+    """子进程输出解码：UTF-8 优先，GBK 回退（Windows dphuanjing 打印中文）。"""
+    for enc in ("utf-8", "gbk"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 def _predict_pair(ald: str, amine: str, ckpt: Path) -> float | None:
     """单对校准分（经 gnn_runtime/predict_pair.py，dphuanjing 解释器）。"""
     try:
@@ -56,7 +66,7 @@ def _predict_pair(ald: str, amine: str, ckpt: Path) -> float | None:
         [str(python), str(script), "--ald", ald, "--amine", amine,
          "--model", str(ckpt), "--mc", "10"],
         cwd=str(script.parent), capture_output=True, timeout=180)
-    out = result.stdout.decode("utf-8", errors="replace")
+    out = _decode_output(result.stdout)
     m = re.search(r"成膜概率\s*[:：]\s*([0-9.]+)", out)
     if not m:
         return None

@@ -279,7 +279,7 @@ def start_retrain(req: GnnRetrainRequest):
         job = jobs.start_retrain(
             feedback_ids=req.feedback_ids, freeze=req.freeze,
             epochs=req.epochs, lr=req.lr, batch_size=req.batch_size,
-            patience=req.patience)
+            patience=req.patience, feedback_pos_w=req.feedback_pos_w)
     except RuntimeError as exc:
         raise HTTPException(503 if "dphuanjing" in str(exc) or "训练资产" in str(exc)
                             else 409, str(exc))

@@ -365,3 +365,5 @@ class GnnRetrainRequest(BaseModel):
     lr: float = Field(1e-4, gt=0, le=1e-2)
     batch_size: int = Field(64, ge=8, le=256)
     patience: int = Field(5, ge=2, le=20)
+    feedback_pos_w: float = Field(5.0, ge=1.0, le=50.0,
+                                  description="反馈正样本加权系数")

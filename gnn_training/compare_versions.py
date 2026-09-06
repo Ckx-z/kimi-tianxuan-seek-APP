@@ -25,7 +25,13 @@ def _predict(ald: str, amine: str, ckpt: Path, repo: Path,
         [str(python), str(script), "--ald", ald, "--amine", amine,
          "--model", str(ckpt), "--mc", "10"],
         cwd=str(script.parent), capture_output=True, timeout=180)
-    out = result.stdout.decode("utf-8", errors="replace")
+    out = ""
+    for enc in ("utf-8", "gbk"):  # Windows dphuanjing 打印中文（GBK 回退）
+        try:
+            out = result.stdout.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
     m = re.search(r"成膜概率\s*[:：]\s*([0-9.]+)", out)
     return float(m.group(1)) if m else None
 

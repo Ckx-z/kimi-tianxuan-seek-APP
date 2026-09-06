@@ -184,9 +184,12 @@ class PairDataset(torch.utils.data.Dataset):
     """v5.4 数据集 + 反馈行加权（多进程建图）。"""
 
     def __init__(self, rows: list[dict], feedback_keys: set[tuple[str, str]],
-                 freq_weights: dict | None = None, n_workers: int = 12):
+                 freq_weights: dict | None = None, n_workers: int = 12,
+                 pos_w: float = FEEDBACK_POS_W, neg_w: float = FEEDBACK_NEG_W):
         self.rows = rows
         self._feedback_keys = feedback_keys
+        self._pos_w = pos_w
+        self._neg_w = neg_w
         self.freq_weights = freq_weights or {}
         import multiprocessing as mp
         tasks = [(i, r) for i, r in enumerate(rows)]
@@ -213,8 +216,8 @@ class PairDataset(torch.utils.data.Dataset):
         weight = freq_w * group_w
         key = (r["aldehyde_smiles"], r["amine_smiles"])
         if key in self._feedback_keys:
-            weight *= (FEEDBACK_POS_W if float(r["is_film"]) >= 0.5
-                       else FEEDBACK_NEG_W)
+            weight *= (self._pos_w if float(r["is_film"]) >= 0.5
+                       else self._neg_w)
         item = {
             "ald_x": g["ald"].x, "ald_edge_index": g["ald"].edge_index,
             "ald_edge_attr": g["ald"].edge_attr,
@@ -245,14 +248,22 @@ def _filter_rows(rows: list[dict]) -> list[dict]:
 
 
 def merge_rows(base_rows: list[dict], feedback_rows: list[dict]) -> tuple[list, set]:
-    """合并反馈行（与基础集按组合去重）；返回 (rows, feedback_keys)。"""
+    """合并反馈行；返回 (rows, feedback_keys)。
+
+    反馈组合已在基础集中时**不重复追加行**，但仍加入 feedback_keys——
+    这些组合正是「打分不合理」的纠偏对象，需要加权重学（×POS/NEG_W）。
+    """
     base_keys = {(r["aldehyde_smiles"], r["amine_smiles"]) for r in base_rows}
     feedback_keys: set[tuple[str, str]] = set()
     merged = list(base_rows)
-    added = 0
+    added, weighted_existing = 0, 0
     for r in feedback_rows:
         key = (r["aldehyde_smiles"], r["amine_smiles"])
-        if key in base_keys or key in feedback_keys:
+        if key in base_keys:
+            feedback_keys.add(key)
+            weighted_existing += 1
+            continue
+        if key in feedback_keys:
             continue
         row = {k: r.get(k, "") for k in
                ("paper_id", "source_db", "aldehyde_smiles", "amine_smiles",
@@ -262,25 +273,56 @@ def merge_rows(base_rows: list[dict], feedback_rows: list[dict]) -> tuple[list, 
         merged.append(row)
         feedback_keys.add(key)
         added += 1
-    log(f"反馈合并：{len(feedback_rows)} 行 → 新增 {added} 行（去重后）")
+    log(f"反馈合并：{len(feedback_rows)} 行 → 新增 {added} 行、"
+        f"基础集内加权 {weighted_existing} 行")
     return merged, feedback_keys
 
 
 def _split_indices(rows: list[dict], feedback_keys: set) -> tuple[list, list]:
-    """验证集 = 反馈行分层 15% + 基础集 5%。"""
+    """验证集 = 反馈行分层 15% + 基础集 5%。
+
+    反馈行过少（<5）时全部留在训练集（纠偏样本必须被模型看到），
+    验证集只从基础集抽 5%。
+    """
     fb_idx = [i for i, r in enumerate(rows)
               if (r["aldehyde_smiles"], r["amine_smiles"]) in feedback_keys]
     base_idx = [i for i, r in enumerate(rows)
                 if (r["aldehyde_smiles"], r["amine_smiles"]) not in feedback_keys]
     rng = np.random.default_rng(42)
-    val_fb = rng.choice(fb_idx, size=max(1, int(len(fb_idx) * VAL_FEEDBACK_RATIO)),
-                        replace=False).tolist() if fb_idx else []
+    val_fb: list[int] = []
+    if len(fb_idx) >= 5:
+        val_fb = rng.choice(fb_idx,
+                            size=max(1, int(len(fb_idx) * VAL_FEEDBACK_RATIO)),
+                            replace=False).tolist()
     val_base = rng.choice(base_idx,
                           size=max(1, int(len(base_idx) * VAL_BASE_RATIO)),
                           replace=False).tolist() if base_idx else []
     val_set = set(val_fb) | set(val_base)
     train = [i for i in range(len(rows)) if i not in val_set]
     return train, sorted(val_set)
+
+
+def _calibration_indices(rows: list[dict], feedback_keys: set) -> list[int]:
+    """校准器拟合样本：全部反馈行 + 基础集按标签分层 10%。
+
+    校准映射要覆盖部署分布（含成膜区间），单靠早停验证集（负样本占优）
+    会把中等原始分单调压到 0（v1.8.0 pilot 真机踩坑）。
+    """
+    fb_idx = [i for i, r in enumerate(rows)
+              if (r["aldehyde_smiles"], r["amine_smiles"]) in feedback_keys]
+    pos = [i for i, r in enumerate(rows)
+           if (r["aldehyde_smiles"], r["amine_smiles"]) not in feedback_keys
+           and float(r["is_film"]) >= 0.5]
+    neg = [i for i, r in enumerate(rows)
+           if (r["aldehyde_smiles"], r["amine_smiles"]) not in feedback_keys
+           and float(r["is_film"]) < 0.5]
+    rng = np.random.default_rng(7)
+    sel_pos = rng.choice(pos, size=max(0, int(len(pos) * 0.10)),
+                         replace=False).tolist() if pos else []
+    sel_neg = rng.choice(neg, size=max(0, int(len(neg) * 0.10)),
+                         replace=False).tolist() if neg else []
+    out = list(fb_idx) + sel_pos + sel_neg
+    return sorted(set(out))
 
 
 # ---------------------------------------------------------------- 微调
@@ -335,6 +377,7 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--patience", type=int, default=5)
+    ap.add_argument("--feedback-pos-w", type=float, default=FEEDBACK_POS_W)
     ap.add_argument("--device", type=str,
                     default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
@@ -355,7 +398,8 @@ def main() -> None:
     _progress(progress, {"phase": "feature_build",
                          "n_rows": len(rows), "n_feedback": len(feedback_keys)})
     freq_weights = _compute_freq_weights(rows)
-    ds = PairDataset(rows, feedback_keys, freq_weights=freq_weights)
+    ds = PairDataset(rows, feedback_keys, freq_weights=freq_weights,
+                     pos_w=args.feedback_pos_w)
     train_idx, val_idx = _split_indices(rows, feedback_keys)
     train_ds = torch.utils.data.Subset(ds, train_idx)
     val_ds = torch.utils.data.Subset(ds, val_idx)
@@ -450,15 +494,19 @@ def main() -> None:
     }, save_path)
     log(f"模型已保存: {save_path}")
 
-    # ---- Isotonic 校准（验证集）----
+    # ---- Isotonic 校准（分层校准样本：反馈行 + 基础集分层 10%）----
     cal_path = out_dir / "calibrator.pkl"
     try:
-        probs, labels = _validate(model, val_loader, args.device)
+        cal_idx = _calibration_indices(rows, feedback_keys)
+        cal_loader = DataLoader(torch.utils.data.Subset(ds, cal_idx),
+                                batch_size=args.batch_size, shuffle=False,
+                                collate_fn=_collate)
+        probs, labels = _validate(model, cal_loader, args.device)
         cal = IsotonicRegression(out_of_bounds="clip", y_min=0.0, y_max=1.0)
         cal.fit(probs, labels)
         with open(cal_path, "wb") as f:
             pickle.dump(cal, f)
-        log(f"校准器已保存: {cal_path}（val n={len(probs)}）")
+        log(f"校准器已保存: {cal_path}（分层样本 n={len(probs)}）")
     except Exception as exc:
         log(f"校准失败（跳过）: {exc}")
         cal_path = Path("")
@@ -471,7 +519,7 @@ def main() -> None:
         "freeze": frozen,
         "params": {"lr": args.lr, "epochs": args.epochs,
                    "batch_size": args.batch_size, "patience": args.patience,
-                   "feedback_pos_w": FEEDBACK_POS_W,
+                   "feedback_pos_w": args.feedback_pos_w,
                    "feedback_neg_w": FEEDBACK_NEG_W},
         "metrics": {"val_pr_auc": round(best_pr_auc, 4),
                     "n_train": len(train_idx), "n_val": len(val_idx)},
