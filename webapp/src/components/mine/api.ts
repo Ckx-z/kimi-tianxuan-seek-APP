@@ -397,6 +397,8 @@ export interface LiteratureConfirmResult {
   in_training: boolean;
   graphrag_indexed: boolean;
   message: string;
+  /** 前端附加：录入时上传的 PDF 是否已留存为附件（v1.9.3 第 7 点闭环） */
+  attachment_note?: string;
 }
 
 /** 录入流程专用错误：带 HTTP 状态与结构化 detail（409 含 existing_paper_id） */

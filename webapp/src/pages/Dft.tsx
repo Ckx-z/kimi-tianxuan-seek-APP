@@ -836,9 +836,9 @@ export default function Dft() {
       </div>
 
       {backendDown && (
-        <Alert className="border-yellow-300 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950/40">
-          <AlertTitle className="text-yellow-800 dark:text-yellow-300">后端未连接</AlertTitle>
-          <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+        <Alert className="border-warning/30 bg-warning/10">
+          <AlertTitle className="text-warning">后端未连接</AlertTitle>
+          <AlertDescription className="text-warning/90">
             无法连接 FastAPI 服务。DFT 计算、单体库与历史记录暂不可用，请启动后端后刷新页面。
           </AlertDescription>
         </Alert>
@@ -908,7 +908,7 @@ export default function Dft() {
                 <h3 className="mb-2 text-sm font-semibold text-foreground">二聚体预览</h3>
                 {dimerLoading && <p className="text-xs text-muted-foreground">正在生成缩合二聚体预览…</p>}
                 {!dimerLoading && dimerError && (
-                  <p className="text-xs text-red-700 dark:text-red-400">{dimerError}</p>
+                  <p className="text-xs text-destructive">{dimerError}</p>
                 )}
                 {!dimerLoading && dimerPreview && (
                   <div className="space-y-2">
@@ -922,7 +922,7 @@ export default function Dft() {
                       {dimerPreview.dimer_smiles}
                     </code>
                     {dimerPreview.multi_site && dimerPreview.note && (
-                      <p className="text-xs text-amber-700 dark:text-amber-400">⚠️ {dimerPreview.note}</p>
+                      <p className="text-xs text-warning">⚠️ {dimerPreview.note}</p>
                     )}
                   </div>
                 )}
@@ -1048,9 +1048,9 @@ export default function Dft() {
 
             {/* Psi4 未安装：引导安装卡 */}
             {isPsi4 && backends && !psi4Installed && (
-              <Alert className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
-                <AlertTitle className="text-amber-800 dark:text-amber-300">Psi4 精度档未安装</AlertTitle>
-                <AlertDescription className="space-y-2 text-amber-700 dark:text-amber-400">
+              <Alert className="border-warning/30 bg-warning/10">
+                <AlertTitle className="text-warning">Psi4 精度档未安装</AlertTitle>
+                <AlertDescription className="space-y-2 text-warning/90">
                   <p>
                     {backends.psi4?.install_hint ??
                       '请运行 scripts/install_psi4_env.bat 一键安装（conda create -n psi4-env -c conda-forge psi4 python=3.11，约 300MB+ 下载）。'}
@@ -1170,7 +1170,7 @@ export default function Dft() {
               </div>
               {estAtoms?.complex_atom_count != null && estAtoms.complex_atom_count > 90
                 && psi4Method !== 'wb97xd3bj_svp_quick' && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
+                <p className="text-xs text-warning">
                   ⚡ 复合物约 {estAtoms.complex_atom_count} 个原子：建议改用「批量快速档」或取消「片段性质」
                   勾选，24 线程下可控制在 40 分钟内完成。
                 </p>
@@ -1232,7 +1232,7 @@ export default function Dft() {
 
           {/* 第三步：开始计算 */}
           {isPsi4 && estAtoms?.complex_atom_count != null && estAtoms.complex_atom_count > 50 && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+            <p className="text-xs text-warning">
               ⏳ 当前组合预估复合物约 {estAtoms.complex_atom_count} 个原子
               （{isPair
                 ? `分子 A ${estAtoms.x_atom_count != null
@@ -1280,7 +1280,7 @@ export default function Dft() {
                           : h.method === 'gfnff' ? '快速' : '精确'}
                       </Badge>
                       {h.backend === 'psi4' && (
-                        <Badge className="mr-1 border-gold bg-gold-muted/60 text-[10px] text-amber-800 dark:text-gold" title="Psi4 精度档（ωB97X-D3BJ/def2-SVP，BSSE 校正）">
+                        <Badge className="mr-1 border-gold bg-gold-muted/60 text-[10px] text-gold" title="Psi4 精度档（ωB97X-D3BJ/def2-SVP，BSSE 校正）">
                           Psi4
                         </Badge>
                       )}
@@ -1299,7 +1299,7 @@ export default function Dft() {
                       ) : (
                         <Badge
                           variant="outline"
-                          className="ml-1 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                          className="ml-1 border-warning/30 text-[10px] text-warning"
                           title="DFT 2.0 前的历史记录，未保存 X 描述（两单体结合能口径）"
                         >
                           旧版记录
@@ -1390,9 +1390,9 @@ export default function Dft() {
 
           {/* 取消提示（琥珀，非失败） */}
           {cancelled && !running && !error && (
-            <Alert className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
-              <AlertTitle className="text-amber-800 dark:text-amber-300">计算已取消</AlertTitle>
-              <AlertDescription className="text-amber-700 dark:text-amber-400">
+            <Alert className="border-warning/30 bg-warning/10">
+              <AlertTitle className="text-warning">计算已取消</AlertTitle>
+              <AlertDescription className="text-warning/90">
                 任务已终止，未产生结果；表单参数已保留，可调整后重新提交。
               </AlertDescription>
             </Alert>
@@ -1400,9 +1400,9 @@ export default function Dft() {
 
           {/* 失败原因（中文） */}
           {error && !running && (
-            <Alert className="border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
-              <AlertTitle className="text-red-800 dark:text-red-300">计算失败</AlertTitle>
-              <AlertDescription className="text-red-700 dark:text-red-400">{error}</AlertDescription>
+            <Alert className="border-destructive/30 bg-destructive/10">
+              <AlertTitle className="text-destructive">计算失败</AlertTitle>
+              <AlertDescription className="text-destructive/90">{error}</AlertDescription>
             </Alert>
           )}
 

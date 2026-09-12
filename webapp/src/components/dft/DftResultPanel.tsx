@@ -122,7 +122,7 @@ export default function DftResultPanel({ result, jobId, compare }: Props) {
             {isPair ? '双分子结合能' : '二聚体结合能'}
             <Badge variant="outline">{result.method_label}</Badge>
             {isPsi4 ? (
-              <Badge className="border-gold bg-gold-muted/60 text-amber-800 dark:text-gold">
+              <Badge className="border-gold bg-gold-muted/60 text-gold">
                 Psi4 精度档
               </Badge>
             ) : (
@@ -136,7 +136,7 @@ export default function DftResultPanel({ result, jobId, compare }: Props) {
             {isPair && <Badge variant="secondary">任意双分子模式</Badge>}
             {result.cached && <Badge variant="secondary">缓存结果</Badge>}
             {!isPair && result.dimer_multi_site && (
-              <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400">
+              <Badge variant="outline" className="border-warning/30 text-warning">
                 示意单点缩合
               </Badge>
             )}
@@ -146,7 +146,7 @@ export default function DftResultPanel({ result, jobId, compare }: Props) {
           <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
             <div>
               {/* kJ/mol 主显示，kcal/mol 次要显示 */}
-              <span className={`text-4xl font-bold tabular-nums font-mono ${bound ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+              <span className={`text-4xl font-bold tabular-nums font-mono ${bound ? 'text-success' : 'text-destructive'}`}>
                 {result.e_bind_kj.toFixed(2)}
               </span>
               <span className="ml-1 text-sm text-muted-foreground">kJ/mol</span>
@@ -238,7 +238,7 @@ export default function DftResultPanel({ result, jobId, compare }: Props) {
               </Button>
             </div>
             {result.dimer_multi_site && result.dimer_note && (
-              <p className="text-xs text-amber-700 dark:text-amber-400">
+              <p className="text-xs text-warning">
                 ⚠️ {result.dimer_note}：多位点单体的真实产物可能多位点缩合或形成寡聚体，
                 本结果为示意性单点缩合二聚体。
               </p>

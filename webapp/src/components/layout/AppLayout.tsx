@@ -87,7 +87,7 @@ export default function AppLayout() {
     <div className="flex min-h-screen bg-background">
       {/* 后端版本握手失败横幅：固定置顶，指引用户完全退出后重开 */}
       {versionMismatch && (
-        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-md">
+        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground shadow-md">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>
             后端版本 (v{versionMismatch.backendVersion}) 与界面版本 (v{versionMismatch.appVersion})

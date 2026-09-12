@@ -24,6 +24,7 @@ import {
   extractLiteratureFromPdf,
   lookupLiteratureByDoi,
   lookupLiteratureByTitle,
+  uploadLiteratureAttachments,
   LiteratureApiError,
   type LiteratureConfirmResult,
   type LiteratureDraft,
@@ -197,9 +198,26 @@ export function LiteratureIntakeSection() {
         abstract: form.abstractText.trim() || null,
         source: form.source || 'crossref',
       });
-      setResult(res);
+      // v1.9.3（第 7 点闭环）：录入时上传的 PDF 直接留存为该文献的附件，
+      // 之后在知识库「补解析 → 用已存附件解析」即可，无需重传大文件。
+      let attachNote = '';
+      if (pdfFile) {
+        try {
+          const up = await uploadLiteratureAttachments(res.paper_id, [pdfFile]);
+          const n = up.uploaded.length;
+          attachNote = n
+            ? `全文已留存为附件（${up.uploaded[0].role === 'main' ? '主文' : 'SI'}），`
+            : '';
+          up.errors.forEach((err) => toast.error(`${err.filename}：${err.message}`));
+        } catch {
+          attachNote = '';
+          toast.warning('全文附件留存失败（不影响入库）：可在知识库「补解析」时重新上传');
+        }
+      }
+      setResult({ ...res, attachment_note: attachNote });
       setForm(null);
       setCandidates(null);
+      setPdfFile(null);
       toast.success(`文献已入库（#${res.paper_id}）`);
     } catch (e) {
       if (e instanceof LiteratureApiError) {
@@ -362,7 +380,7 @@ export function LiteratureIntakeSection() {
                       {c.existing && (
                         <Badge
                           variant="outline"
-                          className="shrink-0 border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                          className="shrink-0 border-warning/30 text-warning"
                         >
                           库中已有 #{c.existing_paper_id}
                         </Badge>
@@ -395,7 +413,7 @@ export function LiteratureIntakeSection() {
 
             {/* 已存在：黄色提示并禁止确认 */}
             {form.existing && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+              <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
                   库中已有此文献（#{form.existingPaperId ?? '未知'}），无需重复入库；
@@ -484,7 +502,7 @@ export function LiteratureIntakeSection() {
 
         {/* 第三步：成功面板 */}
         {result && (
-          <div className="space-y-2 rounded-lg border border-green-300 bg-green-50 px-3 py-2.5 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">
+          <div className="space-y-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2.5 text-sm text-success">
             <div className="flex items-center gap-2 font-medium">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               已入库，文献编号 #{result.paper_id}
@@ -494,8 +512,13 @@ export function LiteratureIntakeSection() {
                 ? '已入文献库并按编号递增；但本次知识图谱写入失败（可稍后重试：'
                   + '重新确认入库或补解析该文献）。'
                 : '已入文献库并写入本机知识图谱（文献节点，标题/摘要即可被助手检索）；'}
-              不入训练集。到下方「科研知识库」上传全文「补解析」后，
-              其结构化条目（单体对/成膜条件/表征/结论）与实验组关系会继续并入图谱。
+              不入训练集。
+              {result.attachment_note
+                ? `全文已留存为附件，到下方「科研知识库」选中该文献 → 补解析 → `
+                  + `「用已存附件解析」即可提取结构化条目（单体对/成膜条件/表征/结论）`
+                  + `并自动并入图谱，无需重传 PDF。`
+                : '到下方「科研知识库」选中该文献 → 补解析（可上传主文 + 多份补充信息 SI）'
+                  + '，其结构化条目与实验组关系会并入图谱。'}
               也可在「文献图谱」为其上传结构式/光谱/机理图。
               {result.url && (
                 <>

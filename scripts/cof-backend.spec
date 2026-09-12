@@ -135,12 +135,18 @@ hiddenimports = [
     "literature.llm_extract", "src.literature.llm_extract",
     "literature.graph_ingest", "src.literature.graph_ingest",
     "literature.embedding", "src.literature.embedding",
+    # 文献附件（本轮新增）：主文/SI PDF 留存与复用（routers/literature.py
+    # 内 `from literature import attachments` 惰性 import，静态分析漏收）
+    "literature.attachments", "src.literature.attachments",
     # 侧车图/图谱检索（graph_ingest/助手 query_graphrag 运行时依赖）
     "networkx",
     # 实验记录导出（routers/records.py 内惰性 import；docx → lxml 原生依赖
     # 见下方 binaries）
     "records.store", "src.records.store",
     "records.export_docx", "src.records.export_docx",
+    # 实验时间派生（本轮新增：records.store._normalize_record 内
+    # `from src.records import dates` / `from records import dates` 惰性 import）
+    "records.dates", "src.records.dates",
     # LLM 门面与方案模板（routers/llm.py、routers/plan.py 内惰性 import）
     "llm.client", "src.llm.client",
     "recommend.plan_templates", "src.recommend.plan_templates",

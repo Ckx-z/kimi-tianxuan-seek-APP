@@ -90,7 +90,7 @@ export function NudgeBar({ onPrefill, disabled }: NudgeBarProps) {
       {nudges.map((n) => (
         <div
           key={`${n.kind ?? 'failure'}:${n.favorite_id}`}
-          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5"
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-warning/40 bg-warning/10 px-4 py-2.5"
         >
           <button
             type="button"
@@ -99,7 +99,7 @@ export function NudgeBar({ onPrefill, disabled }: NudgeBarProps) {
             title="点击把分析请求填入输入框（确认后发送）"
             className="flex min-w-0 flex-1 items-start gap-2.5 text-left disabled:opacity-60"
           >
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <span className="min-w-0 text-xs leading-relaxed">
               <span className="font-medium text-foreground">
                 {n.kind === 'new_mistake'
@@ -110,12 +110,12 @@ export function NudgeBar({ onPrefill, disabled }: NudgeBarProps) {
                 失误：{n.latest_mistakes}
               </span>
               {n.kind === 'new_mistake' ? (
-                <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
+                <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-warning">
                   <MessageSquareText className="h-3 w-3" />
                   点击让 ming 复盘，或发起深度研究
                 </span>
               ) : (
-                <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
+                <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-warning">
                   <MessageSquareText className="h-3 w-3" />
                   点击让 ming 分析失败原因
                 </span>

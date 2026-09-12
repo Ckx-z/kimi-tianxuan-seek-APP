@@ -213,7 +213,7 @@ export default function DftViewer3D({ xyz, fragmentRanges, labelA = '主体', la
               正在加载 3D 查看器…
             </div>
           )}
-          {error && <p className="text-xs text-red-700 dark:text-red-400">{error}</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
           <div
             ref={containerRef}
             className="h-80 w-full rounded border bg-white"

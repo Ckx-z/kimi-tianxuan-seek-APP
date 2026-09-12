@@ -152,8 +152,8 @@ function OodBanner({ ood }: { ood: PredictResult['ood'] }) {
     <div
       className={
         isOut
-          ? 'rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300'
-          : 'rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-900 dark:bg-yellow-950/40 dark:text-yellow-300'
+          ? 'rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive'
+          : 'rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning'
       }
     >
       <div className="font-semibold">
@@ -236,12 +236,12 @@ export default function ResultCard({ result, loading, aldSmiles, amineSmiles }: 
                 ? '取分策略 max_tree_gnn_redline（低交联度红线 + 组合外推收缩）'
                 : `取分策略 ${result.score_policy}`}
             {result.score_flags?.divergence && (
-              <span className="ml-2 text-amber-600 dark:text-amber-400">
+              <span className="ml-2 text-warning">
                 ⚠ 两模型分歧较大，已按保守口径取分
               </span>
             )}
             {result.score_flags?.gnn_pair_unseen && (
-              <span className="ml-2 text-amber-600 dark:text-amber-400">
+              <span className="ml-2 text-warning">
                 ⚠ 该组合未在训练集中出现，GNN 分已收缩
               </span>
             )}

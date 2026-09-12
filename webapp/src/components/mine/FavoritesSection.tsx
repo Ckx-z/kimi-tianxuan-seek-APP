@@ -111,7 +111,7 @@ function EBindText({
     <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
       <span
         className={`font-bold tabular-nums ${mainClass} ${
-          bound ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
+          bound ? 'text-success' : 'text-destructive'
         }`}
       >
         {kj.toFixed(1)} kJ/mol
@@ -403,7 +403,7 @@ function DftSummarySection({ fav, onRecalc }: { fav: FavoriteItem; onRecalc: () 
             <div className="flex items-center gap-2">
               <Badge
                 variant="outline"
-                className="border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                className="border-warning/30 text-warning"
                 title="该收藏保存于 DFT 分条记录上线前，仅有一条快照"
               >
                 旧版口径
@@ -439,7 +439,7 @@ function DftSummarySection({ fav, onRecalc }: { fav: FavoriteItem; onRecalc: () 
               <StructureImg smiles={snap.dimer_smiles} label="缩合二聚体" />
             </div>
           ) : (
-            <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+            <p className="mt-2 text-xs text-warning">
               旧版计算口径（两单体结合能）：DFT 2.0 起计算对象为缩合二聚体与 X，
               可点下方「重新计算」获取新口径结果。
             </p>

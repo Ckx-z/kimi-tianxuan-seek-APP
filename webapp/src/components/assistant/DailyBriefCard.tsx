@@ -28,10 +28,10 @@ import {
 function outcomeBadge(r: { outcome: string; outcome_zh: string }) {
   const cls =
     r.outcome === 'film'
-      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+      ? 'border-success/40 bg-success/10 text-success'
       : r.outcome === 'failed'
         ? 'border-destructive/40 bg-destructive/10 text-destructive'
-        : 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400';
+        : 'border-warning/40 bg-warning/10 text-warning';
   return (
     <Badge variant="outline" className={cn('shrink-0 text-[10px] font-normal', cls)}>
       {r.outcome_zh}

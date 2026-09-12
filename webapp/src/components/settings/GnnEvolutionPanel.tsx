@@ -91,8 +91,8 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const STATUS_BADGE: Record<string, { text: string; cls: string }> = {
   pending: { text: '待确认', cls: 'border-border bg-muted text-muted-foreground' },
-  confirmed: { text: '已确认', cls: 'border-emerald-400 bg-emerald-50 text-emerald-700' },
-  conflict: { text: '标签冲突', cls: 'border-amber-400 bg-amber-50 text-amber-700' },
+  confirmed: { text: '已确认', cls: 'border-success/40 bg-success/10 text-success' },
+  conflict: { text: '标签冲突', cls: 'border-warning/40 bg-warning/10 text-warning' },
   rejected: { text: '已拒绝', cls: 'border-border bg-muted text-muted-foreground' },
 };
 
@@ -377,8 +377,8 @@ export function GnnEvolutionPanel() {
             <div
               className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
                 envOk
-                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                  : 'border-amber-300 bg-amber-50 text-amber-800'
+                  ? 'border-success/30 bg-success/10 text-success'
+                  : 'border-warning/30 bg-warning/10 text-warning'
               }`}
             >
               {envOk ? (
@@ -464,11 +464,11 @@ export function GnnEvolutionPanel() {
                       </span>
                       {!f.can_network && f.label > 0 && (
                         <span title="该组合化学上不可成网（成网红线），label>0 请复核">
-                          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                          <AlertTriangle className="h-3.5 w-3.5 text-warning" />
                         </span>
                       )}
                       {f.status === 'conflict' && (
-                        <span className="text-xs text-amber-600">与已确认标签冲突</span>
+                        <span className="text-xs text-warning">与已确认标签冲突</span>
                       )}
                       <span className="max-w-40 truncate text-xs text-muted-foreground" title={f.note}>
                         {f.note || '（无理由）'}
@@ -713,7 +713,7 @@ export function GnnEvolutionPanel() {
             <p className="text-sm text-muted-foreground">删除后不可恢复。</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDeleteTarget(null)}>取消</Button>
-              <Button className="bg-red-600 text-white hover:bg-red-700"
+              <Button className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       onClick={() => void doDelete()}>
                 确认删除
               </Button>

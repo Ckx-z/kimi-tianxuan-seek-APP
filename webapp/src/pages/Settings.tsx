@@ -73,9 +73,9 @@ function StatusDot({ ok }: { ok: boolean | undefined }) {
   return ok === undefined ? (
     <span className="h-2 w-2 rounded-full bg-muted-foreground" />
   ) : ok ? (
-    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+    <span className="h-2 w-2 rounded-full bg-success" />
   ) : (
-    <span className="h-2 w-2 rounded-full bg-red-400" />
+    <span className="h-2 w-2 rounded-full bg-destructive" />
   );
 }
 
@@ -251,8 +251,8 @@ function LlmSettingsCard({ offline }: { offline: boolean }) {
               <div
                 className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
                   testResult.ok
-                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                    : 'border-red-400/40 bg-red-400/10 text-red-700 dark:text-red-300'
+                    ? 'border-success/40 bg-success/10 text-success'
+                    : 'border-destructive/40 bg-destructive/10 text-destructive'
                 }`}
               >
                 {testResult.ok ? (
@@ -833,7 +833,7 @@ function SoftwareUpdateCard() {
 
             {/* 状态提示 */}
             {ui.kind === 'latest' && (
-              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+              <div className="flex items-center gap-2 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
                 <span>已是最新版本 ✅</span>
               </div>
@@ -857,7 +857,7 @@ function SoftwareUpdateCard() {
               </div>
             )}
             {ui.kind === 'downloaded' && (
-              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+              <div className="flex items-center gap-2 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
                 <span>
                   新版本{ui.version ? ` v${ui.version}` : ''}已下载完成，重启后生效。

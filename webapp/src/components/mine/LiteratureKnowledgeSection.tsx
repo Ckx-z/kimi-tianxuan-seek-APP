@@ -146,10 +146,10 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 function EntryBadge({ e }: { e: Partial<Entry> }) {
   if (e.kind === 'film_outcome' && e.film_label != null) {
     const cls = e.film_label >= 1
-      ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+      ? 'border-success/40 bg-success/10 text-success'
       : e.film_label >= 0.5
-        ? 'border-amber-400 bg-amber-50 text-amber-700'
-        : 'border-red-400 bg-red-50 text-red-700';
+        ? 'border-warning/40 bg-warning/10 text-warning'
+        : 'border-destructive/40 bg-destructive/10 text-destructive';
     const text = e.film_label >= 1 ? '成膜' : e.film_label >= 0.5 ? '边界' : '不成膜';
     return <Badge variant="outline" className={cls}>{text} {e.film_label}</Badge>;
   }
@@ -186,6 +186,19 @@ export function LiteratureKnowledgeSection() {
   const [attachments, setAttachments] = useState<LiteratureAttachment[]>([]);
   const [attachBusy, setAttachBusy] = useState(false);
   const attachRef = useRef<HTMLInputElement>(null);
+  /** v1.9.3：解析耗时秒数（长文献按段解析可能数分钟，给出进度感知） */
+  const [parseElapsed, setParseElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!parseBusy) {
+      setParseElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const id = window.setInterval(
+      () => setParseElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => window.clearInterval(id);
+  }, [parseBusy]);
 
   // 编辑/删除
   const [editTarget, setEditTarget] = useState<Entry | null>(null);
@@ -876,10 +889,19 @@ export function LiteratureKnowledgeSection() {
                     disabled={parseBusy || (!parseText.trim()
                       && pendingPdfs.length === 0 && attachments.length === 0)}>
                     {parseBusy
-                      ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />解析中…</>
+                      ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                          解析中… {parseElapsed}s</>
                       : '开始解析'}
                   </Button>
                 </DialogFooter>
+
+                {parseBusy && (
+                  <div className="rounded-lg border border-gold/40 bg-gold-muted/30 px-2.5 py-2 text-[11px] text-muted-foreground">
+                    正在逐段调用解析 LLM（含推理模型的思考 token，单段约 30–60 秒）：
+                    主文与每份 SI 分别解析后合并去重。已用时 {parseElapsed} 秒，
+                    长文献（100+ 页含 SI）可能需要数分钟，请勿关闭窗口。
+                  </div>
+                )}
 
                 {/* 已存附件管理（主文 / SI 角色可切换、可删除） */}
                 {attachments.length > 0 && (
@@ -1122,7 +1144,7 @@ export function LiteratureKnowledgeSection() {
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDeleteTarget(null)}>取消</Button>
-              <Button className="bg-red-600 text-white hover:bg-red-700"
+              <Button className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       onClick={() => void doDelete()}>
                 确认删除
               </Button>

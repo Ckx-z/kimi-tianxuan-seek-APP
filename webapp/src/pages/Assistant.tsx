@@ -1049,7 +1049,7 @@ export default function Assistant() {
                 {researchPlan.steps.map((s, i) => (
                   <li key={i} className="flex items-start gap-1.5">
                     {researchStepDone[i] ? (
-                      <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+                      <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-success" />
                     ) : (
                       <Circle className="mt-0.5 h-3 w-3 shrink-0" />
                     )}
@@ -1242,7 +1242,7 @@ export default function Assistant() {
               取消
             </Button>
             <Button
-              className="bg-red-600 text-white hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => void handleDeleteSession()}
             >
               确认删除
@@ -1397,7 +1397,7 @@ export default function Assistant() {
               取消
             </Button>
             <Button
-              className="bg-red-600 text-white hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 const target = pendingDelete;
                 if (!target) return;

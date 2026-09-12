@@ -115,8 +115,8 @@ export default function Home() {
               online === null
                 ? 'h-2 w-2 animate-pulse rounded-full bg-muted-foreground'
                 : online
-                  ? 'h-2 w-2 rounded-full bg-emerald-500'
-                  : 'h-2 w-2 rounded-full bg-gray-400'
+                  ? 'h-2 w-2 rounded-full bg-success'
+                  : 'h-2 w-2 rounded-full bg-muted-foreground'
             }
           />
           <span className="text-muted-foreground">

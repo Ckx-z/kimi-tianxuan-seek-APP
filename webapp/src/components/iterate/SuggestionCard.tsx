@@ -163,7 +163,7 @@ export function SuggestionCard({ suggestion, onAdopted, onDeleted }: SuggestionC
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive"
                 title="删除该建议"
               >
                 <Trash2 className="h-4 w-4" />
@@ -182,7 +182,7 @@ export function SuggestionCard({ suggestion, onAdopted, onDeleted }: SuggestionC
                 <AlertDialogAction
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="bg-red-600 text-white hover:bg-red-700"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   {deleting && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
                   确认删除

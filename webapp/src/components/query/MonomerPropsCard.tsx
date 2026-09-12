@@ -48,7 +48,7 @@ export default function MonomerPropsCard({ title, name, loading, error, props }:
 
         {/* 错误态 */}
         {!loading && error && (
-          <div className="rounded-lg border border-dashed border-red-300 p-4 text-sm text-red-600 dark:text-red-400">
+          <div className="rounded-lg border border-dashed border-destructive/30 p-4 text-sm text-destructive">
             性质卡加载失败：{error}
           </div>
         )}

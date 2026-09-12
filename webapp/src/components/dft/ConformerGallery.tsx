@@ -171,7 +171,7 @@ export default function ConformerGallery({ aSmiles, bSmiles, disabled, onApply }
         松弛）；输出为包含两分子的复合物 3D 坐标。小体系数十秒，大体系数分钟。
       </p>
       {crestHint && engine !== 'rigid' && engine !== 'etkdg' && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">
+        <p className="text-xs text-warning">
           ⚠ CREST 不可用：{crestHint}（自动模式将回落 ETKDG）
         </p>
       )}

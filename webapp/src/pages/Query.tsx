@@ -315,9 +315,9 @@ export default function Query() {
 
       {/* 后端降级提示（不阻塞界面，不白屏） */}
       {backendDown && (
-        <Alert className="border-yellow-300 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950/40">
-          <AlertTitle className="text-yellow-800 dark:text-yellow-300">后端未连接</AlertTitle>
-          <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+        <Alert className="border-warning/30 bg-warning/10">
+          <AlertTitle className="text-warning">后端未连接</AlertTitle>
+          <AlertDescription className="text-warning/90">
             无法连接 FastAPI 服务（http://localhost:8000）。单体库、打分、方案卡等功能暂不可用；
             CAS 号解析（PubChem）不受影响。请启动后端后刷新页面。
           </AlertDescription>
@@ -424,7 +424,7 @@ export default function Query() {
                     <span>{it.label}</span>
                     <span className="text-muted-foreground">
                       {it.direction && (
-                        <span className={it.direction === '推高' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>
+                        <span className={it.direction === '推高' ? 'text-success' : 'text-destructive'}>
                           {it.direction}{' '}
                         </span>
                       )}

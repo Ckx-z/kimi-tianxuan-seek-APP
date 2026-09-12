@@ -27,11 +27,11 @@ export default function DftGlobalChip() {
 
   const colorClass =
     task.status === 'done'
-      ? 'border-green-300 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-300'
+      ? 'border-success/30 bg-success/10 text-success'
       : task.status === 'cancelled'
-        ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300'
+        ? 'border-warning/30 bg-warning/10 text-warning'
         : terminal
-          ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300'
+          ? 'border-destructive/30 bg-destructive/10 text-destructive'
           : 'border-gold/60 bg-background/95 text-foreground shadow-lg backdrop-blur';
 
   const label =

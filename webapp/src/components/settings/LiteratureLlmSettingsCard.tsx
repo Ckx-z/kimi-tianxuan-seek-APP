@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 「文献解析 LLM」设置卡（v1.9.0）：科研知识库文献结构化提取的独立 LLM 配置
  * - 与助手 LLM / 联网搜索 key 完全隔离（独立 base_url/api_key/model）
  * - embedding 提供方三态：off（默认，图检索兜底）/ local（dphuanjing +
@@ -207,7 +207,7 @@ export function LiteratureLlmSettingsCard({ offline }: { offline: boolean }) {
             </SelectContent>
           </Select>
           {embed && (
-            <p className={`flex items-center gap-1 text-xs ${embed.available ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+            <p className={`flex items-center gap-1 text-xs ${embed.available ? 'text-success' : 'text-muted-foreground'}`}>
               {embed.available ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
               {embed.available
                 ? `本地 embedding 可用（${embed.model ?? ''}）`
@@ -252,7 +252,7 @@ export function LiteratureLlmSettingsCard({ offline }: { offline: boolean }) {
             测试连接
           </Button>
           {testResult && (
-            <span className={`text-xs ${testResult.ok ? 'text-emerald-600' : 'text-red-500'}`}>
+            <span className={`text-xs ${testResult.ok ? 'text-success' : 'text-destructive'}`}>
               {testResult.message}
             </span>
           )}

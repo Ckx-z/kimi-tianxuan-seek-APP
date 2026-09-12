@@ -113,7 +113,7 @@ export default function PlanCardPanel({
 
         {/* 错误态 */}
         {!loading && error && (
-          <div className="rounded-lg border border-dashed border-red-300 p-4 text-sm text-red-600 dark:text-red-400">
+          <div className="rounded-lg border border-dashed border-destructive/30 p-4 text-sm text-destructive">
             方案卡生成失败：{error}
           </div>
         )}
