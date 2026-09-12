@@ -171,6 +171,28 @@ export interface ResearchReportMeta {
   version?: number | null;
 }
 
+/** 研究报告的结构化引用（v1.9.3：正文链接兜底 —— refs 里 URL 始终干净） */
+export interface ResearchReportRef {
+  title: string;
+  doi: string;
+  url: string;
+  source?: string;
+}
+
+/** 深度研究报告详情（GET /research/reports/{id}） */
+export interface ResearchReportDetail {
+  report_id: string;
+  question: string;
+  title: string;
+  created_at: string;
+  markdown: string;
+  refs: ResearchReportRef[];
+  allow_web?: boolean;
+  kind?: 'session' | 'question';
+  session_id?: string | null;
+  version?: number | null;
+}
+
 /** 深度研究报告 Word 导出地址（浏览器直接下载） */
 export function researchDocxUrl(reportId: string): string {
   return `${BASE_URL}/research/reports/${encodeURIComponent(reportId)}/export.docx`;
@@ -444,6 +466,11 @@ export const assistantApi = {
     const data = await request<{ reports: ResearchReportMeta[] }>(
       '/research/reports');
     return data.reports ?? [];
+  },
+
+  /** 研究报告详情（markdown 全文 + 结构化引用清单；v1.9.3 弹窗渲染用） */
+  getResearchReport(reportId: string): Promise<ResearchReportDetail> {
+    return request(`/research/reports/${encodeURIComponent(reportId)}`);
   },
 
   /** 删除研究报告 */

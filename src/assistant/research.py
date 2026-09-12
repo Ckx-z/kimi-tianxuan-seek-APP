@@ -95,8 +95,11 @@ _WRITER_PROMPT = (
     "2. 按研究计划的每个子问题分节（## 标题），正文只引用证据清单里的内容；\n"
     "3. 「结论与下一步」一节给出可操作建议；\n"
     "4. 「参考文献」一节：编号列出证据清单中真实用到的文献，每条格式为\n"
-    "   `[n] 标题. 期刊, 年份. DOI: 10.xxxx/...（https://doi.org/...）`；\n"
-    "   没有 DOI 的给 URL。\n"
+    "   `[n] 标题. 期刊, 年份. DOI: [10.xxxx/...](https://doi.org/10.xxxx/...)`；\n"
+    "   没有 DOI 的写成 `[n] 标题. 来源, 年份. [链接](URL)`。\n"
+    "   【链接硬性要求】URL 必须是纯 ASCII 且能直接访问：禁止用中文括号"
+    "（如「（https://…）」）或任何标点把 URL 包起来，URL 内不得出现中文、"
+    "空格与多余括号；正文内引用只用 `[n]` 角标。\n"
     "引用纪律（红线）：证据清单里没有的文献/CAS/数字一律不得写入；"
     "证据不足的结论要注明「证据有限」。直接输出 Markdown 正文。"
 )
@@ -288,6 +291,53 @@ def _critic_gaps(plan: dict) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- 引用链接归一化
+# 历史坑：撰写 prompt 曾要求 `DOI: 10.xxxx（https://doi.org/...）`，全角括号被
+# GFM autolink 当成 URL 的一部分（只修剪 ASCII 尾标点）→ href 带 `）` → 404。
+# 这里在【生成后 / 落盘 / Word 导出】统一归一化：全角括号包裹的裸 URL 去壳、
+# Markdown 链接目标与裸 URL 尾部误吞的括号标点剥离；URL 内部的成对括号保留
+# （如 .../Websites_(Inorganic_Chemistry)/... 这类合法 URL）。
+# 幂等：重复调用结果不变，历史报告可安全再处理。
+
+_FULLWIDTH_WRAPPED_URL = re.compile(r"(?<!\])[（(]\s*(https?://[^\s（）()]+?)\s*[）)]")
+_MD_LINK_TARGET = re.compile(r"\]\(\s*(https?://[^\s)]+?)\s*\)")
+# 裸 URL：允许 ASCII 括号（合法 URL 内），遇到中文标点/全角括号即终止；
+# 额外吃掉紧跟其后的全角右括号（历史报告里 `URL）` 会被 GFM 吞进 href）
+_BARE_URL = re.compile(
+    r"(?<![(\[<\"'])https?://[^\s<>\"'（）【】「」，。；：、]+[）】]*")
+_URL_JUNK_TAIL = "）)】]｝>，,。.；;、：:*_…—"
+
+
+def _clean_url_tail(url: str) -> str:
+    """剥离 URL 尾部误吞的括号/标点；URL 内部成对括号保留。"""
+    out = url
+    while out:
+        ch = out[-1]
+        if ch == ")":
+            if out.count("(") >= out.count(")"):
+                break
+        elif ch == "]":
+            if out.count("[") >= out.count("]"):
+                break
+        elif ch not in _URL_JUNK_TAIL:
+            break
+        out = out[:-1]
+    return out
+
+
+def normalize_markdown_links(markdown: str) -> str:
+    """报告 markdown → 纯净链接（幂等）。"""
+    if not markdown:
+        return markdown or ""
+    # 顺序要紧：先修 Markdown 链接目标（避免被「全角括号包裹」规则误伤语法），
+    # 再处理全角括号包裹的裸 URL，最后清理散落裸 URL 的尾部标点。
+    text = _MD_LINK_TARGET.sub(
+        lambda m: "](%s)" % _clean_url_tail(m.group(1)), markdown)
+    text = _FULLWIDTH_WRAPPED_URL.sub(r"\1", text)
+    text = _BARE_URL.sub(lambda m: _clean_url_tail(m.group(0)), text)
+    return text
+
+
 # ---------------------------------------------------------------- 报告落盘
 
 def _report_path(report_id: str) -> Path:
@@ -304,7 +354,7 @@ def save_report(report_id: str, question: str, title: str,
         "question": question,
         "title": title,
         "created_at": _now(),
-        "markdown": markdown,
+        "markdown": normalize_markdown_links(markdown),
         "refs": refs,
         "allow_web": bool(allow_web),
         "kind": "session" if version is not None else "question",
@@ -328,7 +378,12 @@ def load_report(report_id: str) -> dict | None:
         data = json.loads(p.read_text(encoding="utf-8"))
     except Exception:
         return None
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return None
+    # 历史报告读取时归一化链接（修复前落盘的 markdown 可能带全角括号脏 URL）
+    if isinstance(data.get("markdown"), str):
+        data["markdown"] = normalize_markdown_links(data["markdown"])
+    return data
 
 
 def list_reports() -> list[dict]:
@@ -419,7 +474,8 @@ def report_to_docx(report: dict) -> bytes:
     doc.add_heading(report.get("title") or "研究报告", level=0)
     doc.add_paragraph(f"生成时间：{report.get('created_at') or ''}")
     doc.add_paragraph(f"研究问题：{report.get('question') or ''}")
-    lines = (report.get("markdown") or "").splitlines()
+    lines = normalize_markdown_links(
+        report.get("markdown") or "").splitlines()
     for line in lines:
         s = line.strip()
         if not s:
@@ -532,7 +588,7 @@ def run_research(question: str, allow_web: bool = True,
         yield {"type": "error", "message": "报告生成失败（LLM 无响应），"
                                            "请重试。"}
         return
-    report_md = text.strip()
+    report_md = normalize_markdown_links(text.strip())
     yield from loop_verified_stream(work, report_md, all_results)
 
     # 5. 落盘
@@ -578,6 +634,8 @@ _SESSION_WRITER_PROMPT = (
     "1. 忠实整合对话内容，不要编造对话中没有的事实；\n"
     "2. 只引用对话/工具结果中真实出现过的 DOI、URL 或 CAS；对话中确实"
     "没有可引用文献时，参考文献一节如实写「本次对话未产生外部引用」；\n"
+    "   参考文献条目用 `[n] 标题. 来源, 年份. [链接](URL)` 形式，URL 必须是"
+    "纯 ASCII 且不得被中文括号或标点包裹；\n"
     "3. 附录按时间顺序列用户问题与结论摘要（一问一答一行）。"
 )
 
@@ -714,7 +772,7 @@ def build_session_report(session: dict, hint: str | None = None) -> Iterator[dic
     if text is None:
         yield {"type": "error", "message": "报告生成失败（LLM 无响应），请重试。"}
         return
-    report_md = text.strip()
+    report_md = normalize_markdown_links(text.strip())
 
     # 引用核验：对话 + 既有报告中的引用均为「已核实」来源
     ref_results = _conversation_ref_results(session, sub_reports)

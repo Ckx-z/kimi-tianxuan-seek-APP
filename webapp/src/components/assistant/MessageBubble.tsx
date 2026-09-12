@@ -1,13 +1,14 @@
 /**
  * 对话气泡：用户右对齐紫金实底，助手左对齐卡片 + Markdown 渲染。
  * 助手消息中的工具事件以可折叠卡片穿插展示。
+ * Markdown 渲染件（含外链安全打开）统一来自 `@/lib/markdown`（v1.9.3）。
  */
-import ReactMarkdown, { type Components } from 'react-markdown';
+import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Bot, FileText, Image as ImageIcon, User } from 'lucide-react';
 import { ToolEventCard, type ConfirmDecision } from './ToolEventCard';
 import type { AssistantAttachmentMeta, ToolEvent } from './api';
-import { openExternal } from '@/lib/external';
+import { mdComponents, normalizeMarkdownLinks } from '@/lib/markdown';
 
 export interface ChatMessageView {
   role: 'user' | 'assistant';
@@ -21,85 +22,7 @@ export interface ChatMessageView {
   error?: string;
 }
 
-/** 剥离 react-markdown 注入的 node 属性，避免传到 DOM */
-function withoutNode<T extends { node?: unknown }>(props: T): Omit<T, 'node'> {
-  const { node, ...rest } = props;
-  void node;
-  return rest;
-}
-
-/** Markdown 元素的 Tailwind 映射（替代 typography 插件，贴合紫金主题） */
-const mdComponents: Components = {
-  h1: (props) => <h3 className="mb-2 mt-3 text-base font-semibold" {...withoutNode(props)} />,
-  h2: (props) => <h3 className="mb-2 mt-3 text-base font-semibold" {...withoutNode(props)} />,
-  h3: (props) => <h4 className="mb-1.5 mt-2.5 text-sm font-semibold" {...withoutNode(props)} />,
-  p: (props) => <p className="mb-2 leading-relaxed last:mb-0" {...withoutNode(props)} />,
-  ul: (props) => <ul className="mb-2 list-disc space-y-1 pl-5" {...withoutNode(props)} />,
-  ol: (props) => <ol className="mb-2 list-decimal space-y-1 pl-5" {...withoutNode(props)} />,
-  li: (props) => <li className="leading-relaxed" {...withoutNode(props)} />,
-  blockquote: (props) => (
-    <blockquote
-      className="mb-2 border-l-2 border-gold pl-3 text-muted-foreground"
-      {...withoutNode(props)}
-    />
-  ),
-  code: (props) => {
-    const { className, children, ...rest } = withoutNode(props);
-    const isBlock = /language-/.test(className ?? '');
-    return isBlock ? (
-      <code className={className} {...rest}>
-        {children}
-      </code>
-    ) : (
-      <code
-        className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em] text-primary"
-        {...rest}
-      >
-        {children}
-      </code>
-    );
-  },
-  pre: (props) => (
-    <pre
-      className="mb-2 overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs"
-      {...withoutNode(props)}
-    />
-  ),
-  table: (props) => (
-    <div className="mb-2 overflow-x-auto">
-      <table className="w-full border-collapse text-xs" {...withoutNode(props)} />
-    </div>
-  ),
-  th: (props) => (
-    <th
-      className="border border-border bg-muted/60 px-2 py-1 text-left font-medium"
-      {...withoutNode(props)}
-    />
-  ),
-  td: (props) => <td className="border border-border px-2 py-1" {...withoutNode(props)} />,
-  a: (props) => {
-    const { href, ...rest } = withoutNode(props);
-    return (
-      <a
-        className="text-primary underline"
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        onClick={(e) => {
-          // http(s) 外链（DOI 等）统一走系统浏览器（Electron 下 shell.openExternal）
-          if (href && /^https?:\/\//i.test(href)) {
-            e.preventDefault();
-            openExternal(href);
-          }
-        }}
-        {...rest}
-      />
-    );
-  },
-  strong: (props) => (
-    <strong className="font-semibold text-foreground" {...withoutNode(props)} />
-  ),
-};
+/** Markdown 元素映射与链接归一化统一由 `@/lib/markdown` 提供（v1.9.3） */
 
 /** 判断 tool_call 是否尚无对应 tool_result（流式中显示“进行中”样式） */
 function isPendingCall(events: ToolEvent[], index: number, streaming?: boolean): boolean {
@@ -177,7 +100,7 @@ export function MessageBubble({
         <div className="rounded-2xl rounded-tl-sm border border-border bg-card px-4 py-2.5 text-sm text-foreground shadow-sm">
           {message.content ? (
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-              {message.content}
+              {normalizeMarkdownLinks(message.content)}
             </ReactMarkdown>
           ) : message.streaming ? (
             <span className="text-muted-foreground">思考中…</span>

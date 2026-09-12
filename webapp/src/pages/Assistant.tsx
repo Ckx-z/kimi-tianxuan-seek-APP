@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Bot, CheckCircle2, Circle, FilePlus2, FileText, Image as ImageIcon, MessageSquarePlus, Microscope, Paperclip, Pencil, RefreshCw, Send, Settings as SettingsIcon, Trash2, X } from 'lucide-react';
+import { Bot, CheckCircle2, Circle, Eye, FilePlus2, FileText, Image as ImageIcon, MessageSquarePlus, Microscope, Paperclip, Pencil, RefreshCw, Send, Settings as SettingsIcon, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -40,11 +40,14 @@ import {
   type AssistantSessionMeta,
   type AssistantStatus,
   type ResearchReportMeta,
+  type ResearchReportRef,
   type ToolEvent,
 } from '@/components/assistant/api';
 import { MessageBubble, type ChatMessageView } from '@/components/assistant/MessageBubble';
 import { DailyBriefCard } from '@/components/assistant/DailyBriefCard';
 import { NudgeBar } from '@/components/assistant/NudgeBar';
+import { mdComponents, normalizeMarkdownLinks } from '@/lib/markdown';
+import { openExternal } from '@/lib/external';
 
 interface LocalMessage extends ChatMessageView {
   id: string;
@@ -112,6 +115,8 @@ export default function Assistant() {
   const [sessionReportOpen, setSessionReportOpen] = useState(false);
   const [sessionReportMd, setSessionReportMd] = useState('');
   const [sessionReportError, setSessionReportError] = useState<string | null>(null);
+  /** 报告结构化引用（v1.9.3：正文链接不可靠时用干净 refs 兜底） */
+  const [sessionReportRefs, setSessionReportRefs] = useState<ResearchReportRef[]>([]);
 
   const openReports = useCallback(async () => {
     setReportsOpen(true);
@@ -678,6 +683,7 @@ export default function Assistant() {
     setSessionReportStreaming(true);
     setSessionReportError(null);
     setSessionReportMd('');
+    setSessionReportRefs([]);
     setSessionReportOpen(true);
     let errored = false;
     try {
@@ -692,6 +698,16 @@ export default function Assistant() {
           if (sev.version) {
             setActiveReport({ report_id: sev.report_id, version: sev.version });
           }
+          // v1.9.3：拉到落盘版（链接已归一化）+ 结构化引用清单做兜底
+          void assistantApi
+            .getResearchReport(sev.report_id)
+            .then((rep) => {
+              setSessionReportMd((md) => rep.markdown || md);
+              setSessionReportRefs(rep.refs ?? []);
+            })
+            .catch(() => {
+              /* 落盘版拉取失败不影响已流式渲染的正文 */
+            });
         } else if (sev.type === 'error') {
           setSessionReportError(sev.message);
           errored = true;
@@ -710,6 +726,22 @@ export default function Assistant() {
       setSessionReportStreaming(false);
     }
   }, [activeId, sessionReportStreaming, streaming]);
+
+  /** 查看已落盘的会话综合报告（v1.9.3：弹窗内链接一律走系统浏览器） */
+  const openSavedSessionReport = useCallback(async () => {
+    if (!activeReport || sessionReportStreaming || streaming) return;
+    setSessionReportError(null);
+    setSessionReportMd('');
+    setSessionReportRefs([]);
+    setSessionReportOpen(true);
+    try {
+      const rep = await assistantApi.getResearchReport(activeReport.report_id);
+      setSessionReportMd(rep.markdown || '');
+      setSessionReportRefs(rep.refs ?? []);
+    } catch (e) {
+      setSessionReportError(e instanceof Error ? e.message : '报告加载失败');
+    }
+  }, [activeReport, sessionReportStreaming, streaming]);
 
   // ---------- 会话重命名（v1.5.4） ----------
   const [renameTarget, setRenameTarget] = useState<AssistantSessionMeta | null>(null);
@@ -921,20 +953,34 @@ export default function Assistant() {
                   ? `本会话综合报告 v${activeReport.version}（更新 = 追加新进展）`
                   : '综合报告：整合本会话全部问答与深度研究产出'}
               </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void generateSessionReport()}
-                disabled={sessionReportStreaming || streaming}
-                className="shrink-0"
-              >
-                <FilePlus2 className="mr-1.5 h-3.5 w-3.5" />
-                {sessionReportStreaming
-                  ? '生成中…'
-                  : activeReport
-                    ? '更新报告'
-                    : '生成综合报告'}
-              </Button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {activeReport && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void openSavedSessionReport()}
+                    disabled={sessionReportStreaming || streaming}
+                    title="查看已生成的综合报告（含参考文献链接）"
+                  >
+                    <Eye className="mr-1.5 h-3.5 w-3.5" />
+                    查看报告
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void generateSessionReport()}
+                  disabled={sessionReportStreaming || streaming}
+                  className="shrink-0"
+                >
+                  <FilePlus2 className="mr-1.5 h-3.5 w-3.5" />
+                  {sessionReportStreaming
+                    ? '生成中…'
+                    : activeReport
+                      ? '更新报告'
+                      : '生成综合报告'}
+                </Button>
+              </div>
             </div>
           )}
 
@@ -1160,14 +1206,47 @@ export default function Assistant() {
               <p className="text-sm text-destructive">{sessionReportError}</p>
             ) : sessionReportMd ? (
               <div className="prose prose-sm max-w-none dark:prose-invert">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {sessionReportMd}
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                  {normalizeMarkdownLinks(sessionReportMd)}
                 </ReactMarkdown>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
                 {sessionReportStreaming ? '正在整合对话内容…' : '报告为空'}
               </p>
+            )}
+            {/* v1.9.3：结构化引用兜底（refs 里的 URL 始终干净，正文链接异常时也能点） */}
+            {sessionReportRefs.length > 0 && (
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                  引用文献（{sessionReportRefs.length}）
+                </p>
+                <ol className="space-y-1">
+                  {sessionReportRefs.map((ref, i) => {
+                    const href = ref.doi
+                      ? `https://doi.org/${ref.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '')}`
+                      : ref.url;
+                    return (
+                      <li key={`${href}-${i}`} className="flex items-start gap-1.5 text-xs">
+                        <span className="w-5 shrink-0 text-right text-muted-foreground">{i + 1}.</span>
+                        <span className="min-w-0 flex-1 truncate" title={ref.title || href}>
+                          {ref.title || ref.doi || href}
+                        </span>
+                        {href && /^https?:\/\//i.test(href) && (
+                          <button
+                            type="button"
+                            onClick={() => openExternal(href)}
+                            className="shrink-0 rounded border border-gold/40 px-1.5 py-0.5 text-gold hover:bg-gold/10"
+                            title={href}
+                          >
+                            打开
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
             )}
           </div>
           {activeReport && (
