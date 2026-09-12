@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { formatDateTime } from '@/lib/format';
 import {
   Dialog,
   DialogContent,
@@ -54,7 +55,7 @@ export function PlanCardItem({ plan }: { plan: Plan }) {
             <span className="text-xs text-muted-foreground">{plan.plan_id}</span>
             {createdAt && (
               <span className="text-xs text-muted-foreground">
-                {createdAt.replace('T', ' ').slice(0, 16)}
+                {formatDateTime(createdAt)}
               </span>
             )}
           </div>

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { formatDateTime } from '@/lib/format';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog,
@@ -370,7 +371,7 @@ export default function Query() {
                       title={`${h.ald_smiles} + ${h.amine_smiles}`}
                     >
                       <span className="mr-2 text-xs text-muted-foreground">
-                        {(h.timestamp ?? '').replace('T', ' ').slice(0, 19)}
+                        {formatDateTime(h.timestamp)}
                       </span>
                       <span className="font-mono text-xs">
                         {(h.ald_smiles ?? '').slice(0, 14)}… + {(h.amine_smiles ?? '').slice(0, 14)}…

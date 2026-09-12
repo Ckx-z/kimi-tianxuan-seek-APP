@@ -29,6 +29,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatDateTime } from '@/lib/format';
 import {
   deletePlanTemplate,
   fetchPlanTemplates,
@@ -267,7 +268,9 @@ function PlanRow({ plan }: { plan: PlanItem }) {
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <span className="text-xs text-muted-foreground">{plan.created_at || plan.plan_id}</span>
+          <span className="text-xs text-muted-foreground">
+            {formatDateTime(plan.created_at) || plan.plan_id}
+          </span>
           <ChevronDown
             className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
           />

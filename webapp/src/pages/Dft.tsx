@@ -86,6 +86,7 @@ import {
   type DimerPreview,
 } from '@/components/dft/api';
 import { doiUrl, openExternal } from '@/lib/external';
+import { formatDateTime } from '@/lib/format';
 
 interface PropsState {
   loading: boolean;
@@ -1272,7 +1273,7 @@ export default function Dft() {
                       title={`${h.smiles_a} + ${h.smiles_b}${h.x_description ? `｜X：${h.x_description}` : ''}`}
                     >
                       <span className="mr-2 text-xs text-muted-foreground">
-                        {(h.timestamp ?? '').replace('T', ' ').slice(0, 19)}
+                        {formatDateTime(h.timestamp)}
                       </span>
                       <Badge variant="outline" className="mr-1 text-[10px]">
                         {h.backend === 'psi4'

@@ -670,8 +670,9 @@ export function LiteratureKnowledgeSection() {
                               {detail.abstract}
                             </p>
                           ) : (
-                            <p className="text-xs text-muted-foreground">
-                              （无摘要：可点右上「补解析」上传全文提取）
+                            <p className="rounded border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground">
+                              该文献暂无摘要。点右上「补解析」上传主文 PDF（可加补充信息 SI），
+                              即可同时提取摘要等元数据与结构化条目。
                             </p>
                           )}
                           {(detail.source || detail.added_at) && (
