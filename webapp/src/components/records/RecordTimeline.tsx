@@ -26,6 +26,7 @@ import { Switch } from '@/components/ui/switch';
 import RecordDetailDialog from './RecordDetailDialog';
 import RecordEditDialog from './RecordEditDialog';
 import { CONDITION_LABELS, OUTCOME_META, experimentTime, pairLabel } from './meta';
+import { oodInfo } from '@/lib/format';
 import { deleteRecord, exportRecordWord, type RecordItem } from './api';
 
 /** 条件摘要：拼接非空条件键值 */
@@ -45,12 +46,13 @@ function PredictionCompare({ rec }: { rec: RecordItem }) {
   const score = Number(snap.score);
   const consistent =
     (score >= 0.5 && rec.outcome === 'film') || (score < 0.5 && rec.outcome === 'failed');
+  const oodLabel = oodInfo(rec.prediction_snapshot?.ood).label;
   return (
     <div className="mt-2 rounded-lg border border-gold/50 bg-gold-muted px-3 py-2 text-xs">
       <span className="font-medium">预测快照：</span>
       评分 {score.toFixed(3)}
       {snap.std != null && `（±${Number(snap.std).toFixed(3)}）`}
-      {snap.ood ? `｜OOD：${snap.ood}` : ''}
+      {oodLabel ? `｜OOD：${oodLabel}` : ''}
       <span className="mx-1.5">→</span>
       <span className="font-medium">实际：</span>
       {outcomeLabel}

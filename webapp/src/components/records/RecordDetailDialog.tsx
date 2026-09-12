@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import ProcessPanel from './ProcessPanel';
 import { CONDITION_LABELS, OUTCOME_META, experimentTime, pairLabel } from './meta';
+import { oodInfo } from '@/lib/format';
 import { exportRecordWord, type RecordItem } from './api';
 
 export interface RecordDetailDialogProps {
@@ -175,8 +176,8 @@ export default function RecordDetailDialog({
                   评分 {Number(rec.prediction_snapshot.score).toFixed(3)}
                   {rec.prediction_snapshot.std != null &&
                     `（±${Number(rec.prediction_snapshot.std).toFixed(3)}）`}
-                  {rec.prediction_snapshot.ood
-                    ? `｜OOD：${rec.prediction_snapshot.ood}`
+                  {oodInfo(rec.prediction_snapshot.ood).label
+                    ? `｜OOD：${oodInfo(rec.prediction_snapshot.ood).label}`
                     : ''}
                 </div>
               )}

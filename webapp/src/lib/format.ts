@@ -25,6 +25,29 @@ export function formatDate(value: unknown): string {
 }
 
 /**
+ * OOD（分布外）状态归一化（v1.9.3 UI）。
+ *
+ * 后端 `prediction_snapshot.ood` 是对象（`{level: 'in'|'warn'|'out', reasons: []}`），
+ * 记录列表/详情早期直接模板插值渲染 → 界面出现 **`OOD: [Object object]`**。
+ * 这里统一取 level 并给出中文短语；无法识别时返回空串（调用方不渲染）。
+ */
+export function oodInfo(ood: unknown): { level: string; label: string } {
+  let level = '';
+  if (typeof ood === 'string') {
+    level = ood;
+  } else if (ood && typeof ood === 'object') {
+    const obj = ood as { level?: unknown; status?: unknown };
+    level = String(obj.level ?? obj.status ?? '');
+  }
+  const key = level.trim().toLowerCase();
+  const label =
+    key === 'in' ? '分布内'
+      : key === 'warn' || key === 'warning' ? '分布外警告'
+        : key === 'out' ? '分布外'
+          : '';
+  return { level: key, label };
+}
+/**
  * 置信度归一化（v1.9.3）：后端 `payload.confidence` 实际是
  * `{level: 'high'|'medium'|'low', reason}` 对象；早期前端按数字 `*100` 处理，
  * 于是界面出现「置信度 NaN%」。这里兼容 数字 / `{score|value}` / `{level}`。
