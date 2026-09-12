@@ -58,7 +58,11 @@ module.exports = {
           foreground: "hsl(var(--info-foreground))",
         },
         sidebar: {
+          // `DEFAULT` 与显式 `background` 同时提供：布局里写的是
+          // `bg-sidebar-background`（需要 background 键才会生成该类），
+          // 早期只定义了 DEFAULT → 该类缺失 → 浅色主题下侧栏透明、浅灰字不可读。
           DEFAULT: "hsl(var(--sidebar-background))",
+          background: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
           primary: "hsl(var(--sidebar-primary))",
           "primary-foreground": "hsl(var(--sidebar-primary-foreground))",

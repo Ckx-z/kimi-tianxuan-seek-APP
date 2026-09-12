@@ -68,6 +68,7 @@ import {
 } from '@/components/records/api';
 import RecordDetailDialog from '@/components/records/RecordDetailDialog';
 import { experimentTime, OUTCOME_META } from '@/components/records/meta';
+import { formatDateTime } from '@/lib/format';
 // 只读复用查询打分页的结果组件与 API（不修改其文件），保证放大详情与查询打分页内容一致
 import ResultCard from '@/components/query/ResultCard';
 import MonomerPropsCard from '@/components/query/MonomerPropsCard';
@@ -317,7 +318,7 @@ function DimerFigure({ entry }: { entry: DftEntryItem }) {
 
 /** 单条 DFT 记录卡片（dft_entries 条目） */
 function DftEntryCard({ entry, index }: { entry: DftEntryItem; index: number }) {
-  const time = entry.created_at ? String(entry.created_at).replace('T', ' ').slice(0, 19) : '';
+  const time = formatDateTime(entry.created_at);
   return (
     <div className="rounded-lg border border-gold/40 bg-gold-muted/40 p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -398,7 +399,7 @@ function DftSummarySection({ fav, onRecalc }: { fav: FavoriteItem; onRecalc: () 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-medium text-muted-foreground">
               {dftMethodLabel(snap.method)}
-              {snap.date ? ` · ${String(snap.date).replace('T', ' ').slice(0, 19)}` : ''}
+              {snap.date ? ` · ${formatDateTime(snap.date)}` : ''}
             </span>
             <div className="flex items-center gap-2">
               <Badge
@@ -613,7 +614,7 @@ function FavoriteDetailDialog({
               {fav.aldehyde?.name || '未知醛'} × {fav.amine?.name || '未知胺'}
             </DialogTitle>
             <DialogDescription className="text-left">
-              收藏编号 {fav.id} · 创建于 {fav.created_at || '未知时间'}
+              收藏编号 {fav.id} · 创建于 {formatDateTime(fav.created_at) || '未知时间'}
             </DialogDescription>
           </DialogHeader>
 
@@ -1112,10 +1113,10 @@ export function FavoritesSection({
               {visibleFavorites.map((fav) => (
                 <Card
                   key={fav.id}
-                  className="cursor-pointer transition-shadow hover:shadow-md hover:shadow-primary/10"
+                  className="flex h-full cursor-pointer flex-col transition-shadow hover:shadow-card hover:shadow-primary/10"
                   onClick={() => setDetail(fav)}
                 >
-                  <CardContent className="space-y-2 p-4">
+                  <CardContent className="flex flex-1 flex-col gap-2 p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 break-words text-base font-semibold leading-snug text-foreground">
                         {fav.aldehyde?.name || '未知醛'}
@@ -1161,13 +1162,21 @@ export function FavoritesSection({
                         </Button>
                       </div>
                     </div>
-                    <div className="break-all font-mono text-xs text-muted-foreground">
+                    {/* v1.9.3 UI：SMILES 单行截断（原 break-all 会折成三行、卡片高矮不齐），
+                        悬停 title 查看完整串 */}
+                    <div
+                      className="truncate font-mono text-xs text-muted-foreground"
+                      title={fav.aldehyde?.smiles || ''}
+                    >
                       {shortSmiles(fav.aldehyde?.smiles)}
                     </div>
-                    <div className="break-all font-mono text-xs text-muted-foreground">
+                    <div
+                      className="truncate font-mono text-xs text-muted-foreground"
+                      title={fav.amine?.smiles || ''}
+                    >
                       {shortSmiles(fav.amine?.smiles)}
                     </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <ScoreBadge fav={fav} />
                         <DftBadge fav={fav} />
@@ -1188,7 +1197,7 @@ export function FavoritesSection({
                         </Button>
                       )}
                       <span className="truncate text-xs text-muted-foreground">
-                        {fav.created_at || ''}
+                        {formatDateTime(fav.created_at)}
                       </span>
                     </div>
                   </CardContent>

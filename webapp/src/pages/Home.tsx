@@ -14,20 +14,24 @@ import { Badge } from '@/components/ui/badge';
 import { favoritesApi, healthApi, iterateApi, recordsApi, BackendUnavailableError } from '@/lib/api';
 import type { ExperimentRecord, Favorite, Plan, Suggestion } from '@/types';
 import { experimentTime } from '@/components/records/meta';
+import { confidenceLevel } from '@/lib/format';
 
-/** 置信度徽章（金色系，按置信度分档） */
-function ConfidenceBadge({ value }: { value: number }) {
-  const pct = Math.round(value * 100);
-  const variant = value >= 0.8 ? 'high' : value >= 0.5 ? 'mid' : 'low';
-  const cls =
-    variant === 'high'
-      ? 'border-gold/60 bg-gold-muted text-gold-foreground'
-      : variant === 'mid'
-        ? 'border-primary/40 bg-accent text-accent-foreground'
-        : 'border-border bg-muted text-muted-foreground';
+/**
+ * 置信度徽章：与「方案迭代」卡同口径 —— `payload.confidence` 是
+ * `{level, reason}` 对象（不是数值），旧实现按数值 `*100` 渲染出「置信度 NaN%」。
+ */
+function ConfidenceBadge({ confidence }: { confidence?: unknown }) {
+  const level = confidenceLevel(confidence);
+  const meta = level === 'high'
+    ? { label: '高置信', cls: 'border-primary/40 bg-accent text-accent-foreground' }
+    : level === 'medium'
+      ? { label: '中置信', cls: 'border-gold/60 bg-gold-muted text-gold' }
+      : level === 'low'
+        ? { label: '低置信', cls: 'border-border bg-muted text-muted-foreground' }
+        : { label: '置信度未知', cls: 'border-border bg-muted text-muted-foreground' };
   return (
-    <Badge variant="outline" className={cls}>
-      置信度 {pct}%
+    <Badge variant="outline" className={meta.cls}>
+      {meta.label}
     </Badge>
   );
 }
@@ -205,7 +209,7 @@ export default function Home() {
                         批次 {s.batch} · {s.status}
                       </div>
                     </div>
-                    <ConfidenceBadge value={s.payload?.confidence ?? 0} />
+                    <ConfidenceBadge confidence={s.payload?.confidence} />
                   </li>
                 ))}
               </ul>
