@@ -21,7 +21,8 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      // v1.9.4 UI 第 3 批：表头用弱底色区分（不再只靠一条边框），行分隔线更淡
+      className={cn("[&_tr]:border-b [&_tr]:border-border/70 bg-muted/40 [&_tr]:hover:bg-muted/40", className)}
       {...props}
     />
   )

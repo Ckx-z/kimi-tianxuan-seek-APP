@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Star, ClipboardList, FlaskConical, Download, RefreshCw, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { healthApi, BackendUnavailableError } from '@/lib/api';
@@ -97,18 +98,19 @@ export default function Mine() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       {/* 页头 */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gradient-royal">我的</h1>
-          <p className="mt-1 text-sm text-muted-foreground">收藏、方案与实验数据的个人中心</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          刷新
-        </Button>
-      </div>
+      <PageHeader
+        title="我的"
+        subtitle="收藏、方案与实验数据的个人中心"
+        accent
+        actions={(
+          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            刷新
+          </Button>
+        )}
+      />
 
       {/* 后端未连接降级提示 */}
       {online === false && (

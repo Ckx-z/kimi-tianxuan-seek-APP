@@ -11,10 +11,34 @@ import { Link } from 'react-router';
 import { Star, FlaskConical, ClipboardList, Lightbulb, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Skeleton } from '@/components/ui/skeleton';
+import { KpiCard, type KpiCardProps } from '@/components/home/KpiCard';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { favoritesApi, healthApi, iterateApi, recordsApi, BackendUnavailableError } from '@/lib/api';
 import type { ExperimentRecord, Favorite, Plan, Suggestion } from '@/types';
 import { experimentTime } from '@/components/records/meta';
 import { confidenceLevel } from '@/lib/format';
+
+/**
+ * 近 N 周新增计数（v1.9.4 第 3 批：首页仪表盘的真实趋势序列）。
+ * 取实验时间（experiment_date 派生的 timeline 首点），跳过未来时间与无法解析的日期。
+ */
+function weeklyCounts(records: ExperimentRecord[], weeks = 8): number[] {
+  const buckets = new Array(weeks).fill(0) as number[];
+  const now = Date.now();
+  records.forEach((r) => {
+    const raw = experimentTime(r).date;
+    if (!raw) return;
+    const t = new Date(`${raw}T00:00:00`).getTime();
+    if (Number.isNaN(t)) return;
+    const days = Math.floor((now - t) / 86_400_000);
+    if (days < 0) return;
+    const idx = weeks - 1 - Math.floor(days / 7);
+    if (idx >= 0 && idx < weeks) buckets[idx] += 1;
+  });
+  return buckets;
+}
 
 /**
  * 置信度徽章：与「方案迭代」卡同口径 —— `payload.confidence` 是
@@ -96,38 +120,65 @@ export default function Home() {
       .slice(0, 2);
   }, [suggestions]);
 
-  // 统计卡配置
-  const stats = [
-    { label: '收藏数', value: favorites.length, icon: Star, to: '/mine' },
-    { label: '实验记录数', value: records.length, icon: FlaskConical, to: '/records' },
-    { label: '方案数', value: plans.length, icon: ClipboardList, to: '/iterate' },
-    { label: '建议数', value: suggestions.length, icon: Lightbulb, to: '/iterate' },
+  // 统计卡配置（v1.9.4 第 3 批：仪表化——真实趋势序列 + 环比，无数据则不画图不造数）
+  const weekly = useMemo(() => weeklyCounts(records, 8), [records]);
+  const weeklyDelta = (weekly[weekly.length - 1] ?? 0) - (weekly[weekly.length - 2] ?? 0);
+  const batchBars = useMemo(() => {
+    const byBatch = new Map<string, number>();
+    suggestions.forEach((s) => {
+      const k = String(s.batch ?? '');
+      if (k) byBatch.set(k, (byBatch.get(k) ?? 0) + 1);
+    });
+    return [...byBatch.entries()].slice(-6);
+  }, [suggestions]);
+
+  const stats: KpiCardProps[] = [
+    {
+      label: '收藏数', value: favorites.length, icon: Star, to: '/mine',
+      unit: '条', hint: '点击查看收藏夹',
+    },
+    {
+      label: '实验记录数', value: records.length, icon: FlaskConical, to: '/records',
+      unit: '条', series: weekly, trend: { text: '近 8 周', delta: weeklyDelta },
+    },
+    {
+      label: '方案数', value: plans.length, icon: ClipboardList, to: '/iterate',
+      unit: '个', hint: 'GraphRAG 方案迭代',
+    },
+    {
+      label: '建议数', value: suggestions.length, icon: Lightbulb, to: '/iterate',
+      unit: '条',
+      bars: batchBars.length > 0
+        ? { values: batchBars.map(([, v]) => v), labels: batchBars.map(([k]) => `批次 ${k}`) }
+        : undefined,
+      hint: batchBars.length === 0 ? '暂无批次数据' : undefined,
+    },
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       {/* 页头：标题 + 后端状态 */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gradient-royal">COF 科研系统</h1>
-          <p className="mt-1 text-sm text-muted-foreground">机器学习辅助的 COF 成膜条件推荐与实验管理</p>
-        </div>
-        {/* 后端健康状态指示 */}
-        <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs">
-          <span
-            className={
-              online === null
-                ? 'h-2 w-2 animate-pulse rounded-full bg-muted-foreground'
-                : online
-                  ? 'h-2 w-2 rounded-full bg-success'
-                  : 'h-2 w-2 rounded-full bg-muted-foreground'
-            }
-          />
-          <span className="text-muted-foreground">
-            {online === null ? '检测中…' : online ? '后端已连接' : '后端未连接'}
-          </span>
-        </div>
-      </div>
+      <PageHeader
+        title="COF 科研系统"
+        subtitle="机器学习辅助的 COF 成膜条件推荐与实验管理"
+        accent
+        actions={(
+          <div className="flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs">
+            <span
+              className={
+                online === null
+                  ? 'h-2 w-2 animate-pulse rounded-full bg-muted-foreground'
+                  : online
+                    ? 'h-2 w-2 rounded-full bg-success'
+                    : 'h-2 w-2 rounded-full bg-muted-foreground'
+              }
+            />
+            <span className="text-muted-foreground">
+              {online === null ? '检测中…' : online ? '后端已连接' : '后端未连接'}
+            </span>
+          </div>
+        )}
+      />
 
       {/* 后端未连接时的优雅降级提示 */}
       {online === false && (
@@ -136,22 +187,10 @@ export default function Home() {
         </div>
       )}
 
-      {/* 四张统计卡 */}
+      {/* 四张统计卡（仪表化：数值焦点 + 真实迷你趋势） */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {stats.map(({ label, value, icon: Icon, to }) => (
-          <Link key={label} to={to}>
-            <Card className="transition-shadow hover:shadow-md hover:shadow-primary/10">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-                <Icon className="h-4 w-4 text-gold" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-semibold text-primary">
-                  {loading ? '—' : value}
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+        {stats.map((s) => (
+          <KpiCard key={s.label} {...s} loading={loading} />
         ))}
       </div>
 
@@ -165,14 +204,26 @@ export default function Home() {
             </Link>
           </CardHeader>
           <CardContent>
-            {recentRecords.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">暂无记录</p>
+            {loading ? (
+              <div className="space-y-2 py-2">
+                {[0, 1, 2].map((i) => <Skeleton key={i} className="h-6 w-full" />)}
+              </div>
+            ) : recentRecords.length === 0 ? (
+              <Empty className="border-0 p-6">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon"><FlaskConical /></EmptyMedia>
+                  <EmptyTitle className="text-sm">暂无实验记录</EmptyTitle>
+                  <EmptyDescription className="text-xs">
+                    从「实验记录」新建，或在打分页保存方案后自动归档
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
-              <ul className="divide-y divide-border">
+              <ul className="stagger divide-y divide-border/70">
                 {recentRecords.map((r) => (
                   <li key={r.record_id} className="flex items-center justify-between py-2.5 text-sm">
                     <span className="font-medium text-foreground">{r.experiment_no}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="num-data text-xs text-muted-foreground">
                       {experimentTime(r).date}
                       {experimentTime(r).isFallback && (
                         <span className="ml-1 text-muted-foreground/60">（录入）</span>
@@ -194,14 +245,26 @@ export default function Home() {
             </Link>
           </CardHeader>
           <CardContent>
-            {latestSuggestions.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">暂无建议</p>
+            {loading ? (
+              <div className="space-y-3 py-2">
+                {[0, 1].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+              </div>
+            ) : latestSuggestions.length === 0 ? (
+              <Empty className="border-0 p-6">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon"><Lightbulb /></EmptyMedia>
+                  <EmptyTitle className="text-sm">暂无建议</EmptyTitle>
+                  <EmptyDescription className="text-xs">
+                    在「方案迭代」跑一次 GraphRAG，建议会自动出现在这里
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
-              <ul className="space-y-3">
+              <ul className="stagger space-y-3">
                 {latestSuggestions.map((s) => (
                   <li
                     key={s.suggestion_id}
-                    className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-4 py-3"
+                    className="flex items-center justify-between rounded-xl border border-border/70 bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50"
                   >
                     <div>
                       <div className="text-sm font-medium text-foreground">{s.payload?.title}</div>

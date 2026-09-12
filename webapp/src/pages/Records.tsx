@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import RecordForm from '@/components/records/RecordForm';
 import RecordTimeline from '@/components/records/RecordTimeline';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   BackendUnavailableError,
   listFavorites,
@@ -82,8 +83,11 @@ export default function Records() {
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-foreground">实验记录</h1>
+    <div className="space-y-5">
+      <PageHeader
+        title="实验记录"
+        subtitle="录入实验过程与结果，时间线自动归纳实验时间；支持附件与复盘"
+      />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* 左栏：录入表单 2/5 */}
         <div className="lg:col-span-2">

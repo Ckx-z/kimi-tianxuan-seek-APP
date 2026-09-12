@@ -27,7 +27,9 @@ $dist = Join-Path $AppRoot "resources\backend\_internal\webapp\dist"
 $exe = Join-Path $AppRoot "COF科研助手.exe"
 
 if (-not (Test-Path $SnapshotRoot)) { throw "快照目录不存在：$SnapshotRoot" }
-$snaps = Get-ChildItem $SnapshotRoot -Directory | Sort-Object Name -Descending
+$snaps = Get-ChildItem $SnapshotRoot -Directory | Sort-Object LastWriteTime -Descending
+# 注意：必须按时间排序 —— 按名称排会把 ui-batch3 排到 ui-overhaul1 之后，
+# 导致「默认取最近一个快照」取错版本。
 
 if ($List -or $snaps.Count -eq 0) {
   Write-Host "可用 UI 快照（新→旧）："
