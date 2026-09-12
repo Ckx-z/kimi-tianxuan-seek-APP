@@ -208,6 +208,10 @@ def _record_brief_item(rec: dict, with_summary: bool = True) -> dict:
         "outcome": outcome,
         "outcome_zh": _OUTCOME_ZH.get(outcome, outcome or "未填"),
         "status": rec.get("status") or "final",
+        # v1.9.3：实验起始时间（时间线首点）与录入日期分开呈现
+        "experiment_date": rec.get("experiment_date") or rec.get("date") or "",
+        "date": rec.get("date") or "",
+        "date_source": rec.get("date_source") or "",
     }
     if with_summary:
         item["self_summary"] = _cut(rec.get("self_summary") or "", 200)

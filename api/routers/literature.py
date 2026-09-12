@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse
 from ..schemas import (LiteratureConfirm, LiteratureEntriesBatch,
                        LiteratureEntryUpdate, LiteratureFigureFromSmiles,
                        LiteratureFigureUpdate, LiteratureLlmSettingsUpdate,
-                       LiteratureLookup)
+                       LiteratureLookup, LiteraturePaperUpdate)
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +155,15 @@ def confirm(req: LiteratureConfirm):
         pid = r.append_paper(entry)
     except OSError as exc:
         raise HTTPException(500, f"文献库写入失败：{type(exc).__name__}: {exc}")
+    # v1.9.3（第 7 点）：新文献立即写入本机知识图谱的「文献节点」
+    # （node_type=literature，标题/摘要可被助手 query_graphrag 检索命中）；
+    # 失败不回滚入库，如实标注 graph_indexed=false 可重试。
+    graph_indexed = False
+    try:
+        from literature import graph_ingest
+        graph_indexed = bool(graph_ingest.upsert_paper_node(pid, entry))
+    except Exception as exc:  # pragma: no cover
+        logger.warning("文献节点入图失败（已入库，可重试）: %s", exc)
     try:
         r.append_intake({
             "action": "confirm_intake",
@@ -169,7 +178,7 @@ def confirm(req: LiteratureConfirm):
             "entry": entry,
             "url": url,
             "in_training": False,
-            "graphrag_indexed": False,
+            "graphrag_indexed": graph_indexed,
             "audit_written": False,
             "message": f"已入库，但审计流水写入失败：{type(exc).__name__}: {exc}",
         }
@@ -178,9 +187,11 @@ def confirm(req: LiteratureConfirm):
         "entry": entry,
         "url": url,
         "in_training": False,
-        "graphrag_indexed": False,
+        "graphrag_indexed": graph_indexed,
         "audit_written": True,
-        "message": "已入库（仅文献库，未入训练集与 GraphRAG 图，检索层后续再接）",
+        "message": "已入库并写入本机知识图谱（文献节点可被助手检索）；"
+                   "未入训练集。上传全文「补解析」后其结构化条目与实验组"
+                   "关系会继续并入图谱。",
     }
 
 
@@ -228,6 +239,32 @@ def paper_detail(paper_id: str):
         "source": str(entry.get("source") or ""),
         "added_at": str(entry.get("added_at") or ""),
     }
+
+
+@router.patch("/papers/{paper_id}")
+def update_paper(paper_id: str, req: LiteraturePaperUpdate):
+    """回填文献级元数据（补解析 LLM 提取结果；默认只补空字段）。
+
+    返回 updated / skipped 列表，便于前端如实提示「哪些字段已存在被保留」。
+    """
+    r = _resolver()
+    fields = req.model_dump(exclude_none=True)
+    only_empty = bool(fields.pop("only_empty", True))
+    res = r.update_paper_fields(paper_id, fields, only_empty=only_empty)
+    if res.get("missing"):
+        raise HTTPException(404, f"文献不存在: {paper_id}")
+    # v1.9.3：元数据变化同步到知识图谱的文献节点（标题/摘要影响检索命中）
+    try:
+        from literature import graph_ingest
+        graph_ingest.upsert_paper_node(paper_id, res.get("entry") or {})
+    except Exception as exc:  # pragma: no cover
+        logger.warning("文献节点更新失败（文献库已更新）: %s", exc)
+    updated = res.get("updated") or []
+    skipped = res.get("skipped") or []
+    msg = (f"已回填 {len(updated)} 个字段"
+           + (f"（{', '.join(updated)}）" if updated else "")
+           + (f"；{len(skipped)} 个字段已有值被保留" if skipped else ""))
+    return {**res, "message": msg}
 
 
 @router.post("/figures/from-smiles", status_code=201)
@@ -337,33 +374,65 @@ def delete_figure(fig_id: str):
 # 科研知识库（v1.9.0）：结构化提取 / 条目库 / 文献解析 LLM 设置
 # ---------------------------------------------------------------------------
 
+MAX_PARSE_PDF_BYTES = 20 * 1024 * 1024   # 补解析 PDF 上限
+MIN_PDF_CHARS_PER_PAGE = 50              # 低于此值视为无文本层（扫描件）
+
+
 @router.post("/{paper_id}/parse")
 async def parse_paper(paper_id: str,
                       file: UploadFile | None = File(None),
-                      text: str | None = Form(None)):
+                      text: str | None = Form(None),
+                      with_meta: bool = Form(True)):
     """全维度解析：上传 PDF（或直接给全文文本）→ LLM 结构化条目预览。
 
-    文献解析 LLM 未启用时降级为 SMILES 正则扫描（llm_used=false）。
+    - 文献解析 LLM 未启用时降级为 SMILES 正则扫描（llm_used=false）；
+    - with_meta=True（默认）时同一响应附 `paper_meta`（文献级元数据，
+      title/authors/journal/year/doi/abstract），供前端确认后回填文献库；
+    - PDF 无文本层（扫描件，字符/页 < 50）→ 422 并提示改用文本或后续 OCR；
+    - 单文件 ≤ 20MB。
     """
     r = _resolver()
     if r.resolve_paper(paper_id) is None:
         raise HTTPException(404, f"文献不存在: {paper_id}")
     body = (text or "").strip()
+    pages = 0
     if file is not None:
         data = await file.read()
         if not data:
             raise HTTPException(400, "上传文件为空")
+        if len(data) > MAX_PARSE_PDF_BYTES:
+            raise HTTPException(
+                413,
+                f"PDF 超过 {MAX_PARSE_PDF_BYTES // (1024 * 1024)}MB 上限，"
+                "请压缩后重试")
         try:
             import fitz
             doc = fitz.open(stream=data, filetype="pdf")
+            pages = doc.page_count
             body = "\n".join(page.get_text() for page in doc)
             doc.close()
+        except HTTPException:
+            raise
         except Exception as exc:
             raise HTTPException(400, f"PDF 解析失败：{exc}")
+        per_page = len(body.strip()) / max(pages, 1)
+        if per_page < MIN_PDF_CHARS_PER_PAGE:
+            raise HTTPException(
+                422,
+                f"该 PDF 无可提取文本层（{pages} 页仅 {len(body.strip())} 字符，"
+                "疑似扫描件/纯图片版）：请改用「用全文文本解析」，"
+                "或等待后续版本的 OCR / 视觉模型支持")
     if not body:
         raise HTTPException(400, "请提供 PDF 文件或 text 全文")
     ext = _llm_extract()
-    return {"paper_id": paper_id, **ext.parse_text(body)}
+    result = ext.parse_text(body)
+    if with_meta:
+        meta = ext.extract_paper_meta(body)
+        result["paper_meta"] = meta.get("meta") or {}
+        result["meta_note"] = meta.get("note") or ""
+    result["chars"] = len(body)
+    result["pages"] = pages
+    return {"paper_id": paper_id, **result}
 
 
 @router.post("/{paper_id}/entries", status_code=201)

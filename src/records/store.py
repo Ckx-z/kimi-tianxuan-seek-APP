@@ -102,11 +102,22 @@ def _sanitize_timeline(timeline: list,
     return out
 
 
+def _dates_module():
+    """records.dates（双命名空间兼容）。"""
+    try:
+        from src.records import dates as dates_module
+    except ImportError:  # pragma: no cover
+        from records import dates as dates_module  # type: ignore
+    return dates_module
+
+
 def _normalize_record(rec: dict) -> dict:
     """旧数据兼容：缺新字段（status/process_notes/timeline）时补默认值。
 
     旧记录一律视为 final（草稿为本功能新增语义，历史记录全部是正式记录）。
     缺 self_summary/mistakes（自我总结/本人认为的失误，本功能新增字段）时补空串。
+    v1.9.3：追加派生只读字段 experiment_date / date_source / date_label
+    —— 实验时间取时间线第一个可解析时间点，取不到回退录入日期（date 语义不变）。
     """
     rec.setdefault("status", "final")
     rec.setdefault("process_notes", "")
@@ -114,6 +125,16 @@ def _normalize_record(rec: dict) -> dict:
     rec.setdefault("mistakes", "")
     tl = rec.get("timeline")
     rec["timeline"] = tl if isinstance(tl, list) else []
+    try:
+        exp_date, source, label, confidence = _dates_module().effective_date(rec)
+    except Exception as exc:  # pragma: no cover - 派生失败不影响记录可用
+        logger.warning("实验时间派生失败 %s: %s", rec.get("record_id"), exc)
+        exp_date, source, label, confidence = str(rec.get("date") or ""), \
+            "created", "", ""
+    rec["experiment_date"] = exp_date
+    rec["date_source"] = source
+    rec["date_label"] = label
+    rec["date_confidence"] = confidence
     return rec
 
 
@@ -308,8 +329,9 @@ def create_record(
 
 
 def list_records(favorite_id: str | None = None) -> list[dict]:
-    """全部实验记录（可按 favorite_id 过滤），按日期+id 升序（时间线）。
+    """全部实验记录（可按 favorite_id 过滤），按实验时间升序（时间线）。
 
+    排序键用派生的 experiment_date（时间线首个时间点），取不到时回退 date；
     契约示例文件 example.json 不作为真实记录列出；损坏文件跳过。
     """
     if not RECORDS_DIR.exists():
@@ -322,7 +344,9 @@ def list_records(favorite_id: str | None = None) -> list[dict]:
         if rec and _ID_RE.match(str(rec.get("record_id", ""))):
             if favorite_id is None or rec.get("favorite_id") == favorite_id:
                 recs.append(_normalize_record(rec))
-    recs.sort(key=lambda r: (str(r.get("date", "")), str(r.get("record_id", ""))))
+    recs.sort(key=lambda r: (str(r.get("experiment_date")
+                                 or r.get("date", "")),
+                             str(r.get("record_id", ""))))
     return recs
 
 

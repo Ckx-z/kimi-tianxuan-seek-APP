@@ -52,6 +52,11 @@ def mini_lib(tmp_path, monkeypatch):
             mod.reload()
             patched.append(mod)
     monkeypatch.setattr(resolver, "INTAKE_PATH", tmp_path / "literature_intake.jsonl")
+    # v1.9.3：confirm 现在会写知识图谱文献节点 → 侧车图根必须隔离到 tmp_path
+    for mod_name in ("literature.graph_ingest", "src.literature.graph_ingest"):
+        mod = sys.modules.get(mod_name)
+        if mod is not None and hasattr(mod, "_app_root"):
+            monkeypatch.setattr(mod, "_app_root", lambda: tmp_path)
     yield p
     for mod in patched:
         mod.reload()
@@ -348,7 +353,8 @@ class TestConfirmApi:
         assert r.status_code == 201
         body = r.json()
         assert body["paper_id"] == "6"  # 迷你库最大 id 5 → 新 id 6
-        assert body["graphrag_indexed"] is False
+        # v1.9.3（第 7 点）：新文献入库即写入本机知识图谱的文献节点
+        assert body["graphrag_indexed"] is True
         assert body["in_training"] is False
         assert body["audit_written"] is True
         assert body["url"] == "https://doi.org/10.5555/brand-new"

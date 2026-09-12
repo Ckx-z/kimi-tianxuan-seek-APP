@@ -67,7 +67,7 @@ import {
   type RecordItem,
 } from '@/components/records/api';
 import RecordDetailDialog from '@/components/records/RecordDetailDialog';
-import { OUTCOME_META } from '@/components/records/meta';
+import { experimentTime, OUTCOME_META } from '@/components/records/meta';
 // 只读复用查询打分页的结果组件与 API（不修改其文件），保证放大详情与查询打分页内容一致
 import ResultCard from '@/components/query/ResultCard';
 import MonomerPropsCard from '@/components/query/MonomerPropsCard';
@@ -763,7 +763,14 @@ function FavoriteDetailDialog({
                                 </Badge>
                               )}
                             </TableCell>
-                            <TableCell className="whitespace-nowrap">{r.date || '—'}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {experimentTime(r).date || '—'}
+                              {experimentTime(r).isFallback && (
+                                <span className="ml-1 text-xs text-muted-foreground/60">
+                                  （录入）
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell>
                               <Badge className={meta.className}>{meta.label}</Badge>
                             </TableCell>

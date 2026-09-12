@@ -25,7 +25,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import RecordDetailDialog from './RecordDetailDialog';
 import RecordEditDialog from './RecordEditDialog';
-import { CONDITION_LABELS, OUTCOME_META, pairLabel } from './meta';
+import { CONDITION_LABELS, OUTCOME_META, experimentTime, pairLabel } from './meta';
 import { deleteRecord, exportRecordWord, type RecordItem } from './api';
 
 /** 条件摘要：拼接非空条件键值 */
@@ -190,7 +190,17 @@ export default function RecordTimeline({
                 }
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-muted-foreground">{rec.date}</span>
+                  <span
+                    className="text-sm text-muted-foreground"
+                    title={experimentTime(rec).hint}
+                  >
+                    {experimentTime(rec).date}
+                    {experimentTime(rec).isFallback && (
+                      <span className="ml-1 text-xs text-muted-foreground/60">
+                        （录入日期）
+                      </span>
+                    )}
+                  </span>
                   <span className="font-medium text-foreground">{pairLabel(rec)}</span>
                   <Badge className={meta.className}>{meta.label}</Badge>
                   {isDraft && (

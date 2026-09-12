@@ -339,14 +339,25 @@ def _monomer_props_section(doc: Document, label: str, monomer: dict,
 def _sorted_timeline(timeline: list) -> list[dict]:
     """时间线条目按时间排序：time_label 可解析为日期时间的按时间升序，
     不可解析的保持原顺序排在其后（time_label 为自由文本，如「第 2 天」）。
+
+    v1.9.3：改用 records.dates 的容错解析（支持 `26/7/3/10:30` 等实测格式），
+    再退回标准 ISO 解析。
     """
+    try:
+        from src.records import dates as _dates
+    except ImportError:  # pragma: no cover
+        from records import dates as _dates  # type: ignore
+
     def _key(item: tuple[int, dict]):
         idx, entry = item
         label = str(entry.get("time_label") or "").strip()
+        iso, _conf = _dates.parse_time_label(label)
+        if iso:
+            return (0, iso, idx)
         try:
-            return (0, datetime.fromisoformat(label).timestamp(), idx)
+            return (0, datetime.fromisoformat(label).date().isoformat(), idx)
         except ValueError:
-            return (1, 0.0, idx)
+            return (1, "", idx)
 
     entries = [e for e in (timeline or []) if isinstance(e, dict)]
     return [e for _, e in sorted(enumerate(entries), key=_key)]
@@ -394,11 +405,19 @@ def _build_record_body(doc: Document, rec: dict, base_level: int = 1) -> None:
 
     # 基本信息
     doc.add_heading("基本信息", level=base_level)
+    # v1.9.3（问题 5）：实验起始时间取时间线首个时间点；取不到时回退录入日期
+    exp_date = str(rec.get("experiment_date") or rec.get("date") or "—")
+    date_source = str(rec.get("date_source") or "")
+    exp_date_txt = exp_date + (
+        "（来源：实验过程时间线首个时间点）" if date_source == "timeline"
+        else "（来源：记录录入日期——时间线无可解析时间点）"
+        if date_source == "created" else "")
     _kv_table(doc, [
         ("实验编号", experiment_no or "（未填写）"),
         ("记录 ID", record_id),
         ("状态", status or "—"),
-        ("记录日期", str(rec.get("date") or "—")),
+        ("实验起始时间", exp_date_txt),
+        ("录入日期", str(rec.get("date") or "—")),
         ("实验结果", _OUTCOME_LABELS.get(str(rec.get("outcome") or ""), "未定")),
         ("机械强度", str(rec.get("strength") or "—")),
         ("操作人", str(rec.get("operator") or "—")),

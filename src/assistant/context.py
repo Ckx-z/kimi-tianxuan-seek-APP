@@ -131,12 +131,23 @@ def _records_block(context: dict) -> str:
     lines = [f"共 {len(recs)} 条，结果分布：" +
              "，".join(f"{k}×{v}" for k, v in sorted(dist.items()))]
     for r in list(reversed(recs))[:_MAX_RECORDS]:
-        bit = f"- {r.get('record_id')}（{r.get('date') or '?'}，{r.get('outcome') or '未填'}）"
+        exp_date = r.get("experiment_date") or r.get("date") or "?"
+        bit = (f"- {r.get('record_id')}（实验时间 {exp_date}"
+               + ("，回退录入日期" if r.get("date_source") == "created" else "")
+               + f"，{r.get('outcome') or '未填'}）")
         if r.get("self_summary"):
             bit += f" 自我总结：{str(r['self_summary'])[:120]}"
         if r.get("mistakes"):
             bit += f" 失误：{str(r['mistakes'])[:120]}"
         lines.append(bit)
+    # v1.9.3（问题 4.1）：补最近一条的完整实验流程要点，避免助手答不出流程
+    latest = list(reversed(recs))[0] if recs else None
+    if latest and str(latest.get("process_notes") or "").strip():
+        process = str(latest["process_notes"]).strip()
+        lines.append(f"- 最近一条（{latest.get('record_id')}）实验流程"
+                     f"（原文 {len(process)} 字，摘录）：{process[:600]}"
+                     + ("…（需要全文请调 read_experiment_record）"
+                        if len(process) > 600 else ""))
     return "## 实验记录摘要\n" + "\n".join(lines)
 
 

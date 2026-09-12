@@ -24,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import ProcessPanel from './ProcessPanel';
 import { updateRecord, type RecordItem, type TimelineEntry } from './api';
+import { experimentTime } from './meta';
 
 /** conditions 九键（与后端契约一致） */
 const CONDITION_FIELDS: { key: string; label: string }[] = [
@@ -153,8 +154,8 @@ export default function RecordEditDialog({ rec, mode, onClose, onSaved }: Record
           </DialogTitle>
           <DialogDescription>
             {isDraft
-              ? `${rec.date}｜草稿暂存中，可继续编辑后保存草稿，或转为正式记录`
-              : `${rec.date}｜正式记录：全部字段均可修改，保存时保持编号与结果必填校验`}
+              ? `实验时间 ${experimentTime(rec).date}｜草稿暂存中，可继续编辑后保存草稿，或转为正式记录`
+              : `实验时间 ${experimentTime(rec).date}｜正式记录：全部字段均可修改，保存时保持编号与结果必填校验`}
           </DialogDescription>
         </DialogHeader>
 

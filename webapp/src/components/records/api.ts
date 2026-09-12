@@ -142,7 +142,16 @@ export interface RecordItem {
   /** 时间点记录条目 */
   timeline: TimelineEntry[];
   operator: string;
+  /** 录入日期（创建记录当天） */
   date: string;
+  /** v1.9.3 派生：实验起始时间 = 时间线首个可解析时间点（取不到时 = date） */
+  experiment_date?: string;
+  /** 派生来源：timeline（时间线首点）/ created（回退录入日期，旧数据/无时间线） */
+  date_source?: 'timeline' | 'created';
+  /** 派生所用原始标注（如 `2026-9-10 8:59`） */
+  date_label?: string;
+  /** 解析置信度：high（四位年）/ medium（两位年）/ low（尾置年） */
+  date_confidence?: string;
   /** 仅创建响应可能携带：同收藏下编号重复警告 */
   duplicate_experiment_no?: boolean;
 }

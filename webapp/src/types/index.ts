@@ -46,7 +46,12 @@ export interface ExperimentRecord {
   experiment_no: string;
   conditions: Record<string, unknown>;
   outcome: Record<string, unknown>;
+  /** 录入日期（创建记录当天） */
   date: string;
+  /** v1.9.3 派生：实验起始时间（时间线首个时间点；取不到时 = date） */
+  experiment_date?: string;
+  date_source?: 'timeline' | 'created';
+  date_label?: string;
   [key: string]: unknown;
 }
 

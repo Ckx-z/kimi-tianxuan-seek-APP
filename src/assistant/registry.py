@@ -23,6 +23,7 @@ from .tools.plan import generate_plan_card_impact, generate_plan_card_tool
 from .tools.predict import predict_film
 from .tools.records import (draft_experiment_record,
                             draft_experiment_record_impact,
+                            read_experiment_record,
                             read_experiment_records)
 # v1.6.0 P0：联网搜索 / 学术检索 / 网页抓取 / 补齐工具
 from .tools.academic import academic_search
@@ -94,6 +95,31 @@ TOOLS: dict = {
                                         "description": "收藏条目 ID（可选）"},
                     },
                     "required": [],
+                },
+            },
+        },
+    },
+    "read_experiment_record": {
+        "handler": lambda args: read_experiment_record(
+            args.get("record_id") or "",
+            include_timeline=args.get("include_timeline", True)),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "read_experiment_record",
+                "description": "读【单条】实验记录全文：完整实验流程"
+                               "（process_notes 原文）+ 全部实验过程时间点"
+                               "+ 附件清单。需要时间线细节/每天做了什么时用。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "record_id": {"type": "string",
+                                      "description": "记录 ID，如 rec_20260902_006"},
+                        "include_timeline": {
+                            "type": "boolean",
+                            "description": "是否包含全部时间点（默认 true）"},
+                    },
+                    "required": ["record_id"],
                 },
             },
         },

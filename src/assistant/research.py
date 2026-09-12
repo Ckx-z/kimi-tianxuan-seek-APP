@@ -52,8 +52,8 @@ _MAX_DIGEST_CHARS = 15000   # 会话报告：对话摘要注入上限（近期�
 
 # 研究模式工具白名单（只读，无写操作确认流）
 RESEARCH_TOOLS = (
-    "query_graphrag", "read_experiment_records", "predict_film",
-    "get_monomer_props", "cas_resolve", "lookup_paper_doi",
+    "query_graphrag", "read_experiment_records", "read_experiment_record",
+    "predict_film", "get_monomer_props", "cas_resolve", "lookup_paper_doi",
     "web_search", "academic_search", "fetch_page",
     "list_favorites", "list_prediction_history", "get_daily_brief",
 )

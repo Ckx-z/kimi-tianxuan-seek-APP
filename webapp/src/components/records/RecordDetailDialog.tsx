@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import ProcessPanel from './ProcessPanel';
-import { CONDITION_LABELS, OUTCOME_META, pairLabel } from './meta';
+import { CONDITION_LABELS, OUTCOME_META, experimentTime, pairLabel } from './meta';
 import { exportRecordWord, type RecordItem } from './api';
 
 export interface RecordDetailDialogProps {
@@ -103,7 +103,13 @@ export default function RecordDetailDialog({
                 )}
               </div>
               <DialogDescription className="text-left">
-                {rec.date}｜{rec.record_id}
+                实验时间 {experimentTime(rec).date}
+                {experimentTime(rec).isFallback && '（录入日期）'}｜{rec.record_id}
+                {rec.date && experimentTime(rec).date !== rec.date && (
+                  <span className="ml-1 text-muted-foreground/70">
+                    （录入于 {rec.date}）
+                  </span>
+                )}
               </DialogDescription>
             </DialogHeader>
 

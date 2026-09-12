@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, MessagesSquare, Sparkles } from 'lucide-react';
 import type { ExperimentRecord, Favorite, Plan, Suggestion } from '@/types';
+import { experimentTime } from '@/components/records/meta';
 import {
   listFavorites,
   listPlans,
@@ -32,9 +33,9 @@ import { PlanCardItem } from '@/components/iterate/PlanCardItem';
 /** 「全部记录（不锚定）」选项值（Select 不允许空串） */
 const NO_ANCHOR = '__none__';
 
-/** 实验记录标签：日期｜编号｜结果 */
+/** 实验记录标签：实验时间｜编号｜结果（v1.9.3：experiment_date 优先） */
 function recordLabel(r: ExperimentRecord): string {
-  const date = (r.date || '').slice(0, 10) || '未知日期';
+  const date = experimentTime(r).date.slice(0, 10) || '未知日期';
   const outcome = typeof r.outcome === 'string' ? r.outcome : '';
   return `${date}｜${r.experiment_no || r.record_id}｜${outcome || '—'}`;
 }

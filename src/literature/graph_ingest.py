@@ -46,6 +46,83 @@ def lit_node_id(paper_id: str, group_id: str) -> str:
     return f"LIT-{paper_id}-{group_id}"
 
 
+def paper_node_id(paper_id: str) -> str:
+    """文献（论文）节点 ID：与包内 `L-<md5(literature_id)>` 同类但独立前缀，
+    避免与内置节点 ID 冲突（侧车图合并时按 ID 去重）。"""
+    return f"LITP-{paper_id}"
+
+
+def _paper_meta(paper_id: str) -> dict:
+    """文献库元数据（references.titles），失败返回空 dict。"""
+    try:
+        from references import titles
+    except ImportError:  # pragma: no cover
+        from src.references import titles  # type: ignore
+    entry = titles.resolve_entry(paper_id) or {}
+    return entry if isinstance(entry, dict) else {}
+
+
+def upsert_paper_node(paper_id: str, meta: dict | None = None) -> bool:
+    """写入/更新「文献节点」（v1.9.3 第 7 点：新老文献都进知识图谱）。
+
+    - 节点 ID `LITP-<paper_id>`，node_type='literature'，source='literature'；
+    - 字段对齐内置文献节点：`journal` / `system`（= 标题）/ `innovation`
+      （= 摘要或结论）—— query_graphrag 扫这三个字段做关键词命中，
+      因此新入库文献**仅凭标题/摘要即可被助手检索到**，无需等条目解析；
+    - meta 为 None 时从文献库（paper_titles）实时读取；
+    - 幂等：已存在则合并（新值非空才覆盖），返回是否有写入。
+    """
+    pid = str(paper_id or "").strip()
+    if not pid:
+        return False
+    entry = dict(meta) if isinstance(meta, dict) else _paper_meta(pid)
+    title = str(entry.get("title") or "").strip()
+    journal = str(entry.get("journal") or "").strip()
+    doi = str(entry.get("doi") or "").strip()
+    abstract = str(entry.get("abstract") or "").strip()
+    authors = entry.get("authors") or []
+    if isinstance(authors, list):
+        authors_txt = "，".join(str(a).strip() for a in authors if str(a).strip())
+    else:
+        authors_txt = str(authors or "").strip()
+    url = str(entry.get("url") or "").strip() or (
+        f"https://doi.org/{doi}" if doi else "")
+
+    G = _load_graph()
+    nid = paper_node_id(pid)
+    attrs = {
+        "node_type": "literature",
+        "source": "literature",
+        "literature_id": f"paper:{pid}",
+        "paper_id": pid,
+        "title": title,
+        "system": title,          # 检索字段（内置口径）
+        "innovation": abstract[:1200],  # 检索字段（内置口径）
+        "journal": journal,
+        "doi": doi,
+        "url": url,
+        "year": entry.get("year"),
+        "authors": authors_txt,
+        "added_at": entry.get("added_at") or "",
+    }
+    changed = False
+    if nid not in G:
+        G.add_node(nid, **attrs)
+        changed = True
+    else:
+        merged = dict(G.nodes[nid])
+        for key, value in attrs.items():
+            if value not in (None, "", [], {}):
+                if merged.get(key) != value:
+                    merged[key] = value
+                    changed = True
+        if changed:
+            G.nodes[nid].update(merged)
+    if changed:
+        _save_graph(G, _count_lit(G))
+    return changed
+
+
 def _md5_id(prefix: str, text: str) -> str:
     return prefix + "-" + hashlib.md5(text.encode()).hexdigest()[:12]
 
@@ -163,6 +240,11 @@ def sync_group(paper_id: str, group_id: str,
         from literature import knowledge
         entries = [e for e in knowledge.list_entries(paper_id=paper_id)
                    if str(e.get("group_id")) == str(group_id)]
+    # 文献节点先落地（新文献未解析时也能被检索到；已存在则合并元数据）
+    try:
+        upsert_paper_node(paper_id)
+    except Exception as exc:  # pragma: no cover - 文献节点失败不阻塞组节点
+        logger.warning("文献节点写入失败 paper=%s: %s", paper_id, exc)
     nid = lit_node_id(paper_id, group_id)
     G = _load_graph()
     changed = False
@@ -204,6 +286,10 @@ def sync_group(paper_id: str, group_id: str,
             G.add_node(oid, node_type="outcome",
                        name=str(film_label), source="literature")
         edges.append((nid, oid, "reaction_produces"))
+    # 组节点 → 文献节点（对齐内置图 reaction_cited_in 方向：reaction → literature）
+    pnode = paper_node_id(paper_id)
+    if pnode in G:
+        edges.append((nid, pnode, "reaction_cited_in"))
     for u, v, etype in edges:
         existing = {d.get("edge_type")
                     for d in G.get_edge_data(u, v, default={}).values()}

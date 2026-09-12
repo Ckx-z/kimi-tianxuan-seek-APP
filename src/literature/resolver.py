@@ -168,6 +168,59 @@ def append_paper(entry: dict) -> str:
         return pid
 
 
+def update_paper_fields(paper_id: str, fields: dict,
+                        only_empty: bool = True) -> dict:
+    """回填文献级字段（LLM 元数据提取结果）。
+
+    - only_empty=True（默认）：**只补空字段**，已有值（尤其 Crossref 入库的
+      title/authors/journal/year/doi/abstract）绝不覆盖；
+    - 允许字段白名单：title/authors/journal/year/doi/abstract；
+    - doi 命中其他文献时跳过（防重复编号）；
+    - 返回 {"paper_id", "entry", "updated": [...], "skipped": [...],
+      "missing": bool}；文献不存在时 missing=True。
+    """
+    pid = str(paper_id or "").strip()
+    allowed = ("title", "authors", "journal", "year", "doi", "abstract")
+    with _append_lock:
+        papers = dict(titles._load())
+        entry = papers.get(pid)
+        if not isinstance(entry, dict):
+            return {"paper_id": pid, "entry": None, "updated": [],
+                    "skipped": [], "missing": True}
+        entry = dict(entry)
+        updated, skipped = [], []
+        incoming = {k: v for k, v in (fields or {}).items() if k in allowed}
+        # DOI 冲突检查（只针对本次要写入的 doi）
+        new_doi = normalize_doi(incoming.get("doi"))
+        if new_doi:
+            hit = find_by_doi(new_doi)
+            if hit and str(hit[0]) != pid:
+                skipped.append("doi")
+                incoming.pop("doi", None)
+        for key, value in incoming.items():
+            if value in (None, "", [], {}):
+                continue
+            if only_empty and entry.get(key) not in (None, "", [], {}):
+                skipped.append(key)
+                continue
+            if key == "doi":
+                value = normalize_doi(value)
+            entry[key] = value
+            updated.append(key)
+        if updated:
+            papers[pid] = entry
+            path = _papers_path()
+            tmp = path.with_name(path.name + ".tmp")
+            tmp.write_text(
+                json.dumps(papers, ensure_ascii=False, indent=1) + "\n",
+                encoding="utf-8",
+            )
+            tmp.replace(path)
+            titles.reload()
+        return {"paper_id": pid, "entry": entry, "updated": updated,
+                "skipped": skipped, "missing": False}
+
+
 def append_intake(record: dict) -> None:
     """追加一行审计流水到 data/literature_intake.jsonl。"""
     record = dict(record)

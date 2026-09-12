@@ -6,7 +6,7 @@
  *    草稿全字段可编辑（标题/作者/期刊/年份/DOI/摘要）——不正确的可修改后再入库；
  *    existing=true 时黄色提示「库中已有此文献（#paper_id）」并禁止确认。
  * 3.「确认入库」→ confirm（reviewed_by 固定 "user"）→ 成功面板含新 paper_id 与
- *   「不入训练集、暂不入图谱」说明；409 展示已存在 paper_id；
+ *   「已入知识图谱文献节点、不入训练集」说明；409 展示已存在 paper_id；
  *   502 中文提示「Crossref 暂时不可达，请稍后重试」。
  */
 import { useState } from 'react';
@@ -222,7 +222,9 @@ export function LiteratureIntakeSection() {
       <CardContent className="space-y-4 p-4">
         <div className="text-sm text-muted-foreground">
           三种方式录入：DOI 直查 / 标题检索 Crossref / 上传 PDF 由 LLM 提取；
-          核对（可修改）元数据后确认入库；仅入文献库，不入训练集、暂不入图谱。
+          核对（可修改）元数据后确认入库（编号自动递增）。入库即写入本机
+          知识图谱的文献节点，不入训练集；上传全文补解析后其结构化条目与
+          实验组关系会继续并入图谱。
         </div>
 
         {/* 第一步：三种录入方式 */}
@@ -488,8 +490,13 @@ export function LiteratureIntakeSection() {
               已入库，文献编号 #{result.paper_id}
             </div>
             <p className="text-xs">
-              该文献仅入文献库：不入训练集、暂不入图谱（GraphRAG），收藏夹引用与助手检索现在即可解析它。
-              可在下方「文献图谱」为其上传结构式/光谱/机理图。
+              {result.graphrag_indexed === false
+                ? '已入文献库并按编号递增；但本次知识图谱写入失败（可稍后重试：'
+                  + '重新确认入库或补解析该文献）。'
+                : '已入文献库并写入本机知识图谱（文献节点，标题/摘要即可被助手检索）；'}
+              不入训练集。到下方「科研知识库」上传全文「补解析」后，
+              其结构化条目（单体对/成膜条件/表征/结论）与实验组关系会继续并入图谱。
+              也可在「文献图谱」为其上传结构式/光谱/机理图。
               {result.url && (
                 <>
                   {' '}

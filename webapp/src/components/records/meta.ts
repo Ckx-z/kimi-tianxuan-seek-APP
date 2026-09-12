@@ -30,3 +30,28 @@ export function pairLabel(rec: Pick<RecordItem, 'aldehyde' | 'amine'>): string {
   const amine = rec.amine?.name || rec.amine?.smiles?.slice(0, 16) || '未知胺';
   return `${ald} + ${amine}`;
 }
+
+/**
+ * 实验时间（v1.9.3 问题 5）：统一取 `experiment_date`（实验过程时间线第一个
+ * 时间点），接口未返回该派生字段时回退 `date`（录入日期）。
+ *
+ * 参数用宽松结构（unknown 取值 + String 归一），以便同时适配
+ * `RecordItem`（components/records/api）与 `ExperimentRecord`（@/types）。
+ */
+export function experimentTime(rec: {
+  experiment_date?: unknown;
+  date?: unknown;
+  date_source?: unknown;
+}): { date: string; isFallback: boolean; hint: string } {
+  const exp = String(rec.experiment_date ?? '').trim();
+  const created = String(rec.date ?? '').trim();
+  const date = exp || created || '—';
+  const isFallback = !exp || rec.date_source === 'created';
+  return {
+    date,
+    isFallback,
+    hint: isFallback
+      ? '时间线无可解析时间点，显示录入日期'
+      : '实验过程时间线首个时间点',
+  };
+}

@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
-  BookOpen, FlaskConical, FileUp, Loader2, Pencil,
+  BookOpen, FlaskConical, FileCheck2, FileUp, Loader2, Pencil,
   Play, RefreshCw, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -69,6 +69,20 @@ interface ParsePreview {
   llm_used: boolean;
   note: string;
   entries: Partial<Entry>[];
+  /** v1.9.3：文献级元数据（LLM 提取；确认后可回填文献库，只补空字段） */
+  paper_meta?: {
+    title?: string;
+    authors?: string[];
+    journal?: string;
+    year?: number;
+    doi?: string;
+    abstract?: string;
+  };
+  meta_note?: string;
+  /** 本次解析范围（前端展示用） */
+  chars?: number;
+  pages?: number;
+  segments?: { total: number; failed: number };
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -207,6 +221,28 @@ export function LiteratureKnowledgeSection() {
       if (data.entries.length === 0) {
         toast.warning('未提取到条目：可检查全文或配置文献解析 LLM');
       }
+    } catch {
+      /* 已 toast */
+    } finally {
+      setParseBusy(false);
+    }
+  };
+
+  /** v1.9.3：把 LLM 提取的文献级元数据回填文献库（后端只补空字段） */
+  const backfillMeta = async () => {
+    const meta = preview?.paper_meta;
+    if (!meta || Object.keys(meta).length === 0) return;
+    setParseBusy(true);
+    try {
+      const res = await req<{
+        updated: string[]; skipped: string[]; message: string;
+      }>(`/papers/${encodeURIComponent(paperId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ ...meta, only_empty: true }),
+      });
+      toast.success(res.message || '已回填文献库');
+      const fresh = await req<PaperDetail>(`/papers/${encodeURIComponent(paperId)}`);
+      setDetail(fresh);
     } catch {
       /* 已 toast */
     } finally {
@@ -626,8 +662,70 @@ export function LiteratureKnowledgeSection() {
                 <p className="text-xs text-muted-foreground">
                   {preview.llm_used ? 'LLM 结构化提取' : 'SMILES 正则扫描（降级）'}：
                   {preview.note}
+                  {preview.segments && preview.segments.total > 1 && (
+                    <span className="ml-1 text-muted-foreground/70">
+                      （{preview.chars ?? 0} 字符
+                      {preview.pages ? ` / ${preview.pages} 页` : ''}
+                      ，分 {preview.segments.total} 段解析）
+                    </span>
+                  )}
                   （勾选要入库的条目，按组归类）
                 </p>
+
+                {/* v1.9.3：文献级元数据（可回填文献库，只补空字段不覆盖） */}
+                {preview.paper_meta && Object.keys(preview.paper_meta).length > 0 && (
+                  <div className="rounded-lg border border-gold/40 bg-gold-muted/30 p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-gold-foreground">
+                        文献信息（LLM 提取，可回填）
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs"
+                        disabled={parseBusy}
+                        onClick={() => void backfillMeta()}
+                      >
+                        <FileCheck2 className="mr-1 h-3 w-3" />
+                        回填到文献库
+                      </Button>
+                    </div>
+                    <dl className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                      {preview.paper_meta.title && (
+                        <div className="flex gap-1.5">
+                          <dt className="shrink-0">标题：</dt>
+                          <dd className="min-w-0 flex-1 text-foreground">
+                            {preview.paper_meta.title}
+                          </dd>
+                        </div>
+                      )}
+                      {preview.paper_meta.authors?.length ? (
+                        <div className="flex gap-1.5">
+                          <dt className="shrink-0">作者：</dt>
+                          <dd className="truncate">{preview.paper_meta.authors.join('，')}</dd>
+                        </div>
+                      ) : null}
+                      {(preview.paper_meta.journal || preview.paper_meta.year) && (
+                        <div className="flex gap-1.5">
+                          <dt className="shrink-0">期刊：</dt>
+                          <dd>
+                            {[preview.paper_meta.journal, preview.paper_meta.year]
+                              .filter(Boolean).join(' · ')}
+                          </dd>
+                        </div>
+                      )}
+                      {preview.paper_meta.doi && (
+                        <div className="flex gap-1.5">
+                          <dt className="shrink-0">DOI：</dt>
+                          <dd className="truncate">{preview.paper_meta.doi}</dd>
+                        </div>
+                      )}
+                    </dl>
+                    <p className="mt-1 text-[11px] text-muted-foreground/70">
+                      只补文献库中的空字段；已有值（Crossref 入库的标题/作者等）不会被覆盖。
+                    </p>
+                  </div>
+                )}
                 <div className="max-h-[50vh] space-y-2 overflow-y-auto">
                   {Object.entries(
                     preview.entries.reduce<Record<string, (Partial<Entry> & { idx: number })[]>>(

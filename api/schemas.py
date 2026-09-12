@@ -319,6 +319,21 @@ class LiteratureConfirm(BaseModel):
     reviewed_by: str = Field("", description="审核人（审计记录用）")
 
 
+class LiteraturePaperUpdate(BaseModel):
+    """文献级元数据回填（v1.9.3：补解析 LLM 提取结果确认后写入）。
+
+    默认 only_empty=True —— **只补空字段**，绝不覆盖 Crossref 入库的既有值；
+    doi 命中其他文献时自动跳过（防重复编号）。
+    """
+    title: str | None = None
+    authors: list[str] | None = None
+    journal: str | None = None
+    year: int | None = None
+    doi: str | None = None
+    abstract: str | None = None
+    only_empty: bool = True
+
+
 class LiteratureFigureFromSmiles(BaseModel):
     """文献图谱（v1.7.0）：SMILES → 2D 结构图入库。"""
     paper_id: str = Field(..., description="关联文献 paper_id")

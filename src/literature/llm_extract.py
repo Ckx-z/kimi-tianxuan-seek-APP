@@ -36,6 +36,13 @@ SETTINGS_PATH = runtime_config.user_app_root() / "config" \
 MAX_TEXT_CHARS = 24000       # 单次解析注入上限（全文超长分段）
 _MAX_PAIRS_PREVIEW = 30
 
+# 推理模型（deepseek 系等）会把 max_tokens 先花在 reasoning_content 上：
+# 预算 4000 时实测 reasoning_tokens=4000、content 为空、finish_reason=length，
+# 导致解析结果 0 条被误判为「功能坏了」。默认给足预算，并在 content 为空时
+# 自动翻倍重试（上限 _MAX_TOKENS_CEILING）。
+DEFAULT_MAX_TOKENS = 16000
+_MAX_TOKENS_CEILING = 32000
+
 _PROMPT = (
     "你是科研文献解析助手。请阅读下面的 COF（共价有机框架）成膜文献片段，"
     "提取其中的**每一组实验**的结构化信息。\n"
@@ -139,9 +146,12 @@ def is_enabled() -> bool:
 
 # ---------------------------------------------------------------- 解析
 
-def _chat(base_url: str, api_key: str, model: str, prompt: str,
-          max_tokens: int = 4000) -> str | None:
-    """OpenAI 兼容 chat 调用；失败返回 None。"""
+def _chat_once(base_url: str, api_key: str, model: str, prompt: str,
+               max_tokens: int) -> dict:
+    """单次 OpenAI 兼容 chat 调用。返回
+    {"content": str, "reasoning_tokens": int, "finish_reason": str,
+     "error": str|None}；网络/解析失败时 error 非空、content 为空串。
+    """
     req = urllib.request.Request(
         f"{base_url.rstrip('/')}/chat/completions",
         data=json.dumps({
@@ -154,12 +164,64 @@ def _chat(base_url: str, api_key: str, model: str, prompt: str,
                  "Authorization": f"Bearer {api_key}"},
         method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=180) as r:
+        with urllib.request.urlopen(req, timeout=300) as r:
             data = json.loads(r.read().decode("utf-8"))
-        return str(data["choices"][0]["message"]["content"] or "").strip()
+        choice = (data.get("choices") or [{}])[0]
+        msg = choice.get("message") or {}
+        usage = data.get("usage") or {}
+        details = usage.get("completion_tokens_details") or {}
+        return {
+            "content": str(msg.get("content") or "").strip(),
+            "reasoning_tokens": int(details.get("reasoning_tokens") or 0),
+            "finish_reason": str(choice.get("finish_reason") or ""),
+            "error": None,
+        }
     except Exception as exc:
         logger.warning("文献解析 LLM 调用失败: %s", exc)
-        return None
+        return {"content": "", "reasoning_tokens": 0, "finish_reason": "",
+                "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _chat_ex(base_url: str, api_key: str, model: str, prompt: str,
+             max_tokens: int = DEFAULT_MAX_TOKENS) -> tuple[str | None, dict]:
+    """带推理预算自适应的 chat 调用。
+
+    返回 (content|None, info)；info 含 max_tokens / expanded / reasoning_tokens
+    / finish_reason，供上层在 note 里如实说明「预算已自动扩容」。
+    """
+    budget = int(max_tokens)
+    info: dict = {"max_tokens": budget, "expanded": False}
+    last_error = ""
+    for _ in range(4):
+        r = _chat_once(base_url, api_key, model, prompt, budget)
+        if r["content"]:
+            info.update({
+                "max_tokens": budget,
+                "expanded": budget != int(max_tokens),
+                "reasoning_tokens": r["reasoning_tokens"],
+                "finish_reason": r["finish_reason"],
+            })
+            return r["content"], info
+        last_error = r["error"] or last_error
+        info.update({
+            "max_tokens": budget,
+            "reasoning_tokens": r["reasoning_tokens"],
+            "finish_reason": r["finish_reason"],
+            "error": r["error"],
+        })
+        # 网络/接口错误重试无意义；推理吃满预算则翻倍再试
+        if r["error"] or budget >= _MAX_TOKENS_CEILING:
+            break
+        budget = min(budget * 2, _MAX_TOKENS_CEILING)
+    if last_error:
+        info["error"] = last_error
+    return None, info
+
+
+def _chat(base_url: str, api_key: str, model: str, prompt: str,
+          max_tokens: int = DEFAULT_MAX_TOKENS) -> str | None:
+    """OpenAI 兼容 chat 调用（薄封装，保测试/调用兼容）；失败返回 None。"""
+    return _chat_ex(base_url, api_key, model, prompt, max_tokens)[0]
 
 
 def _parse_json_array(text: str) -> list[dict] | None:
@@ -230,10 +292,15 @@ def parse_text(text: str) -> dict:
     chunks = [text[i:i + MAX_TEXT_CHARS]
               for i in range(0, len(text), MAX_TEXT_CHARS)]
     all_entries: list[dict] = []
-    for chunk in chunks:
-        raw = _chat(s["base_url"], s["api_key"], s["model"],
-                    _PROMPT + chunk)
+    expanded_budgets: list[str] = []
+    failed_chunks = 0
+    for idx, chunk in enumerate(chunks):
+        raw, info = _chat_ex(s["base_url"], s["api_key"], s["model"],
+                             _PROMPT + chunk)
+        if info.get("expanded"):
+            expanded_budgets.append(f"{info.get('max_tokens')}")
         if raw is None:
+            failed_chunks += 1
             continue
         arr = _parse_json_array(raw)
         if arr is None:
@@ -244,10 +311,21 @@ def parse_text(text: str) -> dict:
             for item in arr:
                 if isinstance(item, dict) and item.get("group_id") \
                         and item.get("evidence"):
+                    # 多段时给「我们自造的 E1/E2…」加段前缀，避免跨段撞号
+                    # （文中真实编号 G1/D3 保持原样）
+                    gid = str(item.get("group_id"))
+                    if len(chunks) > 1 and re.fullmatch(r"[Ee]\d+", gid):
+                        item["group_id"] = f"C{idx + 1}-{gid.upper()}"
+                    item["chunk_index"] = idx + 1
                     all_entries.append(item)
     if not all_entries:
-        return {"llm_used": True, "entries": _scan_smiles_candidates(text),
-                "note": "LLM 解析未产出有效条目：已降级为 SMILES 扫描"}
+        info_note = ("；LLM 调用失败或返回为空（请检查模型名/额度）"
+                     if failed_chunks else
+                     "；LLM 有返回但未产出带 group_id+evidence 的条目")
+        return {"llm_used": True,
+                "entries": _scan_smiles_candidates(text),
+                "segments": {"total": len(chunks), "failed": failed_chunks},
+                "note": "LLM 解析未产出有效条目：已降级为 SMILES 扫描" + info_note}
     # 去重：同 (group_id, kind, 关键字段) 只留一条
     seen: set[tuple] = set()
     deduped: list[dict] = []
@@ -260,8 +338,93 @@ def parse_text(text: str) -> dict:
         seen.add(key)
         deduped.append(e)
     deduped.sort(key=lambda e: str(e.get("group_id")))
+    note = (f"LLM 解析完成：{len(deduped)} 条"
+            f"（{len(set(str(e.get('group_id')) for e in deduped))} 组，"
+            f"共 {len(chunks)} 段）")
+    if expanded_budgets:
+        note += (f"；检测到推理模型：token 预算已自动扩容至 "
+                 f"{'/'.join(expanded_budgets)}")
+    if failed_chunks:
+        note += f"；有 {failed_chunks} 段调用失败（可重试补齐）"
     return {"llm_used": True, "entries": deduped,
-            "note": f"LLM 解析完成：{len(deduped)} 条（{len(set(str(e.get('group_id')) for e in deduped))} 组）"}
+            "segments": {"total": len(chunks), "failed": failed_chunks},
+            "note": note}
+
+
+# ---------------------------------------------------------------- 文献级元数据
+
+_META_PROMPT = (
+    "你是文献元数据提取助手。阅读下面的文献开头片段，只输出一个 JSON 对象"
+    "（不要 markdown 围栏、不要多余文字）：\n"
+    '{"title": "完整标题", "authors": ["作者1", "作者2"], '
+    '"journal": "期刊名", "year": 2025, "doi": "10.xxxx/xxxx", '
+    '"abstract": "摘要原文或前 500 字"}\n'
+    "规则：只提取文中明确出现的信息，无法确定的字段留空字符串/空数组/null；"
+    "title 用英文原题；doi 只保留 `10.xxxx/...` 形式（不要网址前缀）。\n\n"
+    "文献片段：\n"
+)
+
+META_MAX_CHARS = 8000
+
+
+def _parse_json_object(text: str) -> dict | None:
+    m = re.search(r"\{[\s\S]*\}", text or "")
+    if not m:
+        return None
+    try:
+        obj = json.loads(m.group(0))
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        return None
+
+
+def extract_paper_meta(text: str) -> dict:
+    """从文献开头片段提取文献级元数据（title/authors/journal/year/doi/abstract）。
+
+    返回 {"llm_used": bool, "meta": {...}, "note": str}；未启用 LLM 或失败时
+    meta 为空 dict（不阻塞条目解析）。
+    """
+    text = (text or "").strip()
+    if not text:
+        return {"llm_used": False, "meta": {}, "note": "文本为空"}
+    if not is_enabled():
+        return {"llm_used": False, "meta": {},
+                "note": "文献解析 LLM 未启用：跳过元数据提取"}
+    s = _read_settings()
+    raw, info = _chat_ex(s["base_url"], s["api_key"], s["model"],
+                         _META_PROMPT + text[:META_MAX_CHARS])
+    obj = _parse_json_object(raw or "") if raw else None
+    if not obj:
+        return {"llm_used": True, "meta": {},
+                "note": "元数据提取失败（可手动填写或重试）"}
+    meta: dict = {}
+    title = str(obj.get("title") or "").strip()
+    if title:
+        meta["title"] = title[:300]
+    authors = obj.get("authors")
+    if isinstance(authors, list):
+        names = [str(a).strip() for a in authors if str(a).strip()]
+        if names:
+            meta["authors"] = names[:30]
+    journal = str(obj.get("journal") or "").strip()
+    if journal:
+        meta["journal"] = journal[:120]
+    year = obj.get("year")
+    if isinstance(year, (int, float)) and 1900 <= int(year) <= 2100:
+        meta["year"] = int(year)
+    elif isinstance(year, str) and year.strip().isdigit() \
+            and 1900 <= int(year.strip()) <= 2100:
+        meta["year"] = int(year.strip())
+    doi = str(obj.get("doi") or "").strip()
+    if doi:
+        meta["doi"] = re.sub(r"^https?://(dx\.)?doi\.org/", "", doi,
+                             flags=re.IGNORECASE)
+    abstract = str(obj.get("abstract") or "").strip()
+    if abstract:
+        meta["abstract"] = abstract[:2000]
+    return {"llm_used": True, "meta": meta,
+            "note": (f"元数据提取完成：{len(meta)} 个字段" if meta
+                     else "元数据提取为空（片段中无明确信息）")}
 
 
 def test_connection() -> dict:

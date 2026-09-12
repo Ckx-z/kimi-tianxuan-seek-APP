@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { favoritesApi, healthApi, iterateApi, recordsApi, BackendUnavailableError } from '@/lib/api';
 import type { ExperimentRecord, Favorite, Plan, Suggestion } from '@/types';
+import { experimentTime } from '@/components/records/meta';
 
 /** 置信度徽章（金色系，按置信度分档） */
 function ConfidenceBadge({ value }: { value: number }) {
@@ -70,9 +71,11 @@ export default function Home() {
     };
   }, []);
 
-  // 最近 5 条实验记录（按日期倒序）
+  // 最近 5 条实验记录（按实验时间倒序；v1.9.3：用 experiment_date 派生字段）
   const recentRecords = useMemo(
-    () => [...records].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 5),
+    () => [...records]
+      .sort((a, b) => String(experimentTime(b).date).localeCompare(String(experimentTime(a).date)))
+      .slice(0, 5),
     [records],
   );
 
@@ -165,7 +168,12 @@ export default function Home() {
                 {recentRecords.map((r) => (
                   <li key={r.record_id} className="flex items-center justify-between py-2.5 text-sm">
                     <span className="font-medium text-foreground">{r.experiment_no}</span>
-                    <span className="text-xs text-muted-foreground">{r.date}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {experimentTime(r).date}
+                      {experimentTime(r).isFallback && (
+                        <span className="ml-1 text-muted-foreground/60">（录入）</span>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>
