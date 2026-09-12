@@ -27,6 +27,14 @@ import RecordDetailDialog from './RecordDetailDialog';
 import RecordEditDialog from './RecordEditDialog';
 import { CONDITION_LABELS, OUTCOME_META, experimentTime, pairLabel } from './meta';
 import { oodInfo } from '@/lib/format';
+
+/** 时间轴节点配色（与 OUTCOME_META 同语义：成膜实心主色 / 部分成膜金色 / 失败中性） */
+const OUTCOME_DOT: Record<string, string> = {
+  film: 'border-primary bg-primary',
+  partial: 'border-gold bg-gold',
+  failed: 'border-muted-foreground/70 bg-muted-foreground/70',
+  '': 'border-muted-foreground/40 bg-background',
+};
 import { deleteRecord, exportRecordWord, type RecordItem } from './api';
 
 /** 条件摘要：拼接非空条件键值 */
@@ -176,85 +184,98 @@ export default function RecordTimeline({
         </div>
       )}
 
-      {/* 记录卡列表（时间倒序展示：后端升序，前端反转） */}
+      {/* 记录时间轴（竖向：结果色节点 + 连接线 + 时间前置；内容与操作不变） */}
       {!backendDown && !loading && records.length > 0 && (
-        <div className="space-y-3">
+        <ol className="relative ml-2 space-y-3 border-l border-border pl-6">
           {[...records].reverse().map((rec) => {
             const meta = OUTCOME_META[rec.outcome] ?? OUTCOME_META.failed;
             const isDraft = rec.status === 'draft';
+            const dotCls = isDraft
+              ? 'border-gold bg-card'
+              : OUTCOME_DOT[rec.outcome] ?? OUTCOME_DOT.failed;
             return (
-              <div
-                key={rec.record_id}
-                className={
-                  isDraft
-                    ? 'rounded-xl border border-dashed border-gold/60 bg-card p-4'
-                    : 'rounded-xl border border-border bg-card p-4'
-                }
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="text-sm text-muted-foreground"
-                    title={experimentTime(rec).hint}
-                  >
-                    {experimentTime(rec).date}
+              <li key={rec.record_id} className="relative">
+                {/* 时间轴节点（结果色 + 页面底描边，避免与连接线糊在一起） */}
+                <span
+                  aria-hidden
+                  className={`absolute -left-[32px] top-3.5 h-3.5 w-3.5 rounded-full border-2 ring-2 ring-background ${dotCls}`}
+                />
+                <div
+                  className={
+                    isDraft
+                      ? 'rounded-xl border border-dashed border-gold/60 bg-card p-4'
+                      : 'rounded-xl border border-border bg-card p-4 transition-colors hover:border-border/80'
+                  }
+                >
+                  {/* 第一行：时间 + 操作 */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className="font-mono text-sm font-medium tabular-nums text-foreground"
+                      title={experimentTime(rec).hint}
+                    >
+                      {experimentTime(rec).date}
+                    </span>
                     {experimentTime(rec).isFallback && (
-                      <span className="ml-1 text-xs text-muted-foreground/60">
-                        （录入日期）
+                      <span className="rounded border border-border px-1 text-[10px] text-muted-foreground">
+                        录入日期
                       </span>
                     )}
-                  </span>
-                  <span className="font-medium text-foreground">{pairLabel(rec)}</span>
-                  <Badge className={meta.className}>{meta.label}</Badge>
-                  {isDraft && (
-                    <Badge variant="outline" className="border-gold/60 text-gold-foreground">
-                      草稿
-                    </Badge>
-                  )}
-                  <span className="text-xs text-muted-foreground">
-                    编号 {rec.experiment_no || '（未填写）'}
-                  </span>
-                  <div className="ml-auto flex gap-1">
-                    {isDraft ? (
-                      <Button variant="ghost" size="sm" onClick={() => setEditingRec(rec)}>
-                        <Pencil className="mr-1 h-3.5 w-3.5" /> 继续编辑
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" size="sm" onClick={() => setEditingRec(rec)}>
-                        <Pencil className="mr-1 h-3.5 w-3.5" /> 编辑
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="sm" onClick={() => setDetailRec(rec)}>
-                      <Maximize2 className="mr-1 h-3.5 w-3.5" /> 放大
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      title="导出 Word"
-                      disabled={exportingId === rec.record_id}
-                      onClick={() => void handleExport(rec)}
-                    >
-                      {exportingId === rec.record_id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <div className="ml-auto flex gap-1">
+                      {isDraft ? (
+                        <Button variant="ghost" size="sm" onClick={() => setEditingRec(rec)}>
+                          <Pencil className="mr-1 h-3.5 w-3.5" /> 继续编辑
+                        </Button>
                       ) : (
-                        <FileDown className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="sm" onClick={() => setEditingRec(rec)}>
+                          <Pencil className="mr-1 h-3.5 w-3.5" /> 编辑
+                        </Button>
                       )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => setDeletingRec(rec)}
-                    >
-                      <Trash2 className="mr-1 h-3.5 w-3.5" /> 删除
-                    </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setDetailRec(rec)}>
+                        <Maximize2 className="mr-1 h-3.5 w-3.5" /> 放大
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="导出 Word"
+                        disabled={exportingId === rec.record_id}
+                        onClick={() => void handleExport(rec)}
+                      >
+                        {exportingId === rec.record_id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <FileDown className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeletingRec(rec)}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" /> 删除
+                      </Button>
+                    </div>
                   </div>
+                  {/* 第二行：单体对 + 结果徽章 + 编号 */}
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground">{pairLabel(rec)}</span>
+                    <Badge className={meta.className}>{meta.label}</Badge>
+                    {isDraft && (
+                      <Badge variant="outline" className="border-gold/60 text-gold-foreground">
+                        草稿
+                      </Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      编号 {rec.experiment_no || '（未填写）'}
+                    </span>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{conditionsSummary(rec)}</p>
+                  <PredictionCompare rec={rec} />
                 </div>
-                <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{conditionsSummary(rec)}</p>
-                <PredictionCompare rec={rec} />
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
       )}
 
       {/* 放大详情 Dialog（共享组件，内含「编辑」入口） */}

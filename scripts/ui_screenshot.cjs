@@ -12,7 +12,8 @@
  *   SHOOT_BASE   后端地址（默认 http://127.0.0.1:8902）
  *   SHOOT_OUT    输出目录（默认 E:\cof-build\shots）
  *   SHOOT_ONLY   只截某页（home|query|batch|records|iterate|dft|mine|assistant|settings）
- *   SHOOT_DARK=1 同时截深色版
+ *   SHOOT_DARK=1 同时截深色版（注意：应用自身主题 hook 会覆盖手动注入的 `.dark`，
+ *                深色截图可能不生效——需要深色验收时请在设置页把主题切到深色后重启应用）
  *   SHOOT_FULL=1 整页捕获（按 scrollHeight 放大离屏窗口）
  *   SHOOT_SCROLL 滚动到指定 Y 再截（长页面局部特写）
  *   SHOOT_JS     截图前执行的 async JS（交互流程，如点开会话/弹窗后截图）
