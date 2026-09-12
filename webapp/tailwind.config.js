@@ -81,8 +81,25 @@ module.exports = {
       },
       // 中文字体栈：学术工具气质
       fontFamily: {
-        // 用户定稿：英文 Times New Roman + 中文宋体
+        // v1.9.4 UI 革新：**正文/界面改用无衬线**——原 Times+宋体在 12–14px 下
+        // 以位图字形渲染、笔画发虚，是「廉价感」的最大来源。中文优先微软雅黑/
+        // PingFang，英文优先系统 UI 字体（离线可用，不依赖网络字体）。
         sans: [
+          'Inter',
+          '"Segoe UI Variable Text"',
+          '"Segoe UI"',
+          'system-ui',
+          '-apple-system',
+          '"Microsoft YaHei UI"',
+          '"微软雅黑"',
+          '"PingFang SC"',
+          '"Noto Sans CJK SC"',
+          '"Helvetica Neue"',
+          'Arial',
+          'sans-serif',
+        ],
+        // 展示体（学术签名）：保留衬线，仅用于页面主标题与少量强调
+        display: [
           '"Times New Roman"',
           '"SimSun"',
           '"宋体"',

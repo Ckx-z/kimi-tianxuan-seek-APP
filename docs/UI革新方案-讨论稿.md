@@ -6,18 +6,50 @@
 
 ---
 
-## 一、诊断：为什么现在看着「不够高级」（基于代码与截图的事实，不是感觉）
+## 〇、已实施：第 1 批「杠杆三件套」（2026-09-12，可一键回退）
+
+用户确认「按推荐来 + 热更新 + 保证可回退」后落地了第 1 批（风险最低、收益最大）：
+
+| 改动 | 文件 | 效果 |
+|------|------|------|
+| **字体体系**（最大杠杆） | `webapp/tailwind.config.js` | 正文/界面 `font-sans` 由 Times+宋体 → **无衬线**（Inter/Segoe UI/system-ui + 微软雅黑/PingFang）；新增 `font-display` 保留衬线栈 |
+| 标题学术签名 | `index.css`（`main h1`） | 页面主标题仍用衬线 + `letter-spacing:-0.015em`，保持学术气质 |
+| **表面分层** | `components/ui/card.tsx`、`dialog.tsx`、`index.css` | 卡片改 `rounded-2xl border-border/70 shadow-card`（更柔、更少「边框感」）；弹窗由 `bg-background` → `bg-card` + `shadow-pop` 形成浮层层次；菜单/列表浮层用卡片底色 |
+| 数字对齐 | `index.css` | 表格统一 `tabular-nums`（KPI/分数/数值列对齐更稳） |
+| **栅格与节奏** | `components/layout/AppLayout.tsx` | 主内容 `max-w-6xl py-8` → `max-w-[1200px] py-7`（注：栅格原本已居中约束，此行仅为节奏微调） |
+
+**验证**：`tsc -b` + `vite build` 通过；同后端同数据做 A/B 截图（基线 vs 新版，首页/我的/实验记录/设置），
+再对**安装版**实拍确认（`E:\cof-build\installed-ui-overhaul\home.png`）。
+
+**回退方式（你要的保险）**：
+```powershell
+cd C:\Users\ckx\Desktop\全新机器学习实验
+.\scripts\rollback_ui.ps1 -List                     # 查看所有 UI 快照
+.\scripts\rollback_ui.ps1                           # 回退到最近一个快照（默认 baseline 之前的？见下）
+.\scripts\rollback_ui.ps1 -Snapshot baseline-20260912-195107   # 回退到「改动前」基线
+```
+- 快照位置：`E:\cof-build\ui-snapshots\`（`baseline-*` = 改动前原貌；`ui-overhaul1-*` = 第 1 批）
+- 脚本会自动：关闭应用 → 备份当前资源（`pre-rollback-*`）→ 覆盖 dist → **校验 index.html 哈希** → 重启应用
+- 整包回退：重装 `webapp\release\cof-film-recommend-setup-1.9.3.exe`（或 GitHub Release 任一历史版本）
+- ⚠️ 该脚本以 **UTF-8 BOM** 保存（Windows PowerShell 5.1 读无 BOM 的 .ps1 会按 ANSI 解析、中文串报语法错）——已踩坑修正
+
+**尚未做**（等你对第 1 批的反馈）：组件细节统一、首页仪表盘化（KPI + 迷你图）、动效与图标统一、
+逐页排版打磨（第 2/3 批）。
+
+---
+
+## 一、诊断：为什么「不够高级」（基于代码与截图的事实）
 
 | # | 成因 | 代码层面的事实 | 对「高级感」的伤害 |
 |---|------|----------------|--------------------|
 | 1 | **正文用衬线中文字体** | `tailwind.config.js` 的 `font-sans` = Times New Roman + SimSun（宋体）；界面元素另建了 `font-ui`（Segoe UI/雅黑）但只有侧栏在用 | 12–14px 宋体在 Windows 上以位图字形渲染、笔画发虚——这是「廉价感」最大来源 |
 | 2 | **没有表面分层（surface elevation）** | 全站卡片几乎都是「白底 + 1px 边框 + 单一阴影」，缺少 canvas / panel / raised 三级层次 | 缺乏纵深，信息全在同一平面上「糊」在一起 |
-| 3 | **节奏不统一** | padding/gap 在 `p-2/p-3/p-4`、`gap-1.5/gap-2/gap-3/gap-4` 之间随机；同一页里卡片内边距不一致 | 眼睛能察觉「没对齐」，但说不出哪里不对 |
-| 4 | **栅格缺约束** | 主内容区没有 max-width / 栏宽约束，宽屏下元素被拉散（截图里 1440 宽下右侧大片空白） | 大屏显得「空而不精」，像没设计过的后台 |
+| 3 | **节奏不统一** | padding/gap 在 `p-2/p-3/p-4`、`gap-1.5/gap-2/gap-3/gap-4` 之间随机 | 眼睛能察觉「没对齐」，但说不出哪里不对 |
+| 4 | **栅格缺约束**（**已修正判断**） | 主内容区其实已有 `mx-auto max-w-6xl`；真正问题是**宽屏下卡片被拉宽**、缺少列宽节奏 | 大屏显得「空而不精」 |
 | 5 | **几乎零动效** | 只有 hover 变色；没有进入/切换/展开的微动效 | 缺少「精致」的体感反馈 |
 | 6 | **字体层级弱** | 标题/正文/说明的差异主要靠字号（16/14/12），字重与颜色层次用得少 | 视线没有落点，读起来平 |
 | 7 | **数字不「仪表化」** | KPI 只是大号数字；没有单位弱化、趋势、迷你图、对比基准 | 数据页看起来像表格，不像仪表盘 |
-| 8 | **图标语言不统一** | lucide 尺寸 14/16/20 混用，部分位置的图标颜色随文字 | 细节不齐，累积成「不专业」 |
+| 8 | **图标语言不统一** | lucide 尺寸 14/16/20 混用，部分位置图标颜色随文字 | 细节不齐，累积成「不专业」 |
 
 **关键判断**：1、2、4 三条是「高级感」的杠杆点（字体、表面分层、栅格）；
 其余是打磨项。**不需要重写信息架构**也能有质变。

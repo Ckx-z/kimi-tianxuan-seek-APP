@@ -311,6 +311,25 @@
   }
 }
 
+/* ============ v1.9.4 UI 革新（杠杆三件套） ============ */
+@layer base {
+  /* 1) 字体体系：正文/界面已由 font-sans 改为无衬线（tailwind.config.js）；
+        页面主标题保留衬线作「学术签名」，并收紧字距提升精致度。 */
+  main h1 {
+    font-family: "Times New Roman", "SimSun", "宋体", "NSimSun", "Songti SC", serif;
+    letter-spacing: -0.015em;
+  }
+  /* 数字读数统一等宽数字（KPI/表格/分数对齐更稳） */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+  /* 2) 表面分层：浮层（弹窗/菜单）用卡片底色，与页面底拉开层次 */
+  [role="menu"],
+  [role="listbox"] {
+    background-color: hsl(var(--card));
+  }
+}
+
 /* 主题渐变装饰条（Logo 区、标题装饰用）——随主题色自动变化 */
 @layer utilities {
   .gradient-royal {

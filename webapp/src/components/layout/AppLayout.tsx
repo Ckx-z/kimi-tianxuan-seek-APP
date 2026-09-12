@@ -188,7 +188,7 @@ export default function AppLayout() {
 
       {/* 右侧内容区 */}
       <main className="ml-60 flex-1">
-        <div className="mx-auto w-full max-w-6xl px-8 py-8">
+        <div className="mx-auto w-full max-w-[1200px] px-8 py-7">
           <Outlet />
         </div>
       </main>
