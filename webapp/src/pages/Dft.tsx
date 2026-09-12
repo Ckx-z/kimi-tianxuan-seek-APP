@@ -87,6 +87,7 @@ import {
 } from '@/components/dft/api';
 import { doiUrl, openExternal } from '@/lib/external';
 import { formatDateTime } from '@/lib/format';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 interface PropsState {
   loading: boolean;
@@ -827,14 +828,12 @@ export default function Dft() {
   })();
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-gradient-royal">DFT 计算</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          计算「缩合二聚体与第三物质」的结合能，辅助判断堆积 / 溶剂化 / 异质聚集倾向；
-          支持 xTB 半经验快速档与 Psi4 真 DFT 精度档（BSSE 校正）
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="DFT 计算"
+        subtitle="计算「缩合二聚体与第三物质」的结合能，辅助判断堆积 / 溶剂化 / 异质聚集倾向；支持 xTB 半经验快速档与 Psi4 真 DFT 精度档（BSSE 校正）"
+        accent
+      />
 
       {backendDown && (
         <Alert className="border-warning/30 bg-warning/10">

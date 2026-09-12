@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import MonomerPicker from '@/components/batch/monomer-picker';
 import ResultTable from '@/components/batch/result-table';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   BackendUnavailableError,
   dedupePairs,
@@ -171,12 +172,10 @@ export default function Batch() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">批量排序</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          从内置库多选或粘贴 SMILES 对，批量预测成膜评分并排序（上限 {MAX_PAIRS} 对）
-        </p>
-      </div>
+      <PageHeader
+        title="批量排序"
+        subtitle={`从内置库多选或粘贴 SMILES 对，批量预测成膜评分并排序（上限 ${MAX_PAIRS} 对）`}
+      />
 
       {/* 后端降级提示：不白屏，仍可用粘贴模式查看界面 */}
       {backendDown && (

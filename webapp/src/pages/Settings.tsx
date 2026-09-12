@@ -41,6 +41,7 @@ import { DENSITIES, DENSITY_HINTS, DENSITY_LABELS, useDensity } from '@/hooks/us
 import { FONT_HINTS, FONT_LABELS, FONT_STYLES, useFontStyle } from '@/hooks/use-font';
 import { GnnEvolutionPanel } from '@/components/settings/GnnEvolutionPanel';
 import { LiteratureLlmSettingsCard } from '@/components/settings/LiteratureLlmSettingsCard';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   fetchLlmSettings,
   saveLlmSettings,
@@ -1101,10 +1102,11 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gradient-royal">设置</h1>
-        <p className="mt-1 text-sm text-muted-foreground">LLM 配置、后端状态与关于信息</p>
-      </div>
+      <PageHeader
+        title="设置"
+        subtitle="界面外观、LLM 配置、模型与数据管理"
+        accent
+      />
 
       {offline && (
         <div className="rounded-xl border border-dashed border-gold/50 bg-gold-muted/40 px-5 py-4 text-sm text-muted-foreground">

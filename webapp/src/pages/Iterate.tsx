@@ -29,6 +29,7 @@ import {
 } from '@/components/iterate/api';
 import { SuggestionCard } from '@/components/iterate/SuggestionCard';
 import { PlanCardItem } from '@/components/iterate/PlanCardItem';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 /** 「全部记录（不锚定）」选项值（Select 不允许空串） */
 const NO_ANCHOR = '__none__';
@@ -170,8 +171,11 @@ export default function Iterate() {
   };
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-semibold text-foreground">方案迭代</h1>
+    <div className="space-y-7">
+      <PageHeader
+        title="方案迭代"
+        subtitle="基于历史实验数据与文献图谱，迭代生成下一批实验方案建议"
+      />
 
       {/* ① 顶部提问区 */}
       <Card className="bg-card">

@@ -29,6 +29,7 @@ import ResultCard from '@/components/query/ResultCard';
 import MonomerPropsCard from '@/components/query/MonomerPropsCard';
 import PlanCardPanel from '@/components/query/PlanCardPanel';
 import FavoriteFolderDialog from '@/components/common/FavoriteFolderDialog';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   checkHealth,
   createFavorite,
@@ -311,8 +312,11 @@ export default function Query() {
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-foreground">查询打分</h1>
+    <div className="space-y-5">
+      <PageHeader
+        title="查询打分"
+        subtitle="输入醛 / 胺单体对，预测成膜概率并给出打分理由与 OOD 判定"
+      />
 
       {/* 后端降级提示（不阻塞界面，不白屏） */}
       {backendDown && (
