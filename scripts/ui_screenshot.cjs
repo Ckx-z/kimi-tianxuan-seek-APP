@@ -49,6 +49,13 @@ async function shoot(win, name, route, dark) {
       "document.documentElement.classList.add('dark'); true;");
     await sleep(700);
   }
+  // 界面密度（写 localStorage 后重载，让 use-density 生效）
+  if (process.env.SHOOT_DENSITY) {
+    await win.webContents.executeJavaScript(
+      `localStorage.setItem('cof.appearance.density', '${process.env.SHOOT_DENSITY}'); true;`);
+    await win.webContents.reload();
+    await sleep(3200);
+  }
   // 交互脚本（点击流程后截图）：SHOOT_JS 传入 async JS，返回可序列化值
   if (process.env.SHOOT_JS) {
     await sleep(1800);

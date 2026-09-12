@@ -59,6 +59,22 @@
     --sidebar-accent-foreground: 168 50% 64%;
     --sidebar-border: 24 16% 24%;
     --sidebar-ring: 168 50% 52%;
+    /* 界面密度（v1.9.3）：数据密集区域消费这两个变量，切换密度无需改组件结构 */
+    --density-card-p: 1rem;
+    --density-cell-y: 0.5rem;
+  }
+
+  /* 紧凑密度：行高与内边距收紧（`<html data-density="compact">`，见 use-density.ts） */
+  :root[data-density="compact"] {
+    --density-card-p: 0.75rem;
+    --density-cell-y: 0.25rem;
+  }
+
+  /* 紧凑密度：所有数据表格的纵向内边距跟随密度变量（选择器权重高于 Tailwind 工具类） */
+  :root[data-density="compact"] table th,
+  :root[data-density="compact"] table td {
+    padding-top: var(--density-cell-y);
+    padding-bottom: var(--density-cell-y);
   }
 
   /* ============ 石墨仪器 · 亮色 ============ */

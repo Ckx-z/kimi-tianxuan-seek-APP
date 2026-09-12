@@ -203,8 +203,8 @@ export default function RecordTimeline({
                 <div
                   className={
                     isDraft
-                      ? 'rounded-xl border border-dashed border-gold/60 bg-card p-4'
-                      : 'rounded-xl border border-border bg-card p-4 transition-colors hover:border-border/80'
+                      ? 'rounded-xl border border-dashed border-gold/60 bg-card p-[var(--density-card-p)]'
+                      : 'rounded-xl border border-border bg-card p-[var(--density-card-p)] transition-colors hover:border-border/80'
                   }
                 >
                   {/* 第一行：时间 + 操作 */}

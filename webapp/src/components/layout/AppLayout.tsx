@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
+import { useDensity } from '@/hooks/use-density';
 import DftGlobalChip from '@/components/dft/DftGlobalChip';
 
 /** preload 暴露的版本不一致事件 payload（浏览器 dev 模式下无此 API） */
@@ -67,6 +68,8 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
 
 export default function AppLayout() {
   const { theme, toggleTheme } = useTheme();
+  // v1.9.3 界面密度：布局常驻，负责把 data-density 挂到文档根（设置页负责切换）
+  const { density } = useDensity();
   const location = useLocation();
   // 子路由激活时父分组保持高亮；旧路径（/query /batch）重定向前也兜底算入
   const toolboxActive =
@@ -84,7 +87,7 @@ export default function AppLayout() {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background" data-density={density}>
       {/* 后端版本握手失败横幅：固定置顶，指引用户完全退出后重开 */}
       {versionMismatch && (
         <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground shadow-md">

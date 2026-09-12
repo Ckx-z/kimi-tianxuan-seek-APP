@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { BackendUnavailableError } from '@/lib/api';
 import { COLOR_SCHEMES, SCHEME_LABELS, useTheme } from '@/hooks/use-theme';
+import { DENSITIES, DENSITY_HINTS, DENSITY_LABELS, useDensity } from '@/hooks/use-density';
 import { GnnEvolutionPanel } from '@/components/settings/GnnEvolutionPanel';
 import { LiteratureLlmSettingsCard } from '@/components/settings/LiteratureLlmSettingsCard';
 import {
@@ -1001,6 +1002,43 @@ function ThemeCard() {
   );
 }
 
+/** 界面密度卡（v1.9.3）：舒适 / 紧凑，写 localStorage 并作用于数据密集区域 */
+function DensityCard() {
+  const { density, setDensity } = useDensity();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">界面密度</CardTitle>
+        <CardDescription>
+          影响收藏表格与实验记录列表的行高与内边距；立即生效，刷新后保持。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {DENSITIES.map((d) => (
+          <button
+            key={d}
+            type="button"
+            onClick={() => setDensity(d)}
+            className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
+              density === d
+                ? 'border-primary bg-primary/10 font-medium text-primary'
+                : 'border-border hover:bg-accent'
+            }`}
+          >
+            <span className="flex flex-col items-start">
+              <span>{DENSITY_LABELS[d]}</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {DENSITY_HINTS[d]}
+              </span>
+            </span>
+            {density === d && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+          </button>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [offline, setOffline] = useState(false);
@@ -1048,6 +1086,7 @@ export default function Settings() {
           <BackendStatusCard health={health} offline={offline} loading={healthLoading} />
           <SoftwareUpdateCard />
           <ThemeCard />
+          <DensityCard />
           <AboutCard health={health} offline={offline} loading={healthLoading} />
         </div>
       </div>

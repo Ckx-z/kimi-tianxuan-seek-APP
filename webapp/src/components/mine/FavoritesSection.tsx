@@ -1116,7 +1116,7 @@ export function FavoritesSection({
                   className="flex h-full cursor-pointer flex-col transition-shadow hover:shadow-card hover:shadow-primary/10"
                   onClick={() => setDetail(fav)}
                 >
-                  <CardContent className="flex flex-1 flex-col gap-2 p-4">
+                  <CardContent className="flex flex-1 flex-col gap-2 p-[var(--density-card-p)]">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 break-words text-base font-semibold leading-snug text-foreground">
                         {fav.aldehyde?.name || '未知醛'}
