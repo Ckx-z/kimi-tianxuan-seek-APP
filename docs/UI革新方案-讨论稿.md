@@ -38,6 +38,32 @@ cd C:\Users\ckx\Desktop\全新机器学习实验
 
 ---
 
+## 〇之二、已实施：第 2 批（界面字体可切换 + 应用图标，2026-09-12）
+
+用户反馈「字体还是觉得宋体/Times 好看，不过可以无衬线」+「图标换成侧栏那个渐变 C 标」。
+
+| 改动 | 文件 | 说明 |
+|------|------|------|
+| **界面字体可切换** | `hooks/use-font.ts`（新）、`index.css`、`AppLayout.tsx`、`pages/Settings.tsx` | 设置页新增「界面字体」卡：**无衬线（默认，推荐）** / **宋体·Times（经典学术）**；写 localStorage + `<html data-font>`，正文走 `--font-body` 变量、页面主标题始终走 `--font-display`（衬线学术签名不受影响） |
+| **应用图标换成渐变 C 标** | `assets/app_icon.ico`（替换） | 以侧栏「COF 科研助手」旁的标为准：紫金渐变圆角方 + 白色 C；多尺寸 ICO（16/24/32/48/64/128/256） |
+| 图标接线 | `webapp/electron/main.cjs`、`webapp/package.json` | 窗口图标按「打包路径 resources/assets 优先、开发路径兜底」解析（此前打包版因 assets 未随包而**静默回退成 Electron 默认图标**）；`extraResources` 增加 app_icon.ico |
+| 快捷方式 | 本机 `Public Desktop` + `ProgramData` 开始菜单 | IconLocation 已指向新图标（需管理员，已用一次 UAC 完成） |
+
+**验收证据**：计算样式探测 —— `data-font=sans` 时 `body` = Inter/Segoe UI/system-ui 且 `h1` = Times/SimSun；
+`data-font=serif` 时 `body` = Times New Roman/SimSun（标题不变）；两种模式截图对照已存档
+（`E:\cof-build\font-ab\`）。
+
+**图标候选择一留二**（对比图见 `assets/app_icon_candidates.png`）：
+- **A 渐变 C（已采用，你点名的那一个）**
+- B C + 六边形环（COF 暗示）
+- C 紫金底 + 金色蜂窝晶格（保留原 COF 识别度，只换品牌色）
+想换成 B 或 C 只需一句话，我替换 `assets/app_icon.ico` + 快捷方式（约 1 分钟）。
+
+> 说明：**exe 内嵌图标**与**窗口/任务栏图标**要等下一次安装包构建才会变（当前 exe 仍是旧图标，
+> 但桌面/开始菜单快捷方式已显示新图标）；打包版窗口图标已通过 extraResources 修好。
+
+---
+
 ## 一、诊断：为什么「不够高级」（基于代码与截图的事实）
 
 | # | 成因 | 代码层面的事实 | 对「高级感」的伤害 |

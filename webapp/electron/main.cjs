@@ -31,7 +31,13 @@ const fs = require('fs');
 
 // webapp/electron/main.cjs -> 项目根 = ../../
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
-const ICON_PATH = path.join(PROJECT_ROOT, 'assets', 'app_icon.ico');
+// v1.9.4：打包后 assets 不在 asar 内（随 extraResources 落到 resources/assets），
+// 因此窗口/任务栏图标按「打包路径优先、开发路径兜底」解析，避免静默回退成 Electron 图标。
+const ICON_CANDIDATES = [
+  path.join(process.resourcesPath || '', 'assets', 'app_icon.ico'),
+  path.join(PROJECT_ROOT, 'assets', 'app_icon.ico'),
+];
+const ICON_PATH = ICON_CANDIDATES.find((p) => p && fs.existsSync(p)) || ICON_CANDIDATES[1];
 const PREFERRED_PORT = 18765;
 
 let backendProc = null;

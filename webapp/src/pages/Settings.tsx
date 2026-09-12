@@ -38,6 +38,7 @@ import {
 import { BackendUnavailableError } from '@/lib/api';
 import { COLOR_SCHEMES, SCHEME_LABELS, useTheme } from '@/hooks/use-theme';
 import { DENSITIES, DENSITY_HINTS, DENSITY_LABELS, useDensity } from '@/hooks/use-density';
+import { FONT_HINTS, FONT_LABELS, FONT_STYLES, useFontStyle } from '@/hooks/use-font';
 import { GnnEvolutionPanel } from '@/components/settings/GnnEvolutionPanel';
 import { LiteratureLlmSettingsCard } from '@/components/settings/LiteratureLlmSettingsCard';
 import {
@@ -1039,6 +1040,43 @@ function DensityCard() {
   );
 }
 
+/** 界面字体卡（v1.9.4）：无衬线（默认）/ 宋体·Times，立即生效并记忆 */
+function FontCard() {
+  const { fontStyle, setFontStyle } = useFontStyle();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">界面字体</CardTitle>
+        <CardDescription>
+          影响正文与界面文字；页面主标题始终保留衬线（Times/宋体）作为学术签名。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {FONT_STYLES.map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setFontStyle(f)}
+            className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
+              fontStyle === f
+                ? 'border-primary bg-primary/10 font-medium text-primary'
+                : 'border-border hover:bg-accent'
+            }`}
+          >
+            <span className="flex flex-col items-start">
+              <span>{FONT_LABELS[f]}</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {FONT_HINTS[f]}
+              </span>
+            </span>
+            {fontStyle === f && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+          </button>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [offline, setOffline] = useState(false);
@@ -1086,6 +1124,7 @@ export default function Settings() {
           <BackendStatusCard health={health} offline={offline} loading={healthLoading} />
           <SoftwareUpdateCard />
           <ThemeCard />
+          <FontCard />
           <DensityCard />
           <AboutCard health={health} offline={offline} loading={healthLoading} />
         </div>

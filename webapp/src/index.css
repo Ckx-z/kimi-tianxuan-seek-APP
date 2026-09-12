@@ -313,10 +313,25 @@
 
 /* ============ v1.9.4 UI 革新（杠杆三件套） ============ */
 @layer base {
-  /* 1) 字体体系：正文/界面已由 font-sans 改为无衬线（tailwind.config.js）；
-        页面主标题保留衬线作「学术签名」，并收紧字距提升精致度。 */
+  /* 0) 字体风格开关（设置页「界面字体」）：正文/标题分别取变量，支持
+        「正文无衬线 + 标题衬线」与「全面宋体·Times」两种风格切换。 */
+  :root {
+    --font-body: Inter, "Segoe UI Variable Text", "Segoe UI", system-ui,
+      -apple-system, "Microsoft YaHei UI", "微软雅黑", "PingFang SC",
+      "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif;
+    --font-display: "Times New Roman", "SimSun", "宋体", "NSimSun",
+      "Songti SC", serif;
+  }
+  :root[data-font="serif"] {
+    --font-body: "Times New Roman", "SimSun", "宋体", "NSimSun",
+      "Songti SC", serif;
+  }
+  body {
+    font-family: var(--font-body);
+  }
+  /* 1) 页面主标题用展示体（学术签名），并收紧字距提升精致度。 */
   main h1 {
-    font-family: "Times New Roman", "SimSun", "宋体", "NSimSun", "Songti SC", serif;
+    font-family: var(--font-display);
     letter-spacing: -0.015em;
   }
   /* 数字读数统一等宽数字（KPI/表格/分数对齐更稳） */

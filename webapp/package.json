@@ -26,6 +26,10 @@
       {
         "from": "../dist-backend/cof-backend",
         "to": "backend"
+      },
+      {
+        "from": "../assets/app_icon.ico",
+        "to": "assets/app_icon.ico"
       }
     ],
     "icon": "../assets/app_icon.ico",
