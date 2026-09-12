@@ -518,6 +518,20 @@ def research_chat(req: AssistantResearchRequest):
     done / error。任何失败都走 error 事件，HTTP 恒 200。
     """
     question = (req.question or "").strip()
+    # v1.9.3（问题 4.2）：附件（文献 PDF 等）→ 文档文本作为研究证据注入
+    att_metas: list[dict] = []
+    if req.attachments:
+        try:
+            attachments, _c, _l, _lo, _m, _r, _s = _imports()
+            for uid in (req.attachments or [])[
+                    :attachments.MAX_ATTACHMENTS_PER_MESSAGE]:
+                meta = attachments.get_meta(uid)
+                if meta:
+                    att_metas.append(meta)
+        except Exception as exc:  # pragma: no cover - 附件读取失败不阻塞研究
+            logger.warning("研究附件读取失败（已跳过）: %s", exc)
+        if not question:
+            question = "请基于我上传的文献做一份深度研究"
     if not question:
         def _empty():
             yield _sse({"type": "error", "message": "question 不能为空"})
@@ -529,7 +543,8 @@ def research_chat(req: AssistantResearchRequest):
         try:
             research = _research()
             for ev in research.run_research(question, allow_web=req.allow_web,
-                                            session_id=req.session_id):
+                                            session_id=req.session_id,
+                                            attachments=att_metas):
                 yield _sse(ev)
         except Exception as exc:  # 兜底：任何意外都走 error 事件
             logger.exception("research 异常")

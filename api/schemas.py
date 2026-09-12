@@ -190,11 +190,15 @@ class AssistantResearchRequest(BaseModel):
     """深度研究（v1.6.0 P1）：复杂问题走 plan→execute→critic→report。
 
     session_id（v1.7.0）：给定则报告关联会话，计入「一对话一报告」综合。
+    attachments（v1.9.3 问题 4.2）：upload_id 列表（POST /uploads 返回，≤3 个），
+    附件文本作为**本地证据**注入研究计划与执行，并可被报告引用。
     """
     question: str = Field(..., description="研究问题（自然语言，复杂问题）")
     allow_web: bool = Field(True, description="是否允许联网检索（工具仍按配置裁剪）")
     session_id: str | None = Field(
         None, description="可选：关联的会话 ID（报告计入该会话综合报告）")
+    attachments: list[str] | None = Field(
+        None, description="附件 upload_id 列表（≤3 个；文档文本作为研究证据）")
 
 
 class DftJobCreate(BaseModel):

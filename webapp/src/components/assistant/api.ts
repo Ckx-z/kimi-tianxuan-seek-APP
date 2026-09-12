@@ -435,6 +435,8 @@ export const assistantApi = {
     allow_web?: boolean;
     /** v1.7.0：关联会话（报告计入该会话综合报告） */
     session_id?: string;
+    /** v1.9.3（问题 4.2）：附件 upload_id 列表（≤3；文档文本作为研究证据） */
+    attachments?: string[];
   }): Promise<ReadableStream<Uint8Array>> {
     let res: Response;
     try {

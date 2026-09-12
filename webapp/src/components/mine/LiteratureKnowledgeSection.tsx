@@ -8,10 +8,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
-  BookOpen, FlaskConical, FileCheck2, FileUp, Loader2, Pencil,
-  Play, RefreshCw, Trash2,
+  BookOpen, FileText, FlaskConical, FileCheck2, FileUp, Loader2, Pencil,
+  Play, RefreshCw, Trash2, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  ATTACHMENT_MAX_PER_PAPER,
+  attachmentUrl,
+  deleteLiteratureAttachment,
+  listLiteratureAttachments,
+  updateLiteratureAttachmentRole,
+  uploadLiteratureAttachments,
+  type LiteratureAttachment,
+} from './api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -83,6 +92,13 @@ interface ParsePreview {
   chars?: number;
   pages?: number;
   segments?: { total: number; failed: number };
+  /** v1.9.3：本次解析用了哪些附件（主文/SI） */
+  sources?: { filename: string; role: string; pages: number; chars: number }[];
+  /** 本次新留存的附件 */
+  saved?: LiteratureAttachment[];
+  save_errors?: { filename: string; message: string }[];
+  /** 疑似扫描件（无文本层，被跳过） */
+  scanned?: string[];
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -154,7 +170,13 @@ export function LiteratureKnowledgeSection() {
   const [parseText, setParseText] = useState('');
   const [preview, setPreview] = useState<ParsePreview | null>(null);
   const [checked, setChecked] = useState<Record<number, boolean>>({});
+  /** v1.9.3：待解析的新上传文件（主文 + SI，可多份） */
+  const [pendingPdfs, setPendingPdfs] = useState<{ file: File; role: 'main' | 'si' }[]>([]);
   const pdfRef = useRef<HTMLInputElement>(null);
+  /** v1.9.3：文献附件（主文/SI）列表 */
+  const [attachments, setAttachments] = useState<LiteratureAttachment[]>([]);
+  const [attachBusy, setAttachBusy] = useState(false);
+  const attachRef = useRef<HTMLInputElement>(null);
 
   // 编辑/删除
   const [editTarget, setEditTarget] = useState<Entry | null>(null);
@@ -194,9 +216,18 @@ export function LiteratureKnowledgeSection() {
     }
   }, []);
 
+  const loadAttachments = useCallback(async (pid: string) => {
+    try {
+      setAttachments(await listLiteratureAttachments(pid));
+    } catch {
+      setAttachments([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (paperId) {
       void loadEntries(paperId);
+      void loadAttachments(paperId);
       // 加载原文元数据（老文献的结构化信息：作者/期刊/摘要等）
       req<PaperDetail>(`/papers/${encodeURIComponent(paperId)}`)
         .then(setDetail)
@@ -205,26 +236,93 @@ export function LiteratureKnowledgeSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId]);
 
-  const runParse = async (file?: File) => {
+  /**
+   * 解析（v1.9.3 问题 2）：
+   * - 有新增文件 → 多文件一次提交（后端按 主文/SI 留存并分别解析后合并）；
+   * - 无新增文件 + useStored → 复用已存附件解析；
+   * - 否则用粘贴的全文文本。
+   */
+  const runParse = async (opts: { file?: File; useStored?: boolean } = {}) => {
     setParseBusy(true);
     setPreview(null);
     try {
       const form = new FormData();
-      if (file) form.append('file', file);
-      else if (parseText.trim()) form.append('text', parseText.trim());
+      const files = opts.file
+        ? [{ file: opts.file, role: 'main' as const }]
+        : pendingPdfs;
+      let usedStored = false;
+      if (files.length > 0) {
+        files.forEach((f) => form.append('files', f.file));
+        form.append('roles', files.map((f) => f.role).join(','));
+      } else if (opts.useStored || attachments.length > 0) {
+        form.append('use_stored', 'true');
+        usedStored = true;
+      } else if (parseText.trim()) {
+        form.append('text', parseText.trim());
+      } else {
+        toast.error('请选择主文/补充信息 PDF，或粘贴全文文本');
+        setParseBusy(false);
+        return;
+      }
       const data = await req<ParsePreview>(
         `/${encodeURIComponent(paperId)}/parse`,
         { method: 'POST', body: form });
       setPreview(data);
       setChecked(Object.fromEntries(
         data.entries.map((_, i) => [i, true])));
-      if (data.entries.length === 0) {
+      setPendingPdfs([]);
+      await loadAttachments(paperId);
+      if (data.scanned?.length) {
+        toast.warning(`以下 PDF 无可提取文本层（疑似扫描件）：${data.scanned.join('、')}`);
+      } else if (data.entries.length === 0) {
         toast.warning('未提取到条目：可检查全文或配置文献解析 LLM');
+      } else if (usedStored) {
+        toast.success(`已用 ${data.sources?.length ?? 0} 个已存附件解析`);
       }
     } catch {
       /* 已 toast */
     } finally {
       setParseBusy(false);
+    }
+  };
+
+  /** 上传附件（知识库卡片上的「上传主文/SI」入口） */
+  const uploadAttachments = async (files: FileList | File[]) => {
+    const list = [...files];
+    if (list.length === 0) return;
+    setAttachBusy(true);
+    try {
+      const res = await uploadLiteratureAttachments(paperId, list);
+      const roles = res.uploaded.map((u) => (u.role === 'main' ? '主文' : 'SI'));
+      if (res.uploaded.length) {
+        toast.success(`已上传 ${res.uploaded.length} 个附件（${roles.join('/')}）`);
+      }
+      res.errors.forEach((e) => toast.error(`${e.filename}：${e.message}`));
+      await loadAttachments(paperId);
+    } catch {
+      /* 已 toast */
+    } finally {
+      setAttachBusy(false);
+    }
+  };
+
+  const switchAttachmentRole = async (fileId: string, role: 'main' | 'si') => {
+    try {
+      await updateLiteratureAttachmentRole(fileId, role);
+      toast.success(`已设为${role === 'main' ? '主文' : '补充信息（SI）'}`);
+      await loadAttachments(paperId);
+    } catch {
+      /* 已 toast */
+    }
+  };
+
+  const removeAttachment = async (fileId: string) => {
+    try {
+      await deleteLiteratureAttachment(fileId);
+      toast.success('附件已删除');
+      await loadAttachments(paperId);
+    } catch {
+      /* 已 toast */
     }
   };
 
@@ -450,10 +548,56 @@ export function LiteratureKnowledgeSection() {
                             onClick={() => {
                               setParseText('');
                               setPreview(null);
+                              setPendingPdfs([]);
                               setParseOpen(true);
                             }}>
                       <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                       补解析
+                    </Button>
+                  </div>
+
+                  {/* v1.9.3：附件（主文 + 补充信息 SI）——可随时补传/复用 */}
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2">
+                    <input
+                      ref={attachRef}
+                      type="file"
+                      accept=".pdf"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const picked = [...(e.target.files ?? [])];
+                        e.target.value = '';
+                        if (picked.length) void uploadAttachments(picked);
+                      }}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      附件（主文/SI）：{attachments.length}/{ATTACHMENT_MAX_PER_PAPER}
+                    </span>
+                    {attachments.map((a) => (
+                      <span key={a.file_id}
+                            className="inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[11px]">
+                        <Badge variant={a.role === 'main' ? 'default' : 'outline'}
+                               className="text-[10px]">
+                          {a.role === 'main' ? '主文' : 'SI'}
+                        </Badge>
+                        <a className="max-w-40 truncate hover:underline"
+                           href={attachmentUrl(a.file_id)} target="_blank"
+                           rel="noreferrer" title={a.filename}>
+                          {a.filename}
+                        </a>
+                        <span className="text-muted-foreground/70">
+                          {a.pages}页{a.chars === 0 ? '·无文本层' : ''}
+                        </span>
+                      </span>
+                    ))}
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                            disabled={attachBusy
+                              || attachments.length >= ATTACHMENT_MAX_PER_PAPER}
+                            onClick={() => attachRef.current?.click()}>
+                      {attachBusy
+                        ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        : <FileUp className="mr-1 h-3 w-3" />}
+                      上传主文/SI
                     </Button>
                   </div>
 
@@ -625,37 +769,147 @@ export function LiteratureKnowledgeSection() {
             </DialogHeader>
             {!preview ? (
               <div className="space-y-3">
+                {/* v1.9.3：主文 + 多份补充信息（SI）一次选择；也可复用已存附件 */}
                 <input
                   ref={pdfRef}
                   type="file"
                   accept=".pdf"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
-                    const f = e.target.files?.[0];
+                    const picked = [...(e.target.files ?? [])];
                     e.target.value = '';
-                    if (f) void runParse(f);
+                    if (picked.length === 0) return;
+                    setPendingPdfs((prev) => {
+                      const hasMain = attachments.some((a) => a.role === 'main')
+                        || prev.some((p) => p.role === 'main');
+                      return [...prev, ...picked.map((file, i) => ({
+                        file,
+                        role: (!hasMain && prev.length === 0 && i === 0)
+                          ? 'main' as const : 'si' as const,
+                      }))];
+                    });
                   }}
                 />
+
+                {pendingPdfs.length > 0 && (
+                  <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-2">
+                    <p className="text-xs text-muted-foreground">
+                      待解析文件（{pendingPdfs.length}）：主文 1 份 + 补充信息可多份
+                    </p>
+                    {pendingPdfs.map((p, i) => (
+                      <div key={`${p.file.name}-${i}`}
+                           className="flex items-center gap-2 text-xs">
+                        <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 truncate" title={p.file.name}>
+                          {p.file.name}
+                          <span className="ml-1 text-muted-foreground/70">
+                            {(p.file.size / 1024 / 1024).toFixed(1)}MB
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          className="rounded border border-border px-1.5 py-0.5 text-[11px] hover:bg-accent"
+                          onClick={() => setPendingPdfs((prev) => prev.map(
+                            (x, j) => (j === i
+                              ? { ...x, role: x.role === 'main' ? 'si' : 'main' }
+                              : x)))}
+                          title="切换角色（主文 / 补充信息 SI）"
+                        >
+                          {p.role === 'main' ? '主文' : 'SI'}
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+                          onClick={() => setPendingPdfs(
+                            (prev) => prev.filter((_, j) => j !== i))}
+                          title="移除"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <Textarea
                   value={parseText}
                   onChange={(e) => setParseText(e.target.value)}
-                  rows={6}
-                  placeholder="粘贴文献全文（或直接上传 PDF）——解析 LLM 未配置时降级为 SMILES 正则扫描"
+                  rows={5}
+                  placeholder="粘贴文献全文（或上传 PDF）；补充信息（SI）可与主文一起上传——解析 LLM 未配置时降级为 SMILES 正则扫描"
                 />
-                <DialogFooter className="gap-2">
+
+                <DialogFooter className="flex-wrap gap-2">
                   <Button variant="outline"
                           onClick={() => pdfRef.current?.click()}
-                          disabled={parseBusy}>
-                    {parseBusy
-                      ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                      : <FileUp className="mr-1.5 h-4 w-4" />}
-                    上传 PDF 解析
+                          disabled={parseBusy
+                            || pendingPdfs.length >= ATTACHMENT_MAX_PER_PAPER}>
+                    <FileUp className="mr-1.5 h-4 w-4" />
+                    选择文件（可多份）
                   </Button>
-                  <Button onClick={() => void runParse()}
-                          disabled={parseBusy || !parseText.trim()}>
-                    {parseBusy ? '解析中…' : '用全文文本解析'}
+                  {attachments.length > 0 && (
+                    <Button variant="outline"
+                            onClick={() => void runParse({ useStored: true })}
+                            disabled={parseBusy}>
+                      <RefreshCw className="mr-1.5 h-4 w-4" />
+                      用已存 {attachments.length} 个附件解析
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => void runParse()}
+                    disabled={parseBusy || (!parseText.trim()
+                      && pendingPdfs.length === 0 && attachments.length === 0)}>
+                    {parseBusy
+                      ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />解析中…</>
+                      : '开始解析'}
                   </Button>
                 </DialogFooter>
+
+                {/* 已存附件管理（主文 / SI 角色可切换、可删除） */}
+                {attachments.length > 0 && (
+                  <div className="space-y-1 rounded-lg border border-border p-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      已存附件（{attachments.length}/{ATTACHMENT_MAX_PER_PAPER}）
+                    </p>
+                    {attachments.map((a) => (
+                      <div key={a.file_id} className="flex items-center gap-2 text-xs">
+                        <Badge variant={a.role === 'main' ? 'default' : 'outline'}
+                               className="shrink-0 text-[10px]">
+                          {a.role === 'main' ? '主文' : 'SI'}
+                        </Badge>
+                        <span className="min-w-0 flex-1 truncate" title={a.filename}>
+                          {a.filename}
+                          <span className="ml-1 text-muted-foreground/70">
+                            {a.pages} 页 · {(a.size / 1024 / 1024).toFixed(1)}MB
+                            {a.chars === 0 && ' · 无文本层'}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          className="rounded border border-border px-1.5 py-0.5 text-[11px] hover:bg-accent"
+                          onClick={() => void switchAttachmentRole(
+                            a.file_id, a.role === 'main' ? 'si' : 'main')}
+                          title="切换主文 / SI"
+                        >
+                          {a.role === 'main' ? '设为SI' : '设为主文'}
+                        </button>
+                        <a className="rounded border border-border px-1.5 py-0.5 text-[11px] hover:bg-accent"
+                           href={attachmentUrl(a.file_id)} target="_blank"
+                           rel="noreferrer">
+                          下载
+                        </a>
+                        <button
+                          type="button"
+                          className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+                          onClick={() => void removeAttachment(a.file_id)}
+                          title="删除附件"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -671,6 +925,32 @@ export function LiteratureKnowledgeSection() {
                   )}
                   （勾选要入库的条目，按组归类）
                 </p>
+
+                {/* v1.9.3：本次解析来源（主文/SI 分别解析后合并） */}
+                {preview.sources && preview.sources.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 text-[11px]">
+                    {preview.sources.map((s, i) => (
+                      <span key={`${s.filename}-${i}`}
+                            className="inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-1.5 py-0.5">
+                        <Badge variant={s.role === 'main' ? 'default' : 'outline'}
+                               className="text-[10px]">
+                          {s.role === 'main' ? '主文' : 'SI'}
+                        </Badge>
+                        <span className="max-w-52 truncate" title={s.filename}>
+                          {s.filename}
+                        </span>
+                        <span className="text-muted-foreground/70">
+                          {s.pages} 页 / {s.chars} 字符
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {preview.scanned && preview.scanned.length > 0 && (
+                  <p className="text-[11px] text-destructive">
+                    已跳过（无文本层，疑似扫描件）：{preview.scanned.join('、')}
+                  </p>
+                )}
 
                 {/* v1.9.3：文献级元数据（可回填文献库，只补空字段不覆盖） */}
                 {preview.paper_meta && Object.keys(preview.paper_meta).length > 0 && (

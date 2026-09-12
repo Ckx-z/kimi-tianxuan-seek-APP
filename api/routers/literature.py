@@ -378,60 +378,302 @@ MAX_PARSE_PDF_BYTES = 20 * 1024 * 1024   # 补解析 PDF 上限
 MIN_PDF_CHARS_PER_PAGE = 50              # 低于此值视为无文本层（扫描件）
 
 
-@router.post("/{paper_id}/parse")
-async def parse_paper(paper_id: str,
-                      file: UploadFile | None = File(None),
-                      text: str | None = Form(None),
-                      with_meta: bool = Form(True)):
-    """全维度解析：上传 PDF（或直接给全文文本）→ LLM 结构化条目预览。
+def _attachments():
+    from literature import attachments
+    return attachments
 
-    - 文献解析 LLM 未启用时降级为 SMILES 正则扫描（llm_used=false）；
-    - with_meta=True（默认）时同一响应附 `paper_meta`（文献级元数据，
-      title/authors/journal/year/doi/abstract），供前端确认后回填文献库；
-    - PDF 无文本层（扫描件，字符/页 < 50）→ 422 并提示改用文本或后续 OCR；
-    - 单文件 ≤ 20MB。
+
+def _merge_entries(chunk_results: list[dict]) -> list[dict]:
+    """多来源（主文 + 各 SI）解析结果合并去重。
+
+    去重键 = (group_id, kind, ald_smiles, amine_smiles, technique,
+    evidence 前 80 字)；同一条证据在多份附件里重复出现只留一条。
+    每条带 `source_file`（如「[SI 1] xxx.pdf」）与 evidence 前缀，
+    保证入库后能看出证据出自主文还是补充信息。
+    """
+    seen: set[tuple] = set()
+    merged: list[dict] = []
+    for res in chunk_results:
+        label = str(res.get("label") or "")
+        for entry in (res.get("entries") or []):
+            if not isinstance(entry, dict):
+                continue
+            key = (str(entry.get("group_id")), str(entry.get("kind")),
+                   str(entry.get("ald_smiles") or ""),
+                   str(entry.get("amine_smiles") or ""),
+                   str(entry.get("technique") or ""),
+                   str(entry.get("evidence") or "")[:80])
+            if key in seen:
+                continue
+            seen.add(key)
+            item = dict(entry)
+            if label and not str(item.get("source_file") or "").strip():
+                item["source_file"] = label
+                evidence = str(item.get("evidence") or "").strip()
+                item["evidence"] = f"{label} {evidence}".strip()
+            merged.append(item)
+    merged.sort(key=lambda e: (str(e.get("source_file") or ""),
+                               str(e.get("group_id") or "")))
+    return merged
+
+
+@router.post("/{paper_id}/attachments", status_code=201)
+async def upload_attachments(
+    paper_id: str,
+    files: list[UploadFile] = File(...),
+    role: str = Form(""),
+    roles: str = Form(""),
+):
+    """上传文献附件（主文 + 补充信息 SI，可一次多份）。
+
+    - 仅 PDF、单文件 ≤20MB、单文献 ≤8 个附件、sha1 内容去重（重复上传不占盘）；
+    - 角色分配：`roles`（逗号分隔，逐文件）优先 > `role`（整批统一）>
+      自动规则（该文献还没有主文时第 1 份为 main，其余为 si）。
+    返回 {uploaded: [...], errors: [{filename, message}], count}。
     """
     r = _resolver()
     if r.resolve_paper(paper_id) is None:
         raise HTTPException(404, f"文献不存在: {paper_id}")
-    body = (text or "").strip()
-    pages = 0
+    att = _attachments()
+    role_list = [x.strip().lower() for x in (roles or "").split(",") if x.strip()]
+    only = (role or "").strip().lower()
+    has_main = any(i.get("role") == "main" for i in att.list_pdfs(paper_id))
+    uploaded: list[dict] = []
+    errors: list[dict] = []
+    for idx, f in enumerate(files):
+        filename = (f.filename or "").strip() or f"document{idx + 1}.pdf"
+        data = await f.read()
+        if idx < len(role_list):
+            wanted = role_list[idx]
+        elif only:
+            wanted = only
+        elif idx == 0 and not has_main:
+            wanted = "main"
+        else:
+            wanted = "si"
+        try:
+            meta = att.save_pdf(paper_id, filename, data, role=wanted)
+        except att.AttachmentError as exc:
+            errors.append({"filename": filename, "message": str(exc)})
+            continue
+        uploaded.append(meta)
+    if not uploaded and errors:
+        raise HTTPException(400, errors[0]["message"])
+    return {"uploaded": uploaded, "errors": errors, "count": len(uploaded)}
+
+
+@router.get("/{paper_id}/attachments")
+def list_attachments(paper_id: str):
+    """某文献的附件列表（主文在前，SI 按上传顺序）。"""
+    att = _attachments()
+    items = att.list_pdfs(paper_id)
+    items.sort(key=lambda i: (0 if i.get("role") == "main" else 1,
+                              str(i.get("uploaded_at") or "")))
+    return {"attachments": items, "count": len(items),
+            "max_per_paper": att.MAX_PDFS_PER_PAPER}
+
+
+@router.get("/attachments/{file_id}/file")
+def download_attachment(file_id: str):
+    """下载/预览附件 PDF。"""
+    att = _attachments()
+    hit = att.get_pdf(file_id)
+    if hit is None:
+        raise HTTPException(404, "附件不存在或文件已丢失")
+    path, meta = hit
+    return FileResponse(path, media_type="application/pdf",
+                        filename=meta.get("filename") or path.name)
+
+
+@router.patch("/attachments/{file_id}")
+def update_attachment(file_id: str, role: str = Form(...)):
+    """切换附件角色（main / si）。"""
+    att = _attachments()
+    try:
+        meta = att.update_meta(file_id, role=(role or "").strip().lower())
+    except att.AttachmentError as exc:
+        raise HTTPException(400, str(exc))
+    if meta is None:
+        raise HTTPException(404, "附件不存在")
+    return meta
+
+
+@router.delete("/attachments/{file_id}")
+def delete_attachment(file_id: str):
+    """删除附件（索引 + 文件）。"""
+    att = _attachments()
+    if not att.delete_pdf(file_id):
+        raise HTTPException(404, "附件不存在")
+    return {"deleted": True, "file_id": file_id}
+
+
+@router.post("/{paper_id}/parse")
+async def parse_paper(paper_id: str,
+                      file: UploadFile | None = File(None),
+                      files: list[UploadFile] | None = File(None),
+                      text: str | None = Form(None),
+                      with_meta: bool = Form(True),
+                      use_stored: bool = Form(False),
+                      file_ids: str | None = Form(None),
+                      store_files: bool = Form(True)):
+    """全维度解析：主文 +（多份）补充信息 SI → LLM 结构化条目预览。
+
+    - 三种取材方式：① `files`（可多份，自动留存到附件库；`store_files=False`
+      则只解析不留存）② `file`（兼容旧的单文件调用）③ `use_stored=true`
+      或 `file_ids`（复用已上传附件，不必重复传大文件）④ `text` 全文文本；
+    - 主文与 SI **分别解析后合并去重**（避免跨文件截断丢信息），条目带
+      `source_file`（[主文]/[SI n] 文件名）便于核对证据出处；
+    - `with_meta=True` 时附 `paper_meta`（文献级元数据，取自主文）；
+    - PDF 无文本层（扫描件）→ 422 并提示；单文件 ≤20MB。
+    """
+    r = _resolver()
+    if r.resolve_paper(paper_id) is None:
+        raise HTTPException(404, f"文献不存在: {paper_id}")
+    att = _attachments()
+    ext = _llm_extract()
+
+    # ---------- 取材：解析目标（filename, role, label, text） ----------
+    targets: list[dict] = []
+    scanned: list[str] = []
+    saved: list[dict] = []
+    save_errors: list[dict] = []
+    pending: list[dict] = []          # 新上传（内存，无论是否留存都参与解析）
+
+    incoming = list(files or [])
     if file is not None:
-        data = await file.read()
+        incoming.append(file)
+
+    def _role_for(idx: int) -> str:
+        existing = att.list_pdfs(paper_id)
+        has_main = any(i.get("role") == "main" for i in existing)
+        if idx == 0 and not has_main:
+            return "main"
+        return "si"
+
+    # 1) 新上传文件：校验 → （可选）留存到附件库 → 进内存待解析
+    for idx, f in enumerate(incoming):
+        filename = (f.filename or "").strip() or f"document{idx + 1}.pdf"
+        data = await f.read()
         if not data:
-            raise HTTPException(400, "上传文件为空")
+            raise HTTPException(400, f"上传文件为空：{filename}")
         if len(data) > MAX_PARSE_PDF_BYTES:
             raise HTTPException(
                 413,
-                f"PDF 超过 {MAX_PARSE_PDF_BYTES // (1024 * 1024)}MB 上限，"
-                "请压缩后重试")
+                f"{filename} 超过 {MAX_PARSE_PDF_BYTES // (1024 * 1024)}MB 上限")
+        wanted = _role_for(idx)
+        if store_files:
+            try:
+                saved.append(att.save_pdf(paper_id, filename, data,
+                                          role=wanted))
+            except att.AttachmentError as exc:
+                save_errors.append({"filename": filename,
+                                    "message": str(exc)})
+        pending.append({"filename": filename, "data": data, "role": wanted})
+
+    # 2) 已存附件（use_stored / file_ids 显式指定；无新输入时自动复用）
+    use_ids = [x.strip() for x in (file_ids or "").split(",") if x.strip()]
+    want_stored = bool(use_stored or use_ids
+                       or (not incoming and not (text or "").strip()))
+    si_n = 0
+    if want_stored:
+        stored = att.list_pdfs(paper_id)
+        if use_ids:
+            stored = [i for i in stored if i.get("file_id") in set(use_ids)]
+        stored.sort(key=lambda i: (0 if i.get("role") == "main" else 1,
+                                   str(i.get("uploaded_at") or "")))
+        for item in stored:
+            path = att._path_of(paper_id, item.get("file_id"),
+                                item.get("filename") or "")
+            if not path.is_file():
+                continue
+            try:
+                body, pages, chars = att.pdf_text(path)
+            except att.AttachmentError as exc:
+                raise HTTPException(400, f"{item.get('filename')}：{exc}")
+            if pages and chars / pages < MIN_PDF_CHARS_PER_PAGE:
+                scanned.append(str(item.get("filename") or ""))
+                continue
+            if item.get("role") == "main":
+                label = f"[主文 {item.get('filename')}]"
+            else:
+                si_n += 1
+                label = f"[SI {si_n} {item.get('filename')}]"
+            targets.append({"filename": item.get("filename"),
+                            "role": item.get("role") or "main",
+                            "label": label, "text": body, "pages": pages})
+
+    # 3) 新上传文件（内存直读）→ 解析目标
+    for item in pending:
         try:
-            import fitz
-            doc = fitz.open(stream=data, filetype="pdf")
-            pages = doc.page_count
-            body = "\n".join(page.get_text() for page in doc)
-            doc.close()
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(400, f"PDF 解析失败：{exc}")
-        per_page = len(body.strip()) / max(pages, 1)
-        if per_page < MIN_PDF_CHARS_PER_PAGE:
+            body, pages, chars = att.pdf_text_from_bytes(item["data"])
+        except att.AttachmentError as exc:
+            raise HTTPException(400, f"{item['filename']}：{exc}")
+        if pages and chars / pages < MIN_PDF_CHARS_PER_PAGE:
+            scanned.append(item["filename"])
+            continue
+        if item["role"] == "main":
+            label = f"[主文 {item['filename']}]"
+        else:
+            si_n += 1
+            label = f"[SI {si_n} {item['filename']}]"
+        targets.append({"filename": item["filename"], "role": item["role"],
+                        "label": label, "text": body, "pages": pages})
+
+    # 4) 粘贴的全文文本
+    body_text = (text or "").strip()
+    if body_text and not targets:
+        targets.append({"filename": "（粘贴的全文文本）", "role": "text",
+                        "label": "[全文文本]", "text": body_text,
+                        "pages": 0})
+
+    if not targets:
+        if scanned:
             raise HTTPException(
                 422,
-                f"该 PDF 无可提取文本层（{pages} 页仅 {len(body.strip())} 字符，"
-                "疑似扫描件/纯图片版）：请改用「用全文文本解析」，"
-                "或等待后续版本的 OCR / 视觉模型支持")
-    if not body:
-        raise HTTPException(400, "请提供 PDF 文件或 text 全文")
-    ext = _llm_extract()
-    result = ext.parse_text(body)
-    if with_meta:
-        meta = ext.extract_paper_meta(body)
+                "以下 PDF 无可提取文本层（疑似扫描件/纯图片版）："
+                + "、".join(scanned)
+                + "。请改用「用全文文本解析」，或等待后续版本的 OCR / "
+                  "视觉模型支持")
+        raise HTTPException(
+            400, "请提供 PDF 文件（可多份，含补充信息）、已存附件或 text 全文")
+
+    # ---------- 逐来源解析后合并 ----------
+    chunk_results: list[dict] = []
+    for tgt in targets:
+        res = ext.parse_text(tgt["text"])
+        chunk_results.append({"label": tgt["label"], **res})
+    entries = _merge_entries(chunk_results)
+    llm_used = any(bool(r.get("llm_used")) for r in chunk_results)
+    notes = "；".join(
+        f"{r['label']} {r.get('note')}" for r in chunk_results if r.get("note"))
+    fail_segments = sum(int((r.get("segments") or {}).get("failed") or 0)
+                        for r in chunk_results)
+    segments = sum(int((r.get("segments") or {}).get("total") or 0)
+                   for r in chunk_results)
+
+    main_text = next((t["text"] for t in targets if t["role"] == "main"),
+                     targets[0]["text"] if targets else "")
+    total_chars = sum(len(t["text"]) for t in targets)
+
+    result = {
+        "llm_used": llm_used,
+        "entries": entries,
+        "note": (notes or "解析完成")
+                + (f"；合并后 {len(entries)} 条" if len(targets) > 1 else ""),
+        "segments": {"total": segments, "failed": fail_segments},
+        "sources": [{"filename": t["filename"], "role": t["role"],
+                     "pages": t.get("pages") or 0,
+                     "chars": len(t["text"].strip())} for t in targets],
+        "saved": saved,
+        "save_errors": save_errors,
+        "scanned": scanned,
+        "chars": total_chars,
+        "pages": sum(int(t.get("pages") or 0) for t in targets),
+    }
+    if with_meta and main_text:
+        meta = ext.extract_paper_meta(main_text)
         result["paper_meta"] = meta.get("meta") or {}
         result["meta_note"] = meta.get("note") or ""
-    result["chars"] = len(body)
-    result["pages"] = pages
     return {"paper_id": paper_id, **result}
 
 

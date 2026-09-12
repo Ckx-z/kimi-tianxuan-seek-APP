@@ -161,18 +161,26 @@ def available_research_tools() -> set[str]:
 
 # ---------------------------------------------------------------- 计划
 
-def plan_steps(question: str) -> dict:
-    """LLM 拆解研究计划；失败返回单步兜底计划（不阻塞研究）。"""
+def plan_steps(question: str, evidence: str = "") -> dict:
+    """LLM 拆解研究计划；失败返回单步兜底计划（不阻塞研究）。
+
+    evidence（v1.9.3）：用户上传的本地资料（文献 PDF 文本等），一并给计划
+    LLM，使计划覆盖「结合上传文献」的子问题。
+    """
+    user_content = question
+    if evidence:
+        user_content = (f"{question}\n\n【用户上传的本地资料（可引用）】\n"
+                        f"{evidence}")
     try:
         text = llm_bridge.chat_text(
             [{"role": "system", "content": _PLAN_PROMPT},
-             {"role": "user", "content": question}],
+             {"role": "user", "content": user_content}],
             max_tokens=1200)
         obj = _parse_json(text or "")
         if not obj and text:
             text2 = llm_bridge.chat_text(
                 [{"role": "system", "content": _PLAN_PROMPT},
-                 {"role": "user", "content": question},
+                 {"role": "user", "content": user_content},
                  {"role": "assistant", "content": text},
                  {"role": "user", "content": _PLAN_RETRY}],
                 max_tokens=1200)
@@ -202,17 +210,24 @@ def plan_steps(question: str) -> dict:
 
 # ---------------------------------------------------------------- 步骤执行
 
-def _execute_step(index: int, step: dict, tools: set[str]
-                  ) -> Iterator[dict]:
-    """单步检索：LLM 每轮一个指令（tool/done），结果回填，预算内收尾。"""
+def _execute_step(index: int, step: dict, tools: set[str],
+                  evidence: str = "") -> Iterator[dict]:
+    """单步检索：LLM 每轮一个指令（tool/done），结果回填，预算内收尾。
+
+    evidence（v1.9.3）：用户上传的本地资料，作为可直接引用的证据注入每步。
+    """
     step_no = f"第 {index + 1} 步"
     yield {"type": "step_start", "index": index,
            "title": step.get("title", "")}
     desc = _tool_description(tools)
+    system = _EXEC_PROMPT.format(
+        index=index + 1, title=step.get("title", ""),
+        note=step.get("note") or "", tools=desc)
+    if evidence:
+        system += ("\n\n【用户上传的本地资料（属于已核实证据，可直接引用）】\n"
+                   + evidence)
     work = [
-        {"role": "system", "content": _EXEC_PROMPT.format(
-            index=index + 1, title=step.get("title", ""),
-            note=step.get("note") or "", tools=desc)},
+        {"role": "system", "content": system},
         {"role": "user", "content": f"检索关键词：{step.get('query', '')}"},
     ]
     retried = False
@@ -444,12 +459,15 @@ def _collect_report_refs(results: list[dict]) -> list[dict]:
                 continue
             url = item.get("url") or ""
             doi = item.get("doi") or ""
-            key = doi or url
+            title = str(item.get("title") or "")
+            # 附件类引用（用户上传的文献）以文件名做去重键（无 DOI/URL）
+            key = doi or url or (
+                title if item.get("source") == "user_attachment" else "")
             if not key or key in seen:
                 continue
             seen.add(key)
             refs.append({
-                "title": item.get("title") or "",
+                "title": title,
                 "doi": doi,
                 "url": url,
                 "source": item.get("source") or "",
@@ -497,10 +515,12 @@ def report_to_docx(report: dict) -> bytes:
         for i, ref in enumerate(report["refs"], 1):
             doi = ref.get("doi") or ""
             url = ref.get("url") or ""
-            link = f"https://doi.org/{doi}" if doi else url
+            suffix = f"，DOI: {doi}" if doi else (f"，URL: {url}" if url else
+                                                 "（用户上传附件）"
+                                                 if ref.get("source")
+                                                 == "user_attachment" else "")
             doc.add_paragraph(
-                f"[{i}] {ref.get('title') or '（无标题）'}"
-                + (f"，DOI: {doi}" if doi else f"，URL: {url}"),
+                f"[{i}] {ref.get('title') or '（无标题）'}" + suffix,
                 style="List Number")
     from io import BytesIO
     buf = BytesIO()
@@ -508,19 +528,71 @@ def report_to_docx(report: dict) -> bytes:
     return buf.getvalue()
 
 
+# ---------------------------------------------------------------- 附件证据
+
+MAX_ATTACHMENT_EVIDENCE_CHARS = 6000   # 单份附件注入上限（token 成本控制）
+
+
+def attachment_evidence(metas: list[dict] | None) -> tuple[str, list[dict]]:
+    """用户上传附件 → (注入提示词的证据块, 伪工具结果列表)。
+
+    - 文档附件（pdf/docx/txt/…）走 `assistant.attachments.extract_text` 取文本；
+    - 图片附件如实标注「未做视觉解析」，不假装读到了内容；
+    - 伪工具结果用于：写报告时的【证据清单】、引用核验（`verify.collect_refs`
+      扫 text 字段）、参考文献清单 `_collect_report_refs`。
+    """
+    if not metas:
+        return "", []
+    blocks: list[str] = []
+    results: list[dict] = []
+    for i, meta in enumerate(metas, 1):
+        filename = str(meta.get("filename") or f"附件{i}")
+        kind = str(meta.get("kind") or "")
+        text = ""
+        try:
+            from . import attachments as att_mod
+            text = (att_mod.extract_text(meta) or "").strip()
+        except Exception as exc:  # pragma: no cover - 解析失败不阻塞研究
+            logger.warning("研究附件文本提取失败 %s: %s", filename, exc)
+        if len(text) > MAX_ATTACHMENT_EVIDENCE_CHARS:
+            text = text[:MAX_ATTACHMENT_EVIDENCE_CHARS] + "\n……（已截断）"
+        if not text:
+            text = ("（图片附件：本次研究未做视觉解析，只能引用其文件名，"
+                    "不要编造其中内容）" if kind == "image"
+                    else "（附件无可提取文本：可能是扫描件，不要编造其中内容）")
+        blocks.append(f"### 附件 {i}：{filename}（{kind or '文件'}）\n{text}")
+        results.append({
+            "text": f"用户上传附件 {filename}：\n{text}",
+            # 键名对齐 _collect_report_refs（papers/results）：附件进参考文献清单
+            "details": {"papers": [{"title": filename, "doi": "", "url": "",
+                                    "source": "user_attachment"}]},
+            "is_error": False,
+        })
+    return "\n\n".join(blocks), results
+
+
 # ---------------------------------------------------------------- 主循环
 
 def run_research(question: str, allow_web: bool = True,
-                 session_id: str | None = None) -> Iterator[dict]:
+                 session_id: str | None = None,
+                 attachments: list[dict] | None = None) -> Iterator[dict]:
     """深度研究主入口（生成器，SSE 事件流）。LLM 未配置先抛 error 事件。
 
     session_id（v1.7.0）：报告落盘时关联会话；会话综合报告（一对话一报告）
     会把该报告作为来源并入。不传则为独立单问报告（历史行为）。
+
+    attachments（v1.9.3 问题 4.2）：用户上传的附件元信息（assistant.attachments
+    的 meta dict 列表）。其文档文本作为**已核实本地证据**注入研究计划与每一步
+    执行，并进入报告证据清单/参考文献，使报告能引用上传的文献。
     """
     question = (question or "").strip()
+    evidence_block, att_results = attachment_evidence(attachments)
     if not question:
-        yield {"type": "error", "message": "question 不能为空"}
-        return
+        if evidence_block:
+            question = "请基于我上传的文献做一份深度研究"
+        else:
+            yield {"type": "error", "message": "question 不能为空"}
+            return
     if not llm_bridge.is_configured():
         yield {"type": "error",
                "message": "LLM 未配置：请到设置页填写 base_url / api_key / "
@@ -536,18 +608,33 @@ def run_research(question: str, allow_web: bool = True,
         except Exception as exc:  # pragma: no cover
             logger.warning("研究问题落会话失败（已跳过）: %s", exc)
 
-    # 1. 计划
-    plan = plan_steps(question)
+    # 1. 计划（有附件时把附件摘要一并给计划 LLM；无附件保持旧调用口径，
+    #    兼容既有打桩/外部调用）
+    plan = (plan_steps(question, evidence=evidence_block) if evidence_block
+            else plan_steps(question))
     yield {"type": "plan",
            "steps": [{"title": s["title"], "note": s["note"]}
                      for s in plan["steps"]],
            "summary": plan.get("summary") or ""}
 
     # 2. 逐子问题执行（_result 内部事件收集完整工具结果供引用核验）
-    all_results: list[dict] = []
+    #    附件证据先入列：写报告时进【证据清单】，且引用核验视为已核实来源
+    all_results: list[dict] = list(att_results)
     tool_events: list[dict] = []  # v1.8.1：随助手消息落会话的检索过程
+    for i, meta in enumerate(attachments or [], 1):
+        ev_call = {"type": "tool_call", "name": "attachment",
+                   "args": {"filename": meta.get("filename")}}
+        ev_result = {"type": "tool_result", "name": "attachment",
+                     "summary": f"已读取上传附件：{meta.get('filename')}",
+                     "is_error": False}
+        if session_id:
+            tool_events.extend([ev_call, ev_result])
+        yield ev_call
+        yield ev_result
     for i, step in enumerate(plan["steps"]):
-        for ev in _execute_step(i, step, tools):
+        step_iter = (_execute_step(i, step, tools, evidence=evidence_block)
+                     if evidence_block else _execute_step(i, step, tools))
+        for ev in step_iter:
             if ev.get("type") == "_result":
                 all_results.append(ev["result"])
                 continue

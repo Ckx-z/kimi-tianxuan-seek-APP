@@ -211,6 +211,8 @@ def validate_entry(rec: dict) -> dict:
     fig_ids = rec.get("figure_ids")
     if isinstance(fig_ids, list):
         out["figure_ids"] = [str(x).strip() for x in fig_ids if str(x).strip()]
+    # v1.9.3（问题 2）：来源附件标注（主文 / SI 第 n 份），便于核对证据出处
+    out["source_file"] = _clean_str(rec.get("source_file"))
     return out
 
 

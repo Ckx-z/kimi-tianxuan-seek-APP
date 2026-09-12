@@ -138,6 +138,23 @@ def pdf_text(path: Path) -> tuple[str, int, int]:
         doc.close()
 
 
+def pdf_text_from_bytes(data: bytes) -> tuple[str, int, int]:
+    """内存 PDF → (全文, 页数, 字符数)（不落盘，供「只解析不留存」）。"""
+    try:
+        import fitz
+    except ImportError as exc:  # pragma: no cover
+        raise AttachmentError("PDF 解析组件不可用（PyMuPDF 未安装）") from exc
+    try:
+        doc = fitz.open(stream=data, filetype="pdf")
+    except Exception as exc:
+        raise AttachmentError(f"文件不是有效的 PDF：{type(exc).__name__}") from exc
+    try:
+        text = "\n".join(page.get_text() for page in doc)
+        return text, doc.page_count, len(text.strip())
+    finally:
+        doc.close()
+
+
 def save_pdf(paper_id: str, filename: str, data: bytes,
              role: str = "main") -> dict:
     """保存附件（sha1 去重）。

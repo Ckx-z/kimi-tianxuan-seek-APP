@@ -48,6 +48,8 @@ import { DailyBriefCard } from '@/components/assistant/DailyBriefCard';
 import { NudgeBar } from '@/components/assistant/NudgeBar';
 import { mdComponents, normalizeMarkdownLinks } from '@/lib/markdown';
 import { openExternal } from '@/lib/external';
+import { Resizer } from '@/components/ui/resizer';
+import { useResizableWidth } from '@/hooks/useResizableWidth';
 
 interface LocalMessage extends ChatMessageView {
   id: string;
@@ -117,6 +119,16 @@ export default function Assistant() {
   const [sessionReportError, setSessionReportError] = useState<string | null>(null);
   /** 报告结构化引用（v1.9.3：正文链接不可靠时用干净 refs 兜底） */
   const [sessionReportRefs, setSessionReportRefs] = useState<ResearchReportRef[]>([]);
+
+  // v1.9.3 问题 4.3：会话列表与对话区宽度可拖拽（localStorage 持久化）
+  const sidebar = useResizableWidth({
+    storageKey: 'cof.assistant.sidebarWidth',
+    defaultWidth: 224, min: 160, max: 480,
+  });
+  const chat = useResizableWidth({
+    storageKey: 'cof.assistant.chatWidth',
+    defaultWidth: 0, min: 520, max: 1400, allowZero: true,
+  });
 
   const openReports = useCallback(async () => {
     setReportsOpen(true);
@@ -365,7 +377,11 @@ export default function Assistant() {
   }, []);
 
   // ---------- 深度研究执行（v1.6.0 P1） ----------
-  const runResearch = useCallback(async (question: string, sessionId?: string) => {
+  const runResearch = useCallback(async (
+    question: string,
+    sessionId?: string,
+    attachments?: AssistantAttachmentMeta[],
+  ) => {
     setResearchPlan(null);
     setResearchStepDone({});
     const asstId = nextId();
@@ -381,6 +397,10 @@ export default function Assistant() {
         question,
         allow_web: true,
         session_id: sessionId, // v1.7.0：报告计入该会话综合报告
+        // v1.9.3（问题 4.2）：上传的文献/附件作为研究证据
+        attachments: attachments?.length
+          ? attachments.map((a) => a.upload_id)
+          : undefined,
       });
       for await (const sev of parseSseStream(stream)) {
         if (sev.type === 'plan') {
@@ -451,17 +471,44 @@ export default function Assistant() {
       setInput('');
 
       // 深度研究模式：走研究流（v1.7.0：先确保会话存在，报告归入会话）
+      // v1.9.3（问题 4.2）：先上传附件，再带 upload_id 发起研究；
+      // 允许「只传附件不打字」（自动用默认研究问题）。
       if (researchMode) {
-        if (!message) return;
+        let attMetas: AssistantAttachmentMeta[] = [];
+        if (files.length > 0) {
+          setUploading(true);
+          try {
+            for (const f of files) {
+              attMetas.push(await uploadAttachment(f));
+            }
+            setPendingFiles([]);
+          } catch (e) {
+            toast.error(
+              `附件上传失败：${e instanceof AssistantUnavailableError
+                ? '无法连接后端服务，请确认服务已启动'
+                : e instanceof Error
+                  ? e.message
+                  : '未知错误'}，研究未发起`,
+            );
+            setInput(raw); // 恢复输入，避免丢失
+            return;
+          } finally {
+            setUploading(false);
+          }
+        }
+        const researchQuestion = message
+          || (attMetas.length ? '请基于我上传的文献做一份深度研究' : '');
+        if (!researchQuestion) return;
         setMessages((ms) => [
           ...ms,
-          { id: nextId(), role: 'user', content: message },
+          { id: nextId(), role: 'user', content: researchQuestion,
+            attachments: attMetas.length ? attMetas : undefined },
         ]);
         let sid = activeId;
         if (!sid) {
           try {
             const created = await assistantApi.createSession({
-              title: message.slice(0, 16),
+              title: researchQuestion.slice(0, 16),
             });
             sid = created.session_id;
             setActiveId(sid);
@@ -480,7 +527,7 @@ export default function Assistant() {
             return;
           }
         }
-        await runResearch(message, sid);
+        await runResearch(researchQuestion, sid, attMetas);
         return;
       }
 
@@ -867,12 +914,13 @@ export default function Assistant() {
       <DailyBriefCard />
       <NudgeBar onPrefill={handleNudgePrefill} disabled={streaming} />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
-        {/* 左侧会话列表：窄屏时变为顶部横向滚动条 */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row md:gap-1">
+        {/* 左侧会话列表：窄屏时变为顶部横向滚动条；md 以上可拖拽调宽 */}
         <aside
+          style={{ '--sb-w': `${sidebar.width}px` } as React.CSSProperties}
           className={cn(
             'flex shrink-0 gap-1.5 overflow-x-auto pb-1',
-            'md:w-56 md:flex-col md:overflow-y-auto md:overflow-x-hidden md:rounded-xl md:border md:border-border md:bg-card md:p-2 md:pb-2',
+            'md:w-[var(--sb-w)] md:flex-col md:overflow-y-auto md:overflow-x-hidden md:rounded-xl md:border md:border-border md:bg-card md:p-2 md:pb-2',
           )}
         >
           {sessions.length === 0 && (
@@ -933,8 +981,15 @@ export default function Assistant() {
           ))}
         </aside>
 
-        {/* 右侧对话区：限高 + 内部滚动（同 dialog 90dvh 模式思路） */}
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
+        {/* 会话列表 ↔ 对话区 分隔条（v1.9.3：拖动调宽，双击恢复默认） */}
+        <Resizer handleProps={sidebar.handleProps} dragging={sidebar.dragging}
+                 label="调整会话列表宽度" className="my-2" />
+
+        {/* 右侧对话区：限高 + 内部滚动（同 dialog 90dvh 模式思路）
+            v1.9.3：md 以上可拖右缘分隔条调整对话区宽度（双击恢复铺满） */}
+        <section
+          style={chat.width ? { maxWidth: `${chat.width}px` } : undefined}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
           {/* 上下文提示条（从方案迭代转入时显示） */}
           {activeContext && (
             <div className="border-b border-gold/30 bg-gold-muted/40 px-4 py-2 text-xs text-muted-foreground">
@@ -1129,6 +1184,10 @@ export default function Assistant() {
             )}
           </div>
         </section>
+
+        {/* 对话区右缘分隔条（v1.9.3：拖动调整对话区宽度，双击恢复铺满） */}
+        <Resizer handleProps={chat.handleProps} dragging={chat.dragging}
+                 label="调整对话区宽度" className="my-2" />
       </div>
 
       {/* 会话重命名弹窗（v1.5.4） */}

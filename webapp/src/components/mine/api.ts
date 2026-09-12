@@ -511,3 +511,126 @@ export async function confirmLiterature(draft: {
     reviewed_by: 'user',
   });
 }
+
+// ---------------------------------------------------------------- 文献附件（v1.9.3 问题 2）
+
+/** 文献附件（主文 PDF / 补充信息 SI PDF） */
+export interface LiteratureAttachment {
+  file_id: string;
+  paper_id: string;
+  filename: string;
+  /** main = 主文；si = 补充信息 */
+  role: 'main' | 'si';
+  size: number;
+  sha1: string;
+  uploaded_at: string;
+  pages: number;
+  chars: number;
+  deduplicated?: boolean;
+}
+
+export const ATTACHMENT_MAX_PER_PAPER = 8;
+
+/** 附件下载/预览地址 */
+export function attachmentUrl(fileId: string): string {
+  return `${BASE}/literature/attachments/${encodeURIComponent(fileId)}/file`;
+}
+
+/** GET 请求（文献模块只读端点；错误统一转 LiteratureApiError） */
+async function literatureGet<T>(path: string): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`);
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (!res.ok) {
+    throw new LiteratureApiError(res.status, `请求失败（${res.status}）`);
+  }
+  return (await res.json()) as T;
+}
+
+/** 某文献的附件列表（主文在前） */
+export async function listLiteratureAttachments(
+  paperId: string,
+): Promise<LiteratureAttachment[]> {
+  const data = await literatureGet<{ attachments: LiteratureAttachment[] }>(
+    `/literature/${encodeURIComponent(paperId)}/attachments`);
+  return data.attachments ?? [];
+}
+
+/** 批量上传附件（主文 + 多份 SI）；roles 为逗号分隔的逐文件角色（可选） */
+export async function uploadLiteratureAttachments(
+  paperId: string,
+  files: File[],
+  roles?: string,
+): Promise<{ uploaded: LiteratureAttachment[]; errors: { filename: string; message: string }[] }> {
+  const form = new FormData();
+  files.forEach((f) => form.append('files', f));
+  if (roles) form.append('roles', roles);
+  let res: Response;
+  try {
+    res = await fetch(
+      `${BASE}/literature/${encodeURIComponent(paperId)}/attachments`,
+      { method: 'POST', body: form },
+    );
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (res.ok) {
+    return (await res.json()) as {
+      uploaded: LiteratureAttachment[];
+      errors: { filename: string; message: string }[];
+    };
+  }
+  let detailText = '';
+  try {
+    const detail = (await res.json())?.detail;
+    if (typeof detail === 'string') detailText = detail;
+  } catch {
+    /* 非 JSON 响应 */
+  }
+  throw new LiteratureApiError(res.status, detailText || `附件上传失败（${res.status}）`);
+}
+
+/** 切换附件角色（main / si） */
+export async function updateLiteratureAttachmentRole(
+  fileId: string,
+  role: 'main' | 'si',
+): Promise<LiteratureAttachment> {
+  const form = new FormData();
+  form.append('role', role);
+  let res: Response;
+  try {
+    res = await fetch(
+      `${BASE}/literature/attachments/${encodeURIComponent(fileId)}`,
+      { method: 'PATCH', body: form },
+    );
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (!res.ok) throw new LiteratureApiError(res.status, `修改附件角色失败（${res.status}）`);
+  return (await res.json()) as LiteratureAttachment;
+}
+
+/** 删除附件 */
+export async function deleteLiteratureAttachment(fileId: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(
+      `${BASE}/literature/attachments/${encodeURIComponent(fileId)}`,
+      { method: 'DELETE' },
+    );
+  } catch {
+    const err = new BackendUnavailableError();
+    toast.error(err.message);
+    throw err;
+  }
+  if (!res.ok) throw new LiteratureApiError(res.status, `删除附件失败（${res.status}）`);
+}
