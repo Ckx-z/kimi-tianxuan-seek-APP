@@ -415,3 +415,19 @@ class LiteratureLlmSettingsUpdate(BaseModel):
     embedding_model: str | None = Field(
         None, description="本地模型名/路径（如 Qwen/Qwen3-Embedding-0.6B）")
     embedding_api_key: str | None = Field(None, description="在线提供方 key（掩码则不改）")
+    # 视觉读图（v1.9.4 方案 B，可选）：关闭时方案 A（本地抽图入库）保底
+    vision_enabled: bool | None = Field(
+        None, description="视觉读图开关（需支持图片输入的模型）")
+    vision_base_url: str | None = Field(
+        None, description="视觉模型端点（留空回退主解析 LLM 端点）")
+    vision_api_key: str | None = Field(
+        None, description="视觉模型 key（留空回退主解析 LLM key；掩码则不改）")
+    vision_model: str | None = Field(
+        None, description="视觉模型名（如 qwen-vl-max / gpt-4o 等）")
+
+
+class LiteratureFiguresAnalyze(BaseModel):
+    """视觉读图请求（v1.9.4 方案 B）：对暂存的候选图调用视觉模型读描述与数值。"""
+    staged_ids: list[str] = Field(default_factory=list)
+    max_figures: int = Field(6, description="单次最多分析几张（控制成本）")
+    hint: str = Field("", description="可选补充提示（如「重点读 PXRD 峰位」）")

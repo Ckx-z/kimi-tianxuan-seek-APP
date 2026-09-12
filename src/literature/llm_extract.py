@@ -105,17 +105,15 @@ def _read_settings() -> dict:
 
 
 def get_settings(public: bool = True) -> dict:
-    """读取设置；public=True 时 api_key 只回显掩码。"""
+    """读取设置；public=True 时各类 key 只回显掩码。"""
     s = _read_settings()
-    if public and s.get("api_key"):
-        key = str(s["api_key"])
-        s = dict(s)
-        s["api_key"] = (key[:6] + "…" + key[-4:]) if len(key) > 12 else "***"
-    if public and s.get("embedding_api_key"):
-        key = str(s["embedding_api_key"])
-        s = dict(s)
-        s["embedding_api_key"] = (key[:6] + "…" + key[-4:]) \
-            if len(key) > 12 else "***"
+    if not public:
+        return s
+    s = dict(s)
+    for field in ("api_key", "embedding_api_key", "vision_api_key"):
+        key = str(s.get(field) or "")
+        if key:
+            s[field] = (key[:6] + "…" + key[-4:]) if len(key) > 12 else "***"
     return s
 
 
@@ -123,7 +121,11 @@ def save_settings(enabled: bool | None = None, base_url: str | None = None,
                   api_key: str | None = None, model: str | None = None,
                   embedding_provider: str | None = None,
                   embedding_model: str | None = None,
-                  embedding_api_key: str | None = None) -> dict:
+                  embedding_api_key: str | None = None,
+                  vision_enabled: bool | None = None,
+                  vision_base_url: str | None = None,
+                  vision_api_key: str | None = None,
+                  vision_model: str | None = None) -> dict:
     """写设置（只改传入字段；key 传掩码则不改）。返回公开设置。"""
     s = _read_settings()
     if enabled is not None:
@@ -141,6 +143,17 @@ def save_settings(enabled: bool | None = None, base_url: str | None = None,
     if embedding_api_key is not None and "…" not in embedding_api_key \
             and embedding_api_key != "***":
         s["embedding_api_key"] = embedding_api_key.strip()
+    # 视觉读图（v1.9.4 方案 B）：独立开关 + 可独立配置端点/key/model，
+    # 留空则回退到上面的主解析 LLM 配置（同端点同 key 时无需重复填写）。
+    if vision_enabled is not None:
+        s["vision_enabled"] = bool(vision_enabled)
+    if vision_base_url is not None:
+        s["vision_base_url"] = (vision_base_url or "").strip()
+    if vision_api_key is not None and "…" not in vision_api_key \
+            and vision_api_key != "***":
+        s["vision_api_key"] = vision_api_key.strip()
+    if vision_model is not None:
+        s["vision_model"] = (vision_model or "").strip()
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = SETTINGS_PATH.with_name(SETTINGS_PATH.name + ".tmp")
     tmp.write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")

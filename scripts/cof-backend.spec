@@ -140,6 +140,8 @@ hiddenimports = [
     "literature.attachments", "src.literature.attachments",
     # 文献图自动抽取（v1.9.4）：PDF 内嵌位图 + 矢量图页渲染兜底 + 图注归类
     "literature.pdf_figures", "src.literature.pdf_figures",
+    # 视觉读图（v1.9.4 方案 B，可选开关）：图 → 描述/数值 → 可入库条目
+    "literature.vision", "src.literature.vision",
     # 侧车图/图谱检索（graph_ingest/助手 query_graphrag 运行时依赖）
     "networkx",
     # 实验记录导出（routers/records.py 内惰性 import；docx → lxml 原生依赖

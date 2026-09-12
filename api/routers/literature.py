@@ -21,7 +21,8 @@ from fastapi.responses import FileResponse
 
 from ..schemas import (LiteratureConfirm, LiteratureEntriesBatch,
                        LiteratureEntryUpdate, LiteratureFigureFromSmiles,
-                       LiteratureFigureUpdate, LiteratureFiguresImport,
+                       LiteratureFigureUpdate, LiteratureFiguresAnalyze,
+                       LiteratureFiguresImport,
                        LiteratureLlmSettingsUpdate,
                        LiteratureLookup, LiteraturePaperUpdate)
 
@@ -961,26 +962,98 @@ def entry_to_dft(entry_id: str):
 
 @router.get("/llm-settings")
 def get_llm_settings():
-    """文献解析 LLM 设置（key 只回显掩码）。"""
-    return _llm_extract().get_settings()
+    """文献解析 LLM 设置（key 只回显掩码）+ 视觉读图状态。"""
+    try:
+        from literature import vision
+    except ImportError:  # pragma: no cover
+        from src.literature import vision  # type: ignore
+    return {**_llm_extract().get_settings(), "vision_status": vision.status()}
 
 
 @router.put("/llm-settings")
 def put_llm_settings(req: LiteratureLlmSettingsUpdate):
-    """保存文献解析 LLM 设置（只改传入字段）。"""
+    """保存文献解析 LLM 设置（只改传入字段，含视觉读图 4 个字段）。"""
     body = req.model_dump(exclude_unset=True)
     return _llm_extract().save_settings(
         enabled=body.get("enabled"), base_url=body.get("base_url"),
         api_key=body.get("api_key"), model=body.get("model"),
         embedding_provider=body.get("embedding_provider"),
         embedding_model=body.get("embedding_model"),
-        embedding_api_key=body.get("embedding_api_key"))
+        embedding_api_key=body.get("embedding_api_key"),
+        vision_enabled=body.get("vision_enabled"),
+        vision_base_url=body.get("vision_base_url"),
+        vision_api_key=body.get("vision_api_key"),
+        vision_model=body.get("vision_model"))
 
 
 @router.post("/llm-settings/test")
 def test_llm_settings():
     """测试文献解析 LLM 连接。"""
     return _llm_extract().test_connection()
+
+
+@router.post("/{paper_id}/figures/analyze")
+def analyze_figures(paper_id: str, req: LiteratureFiguresAnalyze):
+    """视觉读图（v1.9.4 方案 B）：对暂存候选图调用视觉模型读描述与数值。
+
+    - 未启用/未配置视觉模型 → 400 且提示到设置页开启（**方案 A 不受影响**：
+      不开启时图照样抽取入库，只是不读图内数值）；
+    - 单次默认最多 6 张（`max_figures` 控制成本）；
+    - 返回 `results`（每张图的描述/数值/置信度）与 `entries`（可直接入预览勾选的条目）。
+    """
+    r = _resolver()
+    if r.resolve_paper(paper_id) is None:
+        raise HTTPException(404, f"文献不存在: {paper_id}")
+    try:
+        from literature import pdf_figures, vision
+    except ImportError:  # pragma: no cover
+        from src.literature import pdf_figures, vision  # type: ignore
+    if not vision.is_enabled():
+        raise HTTPException(
+            400, "视觉读图未启用：请到「设置 → 文献解析 LLM → 视觉读图」开启并填写"
+                 "支持图片输入的模型（关闭时不影响文献图抽取入库）")
+    ids = list(req.staged_ids or [])[:max(1, int(req.max_figures or 6))]
+    results: list[dict] = []
+    entries: list[dict] = []
+    for sid in ids:
+        hit = pdf_figures.get_staged(sid)
+        if hit is None:
+            results.append({"staged_id": sid, "ok": False,
+                            "error": "暂存已过期或不存在"})
+            continue
+        path, meta = hit
+        mime = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+        try:
+            analysis = vision.analyze_image(path.read_bytes(), mime=mime,
+                                            hint=req.hint or "")
+        except Exception as exc:  # pragma: no cover - 兜底不炸整个请求
+            analysis = {"ok": False, "error": f"{type(exc).__name__}: {exc}",
+                        "metrics": [], "description": "", "technique": "",
+                        "confidence": "", "notes": ""}
+        results.append({"staged_id": sid,
+                        "page": meta.get("page"),
+                        "caption_label": meta.get("caption_label"),
+                        **analysis})
+        entry = vision.propose_entry(meta, analysis)
+        if entry:
+            entries.append(entry)
+    try:
+        from literature import knowledge as knowledge_mod
+        entries = knowledge_mod.annotate_entries(entries)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("视觉条目试校验标注失败（已跳过）: %s", exc)
+    ok_n = sum(1 for x in results if x.get("ok"))
+    return {
+        "paper_id": paper_id,
+        "analyzed": len(results),
+        "ok_count": ok_n,
+        "metric_total": sum(len(x.get("metrics") or []) for x in results),
+        "results": results,
+        "entries": entries,
+        "vision": vision.status(),
+        "note": (f"视觉读图完成：{ok_n}/{len(results)} 张成功，"
+                 f"提出 {len(entries)} 条待勾选条目"),
+    }
 
 
 @router.get("/embedding-status")

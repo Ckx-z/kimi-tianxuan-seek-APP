@@ -8,8 +8,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
-  BookOpen, FileText, FlaskConical, FileCheck2, FileUp, Loader2, Pencil,
-  Play, RefreshCw, Trash2, X,
+  BookOpen, FileText, FlaskConical, FileCheck2, FileUp, Loader2, Microscope,
+  Pencil, Play, RefreshCw, Trash2, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -208,6 +208,15 @@ export function LiteratureKnowledgeSection() {
   const [checkedFigures, setCheckedFigures] = useState<Record<string, boolean>>({});
   /** v1.9.4：文献图入库后强制刷新「图谱」页签 */
   const [figuresRefreshKey, setFiguresRefreshKey] = useState(0);
+  /** v1.9.4 方案 B：视觉读图可用性（设置页开启后才显示「读图提取数值」） */
+  const [visionInfo, setVisionInfo] = useState<{ available: boolean; model: string } | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  useEffect(() => {
+    req<{ vision_status?: { available: boolean; model: string } }>('/llm-settings')
+      .then((d) => setVisionInfo(d.vision_status ?? null))
+      .catch(() => setVisionInfo(null));
+  }, []);
 
   useEffect(() => {
     if (!parseBusy) {
@@ -396,6 +405,45 @@ export function LiteratureKnowledgeSection() {
       /* 已 toast */
     } finally {
       setParseBusy(false);
+    }
+  };
+
+  /** v1.9.4 方案 B：对已勾选的文献图调用视觉模型读描述与数值 → 追加为可勾选条目 */
+  const analyzeFigures = async () => {
+    const chosen = (preview?.figures ?? []).filter((f) => checkedFigures[f.staged_id]);
+    if (chosen.length === 0) {
+      toast.error('请先勾选要读图的文献图');
+      return;
+    }
+    setAnalyzing(true);
+    try {
+      const offset = preview?.entries.length ?? 0;
+      const res = await req<{
+        ok_count: number; analyzed: number; metric_total: number;
+        entries: Partial<Entry>[]; note: string;
+      }>(`/${encodeURIComponent(paperId)}/figures/analyze`, {
+        method: 'POST',
+        body: JSON.stringify({
+          staged_ids: chosen.map((f) => f.staged_id),
+          max_figures: 6,
+        }),
+      });
+      setPreview((prev) => (prev
+        ? { ...prev, entries: [...prev.entries, ...res.entries] }
+        : prev));
+      setChecked((c) => {
+        const next = { ...c };
+        res.entries.forEach((_, i) => { next[offset + i] = true; });
+        return next;
+      });
+      toast.success(res.note);
+      if (res.entries.length === 0 && res.ok_count === 0) {
+        toast.warning('视觉模型未返回可用内容：可检查模型是否支持图片输入');
+      }
+    } catch {
+      /* 已 toast（未启用时后端返回明确提示） */
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -1110,6 +1158,18 @@ export function LiteratureKnowledgeSection() {
                       <span className="text-[11px] text-muted-foreground">
                         内嵌图默认勾选；页渲染为矢量图兜底，按需勾选
                       </span>
+                      {visionInfo?.available && (
+                        <Button size="sm" variant="outline"
+                                className="h-7 px-2 text-xs"
+                                disabled={analyzing}
+                                title={`用视觉模型（${visionInfo.model}）读取勾选图中的数值，结果作为可勾选条目`}
+                                onClick={() => void analyzeFigures()}>
+                          {analyzing
+                            ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                            : <Microscope className="mr-1 h-3 w-3" />}
+                          读图提取数值
+                        </Button>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {preview.figures.map((f) => (

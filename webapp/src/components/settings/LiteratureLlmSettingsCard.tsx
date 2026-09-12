@@ -26,6 +26,18 @@ interface Settings {
   embedding_provider: string;
   embedding_model: string;
   embedding_api_key: string;
+  /** v1.9.4 方案 B：视觉读图（可选，关闭时方案 A 保底） */
+  vision_enabled: boolean;
+  vision_base_url: string;
+  vision_api_key: string;
+  vision_model: string;
+  vision_status?: {
+    enabled: boolean;
+    available: boolean;
+    model: string;
+    base_url: string;
+    inherits_main: boolean;
+  };
 }
 
 interface EmbedStatus {
@@ -66,6 +78,7 @@ export function LiteratureLlmSettingsCard({ offline }: { offline: boolean }) {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [newKey, setNewKey] = useState('');       // 新 key 输入（保存后清空）
   const [newEmbedKey, setNewEmbedKey] = useState('');
+  const [newVisionKey, setNewVisionKey] = useState('');   // 视觉模型 key（可选）
 
   const load = useCallback(async () => {
     try {
@@ -94,13 +107,18 @@ export function LiteratureLlmSettingsCard({ offline }: { offline: boolean }) {
         model: settings.model,
         embedding_provider: settings.embedding_provider,
         embedding_model: settings.embedding_model,
+        vision_enabled: settings.vision_enabled,
+        vision_base_url: settings.vision_base_url,
+        vision_model: settings.vision_model,
       };
       if (newKey.trim()) body.api_key = newKey.trim();
       if (newEmbedKey.trim()) body.embedding_api_key = newEmbedKey.trim();
+      if (newVisionKey.trim()) body.vision_api_key = newVisionKey.trim();
       await req('/llm-settings', { method: 'PUT', body: JSON.stringify(body) });
       toast.success('文献解析设置已保存');
       setNewKey('');
       setNewEmbedKey('');
+      setNewVisionKey('');
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '保存失败');
@@ -241,6 +259,69 @@ export function LiteratureLlmSettingsCard({ offline }: { offline: boolean }) {
             />
           </div>
         )}
+
+        {/* v1.9.4 方案 B：视觉读图（可选）。关闭时方案 A（本地抽图入库）保底 */}
+        <div className="space-y-2 rounded-lg border border-border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <Label htmlFor="lit-vision-enabled" className="text-sm">
+                视觉读图（可选）
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                开启后可在补解析弹窗对抽取到的文献图「读图提取数值」（PXRD 峰位/比表面/截留率等）
+                并转为可勾选入库的条目；需要**支持图片输入**的模型。
+                <span className="font-medium text-foreground">关闭时不影响文献图抽取与入库（方案 A 保底）。</span>
+              </p>
+            </div>
+            <Switch
+              id="lit-vision-enabled"
+              checked={settings.vision_enabled}
+              onCheckedChange={(v) => setSettings((s) => (s ? { ...s, vision_enabled: v } : s))}
+              disabled={offline}
+            />
+          </div>
+          {settings.vision_enabled && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="lit-vision-model">视觉模型名</Label>
+                <Input
+                  id="lit-vision-model"
+                  value={settings.vision_model}
+                  onChange={(e) => setSettings((s) => (s ? { ...s, vision_model: e.target.value } : s))}
+                  placeholder="如 qwen-vl-max / gpt-4o / gemini-2.0-flash"
+                  disabled={offline}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="lit-vision-base">视觉模型端点（留空用上面的解析端点）</Label>
+                <Input
+                  id="lit-vision-base"
+                  value={settings.vision_base_url}
+                  onChange={(e) => setSettings((s) => (s ? { ...s, vision_base_url: e.target.value } : s))}
+                  placeholder={settings.base_url || 'https://.../v1'}
+                  disabled={offline}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="lit-vision-key">视觉模型 Key（留空用上面的解析 Key）</Label>
+                <Input
+                  id="lit-vision-key"
+                  type="password"
+                  value={newVisionKey}
+                  onChange={(e) => setNewVisionKey(e.target.value)}
+                  placeholder={settings.vision_api_key
+                    ? `已配置（${settings.vision_api_key}），留空不改` : '未配置则回退解析 Key'}
+                  disabled={offline}
+                />
+              </div>
+              <p className={`text-xs ${settings.vision_status?.available ? 'text-success' : 'text-muted-foreground'}`}>
+                {settings.vision_status?.available
+                  ? `视觉读图可用（${settings.vision_status.model}${settings.vision_status.inherits_main ? '，端点/key 沿用解析 LLM' : ''}）`
+                  : '启用后请填写视觉模型名（端点/key 可留空沿用解析 LLM）并保存'}
+              </p>
+            </>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           <Button onClick={() => void save()} disabled={busy || offline}>
