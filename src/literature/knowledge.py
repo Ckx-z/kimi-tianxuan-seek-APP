@@ -45,6 +45,48 @@ ALLOWED_LABELS = {0.0, 0.5, 1.0}
 _ID_RE = re.compile(r"^ke_[0-9a-f]{12}$")
 _lock = threading.Lock()
 
+# 表征技术别名（v1.9.3 修复）：LLM 常写 XRD / IR / UV-Vis / DSC 等变体，
+# 统一映射到 ALLOWED_TECHNIQUES 的规范写法。
+_TECHNIQUE_ALIASES = {
+    "XRD": "PXRD", "POWDER_XRD": "PXRD", "WAXD": "PXRD", "GIWAXS": "PXRD",
+    "IR": "FTIR", "FT_IR": "FTIR", "ATR_FTIR": "FTIR", "ATR": "FTIR",
+    "UV_VIS": "UVVis", "UV_VISIBLE": "UVVis", "UVVIS": "UVVis",
+    "UV_VIS_SPECTROSCOPY": "UVVis", "UV": "UVVis",
+    "SOLID_STATE_NMR": "NMR", "SSNMR": "NMR", "13C_NMR": "NMR",
+    "TG": "TGA", "TGA_DSC": "TGA", "TG_DSC": "TGA", "DSC": "TGA",
+    "FE_SEM": "SEM", "FESEM": "SEM", "HRTEM": "TEM", "TEM_EDS": "TEM",
+    "N2_ADSORPTION": "BET", "N2_SORPTION": "BET", "BJH": "BET",
+    "SURFACE_AREA": "BET", "POROSIMETRY": "BET",
+    "CONTACT_ANGLE": "contact_angle", "WATER_CONTACT_ANGLE": "contact_angle",
+    "FLUX": "separation_flux", "WATER_FLUX": "separation_flux",
+    "PERMEANCE": "separation_flux", "PERMEABILITY": "separation_flux",
+    "SELECTIVITY": "separation_selectivity",
+    "REJECTION": "separation_selectivity", "SIEVING": "separation_selectivity",
+    "TENSILE": "mechanical", "YOUNG_MODULUS": "mechanical",
+    "MECHANICAL_STRENGTH": "mechanical",
+    "PHOTOCATALYTIC": "photocatalysis", "PHOTOCATALYSIS": "photocatalysis",
+    "ELECTROCHEMICAL": "electrochem", "EIS": "electrochem",
+    "DFT_CALCULATION": "dft", "DFT_CALCULATIONS": "dft",
+    "COMPUTATIONAL": "dft", "COMPUTATION": "dft",
+}
+
+
+def normalize_technique(raw) -> str:
+    """表征技术 → 规范写法（大小写/连字符/别名容错）；无法识别返回空串。
+
+    v1.9.3 修复：旧实现 `upper()` 后与白名单直接比对，导致白名单里小写混合的
+    规范名（UVVis / contact_angle / separation_flux / separation_selectivity /
+    mechanical / photocatalysis / electrochem / dft）**永远校验失败**——
+    而解析 prompt 恰好要求这些写法，导致大量 characterization 条目被拒。
+    """
+    key = re.sub(r"[\s\-]+", "_", _clean_str(raw)).upper()
+    if not key:
+        return ""
+    if key in _TECHNIQUE_ALIASES:
+        return _TECHNIQUE_ALIASES[key]
+    lookup = {t.upper(): t for t in ALLOWED_TECHNIQUES}
+    return lookup.get(key, "")
+
 
 def _now() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
@@ -141,10 +183,11 @@ def validate_entry(rec: dict) -> dict:
             k: _clean_str(v) for k, v in cond.items() if _clean_str(v)
         }
     if kind == "characterization":
-        technique = _clean_str(rec.get("technique")).upper().replace("-", "_")
-        if technique not in ALLOWED_TECHNIQUES:
+        technique = normalize_technique(rec.get("technique"))
+        if not technique:
             raise ValueError(
-                f"technique 必须是 {sorted(ALLOWED_TECHNIQUES)} 之一")
+                f"technique 必须是 {sorted(ALLOWED_TECHNIQUES)} 之一"
+                f"（或常见别名，如 XRD→PXRD / IR→FTIR / UV-Vis→UVVis）")
         out["technique"] = technique
         out["sample"] = _clean_str(rec.get("sample"))
         metrics = rec.get("metrics")
@@ -163,10 +206,15 @@ def validate_entry(rec: dict) -> dict:
                 continue
             cleaned.append({"name": name, "value": value,
                             "unit": _clean_str(m.get("unit"))})
-        if not cleaned:
-            raise ValueError("characterization 必须至少一条 metrics[{name,value}]")
+        conclusion = _clean_str(rec.get("conclusion"))
+        if not cleaned and not conclusion:
+            raise ValueError(
+                "characterization 必须至少一条 metrics[{name,value}]，"
+                "或给出定性结论（conclusion）")
         out["metrics"] = cleaned
-        out["conclusion"] = _clean_str(rec.get("conclusion"))
+        out["conclusion"] = conclusion
+        # 无定量指标、仅定性描述的条目如实标注（前端/检索可区分）
+        out["qualitative"] = not cleaned
     if kind == "property":
         out["property_name"] = _clean_str(rec.get("property_name"))
         out["conclusion"] = _clean_str(rec.get("conclusion"))
@@ -216,12 +264,43 @@ def validate_entry(rec: dict) -> dict:
     return out
 
 
+def annotate_entries(records: list[dict]) -> list[dict]:
+    """给 LLM 解析预览的条目逐条做**试校验**标注（v1.9.3）。
+
+    背景：批量入库是原子操作（一条不合法整批失败）。LLM 常输出字段不全的条目
+    （如 monomer_pair 但 SMILES 为空），前端若默认全选会导致「入库失败」而看不出
+    是哪一条的问题。本函数返回带 `valid` / `invalid_reason` 的副本，供前端默认
+    只勾选合法条目、并标出不合法原因。
+    """
+    out: list[dict] = []
+    for rec in records or []:
+        item = dict(rec) if isinstance(rec, dict) else {}
+        try:
+            validate_entry(item)
+            item["valid"] = True
+            item["invalid_reason"] = ""
+        except ValueError as exc:
+            item["valid"] = False
+            item["invalid_reason"] = str(exc)
+        out.append(item)
+    return out
+
+
 def add_entries(paper_id: str, records: list[dict]) -> list[dict]:
-    """批量入库（原子：全部校验通过才写入）。返回带 entry_id 的条目列表。"""
+    """批量入库（原子：全部校验通过才写入）。返回带 entry_id 的条目列表。
+
+    校验失败时 ValueError 带**条目序号与 kind**，便于前端定位问题条目。
+    """
     paper_id = _clean_str(paper_id)
     if not paper_id:
         raise ValueError("paper_id 不能为空")
-    validated = [validate_entry(rec) for rec in records]
+    validated: list[dict] = []
+    for idx, rec in enumerate(records or [], 1):
+        kind = _clean_str((rec or {}).get("kind")) if isinstance(rec, dict) else ""
+        try:
+            validated.append(validate_entry(rec))
+        except ValueError as exc:
+            raise ValueError(f"第 {idx} 条（kind={kind or '未知'}）校验失败：{exc}")
     if not validated:
         raise ValueError("条目列表为空")
     now = _now()

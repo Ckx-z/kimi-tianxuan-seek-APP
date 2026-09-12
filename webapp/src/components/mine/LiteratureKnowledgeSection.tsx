@@ -12,6 +12,7 @@ import {
   Play, RefreshCw, Trash2, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import {
   ATTACHMENT_MAX_PER_PAPER,
   attachmentUrl,
@@ -71,6 +72,11 @@ interface Entry {
   conclusion?: string;
   graph_indexed?: boolean;
   source?: string;
+  /** v1.9.3：条目来源附件（[主文 xx.pdf] / [SI 1 xx.pdf]） */
+  source_file?: string;
+  /** v1.9.3（解析预览）：试校验结果 —— false 时不可勾选入库 */
+  valid?: boolean;
+  invalid_reason?: string;
   conditions?: Record<string, string>;
 }
 
@@ -94,11 +100,14 @@ interface ParsePreview {
   segments?: { total: number; failed: number };
   /** v1.9.3：本次解析用了哪些附件（主文/SI） */
   sources?: { filename: string; role: string; pages: number; chars: number }[];
-  /** 本次新留存的附件 */
+  /** 本次解析新留存的附件 */
   saved?: LiteratureAttachment[];
   save_errors?: { filename: string; message: string }[];
   /** 疑似扫描件（无文本层，被跳过） */
   scanned?: string[];
+  /** v1.9.3：试校验通过/不通过条数（不通过的默认不勾选） */
+  valid_count?: number;
+  invalid_count?: number;
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -268,14 +277,20 @@ export function LiteratureKnowledgeSection() {
         `/${encodeURIComponent(paperId)}/parse`,
         { method: 'POST', body: form });
       setPreview(data);
+      // v1.9.3：默认只勾选**合法**条目（字段不全的条目会导致原子入库整批失败）
       setChecked(Object.fromEntries(
-        data.entries.map((_, i) => [i, true])));
+        data.entries.map((e, i) => [i, e.valid !== false])));
       setPendingPdfs([]);
       await loadAttachments(paperId);
+      const invalid = data.invalid_count
+        ?? data.entries.filter((e) => e.valid === false).length;
       if (data.scanned?.length) {
         toast.warning(`以下 PDF 无可提取文本层（疑似扫描件）：${data.scanned.join('、')}`);
       } else if (data.entries.length === 0) {
         toast.warning('未提取到条目：可检查全文或配置文献解析 LLM');
+      } else if (invalid > 0) {
+        toast.warning(`提取 ${data.entries.length} 条，其中 ${invalid} 条字段不完整`
+          + `已自动排除（字段完整的 ${data.entries.length - invalid} 条已勾选）`);
       } else if (usedStored) {
         toast.success(`已用 ${data.sources?.length ?? 0} 个已存附件解析`);
       }
@@ -350,9 +365,10 @@ export function LiteratureKnowledgeSection() {
 
   const submitParse = async () => {
     if (!preview) return;
-    const chosen = preview.entries.filter((_, i) => checked[i]);
+    const chosen = preview.entries.filter(
+      (e, i) => e.valid !== false && checked[i] !== false);
     if (chosen.length === 0) {
-      toast.error('请至少勾选一条条目');
+      toast.error('请至少勾选一条字段完整的条目');
       return;
     }
     setParseBusy(true);
@@ -1020,11 +1036,15 @@ export function LiteratureKnowledgeSection() {
                       </p>
                       {rows.map((e) => (
                         <label key={e.idx}
-                               className="flex cursor-pointer items-start gap-2 px-2 py-1.5 text-xs hover:bg-muted/40">
+                               className={cn(
+                                 'flex cursor-pointer items-start gap-2 px-2 py-1.5 text-xs hover:bg-muted/40',
+                                 e.valid === false && 'cursor-not-allowed opacity-60',
+                               )}>
                           <input
                             type="checkbox"
                             className="mt-0.5"
-                            checked={checked[e.idx] !== false}
+                            disabled={e.valid === false}
+                            checked={e.valid !== false && checked[e.idx] !== false}
                             onChange={(ev) =>
                               setChecked((c) => ({ ...c, [e.idx]: ev.target.checked }))}
                           />
@@ -1038,6 +1058,16 @@ export function LiteratureKnowledgeSection() {
                             <span className="ml-1 text-muted-foreground">
                               {e.metrics?.map((m) => `${m.name}=${m.value}${m.unit ?? ''}`).join('，')}
                             </span>
+                            {e.source_file && (
+                              <span className="ml-1 rounded border border-border px-1 text-[10px] text-muted-foreground">
+                                {e.source_file}
+                              </span>
+                            )}
+                            {e.valid === false && (
+                              <span className="ml-1 text-[11px] text-destructive">
+                                不可入库：{e.invalid_reason}
+                              </span>
+                            )}
                             <span className="mt-0.5 block truncate text-muted-foreground/70"
                                   title={e.evidence}>
                               依据：{e.evidence}

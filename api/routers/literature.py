@@ -643,6 +643,13 @@ async def parse_paper(paper_id: str,
         res = ext.parse_text(tgt["text"])
         chunk_results.append({"label": tgt["label"], **res})
     entries = _merge_entries(chunk_results)
+    # v1.9.3：逐条试校验标注（前端默认只勾选合法条目，避免原子入库整批失败）
+    try:
+        from literature import knowledge as knowledge_mod
+        entries = knowledge_mod.annotate_entries(entries)
+    except Exception as exc:  # pragma: no cover - 标注失败不影响解析结果
+        logger.warning("条目试校验标注失败（已跳过）: %s", exc)
+    invalid_n = sum(1 for e in entries if e.get("valid") is False)
     llm_used = any(bool(r.get("llm_used")) for r in chunk_results)
     notes = "；".join(
         f"{r['label']} {r.get('note')}" for r in chunk_results if r.get("note"))
@@ -658,6 +665,8 @@ async def parse_paper(paper_id: str,
     result = {
         "llm_used": llm_used,
         "entries": entries,
+        "valid_count": len(entries) - invalid_n,
+        "invalid_count": invalid_n,
         "note": (notes or "解析完成")
                 + (f"；合并后 {len(entries)} 条" if len(targets) > 1 else ""),
         "segments": {"total": segments, "failed": fail_segments},

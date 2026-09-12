@@ -94,11 +94,18 @@ def test_validate_characterization_metrics():
     rec = knowledge.validate_entry(_char())
     assert rec["technique"] == "PL"
     assert rec["metrics"][0] == {"name": "PLQY", "value": 41.3, "unit": "%"}
-    # 无有效数值 → 拒绝
+    assert rec["qualitative"] is False
+    # v1.9.3：数值无效但**有定性结论** → 作为 qualitative 条目入库（不丢信息）
     bad = _char()
     bad["metrics"] = [{"name": "PLQY", "value": "非数字"}]
+    kept = knowledge.validate_entry(bad)
+    assert kept["metrics"] == [] and kept["qualitative"] is True
+    # 既无数值也无结论 → 拒绝
+    bad_none = _char()
+    bad_none["metrics"] = []
+    bad_none["conclusion"] = ""
     with pytest.raises(ValueError, match="metrics"):
-        knowledge.validate_entry(bad)
+        knowledge.validate_entry(bad_none)
     # 非法 technique → 拒绝
     bad2 = _char()
     bad2["technique"] = "RAMAN"

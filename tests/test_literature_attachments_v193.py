@@ -277,3 +277,108 @@ def test_source_file_survives_entry_validation():
         "evidence": "[SI 1 si.pdf] PXRD 数据", "source_file": "[SI 1 si.pdf]",
     })
     assert rec["source_file"] == "[SI 1 si.pdf]"
+
+
+# ------------------------------------------------- 条目试校验（v1.9.3 实测发现）
+
+@pytest.mark.parametrize("raw,expected", [
+    # 规范名（含小写混合）必须原样通过 —— 旧实现 upper() 后比对导致全部被拒
+    ("PXRD", "PXRD"), ("pxrd", "PXRD"), ("UVVis", "UVVis"), ("uvvis", "UVVis"),
+    ("contact_angle", "contact_angle"), ("dft", "dft"),
+    ("separation_flux", "separation_flux"),
+    ("separation_selectivity", "separation_selectivity"),
+    ("mechanical", "mechanical"), ("photocatalysis", "photocatalysis"),
+    ("electrochem", "electrochem"),
+    # 常见别名
+    ("XRD", "PXRD"), ("IR", "FTIR"), ("ATR-FTIR", "FTIR"),
+    ("UV-Vis", "UVVis"), ("DSC", "TGA"), ("FE-SEM", "SEM"),
+    ("N2 adsorption", "BET"), ("water contact angle", "contact_angle"),
+    ("water flux", "separation_flux"), ("rejection", "separation_selectivity"),
+    # 无法识别
+    ("RAMAN", ""), ("", ""),
+])
+def test_normalize_technique(raw, expected):
+    assert knowledge.normalize_technique(raw) == expected
+
+
+def test_characterization_qualitative_and_alias_validation():
+    """定性表征（有 conclusion 无 metrics）可入库；别名 technique 可入库。"""
+    rec = knowledge.validate_entry({
+        "kind": "characterization", "group_id": "G1", "technique": "XRD",
+        "sample": "膜", "metrics": [], "conclusion": "出现 3.5° 强峰，结晶性好",
+        "evidence": "PXRD 显示 3.5° 强峰",
+    })
+    assert rec["technique"] == "PXRD" and rec["qualitative"] is True
+    assert rec["metrics"] == []
+    # 既无 metrics 也无 conclusion → 拒绝
+    with pytest.raises(ValueError, match="metrics"):
+        knowledge.validate_entry({
+            "kind": "characterization", "group_id": "G1",
+            "technique": "PXRD", "evidence": "x"})
+    # 未知 technique → 拒绝（错误信息给出别名提示）
+    with pytest.raises(ValueError, match="别名"):
+        knowledge.validate_entry({
+            "kind": "characterization", "group_id": "G1", "technique": "RAMAN",
+            "metrics": [{"name": "shift", "value": 1000}], "evidence": "x"})
+
+
+def test_annotate_entries_flags_invalid_with_reason():
+    """LLM 常输出 SMILES 为空的 monomer_pair → 标 invalid 而不是让整批入库失败。"""
+    rows = knowledge.annotate_entries([
+        {"kind": "film_outcome", "group_id": "G1", "ald_smiles": TFPT,
+         "amine_smiles": B5, "film_label": 1.0, "evidence": "成膜"},
+        {"kind": "monomer_pair", "group_id": "G1", "ald_smiles": "",
+         "amine_smiles": "", "evidence": "文中未给结构"},
+        {"kind": "characterization", "group_id": "G2", "technique": "PXRD",
+         "metrics": [{"name": "2theta", "value": 3.5}], "evidence": "峰位"},
+    ])
+    assert [r["valid"] for r in rows] == [True, False, True]
+    assert "ald_smiles" in rows[1]["invalid_reason"]
+    assert rows[0]["invalid_reason"] == ""
+
+
+def test_add_entries_error_reports_index_and_kind():
+    with pytest.raises(ValueError) as exc:
+        knowledge.add_entries("1", [
+            {"kind": "condition", "group_id": "G1", "evidence": "条件",
+             "conditions": {"solvent": "toluene"}},
+            {"kind": "monomer_pair", "group_id": "G1", "evidence": "缺 SMILES"},
+        ])
+    msg = str(exc.value)
+    assert "第 2 条" in msg and "monomer_pair" in msg
+
+
+def test_parse_response_annotates_validity(isolate, monkeypatch):
+    """解析预览带 valid/invalid_reason 与计数，前端据此默认只勾合法条目。"""
+    def fake_parse(text):
+        return {"llm_used": True, "segments": {"total": 1, "failed": 0},
+                "note": "ok", "entries": [
+                    {"group_id": "G1", "kind": "film_outcome",
+                     "ald_smiles": TFPT, "amine_smiles": B5, "film_label": 1.0,
+                     "evidence": "主文：成膜"},
+                    {"group_id": "G1", "kind": "monomer_pair",
+                     "ald_smiles": "", "amine_smiles": "",
+                     "evidence": "主文：未给出结构"},
+                ]}
+    monkeypatch.setattr(llm_extract, "parse_text", fake_parse)
+    monkeypatch.setattr(llm_extract, "extract_paper_meta",
+                        lambda text: {"llm_used": True, "meta": {}, "note": ""})
+    r = client.post("/api/literature/1/parse",
+                    data={"text": "正文", "with_meta": "false"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["valid_count"] == 1 and body["invalid_count"] == 1
+    valid = [e for e in body["entries"] if e["valid"]]
+    invalid = [e for e in body["entries"] if e["valid"] is False]
+    assert len(valid) == 1 and len(invalid) == 1
+    assert "ald_smiles" in invalid[0]["invalid_reason"]
+    # 只提交合法条目 → 入库成功且入图
+    ok = client.post("/api/literature/1/entries",
+                     json={"entries": valid})
+    assert ok.status_code == 201 and ok.json()["count"] == 1
+    assert ok.json()["graph_synced"] >= 1
+    # 混入非法条目 → 400 且提示到具体条目
+    bad = client.post("/api/literature/1/entries",
+                      json={"entries": valid + invalid})
+    assert bad.status_code == 400
+    assert "第 2 条" in str(bad.json()["detail"])
