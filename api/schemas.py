@@ -338,6 +338,12 @@ class LiteraturePaperUpdate(BaseModel):
     only_empty: bool = True
 
 
+class LiteratureFiguresImport(BaseModel):
+    """解析时抽取的候选图入库（v1.9.4）：传解析响应 figures[].staged_id 列表。"""
+    staged_ids: list[str] = Field(default_factory=list,
+                                  description="候选图暂存 id 列表")
+
+
 class LiteratureFigureFromSmiles(BaseModel):
     """文献图谱（v1.7.0）：SMILES → 2D 结构图入库。"""
     paper_id: str = Field(..., description="关联文献 paper_id")

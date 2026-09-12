@@ -108,6 +108,22 @@ interface ParsePreview {
   /** v1.9.3：试校验通过/不通过条数（不通过的默认不勾选） */
   valid_count?: number;
   invalid_count?: number;
+  /** v1.9.4：解析时自动抽取的文献图候选（暂存，勾选后入图谱） */
+  figures?: {
+    staged_id: string;
+    paper_id: string;
+    kind: 'embedded' | 'page_render';
+    figure_type: string;
+    caption: string;
+    caption_label: string;
+    page: number;
+    width: number;
+    height: number;
+    size: number;
+    url: string;
+  }[];
+  figure_counts?: { total: number; embedded: number; page_render: number };
+  figure_errors?: string[];
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -188,6 +204,10 @@ export function LiteratureKnowledgeSection() {
   const attachRef = useRef<HTMLInputElement>(null);
   /** v1.9.3：解析耗时秒数（长文献按段解析可能数分钟，给出进度感知） */
   const [parseElapsed, setParseElapsed] = useState(0);
+  /** v1.9.4：候选图勾选状态（内嵌图默认勾选，页渲染兜底默认不勾） */
+  const [checkedFigures, setCheckedFigures] = useState<Record<string, boolean>>({});
+  /** v1.9.4：文献图入库后强制刷新「图谱」页签 */
+  const [figuresRefreshKey, setFiguresRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!parseBusy) {
@@ -293,6 +313,9 @@ export function LiteratureKnowledgeSection() {
       // v1.9.3：默认只勾选**合法**条目（字段不全的条目会导致原子入库整批失败）
       setChecked(Object.fromEntries(
         data.entries.map((e, i) => [i, e.valid !== false])));
+      // v1.9.4：候选图默认勾选内嵌图（页渲染兜底默认不勾，避免噪音入库）
+      setCheckedFigures(Object.fromEntries(
+        (data.figures ?? []).map((f) => [f.staged_id, f.kind === 'embedded'])));
       setPendingPdfs([]);
       await loadAttachments(paperId);
       const invalid = data.invalid_count
@@ -380,19 +403,45 @@ export function LiteratureKnowledgeSection() {
     if (!preview) return;
     const chosen = preview.entries.filter(
       (e, i) => e.valid !== false && checked[i] !== false);
-    if (chosen.length === 0) {
-      toast.error('请至少勾选一条字段完整的条目');
+    const chosenFigures = (preview.figures ?? []).filter(
+      (f) => checkedFigures[f.staged_id]);
+    if (chosen.length === 0 && chosenFigures.length === 0) {
+      toast.error('请至少勾选一条字段完整的条目或一张文献图');
       return;
     }
     setParseBusy(true);
     try {
-      await req(`/${encodeURIComponent(paperId)}/entries`, {
-        method: 'POST',
-        body: JSON.stringify({ entries: chosen }),
-      });
-      toast.success(`已入库 ${chosen.length} 条并同步知识图谱`);
+      // 1) 文献图先入图谱（图注含图号时会自动关联到引用它的条目）
+      let figMsg = '';
+      if (chosenFigures.length > 0) {
+        try {
+          const res = await req<{
+            count: number; linked_entries: number; skipped: { reason: string }[];
+          }>(`/${encodeURIComponent(paperId)}/figures/import`, {
+            method: 'POST',
+            body: JSON.stringify({
+              staged_ids: chosenFigures.map((f) => f.staged_id),
+            }),
+          });
+          figMsg = `、文献图 ${res.count} 张`
+            + (res.linked_entries ? `（关联 ${res.linked_entries} 条条目）` : '');
+          res.skipped?.forEach((s) => toast.warning(`有图未入库：${s.reason}`));
+        } catch {
+          toast.warning('文献图入库失败（条目仍会继续入库）');
+        }
+      }
+      // 2) 条目入库
+      if (chosen.length > 0) {
+        await req(`/${encodeURIComponent(paperId)}/entries`, {
+          method: 'POST',
+          body: JSON.stringify({ entries: chosen }),
+        });
+      }
+      toast.success(`已入库 ${chosen.length} 条并同步知识图谱${figMsg}`);
       setParseOpen(false);
       await loadEntries(paperId);
+      // 图谱面板自带加载逻辑：换 key 强制重挂载以显示刚入库的文献图
+      setFiguresRefreshKey((k) => k + 1);
     } catch {
       /* 已 toast */
     } finally {
@@ -782,7 +831,8 @@ export function LiteratureKnowledgeSection() {
                     </TabsContent>
 
                     <TabsContent value="figures" className="pt-2">
-                      <LiteratureFiguresPanel fixedPaperId={paperId} />
+                      <LiteratureFiguresPanel key={figuresRefreshKey}
+                                              fixedPaperId={paperId} />
                     </TabsContent>
                   </Tabs>
                 </>
@@ -1047,6 +1097,66 @@ export function LiteratureKnowledgeSection() {
                     </p>
                   </div>
                 )}
+                {/* v1.9.4：解析时自动抽取的文献图（内嵌图默认勾选，页渲染兜底默认不勾） */}
+                {preview.figures && preview.figures.length > 0 && (
+                  <div className="rounded-lg border border-border p-2.5">
+                    <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-foreground">
+                        文献图（自动抽取 {preview.figure_counts?.total ?? preview.figures.length} 张
+                        {preview.figure_counts
+                          ? `：内嵌 ${preview.figure_counts.embedded} · 页渲染 ${preview.figure_counts.page_render}`
+                          : ''}）
+                      </p>
+                      <span className="text-[11px] text-muted-foreground">
+                        内嵌图默认勾选；页渲染为矢量图兜底，按需勾选
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {preview.figures.map((f) => (
+                        <label key={f.staged_id}
+                               className="min-w-0 cursor-pointer overflow-hidden rounded-lg border border-border hover:bg-muted/40">
+                          <div className="flex items-center gap-1 border-b border-border bg-muted/30 px-1.5 py-1">
+                            <input
+                              type="checkbox"
+                              checked={checkedFigures[f.staged_id] === true}
+                              onChange={(ev) => setCheckedFigures((c) => ({
+                                ...c, [f.staged_id]: ev.target.checked,
+                              }))}
+                            />
+                            <Badge variant="outline" className="text-[10px]">
+                              {f.figure_type === 'spectra' ? '谱图'
+                                : f.figure_type === 'structure' ? '结构' : '机理'}
+                            </Badge>
+                            <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                              p{f.page}
+                              {f.kind === 'page_render' ? ' · 页渲染' : ''}
+                            </span>
+                          </div>
+                          <img
+                            src={f.url}
+                            alt={f.caption || `图 ${f.page}`}
+                            loading="lazy"
+                            className="h-24 w-full bg-white object-contain"
+                          />
+                          <p className="line-clamp-2 px-1.5 py-1 text-[11px] text-muted-foreground"
+                             title={f.caption}>
+                            {f.caption_label
+                              ? `${f.caption_label}：${(f.caption || '')
+                                  .replace(/^\s*(?:fig(?:ure)?\.?|scheme|table|chart|图|表)\s*\d{1,2}[a-z]?\s*[:.|—–-]?\s*/i, '')
+                                  || f.caption}`
+                              : (f.caption || '（无图注）')}
+                          </p>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {preview.figure_errors && preview.figure_errors.length > 0 && (
+                  <p className="text-[11px] text-destructive">
+                    图片抽取异常：{preview.figure_errors.join('；')}
+                  </p>
+                )}
+
                 <div className="space-y-2">
                   {Object.entries(
                     preview.entries.reduce<Record<string, (Partial<Entry> & { idx: number })[]>>(

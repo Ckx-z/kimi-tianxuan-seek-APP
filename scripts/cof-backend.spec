@@ -138,6 +138,8 @@ hiddenimports = [
     # 文献附件（本轮新增）：主文/SI PDF 留存与复用（routers/literature.py
     # 内 `from literature import attachments` 惰性 import，静态分析漏收）
     "literature.attachments", "src.literature.attachments",
+    # 文献图自动抽取（v1.9.4）：PDF 内嵌位图 + 矢量图页渲染兜底 + 图注归类
+    "literature.pdf_figures", "src.literature.pdf_figures",
     # 侧车图/图谱检索（graph_ingest/助手 query_graphrag 运行时依赖）
     "networkx",
     # 实验记录导出（routers/records.py 内惰性 import；docx → lxml 原生依赖

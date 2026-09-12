@@ -94,6 +94,11 @@ def _validate_meta(figure_type: str, meta: dict) -> dict:
     meta = dict(meta or {})
     if figure_type == "structure":
         smiles = str(meta.get("smiles") or "").strip()
+        # v1.9.4：PDF 自动抽取的结构图（Scheme/晶体结构截图）没有 SMILES，
+        # 允许以 role=unknown 入库；人工上传仍强制要求可解析 SMILES。
+        if not smiles and str(meta.get("source") or "") == "pdf_extract":
+            meta["role"] = "unknown"
+            return meta
         mol = Chem.MolFromSmiles(smiles)
         if not smiles or mol is None:
             raise FigureError("structure 类型必须提供可解析的 smiles 元数据")

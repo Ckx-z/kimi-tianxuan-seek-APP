@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -20,7 +21,8 @@ from fastapi.responses import FileResponse
 
 from ..schemas import (LiteratureConfirm, LiteratureEntriesBatch,
                        LiteratureEntryUpdate, LiteratureFigureFromSmiles,
-                       LiteratureFigureUpdate, LiteratureLlmSettingsUpdate,
+                       LiteratureFigureUpdate, LiteratureFiguresImport,
+                       LiteratureLlmSettingsUpdate,
                        LiteratureLookup, LiteraturePaperUpdate)
 
 logger = logging.getLogger(__name__)
@@ -265,6 +267,87 @@ def update_paper(paper_id: str, req: LiteraturePaperUpdate):
            + (f"（{', '.join(updated)}）" if updated else "")
            + (f"；{len(skipped)} 个字段已有值被保留" if skipped else ""))
     return {**res, "message": msg}
+
+
+@router.get("/figure-staging/{staged_id}/file")
+def staged_figure_file(staged_id: str):
+    """预览/下载解析时抽取到、尚未入库的候选图。"""
+    try:
+        from literature import pdf_figures
+    except ImportError:  # pragma: no cover
+        from src.literature import pdf_figures  # type: ignore
+    hit = pdf_figures.get_staged(staged_id)
+    if hit is None:
+        raise HTTPException(404, "候选图不存在或暂存已过期（重新解析即可）")
+    path, meta = hit
+    return FileResponse(path, filename=f"{staged_id}{path.suffix}",
+                        media_type="image/png" if path.suffix == ".png"
+                        else "image/jpeg")
+
+
+@router.delete("/figure-staging/{staged_id}")
+def discard_staged_figure(staged_id: str):
+    """丢弃单个候选图（不入图谱）。"""
+    try:
+        from literature import pdf_figures
+    except ImportError:  # pragma: no cover
+        from src.literature import pdf_figures  # type: ignore
+    if not pdf_figures.discard_staged(staged_id):
+        raise HTTPException(404, "候选图不存在或已清理")
+    return {"discarded": True, "staged_id": staged_id}
+
+
+@router.post("/{paper_id}/figures/import", status_code=201)
+def import_figures(paper_id: str, req: LiteratureFiguresImport):
+    """把解析时抽取的候选图（staged_ids）正式写入文献图谱。
+
+    - 复用 `figures.add_figure`（按 figure_type/caption/tags/meta 落库）；
+    - 顺带做**条目↔图关联**：图注含 `Fig. 3` / `图 3` 时，若某条目 evidence 提到同一
+      图号，则把该 figure_id 追加进条目的 `figure_ids`（`knowledge.update_entry`）；
+    - 返回 {imported, skipped, figure_ids, linked_entries}。
+    """
+    r = _resolver()
+    if r.resolve_paper(paper_id) is None:
+        raise HTTPException(404, f"文献不存在: {paper_id}")
+    try:
+        from literature import pdf_figures
+    except ImportError:  # pragma: no cover
+        from src.literature import pdf_figures  # type: ignore
+    res = pdf_figures.import_staged(paper_id, list(req.staged_ids or []))
+    if not res["imported"] and res["skipped"]:
+        raise HTTPException(400, res["skipped"][0]["reason"])
+
+    # 条目 ↔ 图 关联（尽力而为，失败不影响已入库的图）
+    linked = 0
+    try:
+        from literature import knowledge as knowledge_mod
+        entries = knowledge_mod.list_entries(paper_id=paper_id)
+        fig_by_label: dict[str, str] = {}
+        for rec in res["imported"]:
+            label = str((rec.get("meta") or {}).get("caption_label") or "")
+            m = re.search(r"([0-9]{1,2})", label)
+            if m:
+                fig_by_label[m.group(1)] = rec["fig_id"]
+        if fig_by_label:
+            for entry in entries:
+                evidence = str(entry.get("evidence") or "")
+                ids = list(entry.get("figure_ids") or [])
+                for num, fig_id in fig_by_label.items():
+                    if fig_id in ids:
+                        continue
+                    if re.search(rf"(?:fig(?:ure)?\.?|图|scheme|表)\s*{num}\b",
+                                 evidence, re.IGNORECASE):
+                        ids.append(fig_id)
+                if ids != list(entry.get("figure_ids") or []):
+                    updated = knowledge_mod.update_entry(
+                        entry["entry_id"], {**entry, "figure_ids": ids})
+                    if updated:
+                        linked += 1
+    except Exception as exc:  # pragma: no cover
+        logger.warning("条目↔图关联失败（图已入库）: %s", exc)
+
+    return {**res, "linked_entries": linked,
+            "count": len(res["imported"])}
 
 
 @router.post("/figures/from-smiles", status_code=201)
@@ -515,7 +598,8 @@ async def parse_paper(paper_id: str,
                       with_meta: bool = Form(True),
                       use_stored: bool = Form(False),
                       file_ids: str | None = Form(None),
-                      store_files: bool = Form(True)):
+                      store_files: bool = Form(True),
+                      extract_figures: bool = Form(True)):
     """全维度解析：主文 +（多份）补充信息 SI → LLM 结构化条目预览。
 
     - 三种取材方式：① `files`（可多份，自动留存到附件库；`store_files=False`
@@ -524,6 +608,9 @@ async def parse_paper(paper_id: str,
     - 主文与 SI **分别解析后合并去重**（避免跨文件截断丢信息），条目带
       `source_file`（[主文]/[SI n] 文件名）便于核对证据出处；
     - `with_meta=True` 时附 `paper_meta`（文献级元数据，取自主文）；
+    - `extract_figures=True`（默认）时自动抽取文献图（内嵌位图 + 矢量图页渲染兜底），
+      候选图暂存并随响应返回 `figures`，前端勾选后调
+      `POST /{paper_id}/figures/import` 正式入文献图谱；
     - PDF 无文本层（扫描件）→ 422 并提示；单文件 ≤20MB。
     """
     r = _resolver()
@@ -600,7 +687,8 @@ async def parse_paper(paper_id: str,
                 label = f"[SI {si_n} {item.get('filename')}]"
             targets.append({"filename": item.get("filename"),
                             "role": item.get("role") or "main",
-                            "label": label, "text": body, "pages": pages})
+                            "label": label, "text": body, "pages": pages,
+                            "path": path})
 
     # 3) 新上传文件（内存直读）→ 解析目标
     for item in pending:
@@ -617,7 +705,8 @@ async def parse_paper(paper_id: str,
             si_n += 1
             label = f"[SI {si_n} {item['filename']}]"
         targets.append({"filename": item["filename"], "role": item["role"],
-                        "label": label, "text": body, "pages": pages})
+                        "label": label, "text": body, "pages": pages,
+                        "data": item["data"]})
 
     # 4) 粘贴的全文文本
     body_text = (text or "").strip()
@@ -662,17 +751,62 @@ async def parse_paper(paper_id: str,
                      targets[0]["text"] if targets else "")
     total_chars = sum(len(t["text"]) for t in targets)
 
+    # ---------- 文献图抽取（v1.9.4 方案 A）：内嵌位图 + 矢量图页渲染兜底 ----------
+    figure_candidates: list[dict] = []
+    figure_errors: list[str] = []
+    if extract_figures:
+        try:
+            from literature import pdf_figures
+        except ImportError:  # pragma: no cover
+            from src.literature import pdf_figures  # type: ignore
+        for tgt in targets:
+            if tgt.get("role") == "text":
+                continue
+            try:
+                if tgt.get("path") is not None:
+                    cands = pdf_figures.extract_candidates(path=tgt["path"])
+                elif tgt.get("data"):
+                    cands = pdf_figures.extract_candidates(data=tgt["data"])
+                else:
+                    continue
+            except Exception as exc:
+                logger.warning("文献图抽取失败 %s: %s", tgt.get("filename"), exc)
+                figure_errors.append(f"{tgt.get('filename')}：{exc}")
+                continue
+            for cand in cands:
+                cand["source_file"] = tgt.get("filename")
+            figure_candidates.extend(cands)
+        figure_candidates = figure_candidates[:pdf_figures.MAX_PER_PAPER]
+    staged_figures = []
+    if figure_candidates:
+        try:
+            staged_figures = pdf_figures.stage_candidates(paper_id,
+                                                           figure_candidates)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("候选图暂存失败（已跳过）: %s", exc)
+            figure_errors.append(f"暂存失败：{exc}")
+
     result = {
         "llm_used": llm_used,
         "entries": entries,
         "valid_count": len(entries) - invalid_n,
         "invalid_count": invalid_n,
         "note": (notes or "解析完成")
-                + (f"；合并后 {len(entries)} 条" if len(targets) > 1 else ""),
+                + (f"；合并后 {len(entries)} 条" if len(targets) > 1 else "")
+                + (f"；抽取到 {len(staged_figures)} 张文献图"
+                   if staged_figures else ""),
         "segments": {"total": segments, "failed": fail_segments},
         "sources": [{"filename": t["filename"], "role": t["role"],
                      "pages": t.get("pages") or 0,
                      "chars": len(t["text"].strip())} for t in targets],
+        "figures": staged_figures,
+        "figure_counts": {
+            "total": len(staged_figures),
+            "embedded": sum(1 for f in staged_figures if f.get("kind") == "embedded"),
+            "page_render": sum(1 for f in staged_figures
+                               if f.get("kind") == "page_render"),
+        },
+        "figure_errors": figure_errors,
         "saved": saved,
         "save_errors": save_errors,
         "scanned": scanned,
