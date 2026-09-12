@@ -86,14 +86,19 @@ async function shoot(win, name, route, dark) {
 app.commandLine.appendSwitch('disable-gpu');
 app.whenReady().then(async () => {
   fs.mkdirSync(OUT, { recursive: true });
+  const [winW, winH] = (process.env.SHOOT_SIZE || '1440x900').split('x').map(Number);
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: winW || 1440,
+    height: winH || 900,
     show: false,
     webPreferences: { offscreen: true, contextIsolation: true },
   });
   const only = process.env.SHOOT_ONLY;
-  for (const [name, route] of ROUTES) {
+  // 自定义路由（如本地 harness 对照页）：SHOOT_ROUTE=/before.html + SHOOT_NAME=before
+  const routes = process.env.SHOOT_ROUTE
+    ? [[process.env.SHOOT_NAME || 'custom', process.env.SHOOT_ROUTE]]
+    : ROUTES;
+  for (const [name, route] of routes) {
     if (only && only !== name) continue;
     try {
       await shoot(win, name, route, false);

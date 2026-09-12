@@ -791,14 +791,14 @@ export function LiteratureKnowledgeSection() {
           </div>
         )}
 
-        {/* 补解析弹窗 */}
+        {/* 补解析弹窗（v1.9.4：高度受限 + 单一滚动区，底部按钮固定在弹窗底部永远可点） */}
         <Dialog open={parseOpen} onOpenChange={(o) => !o && !parseBusy && setParseOpen(false)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col gap-3">
+            <DialogHeader className="shrink-0">
               <DialogTitle>补解析：LLM 全维度提取（#{paperId}）</DialogTitle>
             </DialogHeader>
             {!preview ? (
-              <div className="space-y-3">
+              <div className="space-y-3 overflow-y-auto">
                 {/* v1.9.3：主文 + 多份补充信息（SI）一次选择；也可复用已存附件 */}
                 <input
                   ref={pdfRef}
@@ -951,8 +951,10 @@ export function LiteratureKnowledgeSection() {
                 )}
               </div>
             ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
+              <>
+                {/* 单一滚动区：说明 + 来源 + 元数据 + 条目；底部按钮在其外，始终可见可点 */}
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden pr-1">
+                <p className="break-words text-xs text-muted-foreground">
                   {preview.llm_used ? 'LLM 结构化提取' : 'SMILES 正则扫描（降级）'}：
                   {preview.note}
                   {preview.segments && preview.segments.total > 1 && (
@@ -1045,7 +1047,7 @@ export function LiteratureKnowledgeSection() {
                     </p>
                   </div>
                 )}
-                <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+                <div className="space-y-2">
                   {Object.entries(
                     preview.entries.reduce<Record<string, (Partial<Entry> & { idx: number })[]>>(
                       (acc, e, i) => {
@@ -1053,14 +1055,15 @@ export function LiteratureKnowledgeSection() {
                         (acc[g] ??= []).push({ ...e, idx: i });
                         return acc;
                       }, {})).map(([gid, rows]) => (
-                    <div key={gid} className="rounded-lg border border-border">
-                      <p className="border-b border-border bg-muted/40 px-2 py-1 text-xs font-medium">
+                    <div key={gid} className="min-w-0 overflow-hidden rounded-lg border border-border">
+                      <p className="truncate border-b border-border bg-muted/40 px-2 py-1 text-xs font-medium"
+                         title={`组 ${gid}：${rows[0]?.experiment ?? ''}`}>
                         组 {gid}：{rows[0]?.experiment}
                       </p>
                       {rows.map((e) => (
                         <label key={e.idx}
                                className={cn(
-                                 'flex cursor-pointer items-start gap-2 px-2 py-1.5 text-xs hover:bg-muted/40',
+                                 'flex min-w-0 cursor-pointer items-start gap-2 px-2 py-1.5 text-xs hover:bg-muted/40',
                                  e.valid === false && 'cursor-not-allowed opacity-60',
                                )}>
                           <input
@@ -1078,20 +1081,21 @@ export function LiteratureKnowledgeSection() {
                                 {e.technique}
                               </span>
                             )}
-                            <span className="ml-1 text-muted-foreground">
+                            <span className="ml-1 break-words text-muted-foreground">
                               {e.metrics?.map((m) => `${m.name}=${m.value}${m.unit ?? ''}`).join('，')}
                             </span>
                             {e.source_file && (
-                              <span className="ml-1 rounded border border-border px-1 text-[10px] text-muted-foreground">
+                              <span className="ml-1 inline-block max-w-full truncate rounded border border-border px-1 align-bottom text-[10px] text-muted-foreground">
                                 {e.source_file}
                               </span>
                             )}
                             {e.valid === false && (
-                              <span className="ml-1 text-[11px] text-destructive">
+                              <span className="ml-1 break-words text-[11px] text-destructive">
                                 不可入库：{e.invalid_reason}
                               </span>
                             )}
-                            <span className="mt-0.5 block truncate text-muted-foreground/70"
+                            {/* 依据：两行截断 + 长 URL/SMILES 强制换行，避免溢出弹窗边框 */}
+                            <span className="mt-0.5 line-clamp-2 break-words text-muted-foreground/70"
                                   title={e.evidence}>
                               依据：{e.evidence}
                             </span>
@@ -1101,16 +1105,26 @@ export function LiteratureKnowledgeSection() {
                     </div>
                   ))}
                 </div>
-                <DialogFooter>
-                  <Button variant="outline"
-                          onClick={() => { setPreview(null); setParseText(''); }}>
-                    重新解析
-                  </Button>
-                  <Button onClick={() => void submitParse()} disabled={parseBusy}>
-                    {parseBusy ? '入库中…' : '勾选条目入库（同步知识图谱）'}
-                  </Button>
+                </div>
+                <DialogFooter className="shrink-0 items-center gap-2 border-t border-border pt-3 sm:justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    已勾选 {preview.entries.filter(
+                      (e, i) => e.valid !== false && checked[i] !== false).length} 条
+                    {preview.invalid_count
+                      ? `（另有 ${preview.invalid_count} 条字段不完整已排除）`
+                      : ''}
+                  </span>
+                  <span className="flex gap-2">
+                    <Button variant="outline"
+                            onClick={() => { setPreview(null); setParseText(''); }}>
+                      重新解析
+                    </Button>
+                    <Button onClick={() => void submitParse()} disabled={parseBusy}>
+                      {parseBusy ? '入库中…' : '勾选条目入库（同步知识图谱）'}
+                    </Button>
+                  </span>
                 </DialogFooter>
-              </div>
+              </>
             )}
           </DialogContent>
         </Dialog>
