@@ -220,7 +220,21 @@ export function ToolEventCard({
               {JSON.stringify(event.args, null, 2)}
             </pre>
           )}
-          {event.summary && <p className="leading-relaxed">{event.summary}</p>}
+          {/* v1.9.6：结果可滚动 + 保留换行，长内容（迭代意见/实验记录）不再被腰斩；
+              若后端仍截断（>6000 字）则如实提示完整字数 */}
+          {event.summary && (
+            <div className="space-y-1">
+              <p className="max-h-72 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed">
+                {event.summary}
+              </p>
+              {typeof event.chars === 'number' && event.chars > event.summary.length && (
+                <p className="text-[11px] text-muted-foreground/70">
+                  结果共 {event.chars} 字，此处显示前 {event.summary.length} 字；
+                  可让助手「读取单条实验记录全文」或指定更小的范围获取完整内容
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

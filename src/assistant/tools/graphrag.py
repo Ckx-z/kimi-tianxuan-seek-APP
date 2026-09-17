@@ -22,7 +22,8 @@ try:
 except ImportError:  # pragma: no cover
     import runtime_config  # type: ignore
 
-_MAX_TEXT = 3000  # 工具返回 text 限长（token 成本控制，方案 §8.2）
+_MAX_TEXT = 8000  # 工具返回 text 限长（v1.9.6：3000→8000。原值会让「五路召回 + 图谱命中」
+                  # 里的实验记录/文献证据被**静默腰斩**；现放宽并在截断时如实标注）
 
 
 def _bootstrap_bridge_path() -> Path:
@@ -148,6 +149,9 @@ def query_graphrag_tool(question: str) -> dict:
                 "details": {"hits": 0}, "is_error": False}
 
     text = "\n\n".join(blocks)
-    return {"text": text[:_MAX_TEXT],
+    if len(text) > _MAX_TEXT:
+        text = text[:_MAX_TEXT] + (f"\n\n……（检索结果共 {len(text)} 字已截断；"
+                                   "如需完整内容请缩小问题范围或指定文献/记录编号）")
+    return {"text": text,
             "details": {"hits": len(blocks), "failures": failures},
             "is_error": False}

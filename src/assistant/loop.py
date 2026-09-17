@@ -199,10 +199,15 @@ def _history_block(session: dict) -> list[dict]:
 
 
 def _tool_event_pair(name: str, args: dict, result: dict) -> Iterator[dict]:
-    """一次工具调用的两个 SSE 事件。"""
+    """一次工具调用的两个 SSE 事件。
+
+    v1.9.6：额外带 `chars`（工具结果完整字数），前端据此提示「已截断」，
+    避免用户以为助手真的只拿到那么点内容。
+    """
     yield {"type": "tool_call", "name": name, "args": args}
     yield {"type": "tool_result", "name": name,
            "summary": registry.summary_of(result),
+           "chars": registry.result_chars(result),
            "is_error": bool(result.get("is_error"))}
 
 

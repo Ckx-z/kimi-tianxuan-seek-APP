@@ -44,6 +44,8 @@ export interface ToolEvent {
   name?: string;
   args?: Record<string, unknown>;
   summary?: string;
+  /** tool_result：工具结果完整字数（v1.9.6，用于提示「已截断」） */
+  chars?: number;
   is_error?: boolean;
   /** critic_note：引用核验说明（v1.6.0） */
   text?: string;
@@ -202,7 +204,7 @@ export function researchDocxUrl(reportId: string): string {
 export type AssistantSseEvent =
   | { type: 'token'; text: string }
   | { type: 'tool_call'; name: string; args?: Record<string, unknown> }
-  | { type: 'tool_result'; name: string; summary?: string; is_error?: boolean; cancelled?: boolean }
+  | { type: 'tool_result'; name: string; summary?: string; chars?: number; is_error?: boolean; cancelled?: boolean }
   | {
       type: 'tool_confirm';
       confirm_token: string;

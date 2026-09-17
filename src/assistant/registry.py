@@ -33,8 +33,9 @@ from .tools.web import web_search
 
 logger = logging.getLogger(__name__)
 
-_MAX_SUMMARY = 600   # SSE tool_result 摘要限长
-_MAX_TEXT = 4000     # 回填给 LLM 的工具结果限长
+_MAX_SUMMARY = 6000  # SSE tool_result 摘要限长（v1.9.6：600→6000，原值会让「迭代意见/
+                     # 实验记录」这类长文本在助手卡片里被腰斩；前端改为可滚动展示）
+_MAX_TEXT = 8000     # 回填给 LLM 的工具结果限长（v1.9.6：4000→8000）
 
 TOOLS: dict = {
     "predict_film": {
@@ -534,9 +535,16 @@ def execute(name: str, args: dict | None) -> dict:
 
 
 def summary_of(result: dict) -> str:
-    """SSE tool_result 事件的摘要（限长）。"""
+    """SSE tool_result 事件的摘要（限长，截断时如实标注剩余字数）。"""
     text = str(result.get("text") or "")
-    return text if len(text) <= _MAX_SUMMARY else text[:_MAX_SUMMARY] + "…"
+    if len(text) <= _MAX_SUMMARY:
+        return text
+    return text[:_MAX_SUMMARY] + f"…（结果共 {len(text)} 字，此处显示前 {_MAX_SUMMARY} 字）"
+
+
+def result_chars(result: dict) -> int:
+    """工具结果的完整字符数（前端据此提示「已截断」）。"""
+    return len(str(result.get("text") or ""))
 
 
 def confirm_impact(name: str, args: dict | None) -> str | None:

@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 _MAX_SUGGESTIONS = 3   # 注入的最新迭代建议条数
 _MAX_RECORDS = 5       # 注入的最近实验记录条数
+_PROCESS_EXCERPT = 1500  # 注入的「最近一条实验流程」摘录上限（v1.9.6：600→1500）
 
 
 def _monomer_block(context: dict) -> str:
@@ -141,13 +142,14 @@ def _records_block(context: dict) -> str:
             bit += f" 失误：{str(r['mistakes'])[:120]}"
         lines.append(bit)
     # v1.9.3（问题 4.1）：补最近一条的完整实验流程要点，避免助手答不出流程
+    # v1.9.6：摘录上限 600 → 1500（原值让「看迭代意见/复盘」时流程被腰斩）
     latest = list(reversed(recs))[0] if recs else None
     if latest and str(latest.get("process_notes") or "").strip():
         process = str(latest["process_notes"]).strip()
         lines.append(f"- 最近一条（{latest.get('record_id')}）实验流程"
-                     f"（原文 {len(process)} 字，摘录）：{process[:600]}"
+                     f"（原文 {len(process)} 字，摘录）：{process[:_PROCESS_EXCERPT]}"
                      + ("…（需要全文请调 read_experiment_record）"
-                        if len(process) > 600 else ""))
+                        if len(process) > _PROCESS_EXCERPT else ""))
     return "## 实验记录摘要\n" + "\n".join(lines)
 
 

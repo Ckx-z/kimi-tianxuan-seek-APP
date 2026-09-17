@@ -15,11 +15,13 @@ from __future__ import annotations
 
 _MAX_RECORDS = 10      # 单次最多返回条数（token 成本控制）
 _MAX_FIELD = 200       # 长文本字段截断长度
-_MAX_PROCESS = 1200    # 列表输出中「完整实验流程」注入上限（单条全量见下方工具）
-_FULL_PROCESS = 6000   # 单条工具：流程全文上限
-_MAX_TIMELINE_CHARS = 4000   # 列表输出：全部时间点的总字符预算
-_MAX_TIMELINE_CHARS_FULL = 8000  # 单条工具：时间线总字符预算
-_MAX_SEGMENT = 600     # 单条时间点描述截断长度
+# v1.9.6：原 1200/6000/4000/8000/600 的预算会让「迭代意见」里引用的实验记录被腰斩，
+# 现整体放宽（列表仍为摘录并注明，单条工具给近全文）。
+_MAX_PROCESS = 2500    # 列表输出中「完整实验流程」注入上限（单条全量见下方工具）
+_FULL_PROCESS = 12000  # 单条工具：流程全文上限
+_MAX_TIMELINE_CHARS = 6000   # 列表输出：全部时间点的总字符预算
+_MAX_TIMELINE_CHARS_FULL = 16000  # 单条工具：时间线总字符预算
+_MAX_SEGMENT = 900     # 单条时间点描述截断长度
 
 _OUTCOME_ZH = {"film": "成膜", "partial": "部分成膜", "failed": "失败"}
 
