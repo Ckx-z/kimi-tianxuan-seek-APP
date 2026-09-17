@@ -53,6 +53,10 @@ Get-ChildItem dist-backend\cof-backend\_internal\webapp\dist -Recurse -File
 # 脚本自带：隔离 COF_DATA_DIR、起 exe --port 8901、跑完自动 taskkill
 $env:SELFCERT_DATA="E:\cof-build\selfcert193"
 E:\ANACONDA\python.exe .tmp_xtb\frozen_selfcert_v193.py     # 期望 9/9 通过
+
+# v1.9.6 起：再跑一遍「本版新功能专项自证」（同一个 exe，另起端口）
+$env:SELFCERT_DATA="E:\cof-build\selfcert196_extra"
+E:\ANACONDA\python.exe .tmp_xtb\frozen_selfcert_v195_extra.py   # 期望 12/12 通过
 ```
 
 覆盖：health / 文献录入+编号+文献节点入图 / `literature.attachments`（主文+SI）/
@@ -60,13 +64,50 @@ E:\ANACONDA\python.exe .tmp_xtb\frozen_selfcert_v193.py     # 期望 9/9 通过
 `records.dates` experiment_date / `assistant.research` 新 attachments 参数无 ImportError /
 侧车图含文献节点+组节点+`reaction_cited_in` 边。
 
+**专项自证为什么必要**：路由内**惰性 import** 的新模块（`literature.pdf_figures`、
+`literature.vision` 等）PyInstaller 静态分析抓不到，spec 里靠 `hiddenimports` 兜。
+只跑标准自证会漏掉「用户侧静默 ImportError」。专项自证在真实 exe 上端到端验证：
+文献图抽取（内嵌图+图注配对+类型）、暂存图预览、候选图入图谱、视觉读图未启用时
+400 并指向设置页、`llm-settings` 暴露 `vision_status`、前端资源含本版新样式/开关。
+**发新版时把新功能加进这个脚本**（历史版本号留在脚本名里不影响复用）。
+
 ## 5. Electron 安装包
 
 ```powershell
 cd webapp
-# 输出目录若被占用/被杀软扫描，用临时输出目录再拷贝
-npx electron-builder --win nsis -c.directories.output=C:/cof-build/release
+# v1.9.6 实测：本机 TLS 被中间证书拦截，electron-builder 下载 Electron 发行包会报
+# 「unable to verify the first certificate」；缓存里也没有 electron 目录。
+# 用本地已有发行版可完全免下载：
+npx electron-builder --win nsis --config.directories.output=release `
+    --config.electronDist=node_modules/electron/dist
 ```
+
+> 旧写法 `-c.directories.output=C:/cof-build/release` 会被当成**配置文件路径**
+> （ENOENT），必须用长参数 `--config.directories.output=`。
+
+## 5b. 发布 zip（**必须校验内容**）
+
+```powershell
+cd webapp\release
+# ① 先把 exe 拷到暂存目录（避免与构建/杀软扫描抢文件）
+$stage = Join-Path $env:TEMP "zipstage"; Remove-Item $stage -Recurse -Force -EA SilentlyContinue
+New-Item -ItemType Directory $stage | Out-Null
+Copy-Item cof-film-recommend-setup-X.Y.Z.exe $stage -Force
+# ② 压缩暂存副本，再移回 release
+Compress-Archive -Path (Join-Path $stage "cof-film-recommend-setup-X.Y.Z.exe") `
+                 -DestinationPath (Join-Path $stage "out.zip") -CompressionLevel Optimal
+Move-Item (Join-Path $stage "out.zip") COF-Assistant-Setup-X.Y.Z-win-x64.zip -Force
+# ③ 解压校验：必须与源 exe MD5 一致，且体积 ≈ 安装包
+Expand-Archive COF-Assistant-Setup-X.Y.Z-win-x64.zip -DestinationPath $env:TEMP\zipverify -Force
+(Get-FileHash $env:TEMP\zipverify\cof-film-recommend-setup-X.Y.Z.exe -Algorithm MD5).Hash
+```
+
+> **v1.9.6 实测踩坑**：构建后立刻 `Compress-Archive -Path <exe>` 会读到**残缺内容 →
+> 只生成 6.9MB 的坏 zip**（源文件仍被占用/扫描）；`ZipFile::CreateFromDirectory`
+> 更糟——会把整个 `release/`（含 win-unpacked）当输入并因自占用失败，留下垃圾包。
+> 因此**必须**「先拷副本 → 压缩副本 → 解压对比 MD5」，不可省。
+
+
 产物：`cof-film-recommend-setup-X.Y.Z.exe`（约 456MB）；随后压缩 `dist-backend/cof-backend`
 为 zip（压缩前等杀软释放句柄，失败就重试）。
 
