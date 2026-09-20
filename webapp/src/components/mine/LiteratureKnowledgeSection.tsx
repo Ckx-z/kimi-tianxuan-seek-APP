@@ -313,9 +313,11 @@ export function LiteratureKnowledgeSection({
       void loadAttachments(paperId);
       void loadFigureCount(paperId);
       // R1：图谱关联（引用/被引/相似；未构建时接口返回空列表，不报错）
+      // 注意：本组件的 req() 会自动加 /api/literature 前缀，图谱接口在 /api/library，
+      // 因此这里必须用原生 fetch（此前误用 req() → 404 → 页签恒显示"暂无关联数据"）。
       setRelations(null);
-      req<{ cites: never[]; cited_by: never[]; similar: never[] }>(
-        `/graph/neighbors/${encodeURIComponent(paperId)}`)
+      fetch(`/api/library/graph/neighbors/${encodeURIComponent(paperId)}`)
+        .then((r) => (r.ok ? r.json() : null))
         .then((d) => setRelations(d as never))
         .catch(() => setRelations(null));
       // 加载原文元数据（老文献的结构化信息：作者/期刊/摘要等）
