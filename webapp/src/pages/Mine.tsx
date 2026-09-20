@@ -67,6 +67,8 @@ export default function Mine() {
   const [online, setOnline] = useState<boolean | null>(null);
   /** v1.9.8 R1：三栏导航壳选中的文献（驱动下方科研知识库卡片） */
   const [focusPaperId, setFocusPaperId] = useState<string>('');
+  /** v1.9.8 R1-f：录入区默认收起（工具栏「＋添加文献」展开） */
+  const [intakeOpen, setIntakeOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   /** 导出实验记录：勾选的收藏组 id 集合 */
@@ -151,9 +153,17 @@ export default function Mine() {
 
       {/* 科研知识库（v1.9.0；v1.9.8 R1 合并：三栏导航壳 + 文献卡片统一为一个模块，图谱并入「关联」） */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">科研知识库</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-foreground">科研知识库</h2>
+          {/* v1.9.8 R1-f：录入区收进工具栏（默认收起，避免长期占一整块） */}
+          <Button variant={intakeOpen ? 'default' : 'outline'} size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setIntakeOpen((o) => !o)}>
+            {intakeOpen ? '收起添加文献' : '＋ 添加文献（DOI / 标题 / 上传 PDF+SI）'}
+          </Button>
+        </div>
         <LibraryExplorer compact onSelectPaper={setFocusPaperId} />
-        <LiteratureIntakeSection />
+        {intakeOpen && <LiteratureIntakeSection />}
         <LiteratureKnowledgeSection focusPaperId={focusPaperId} />
       </section>
 
