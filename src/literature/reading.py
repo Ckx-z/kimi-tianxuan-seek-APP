@@ -50,7 +50,113 @@ def _db():
 
 def ensure_schema(conn) -> None:
     conn.executescript(SCHEMA)
+    conn.executescript(INBOX_SCHEMA)
     conn.commit()
+
+
+# ---------------------------------------------------------------- 阅读收件箱
+# 用户决策：**先读后入库** —— 外部上传的 PDF 先进收件箱（不进文献库、不占编号），
+# 读完再一键「提取解析并入库」，届时才创建文献条目。
+
+INBOX_SCHEMA = """
+CREATE TABLE IF NOT EXISTS reading_inbox (
+  inbox_id TEXT PRIMARY KEY,
+  filename TEXT, path TEXT, sha1 TEXT UNIQUE, size INTEGER,
+  state TEXT DEFAULT 'pending',        -- pending | ingested | discarded
+  paper_id TEXT,                       -- 入库后回填
+  note TEXT,
+  uploaded_at TEXT, updated_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_inbox_state ON reading_inbox(state);
+"""
+
+INBOX_DIRNAME = "reading_inbox"
+MAX_INBOX_BYTES = 80 * 1024 * 1024
+
+
+def _inbox_dir():
+    try:
+        from src import runtime_config
+    except ImportError:  # pragma: no cover
+        import runtime_config  # type: ignore
+    d = runtime_config.user_data_root() / "literature" / INBOX_DIRNAME
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def add_inbox_file(conn, filename: str, data: bytes, *, note: str = "") -> dict:
+    """把外部 PDF 收进阅读清单（按 sha1 去重；不创建文献条目）。"""
+    import hashlib
+    if not data:
+        raise ValueError("文件内容为空")
+    if len(data) > MAX_INBOX_BYTES:
+        raise ValueError(f"文件过大（上限 {MAX_INBOX_BYTES // 1024 // 1024} MB）")
+    name = (filename or "paper.pdf").replace("\\", "/").split("/")[-1][:120]
+    if not name.lower().endswith(".pdf"):
+        raise ValueError("目前只支持 PDF")
+    sha1 = hashlib.sha1(data).hexdigest()
+    ensure_schema(conn)
+    hit = conn.execute("SELECT * FROM reading_inbox WHERE sha1=?", (sha1,)).fetchone()
+    if hit is not None:
+        return {"inbox_id": hit["inbox_id"], "filename": hit["filename"],
+                "state": hit["state"], "duplicate": True, "size": hit["size"]}
+    inbox_id = f"inb_{uuid.uuid4().hex[:12]}"
+    path = _inbox_dir() / f"{inbox_id}_{name}"
+    path.write_bytes(data)
+    now = _db()._now()
+    conn.execute(
+        "INSERT INTO reading_inbox(inbox_id,filename,path,sha1,size,state,note,"
+        "uploaded_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+        (inbox_id, name, str(path), sha1, len(data), "pending", note, now, now))
+    conn.commit()
+    return {"inbox_id": inbox_id, "filename": name, "state": "pending",
+            "duplicate": False, "size": len(data), "path": str(path)}
+
+
+def list_inbox(conn, *, state: str | None = None) -> list[dict]:
+    ensure_schema(conn)
+    where, params = "1=1", []
+    if state:
+        where += " AND state=?"
+        params.append(state)
+    return [dict(r) for r in conn.execute(
+        f"SELECT * FROM reading_inbox WHERE {where} ORDER BY uploaded_at DESC", params)]
+
+
+def get_inbox(conn, inbox_id: str) -> dict | None:
+    ensure_schema(conn)
+    row = conn.execute("SELECT * FROM reading_inbox WHERE inbox_id=?",
+                       (inbox_id,)).fetchone()
+    return dict(row) if row is not None else None
+
+
+def set_inbox_state(conn, inbox_id: str, state: str, *,
+                    paper_id: str | None = None) -> dict | None:
+    """更新收件箱状态（pending / ingested / discarded）；入库时回填 paper_id。"""
+    if state not in ("pending", "ingested", "discarded"):
+        raise ValueError("state 必须是 pending | ingested | discarded")
+    if get_inbox(conn, inbox_id) is None:
+        return None
+    conn.execute(
+        "UPDATE reading_inbox SET state=?, paper_id=COALESCE(?,paper_id), updated_at=?"
+        " WHERE inbox_id=?", (state, paper_id, _db()._now(), inbox_id))
+    conn.commit()
+    return get_inbox(conn, inbox_id)
+
+
+def delete_inbox(conn, inbox_id: str, *, remove_file: bool = True) -> bool:
+    rec = get_inbox(conn, inbox_id)
+    if rec is None:
+        return False
+    if remove_file:
+        try:
+            from pathlib import Path
+            Path(rec["path"]).unlink(missing_ok=True)
+        except Exception:  # pragma: no cover
+            logger.warning("删除收件箱文件失败: %s", rec.get("path"))
+    conn.execute("DELETE FROM reading_inbox WHERE inbox_id=?", (inbox_id,))
+    conn.commit()
+    return True
 
 
 # ---------------------------------------------------------------- 批注 CRUD

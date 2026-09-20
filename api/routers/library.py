@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 
 from ..schemas import (LibraryAnnotationCreate, LibraryAnnotationUpdate,
                        LibraryCollectionCreate, LibraryCollectionRename,
@@ -650,5 +651,76 @@ def library_reading_ask(req: ReadingAskRequest):
         return out
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------- 阅读收件箱（先读后入库）
+
+@router.post("/reading/upload", status_code=201)
+async def library_reading_upload(file: UploadFile = File(...), note: str = ""):
+    """外部上传 PDF 进阅读清单（**不创建文献条目**，读完再一键入库）。按 sha1 去重。"""
+    _db, conn = _open()
+    try:
+        data = await file.read()
+        return _reading().add_inbox_file(conn, file.filename or "paper.pdf", data,
+                                         note=note)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+@router.get("/reading/inbox")
+def library_reading_inbox(state: str | None = None):
+    """阅读收件箱（pending=在读数、ingested=已入库、discarded=已丢弃）。"""
+    _db, conn = _open()
+    try:
+        return {"inbox": _reading().list_inbox(conn, state=state)}
+    finally:
+        conn.close()
+
+
+@router.get("/reading/inbox/{inbox_id}/file")
+def library_reading_inbox_file(inbox_id: str):
+    """读取收件箱中的 PDF（供阅读器 iframe 使用）。"""
+    _db, conn = _open()
+    try:
+        rec = _reading().get_inbox(conn, inbox_id)
+        if rec is None:
+            raise HTTPException(404, f"收件箱条目不存在: {inbox_id}")
+        from pathlib import Path
+        p = Path(rec["path"])
+        if not p.is_file():
+            raise HTTPException(404, "文件已丢失")
+        return FileResponse(str(p), media_type="application/pdf",
+                            filename=rec["filename"])
+    finally:
+        conn.close()
+
+
+@router.post("/reading/inbox/{inbox_id}/state")
+def library_reading_inbox_state(inbox_id: str, state: str,
+                                paper_id: str | None = None):
+    """更新收件箱状态；入库时用 paper_id 回填关联的文献编号。"""
+    _db, conn = _open()
+    try:
+        out = _reading().set_inbox_state(conn, inbox_id, state, paper_id=paper_id)
+        if out is None:
+            raise HTTPException(404, f"收件箱条目不存在: {inbox_id}")
+        return out
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+@router.delete("/reading/inbox/{inbox_id}")
+def library_reading_inbox_delete(inbox_id: str):
+    _db, conn = _open()
+    try:
+        if not _reading().delete_inbox(conn, inbox_id):
+            raise HTTPException(404, f"收件箱条目不存在: {inbox_id}")
+        return {"ok": True, "inbox_id": inbox_id}
     finally:
         conn.close()

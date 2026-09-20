@@ -129,3 +129,41 @@ def test_export_annotations_as_note(conn):
     md = notes[0]["content_md"]
     assert "# 阅读批注" in md and "高亮（第 4 页）" in md
     assert "> peak at 2.76°" in md and "截图（第 5 页）" in md
+
+
+# ---------------------------------------------------------------- 阅读收件箱（先读后入库）
+
+def test_inbox_upload_dedupe_and_states(conn):
+    out = reading.add_inbox_file(conn, "外部新文献.pdf", b"%PDF-1.4 fake content",
+                                 note="待读")
+    assert out["inbox_id"].startswith("inb_") and out["duplicate"] is False
+    assert out["filename"] == "外部新文献.pdf"
+    # 文件真的落盘
+    from pathlib import Path
+    assert Path(out["path"]).is_file() and Path(out["path"]).read_bytes().startswith(b"%PDF")
+
+    # 同一文件再传 → 去重，不产生第二条
+    dup = reading.add_inbox_file(conn, "same.pdf", b"%PDF-1.4 fake content")
+    assert dup["duplicate"] is True and dup["inbox_id"] == out["inbox_id"]
+    assert len(reading.list_inbox(conn)) == 1
+
+    # 状态流转：pending → ingested（回填 paper_id）
+    up = reading.set_inbox_state(conn, out["inbox_id"], "ingested", paper_id="1782")
+    assert up["state"] == "ingested" and up["paper_id"] == "1782"
+    assert reading.list_inbox(conn, state="pending") == []
+    assert len(reading.list_inbox(conn, state="ingested")) == 1
+    with pytest.raises(ValueError):
+        reading.set_inbox_state(conn, out["inbox_id"], "bogus")
+    assert reading.set_inbox_state(conn, "inb_nope", "pending") is None
+
+    # 删除会同时清掉文件
+    p = Path(out["path"])
+    assert reading.delete_inbox(conn, out["inbox_id"]) is True
+    assert not p.exists() and reading.list_inbox(conn) == []
+
+
+def test_inbox_rejects_non_pdf_and_empty(conn):
+    with pytest.raises(ValueError):
+        reading.add_inbox_file(conn, "not-a-pdf.docx", b"PK\x03\x04 xxxx")
+    with pytest.raises(ValueError):
+        reading.add_inbox_file(conn, "empty.pdf", b"")
