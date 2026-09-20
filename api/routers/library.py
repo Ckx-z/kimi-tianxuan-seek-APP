@@ -439,3 +439,65 @@ def library_gnn_mark_used(version: str, feedback_ids: str | None = None):
                 "marked": _gnn_bridge().mark_used(conn, version, ids or None)}
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------- Zotero 互操作（P5）
+
+def _zotero_io():
+    try:
+        from literature import zotero_io
+    except ImportError:  # pragma: no cover
+        from src.literature import zotero_io  # type: ignore
+    return zotero_io
+
+
+@router.post("/zotero/import")
+def library_zotero_import(limit: int = 100, start: int = 0, dry_run: bool = False):
+    """从 **Zotero 本地 API** 导入条目（只读；不碰 zotero.sqlite）。
+
+    需在 Zotero 设置 → Advanced 勾选允许本机应用通信，否则返回 400 并说明关卡。
+    DOI 重复的条目自动跳过；导入的条目归入「Zotero 导入」集合、标签标为自动。
+    """
+    zio = _zotero_io()
+    _db, conn = _open()
+    try:
+        items = zio.fetch_items(limit=limit, start=start)
+        return {"fetched": len(items),
+                **zio.import_entries(conn, items, dry_run=dry_run)}
+    except zio.ZoteroError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+@router.get("/export")
+def library_export(format: str = "bibtex", collection_id: str | None = None,
+                   paper_ids: str | None = None):
+    """导出为 BibTeX 或 CSL-JSON（可直接导入 Zotero / EndNote）。"""
+    zio = _zotero_io()
+    _db, conn = _open()
+    try:
+        ids = [x.strip() for x in (paper_ids or "").split(",") if x.strip()]
+        where, params = ["deleted_at IS NULL"], []
+        if ids:
+            where.append(f"paper_id IN ({','.join('?' * len(ids))})")
+            params.extend(ids)
+        elif collection_id:
+            where.append("paper_id IN (SELECT paper_id FROM collection_items"
+                         " WHERE collection_id=?)")
+            params.append(collection_id)
+        rows = [dict(r) for r in conn.execute(
+            f"SELECT paper_id,title,abstract,journal,year,doi,url,authors_json"
+            f" FROM items WHERE {' AND '.join(where)} ORDER BY CAST(paper_id AS INTEGER)",
+            params)]
+        for r in rows:
+            try:
+                r["authors"] = json.loads(r.pop("authors_json") or "[]")
+            except Exception:
+                r["authors"] = []
+        if format.lower() in ("csljson", "csl-json", "json"):
+            return {"format": "csljson", "count": len(rows),
+                    "items": zio.to_csl_json(rows)}
+        return {"format": "bibtex", "count": len(rows), "bibtex": zio.to_bibtex(rows)}
+    finally:
+        conn.close()
