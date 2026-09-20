@@ -289,7 +289,45 @@ export function LiteratureKnowledgeSection({
   }, []);
 
   /** v1.9.7：文献图片数量（页签计数）——此前页签无计数，用户误以为「一直是 0」 */
+  /** v1.9.7：文献图片数量（页签计数） */
   const [figureCount, setFigureCount] = useState<number | null>(null);
+  /** v1.9.8 R1：笔记（Markdown；人工/助手/LLM 精读产出） */
+  const [notes, setNotes] = useState<{ note_id: string; title: string; content_md: string;
+    source: string; created_at: string }[]>([]);
+  const [noteDraft, setNoteDraft] = useState('');
+
+  const loadNotes = useCallback(async (pid: string) => {
+    try {
+      const r = await fetch(`/api/library/papers/${encodeURIComponent(pid)}/notes`);
+      const d = r.ok ? await r.json() : { notes: [] };
+      setNotes(d.notes ?? []);
+    } catch {
+      setNotes([]);
+    }
+  }, []);
+
+  const addNote = async () => {
+    if (!paperId || !noteDraft.trim()) return;
+    try {
+      const r = await fetch(`/api/library/papers/${encodeURIComponent(paperId)}/notes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_md: noteDraft.trim(), source: 'user' }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      setNoteDraft('');
+      await loadNotes(paperId);
+      toast.success('笔记已保存');
+    } catch {
+      toast.error('保存笔记失败');
+    }
+  };
+
+  const deleteNote = async (noteId: string) => {
+    try {
+      await fetch(`/api/library/notes/${noteId}`, { method: 'DELETE' });
+      await loadNotes(paperId);
+    } catch { /* 已提示 */ }
+  };
   /** v1.9.8 R1：图谱关联（引用/被引/相似）——图谱并入知识库的「关联」页签 */
   const [relations, setRelations] = useState<{
     cites: { node: string; title: string; doi: string; external: boolean }[];
@@ -312,6 +350,7 @@ export function LiteratureKnowledgeSection({
       void loadEntries(paperId);
       void loadAttachments(paperId);
       void loadFigureCount(paperId);
+      void loadNotes(paperId);
       // R1：图谱关联（引用/被引/相似；未构建时接口返回空列表，不报错）
       // 注意：本组件的 req() 会自动加 /api/literature 前缀，图谱接口在 /api/library，
       // 因此这里必须用原生 fetch（此前误用 req() → 404 → 页签恒显示"暂无关联数据"）。
@@ -792,6 +831,10 @@ export function LiteratureKnowledgeSection({
                       <TabsTrigger value="figures">
                         文献图片{figureCount !== null ? `（${figureCount}）` : ''}
                       </TabsTrigger>
+                      {/* R1：笔记（Markdown；人工/助手/LLM 精读产出） */}
+                      <TabsTrigger value="notes">
+                        笔记{notes.length > 0 ? `（${notes.length}）` : ''}
+                      </TabsTrigger>
                       {/* R1：图谱并入知识库 —— 该文献的引用/被引/相似 */}
                       <TabsTrigger value="related">
                         关联{relations
@@ -948,6 +991,46 @@ export function LiteratureKnowledgeSection({
                     <TabsContent value="figures" className="pt-2">
                       <LiteratureFiguresPanel key={figuresRefreshKey}
                                               fixedPaperId={paperId} />
+                    </TabsContent>
+
+                    {/* R1：笔记页签（Markdown，可增删；来源标注 人工/助手/LLM） */}
+                    <TabsContent value="notes" className="space-y-2 pt-2">
+                      {notes.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          暂无笔记：可在下方写一条，或让科研助手/精读流程把结论存成笔记。
+                        </p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {notes.map((n) => (
+                            <li key={n.note_id}
+                                className="rounded-lg border border-border/70 bg-muted/20 p-2.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-xs font-medium">
+                                  {n.title || '（无标题）'}
+                                  <span className="ml-1 font-normal text-muted-foreground">
+                                    {n.source === 'llm' ? 'LLM 精读'
+                                      : n.source === 'assistant' ? '助手' : '手动'}
+                                  </span>
+                                </p>
+                                <button type="button" title="删除笔记"
+                                        onClick={() => void deleteNote(n.note_id)}
+                                        className="text-muted-foreground hover:text-destructive">
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                              <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                                {n.content_md}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <Textarea value={noteDraft} rows={3}
+                                onChange={(e) => setNoteDraft(e.target.value)}
+                                placeholder="写一条笔记（Markdown）…" className="text-xs" />
+                      <Button size="sm" className="h-7 text-xs" onClick={() => void addNote()}>
+                        保存笔记
+                      </Button>
                     </TabsContent>
 
                     {/* R1：关联页签 —— 引用 / 被引 / 相似（边带来源：Crossref=确证引用，embedding=算法推荐） */}
