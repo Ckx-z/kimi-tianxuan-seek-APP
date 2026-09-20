@@ -597,6 +597,7 @@ async def parse_paper(paper_id: str,
                       files: list[UploadFile] | None = File(None),
                       text: str | None = Form(None),
                       with_meta: bool = Form(True),
+                      auto_backfill: bool = Form(True),
                       use_stored: bool = Form(False),
                       file_ids: str | None = Form(None),
                       store_files: bool = Form(True),
@@ -818,6 +819,18 @@ async def parse_paper(paper_id: str,
         meta = ext.extract_paper_meta(main_text)
         result["paper_meta"] = meta.get("meta") or {}
         result["meta_note"] = meta.get("note") or ""
+        # v1.9.7（问题 2.3）：解析成功后**自动回填**文献级元数据（含摘要），
+        # 只补空字段、绝不覆盖 Crossref 已有值；此前必须用户手动点「回填到文献库」，
+        # 实测导致「补解析完仍显示暂无摘要」（文献 1529 的 abstract 为空即此因）。
+        if auto_backfill and result["paper_meta"]:
+            try:
+                r = _resolver()
+                back = r.update_paper_fields(paper_id, result["paper_meta"],
+                                             only_empty=True)
+                result["auto_backfill"] = back
+            except Exception as exc:  # 回填失败不影响解析结果
+                logger.warning("元数据自动回填失败（已跳过）: %s", exc)
+                result["auto_backfill"] = {"error": f"{type(exc).__name__}: {exc}"}
     return {"paper_id": paper_id, **result}
 
 

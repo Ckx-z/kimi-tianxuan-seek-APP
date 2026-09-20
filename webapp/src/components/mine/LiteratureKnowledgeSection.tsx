@@ -124,6 +124,8 @@ interface ParsePreview {
   }[];
   figure_counts?: { total: number; embedded: number; page_render: number };
   figure_errors?: string[];
+  /** v1.9.7：解析后元数据自动回填结果（只补空字段） */
+  auto_backfill?: { updated?: string[]; skipped?: string[]; error?: string };
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -275,10 +277,24 @@ export function LiteratureKnowledgeSection() {
     }
   }, []);
 
+  /** v1.9.7：文献图片数量（页签计数）——此前页签无计数，用户误以为「一直是 0」 */
+  const [figureCount, setFigureCount] = useState<number | null>(null);
+
+  const loadFigureCount = useCallback(async (pid: string) => {
+    try {
+      const data = await req<{ figures: unknown[] }>(
+        `/figures?paper_id=${encodeURIComponent(pid)}`);
+      setFigureCount((data.figures ?? []).length);
+    } catch {
+      setFigureCount(null);
+    }
+  }, []);
+
   useEffect(() => {
     if (paperId) {
       void loadEntries(paperId);
       void loadAttachments(paperId);
+      void loadFigureCount(paperId);
       // 加载原文元数据（老文献的结构化信息：作者/期刊/摘要等）
       req<PaperDetail>(`/papers/${encodeURIComponent(paperId)}`)
         .then(setDetail)
@@ -327,6 +343,21 @@ export function LiteratureKnowledgeSection() {
         (data.figures ?? []).map((f) => [f.staged_id, f.kind === 'embedded'])));
       setPendingPdfs([]);
       await loadAttachments(paperId);
+      // v1.9.7（问题 2.3）：解析后元数据已由后端**自动回填**（只补空字段），
+      // 这里刷新「原文信息」页签并如实提示补了哪些字段——此前必须手动点按钮，
+      // 导致「补解析完仍显示暂无摘要」。
+      const backfilled = data.auto_backfill?.updated ?? [];
+      if (backfilled.length > 0) {
+        const zh: Record<string, string> = {
+          title: '标题', authors: '作者', journal: '期刊', year: '年份',
+          doi: 'DOI', abstract: '摘要',
+        };
+        toast.success(`已自动回填文献元数据：${backfilled.map((k) => zh[k] ?? k).join('、')}`
+          + (data.auto_backfill?.skipped?.length ? '（已有值未覆盖）' : ''));
+        req<PaperDetail>(`/papers/${encodeURIComponent(paperId)}`)
+          .then(setDetail)
+          .catch(() => undefined);
+      }
       const invalid = data.invalid_count
         ?? data.entries.filter((e) => e.valid === false).length;
       if (data.scanned?.length) {
@@ -490,6 +521,7 @@ export function LiteratureKnowledgeSection() {
       await loadEntries(paperId);
       // 图谱面板自带加载逻辑：换 key 强制重挂载以显示刚入库的文献图
       setFiguresRefreshKey((k) => k + 1);
+      void loadFigureCount(paperId);
     } catch {
       /* 已 toast */
     } finally {
@@ -730,10 +762,14 @@ export function LiteratureKnowledgeSection() {
                   <Tabs defaultValue="meta">
                     <TabsList>
                       <TabsTrigger value="meta">原文信息</TabsTrigger>
+                      {/* v1.9.7：原「图谱」改名「文献图片」并移到「原文信息」之后，
+                          并显示数量（此前无计数且因渲染分支 bug 恒为空） */}
+                      <TabsTrigger value="figures">
+                        文献图片{figureCount !== null ? `（${figureCount}）` : ''}
+                      </TabsTrigger>
                       <TabsTrigger value="entries">
                         结构化条目（{entries.length}）
                       </TabsTrigger>
-                      <TabsTrigger value="figures">图谱</TabsTrigger>
                     </TabsList>
 
                     {/* 原文信息：老文献自带的结构化元数据（非 LLM 提取条目） */}
@@ -1139,9 +1175,29 @@ export function LiteratureKnowledgeSection() {
                           <dd className="truncate">{preview.paper_meta.doi}</dd>
                         </div>
                       )}
+                      {/* v1.9.7（问题 2.3）：此前预览不显示摘要，用户无从判断是否提取到；
+                          现在展示字数与是否已自动回填 */}
+                      {preview.paper_meta.abstract && (
+                        <div className="flex gap-1.5">
+                          <dt className="shrink-0">摘要：</dt>
+                          <dd className="min-w-0 flex-1 text-foreground/90">
+                            <span className="line-clamp-3 break-words"
+                                  title={preview.paper_meta.abstract}>
+                              {preview.paper_meta.abstract}
+                            </span>
+                            <span className="ml-1 text-[10px] text-muted-foreground">
+                              （{preview.paper_meta.abstract.length} 字
+                              {preview.auto_backfill?.updated?.includes('abstract')
+                                ? '，已回填' : ''}）
+                            </span>
+                          </dd>
+                        </div>
+                      )}
                     </dl>
                     <p className="mt-1 text-[11px] text-muted-foreground/70">
-                      只补文献库中的空字段；已有值（Crossref 入库的标题/作者等）不会被覆盖。
+                      {preview.auto_backfill?.updated?.length
+                        ? `已在解析后自动回填：${preview.auto_backfill.updated.join('、')}（只补空字段，已有值不覆盖）`
+                        : '只补文献库中的空字段；已有值（Crossref 入库的标题/作者等）不会被覆盖。'}
                     </p>
                   </div>
                 )}

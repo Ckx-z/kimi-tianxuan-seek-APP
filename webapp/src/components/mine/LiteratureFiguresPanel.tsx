@@ -248,6 +248,28 @@ export function LiteratureFiguresPanel({
   };
 
   const shown = figures.filter((f) => typeFilter === 'all' || f.figure_type === typeFilter);
+  /** v1.9.7：点击缩略图放大（Lightbox）——此前只有小图与"下载原图"，用户看不到大图 */
+  const [zoomIndex, setZoomIndex] = useState<number | null>(null);
+  const zoomFigure = zoomIndex !== null ? shown[zoomIndex] : null;
+
+  const stepZoom = useCallback((delta: number) => {
+    setZoomIndex((i) => {
+      if (i === null || shown.length === 0) return i;
+      return (i + delta + shown.length) % shown.length;
+    });
+  }, [shown.length]);
+
+  // Lightbox 键盘：← / → 切换，Esc 关闭
+  useEffect(() => {
+    if (zoomIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') stepZoom(-1);
+      else if (e.key === 'ArrowRight') stepZoom(1);
+      else if (e.key === 'Escape') setZoomIndex(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoomIndex, stepZoom]);
 
   return (
     <Card>
@@ -259,7 +281,10 @@ export function LiteratureFiguresPanel({
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> 加载中…
           </div>
-        ) : papers.length === 0 ? (
+        ) : !fixedPaperId && papers.length === 0 ? (
+          // v1.9.7 修复：该分支此前未区分「固定文献模式」，而本面板在文献卡片里
+          // **只以固定模式使用**（不加载 papers）→ papers 恒为空 → 画廊永远不可达，
+          // 于是有 22 张图的文献也显示「文献库为空」。现在只有非固定模式才提示库空。
           <p className="text-sm text-muted-foreground">
             文献库为空：先在上方「文献录入」入库文献，再为其上传图谱。
           </p>
@@ -311,20 +336,26 @@ export function LiteratureFiguresPanel({
             {/* 画廊 */}
             {shown.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground">
-                该文献暂无{typeFilter === 'all' ? '' : TYPE_LABEL[typeFilter]}图谱。
+                该文献暂无{typeFilter === 'all' ? '' : TYPE_LABEL[typeFilter]}文献图片。
               </p>
             ) : (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                {shown.map((f) => (
+                {shown.map((f, idx) => (
                   <div
                     key={f.fig_id}
                     className="group overflow-hidden rounded-lg border border-border bg-muted/20"
                   >
-                    <div className="relative flex h-32 items-center justify-center bg-white/60 p-1 dark:bg-black/20">
+                    {/* v1.9.7：点击缩略图放大（此前只能看 112px 小图或下载原图） */}
+                    <button
+                      type="button"
+                      title="点击查看大图"
+                      onClick={() => setZoomIndex(idx)}
+                      className="relative flex h-32 w-full cursor-zoom-in items-center justify-center bg-white/60 p-1 dark:bg-black/20"
+                    >
                       <img
                         src={figureFileUrl(f.fig_id)}
-                        alt={f.caption || '图谱'}
-                        className="max-h-28 max-w-full object-contain"
+                        alt={f.caption || '文献图片'}
+                        className="max-h-28 max-w-full object-contain transition-transform group-hover:scale-[1.03]"
                         loading="lazy"
                       />
                       <Badge
@@ -333,7 +364,7 @@ export function LiteratureFiguresPanel({
                       >
                         {TYPE_LABEL[f.figure_type]}
                       </Badge>
-                    </div>
+                    </button>
                     <div className="space-y-1 p-2">
                       <p className="line-clamp-2 min-h-8 text-xs text-foreground" title={f.caption}>
                         {f.caption || '（无图注）'}
@@ -547,6 +578,79 @@ export function LiteratureFiguresPanel({
               >
                 确认删除
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {/* v1.9.7：大图查看（Lightbox）——←/→ 切换、Esc 关闭、可直接改标注或下载 */}
+        <Dialog open={zoomIndex !== null} onOpenChange={(open) => !open && setZoomIndex(null)}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Badge variant="outline" className="text-[10px]">
+                  {zoomFigure ? TYPE_LABEL[zoomFigure.figure_type] : ''}
+                </Badge>
+                <span className="line-clamp-1">
+                  {zoomFigure?.caption || '（无图注）'}
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+            {zoomFigure && (
+              <div className="space-y-2">
+                <div className="flex max-h-[70vh] items-center justify-center overflow-auto rounded-lg border border-border bg-white/70 p-2 dark:bg-black/30">
+                  <img
+                    src={figureFileUrl(zoomFigure.fig_id)}
+                    alt={zoomFigure.caption || '文献图片'}
+                    className="max-h-[66vh] max-w-full object-contain"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {(zoomIndex ?? 0) + 1} / {shown.length}
+                  </span>
+                  {typeof zoomFigure.meta?.page === 'number' && (
+                    <span>· 第 {String(zoomFigure.meta.page)} 页</span>
+                  )}
+                  {zoomFigure.tags.length > 0 && (
+                    <span className="truncate">· {zoomFigure.tags.join(' · ')}</span>
+                  )}
+                </div>
+              </div>
+            )}
+            <DialogFooter className="sm:justify-between">
+              <span className="flex gap-2">
+                <Button variant="outline" size="sm"
+                        disabled={shown.length < 2}
+                        onClick={() => stepZoom(-1)}>
+                  上一张
+                </Button>
+                <Button variant="outline" size="sm"
+                        disabled={shown.length < 2}
+                        onClick={() => stepZoom(1)}>
+                  下一张
+                </Button>
+              </span>
+              <span className="flex gap-2">
+                {zoomFigure && (
+                  <>
+                    <Button variant="outline" size="sm"
+                            onClick={() => {
+                              setEditTarget(zoomFigure);
+                              setEditCaption(zoomFigure.caption);
+                              setEditTags(zoomFigure.tags.join(', '));
+                              setZoomIndex(null);
+                            }}>
+                      <Pencil className="mr-1 h-3 w-3" />改标注
+                    </Button>
+                    <a
+                      href={figureFileUrl(zoomFigure.fig_id)}
+                      download
+                      className="inline-flex h-8 items-center rounded-md border border-input px-3 text-xs hover:bg-accent"
+                    >
+                      <Download className="mr-1 h-3 w-3" />下载原图
+                    </a>
+                  </>
+                )}
+              </span>
             </DialogFooter>
           </DialogContent>
         </Dialog>
