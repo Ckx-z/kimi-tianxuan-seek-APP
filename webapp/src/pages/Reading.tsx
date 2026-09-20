@@ -11,12 +11,15 @@
  * 下一轮接：pdf.js 批注层（高亮/便签/区域截图）、DeepSeek 双语对照翻译、划词提问。
  */
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpen, CheckCircle2, FileText, Loader2, NotebookPen, Upload } from 'lucide-react';
+import { BookOpen, CheckCircle2, FileText, Languages, Loader2, NotebookPen,
+         Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 const STATES: { key: string; label: string }[] = [
@@ -62,6 +65,54 @@ function Reading() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [atts, setAtts] = useState<Attachment[]>([]);
   const [annos, setAnnos] = useState<Annotation[]>([]);
+  /** v1.9.8 R2-d：选中/粘贴的原文片段（下一轮由 pdf.js 真实划选直接填入） */
+  const [selText, setSelText] = useState('');
+  const [translation, setTranslation] = useState('');
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const doTranslate = async () => {
+    const text = selText.trim();
+    if (!text) return;
+    setBusy(true);
+    setTranslation('');
+    try {
+      const r = await fetch('/api/library/reading/translate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ segments: text.split(/\n{2,}/).filter(Boolean) }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || '翻译失败');
+      const list: string[] = d.translations ?? [];
+      setTranslation(list.filter(Boolean).join('\n\n'));
+      if (d.cached) toast.info(`其中 ${d.cached} 段命中缓存（未重复计费）`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '翻译失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doAsk = async () => {
+    if (!paperId || !question.trim()) return;
+    setBusy(true);
+    setAnswer('');
+    try {
+      const r = await fetch('/api/library/reading/ask', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paper_id: paperId, question: question.trim(),
+                               selection: selText.trim() }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || '提问失败');
+      setAnswer(d.answer || '');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '提问失败');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const loadQueue = useCallback(async () => {
     setLoading(true);
@@ -276,6 +327,47 @@ function Reading() {
                           {STATE_LABEL[s]}
                         </button>
                       ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/70 p-2.5">
+                    <p className="flex items-center gap-1 text-xs font-medium">
+                      <Languages className="h-3.5 w-3.5" />翻译 / 提问（DeepSeek）
+                    </p>
+                    <Textarea value={selText} rows={3} className="mt-1.5 text-xs"
+                              onChange={(e) => setSelText(e.target.value)}
+                              placeholder="粘贴或选中的原文段落（下一轮接入 PDF 划选自动填入）…" />
+                    <div className="mt-1.5 flex items-center gap-1">
+                      <Button size="sm" className="h-7 text-xs" disabled={busy || !selText.trim()}
+                              onClick={() => void doTranslate()}>
+                        {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                        翻译为中文
+                      </Button>
+                      <span className="text-[10px] text-muted-foreground">
+                        术语与 DOI/SMILES/数字自动保护；同段二次翻译走缓存
+                      </span>
+                    </div>
+                    {translation && (
+                      <p className="mt-1.5 whitespace-pre-wrap break-words rounded-md bg-muted/30 p-2 text-[11px]">
+                        {translation}
+                      </p>
+                    )}
+
+                    <div className="mt-2.5 border-t border-border/60 pt-2">
+                      <Input value={question} className="h-7 text-xs"
+                             onChange={(e) => setQuestion(e.target.value)}
+                             onKeyDown={(e) => { if (e.key === 'Enter') void doAsk(); }}
+                             placeholder="就这篇文献提问（依据摘要 / 条目 / 选中段落）…" />
+                      <Button size="sm" variant="outline" className="mt-1.5 h-7 text-xs"
+                              disabled={busy || !question.trim()}
+                              onClick={() => void doAsk()}>
+                        提问
+                      </Button>
+                      {answer && (
+                        <p className="mt-1.5 whitespace-pre-wrap break-words rounded-md bg-muted/30 p-2 text-[11px]">
+                          {answer}
+                        </p>
+                      )}
                     </div>
                   </div>
 
