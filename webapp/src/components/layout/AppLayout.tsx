@@ -9,6 +9,7 @@ import {
   Home,
   Search,
   BarChart3,
+  BookOpen,
   Atom,
   FlaskConical,
   Lightbulb,
@@ -45,6 +46,8 @@ const NAV_ITEMS = [
   { to: '/records', label: '实验记录', icon: FlaskConical },
   { to: '/iterate', label: '方案迭代', icon: Lightbulb },
   { to: '/assistant', label: '科研助手', icon: Bot },
+  // v1.9.8 R2：文献阅读（对标 Zotero 的阅读流程），置于「我的」之上
+  { to: '/reading', label: '文献阅读', icon: BookOpen },
   { to: '/mine', label: '我的', icon: Star },
 ];
 
