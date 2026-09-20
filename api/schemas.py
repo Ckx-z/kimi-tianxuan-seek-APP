@@ -431,3 +431,47 @@ class LiteratureFiguresAnalyze(BaseModel):
     staged_ids: list[str] = Field(default_factory=list)
     max_figures: int = Field(6, description="单次最多分析几张（控制成本）")
     hint: str = Field("", description="可选补充提示（如「重点读 PXRD 峰位」）")
+
+
+# ---------------------------------------------------------------- 文献库（v1.9.7 P1/P2）
+
+class LibraryPaperPatch(BaseModel):
+    """文献条目更新（文献库三栏 UI）：只传需要改的字段。"""
+    title: str | None = None
+    abstract: str | None = None
+    journal: str | None = None
+    year: int | None = None
+    doi: str | None = None
+    url: str | None = None
+    authors: list[str] | None = Field(None, description="作者名列表（按顺序）")
+    source: str | None = None
+    item_type: str | None = None
+    extra_json: str | None = None
+
+
+class LibraryCollectionCreate(BaseModel):
+    """新建集合（支持嵌套：parent_id 指向父集合）。"""
+    name: str = Field(..., min_length=1, max_length=80)
+    parent_id: str | None = None
+
+
+class LibraryCollectionRename(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+
+
+class LibraryTagSet(BaseModel):
+    """给文献打标签（type=manual|auto）。"""
+    tag: str = Field(..., min_length=1, max_length=60)
+    type: str = Field("manual", description="manual=手动 / auto=自动")
+
+
+class LibraryNoteCreate(BaseModel):
+    """新建笔记（Markdown）。"""
+    content_md: str = Field(..., min_length=1)
+    title: str = Field("", max_length=120)
+    source: str = Field("user", description="user | assistant | llm")
+
+
+class LibraryNoteUpdate(BaseModel):
+    title: str | None = None
+    content_md: str | None = None

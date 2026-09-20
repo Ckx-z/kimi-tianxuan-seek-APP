@@ -1,0 +1,295 @@
+"""科研文献库 API（v1.9.7 P1/P2，借鉴 Zotero local API 的参数设计）。
+
+这一层是**新的三栏文献库 UI 的后端**：服务端检索（`q/limit/offset/sort/direction/
+collection/tag`）+ 集合（树）/标签/笔记 + 跨文献数值检索 + 关系查询。
+
+数据来源：`src/literature/library_db.py` 的 SQLite 单库（镜像既有落盘文件；
+原文件仍是写入的事实来源，DB 可随时 `POST /api/library/rebuild` 重建）。
+"""
+
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter, HTTPException, Query
+
+from ..schemas import (LibraryCollectionCreate, LibraryCollectionRename,
+                       LibraryNoteCreate, LibraryNoteUpdate, LibraryPaperPatch,
+                       LibraryTagSet)
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/library", tags=["library"])
+
+
+def _db():
+    """惰性 import（沿用本项目对 literature 包的既有约定，PyInstaller 友好）。"""
+    try:
+        from literature import library_db
+    except ImportError:  # pragma: no cover
+        from src.literature import library_db  # type: ignore
+    return library_db
+
+
+def _open():
+    db = _db()
+    db.ensure_ready()
+    return db, db.connect()
+
+
+# ---------------------------------------------------------------- 状态 / 检索
+
+@router.get("/status")
+def library_status():
+    """DB 状态：迁移计数、校验结果、各类条数、文件路径与体积。"""
+    db, conn = _open()
+    try:
+        counts = {}
+        row = conn.execute(
+            "SELECT value_json FROM settings WHERE key='migrated_counts'").fetchone()
+        if row is not None:
+            try:
+                counts = __import__("json").loads(row["value_json"])
+            except Exception:
+                counts = {}
+        return {"ok": True, "counts": counts, "stats": db.stats(conn),
+                "verify": db.verify_migration(conn)}
+    finally:
+        conn.close()
+
+
+@router.post("/rebuild")
+def library_rebuild():
+    """用既有文件重建 DB（镜像层可随时重建；原文件不受影响）。"""
+    db = _db()
+    try:
+        return {"ok": True, **db.rebuild(backup=True)}
+    except Exception as exc:
+        raise HTTPException(500, f"重建失败：{type(exc).__name__}: {exc}")
+
+
+@router.get("/papers")
+def library_papers(q: str = "", limit: int = Query(50, ge=1, le=500),
+                   offset: int = Query(0, ge=0), sort: str = "paper_id",
+                   direction: str = "desc", collection_id: str | None = None,
+                   tag: str | None = None, source: str | None = None):
+    """服务端检索文献（替代 `/papers` 全量返回 + 前端本地过滤）。"""
+    db, conn = _open()
+    try:
+        return db.search_papers(conn, q=q, limit=limit, offset=offset, sort=sort,
+                                direction=direction, collection_id=collection_id,
+                                tag=tag, source=source)
+    finally:
+        conn.close()
+
+
+@router.get("/papers/{paper_id}")
+def library_paper(paper_id: str):
+    db, conn = _open()
+    try:
+        rec = db.get_paper(conn, paper_id)
+        if rec is None:
+            raise HTTPException(404, f"文献不存在: {paper_id}")
+        return rec
+    finally:
+        conn.close()
+
+
+@router.patch("/papers/{paper_id}")
+def library_patch_paper(paper_id: str, req: LibraryPaperPatch):
+    """更新文献元数据（仅传字段生效；`null` 视为不改）。"""
+    db, conn = _open()
+    try:
+        if db.get_paper(conn, paper_id) is None:
+            raise HTTPException(404, f"文献不存在: {paper_id}")
+        body = req.model_dump(exclude_unset=True, exclude_none=True)
+        if not body:
+            raise HTTPException(400, "没有需要更新的字段")
+        if "authors" in body and isinstance(body["authors"], list):
+            body["authors_json"] = __import__("json").dumps(
+                body.pop("authors"), ensure_ascii=False)
+        db.upsert_paper(conn, paper_id, body)
+        return {"ok": True, "paper_id": paper_id,
+                "paper": db.get_paper(conn, paper_id)}
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------- 集合
+
+@router.get("/collections")
+def library_collections():
+    """集合树（含默认集合与「未分类」计数）。"""
+    db, conn = _open()
+    try:
+        return {"collections": db.list_collections(conn)}
+    finally:
+        conn.close()
+
+
+@router.post("/collections", status_code=201)
+def library_create_collection(req: LibraryCollectionCreate):
+    db, conn = _open()
+    try:
+        return db.create_collection(conn, req.name, req.parent_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+@router.patch("/collections/{collection_id}")
+def library_rename_collection(collection_id: str, req: LibraryCollectionRename):
+    db, conn = _open()
+    try:
+        out = db.rename_collection(conn, collection_id, req.name)
+        if out is None:
+            raise HTTPException(404, f"集合不存在: {collection_id}")
+        return out
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+@router.delete("/collections/{collection_id}")
+def library_delete_collection(collection_id: str):
+    db, conn = _open()
+    try:
+        if not db.delete_collection(conn, collection_id):
+            raise HTTPException(404, f"集合不存在: {collection_id}")
+        return {"ok": True, "collection_id": collection_id}
+    finally:
+        conn.close()
+
+
+@router.post("/papers/{paper_id}/collections/{collection_id}")
+def library_add_to_collection(paper_id: str, collection_id: str):
+    db, conn = _open()
+    try:
+        if db.get_paper(conn, paper_id) is None:
+            raise HTTPException(404, f"文献不存在: {paper_id}")
+        db.assign_collection(conn, paper_id, collection_id, add=True)
+        return {"ok": True, "paper_id": paper_id, "collection_id": collection_id}
+    finally:
+        conn.close()
+
+
+@router.delete("/papers/{paper_id}/collections/{collection_id}")
+def library_remove_from_collection(paper_id: str, collection_id: str):
+    db, conn = _open()
+    try:
+        db.assign_collection(conn, paper_id, collection_id, add=False)
+        return {"ok": True, "paper_id": paper_id, "collection_id": collection_id}
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------- 标签
+
+@router.get("/tags")
+def library_tags():
+    db, conn = _open()
+    try:
+        return {"tags": db.list_tags(conn)}
+    finally:
+        conn.close()
+
+
+@router.post("/papers/{paper_id}/tags")
+def library_add_tag(paper_id: str, req: LibraryTagSet):
+    db, conn = _open()
+    try:
+        if db.get_paper(conn, paper_id) is None:
+            raise HTTPException(404, f"文献不存在: {paper_id}")
+        db.set_tag(conn, paper_id, req.tag, add=True, type_=req.type or "manual")
+        return {"ok": True, "paper_id": paper_id, "tag": req.tag}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+@router.delete("/papers/{paper_id}/tags/{tag}")
+def library_remove_tag(paper_id: str, tag: str):
+    db, conn = _open()
+    try:
+        db.set_tag(conn, paper_id, tag, add=False)
+        return {"ok": True, "paper_id": paper_id, "tag": tag}
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------- 笔记
+
+@router.get("/papers/{paper_id}/notes")
+def library_notes(paper_id: str):
+    db, conn = _open()
+    try:
+        return {"notes": db.list_notes(conn, paper_id)}
+    finally:
+        conn.close()
+
+
+@router.post("/papers/{paper_id}/notes", status_code=201)
+def library_add_note(paper_id: str, req: LibraryNoteCreate):
+    db, conn = _open()
+    try:
+        return db.add_note(conn, paper_id, req.content_md, title=req.title or "",
+                           source=req.source or "user")
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+    finally:
+        conn.close()
+
+
+@router.patch("/notes/{note_id}")
+def library_update_note(note_id: str, req: LibraryNoteUpdate):
+    db, conn = _open()
+    try:
+        out = db.update_note(conn, note_id, title=req.title,
+                             content_md=req.content_md)
+        if out is None:
+            raise HTTPException(404, f"笔记不存在: {note_id}")
+        return out
+    finally:
+        conn.close()
+
+
+@router.delete("/notes/{note_id}")
+def library_delete_note(note_id: str):
+    db, conn = _open()
+    try:
+        if not db.delete_note(conn, note_id):
+            raise HTTPException(404, f"笔记不存在: {note_id}")
+        return {"ok": True, "note_id": note_id}
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------- 数值检索 / 关系
+
+@router.get("/metrics")
+def library_metrics(name: str = "", min_value: float | None = None,
+                    max_value: float | None = None, technique: str | None = None,
+                    limit: int = Query(100, ge=1, le=1000)):
+    """跨文献数值检索（如「比表面积 > 2000」）。"""
+    db, conn = _open()
+    try:
+        return {"metrics": db.search_metrics(conn, name=name, min_value=min_value,
+                                             max_value=max_value,
+                                             technique=technique, limit=limit)}
+    finally:
+        conn.close()
+
+
+@router.get("/relations")
+def library_relations(subject: str | None = None, object: str | None = None,
+                      predicate: str | None = None):
+    """关系查询（P3 的 cites/similar_to 将写入此处）。"""
+    db, conn = _open()
+    try:
+        return {"relations": db.list_relations(conn, subject=subject,
+                                               object_=object,
+                                               predicate=predicate)}
+    finally:
+        conn.close()
