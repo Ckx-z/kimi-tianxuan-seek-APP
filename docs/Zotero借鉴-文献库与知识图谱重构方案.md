@@ -135,26 +135,29 @@ item types 与 fields 的权威定义在 [`zotero/zotero-schema`](https://github
   **不覆盖 HTTP JSON 形状**）、[dzackgarza/zotero-local-write-api 的 openapi.yaml](https://github.com/dzackgarza/zotero-local-write-api/blob/main/openapi.yaml)
   （真 OpenAPI 3.1，但描述的是该第三方 add-on 自建端点，**非官方**）。
 
-### 1.4 知识图谱类插件（**仓库地址已逐个核实**，与你 brief 中名称不一致处已更正）
+### 1.4 知识图谱类插件（**仓库地址与活跃度已逐个核实**，含同名混淆澄清）
 
-| 项目 | 定位（按仓库自述） | 借鉴点 |
-|---|---|---|
-| [`alisoroushmd/zotero-mcp`](https://github.com/alisoroushmd/zotero-mcp) | MCP server for Zotero —— search, add papers, write Word docs with live citations（PyPI: `zotero-mcp-server`） | 把「库」暴露成一组**工具调用**，与我们科研助手的 tool registry 天然同构 |
-| [`amberbiology/scribl`](https://github.com/amberbiology/scribl) | Semantic Capture of Relationships In Biological Literature —— 从文献中抽取**关系**并转成语义/图结构（Zenodo 有 v0.8.3 发布） | 「文档→实体→关系→图」的 ETL 思路；说明业界做法是**导出图**而非把图塞进文献库 |
-| [`Stef4678/citation-atlas`](https://github.com/Stef4678/citation-atlas) | 把 Zotero 的 items / collections / **authors** 导出为 Obsidian `.canvas`（JSON Canvas）引用图 | 图谱**导出为通用格式**（便于外部工具消费）；按 collection 维度出图 |
-| `zotero-refs` | 为条目展示引用/被引/相关与引用图谱 | ⚠️ **仓库地址未核实**，仅按你提供的描述记入；落地前需确认 |
-| `lit-monitor` | 实体/关系抽取（主题、方法、材料、作者、期刊） | ⚠️ **未核实**（同上） |
+| 项目 | 定位（按仓库自述） | 关键机制（可借鉴） | 活跃度/许可 |
+|---|---|---|---|
+| [`alisoroushmd/zotero-mcp`](https://github.com/alisoroushmd/zotero-mcp) | MCP server：搜索/建条目/Word 实时引文/**引文图谱与知识图谱** | ① **「两工具契约」抽实体**：server 只提供 `get_unextracted_abstracts` 与 `store_entities`，**抽取由调用方 LLM 做** → 模型供应商彻底解耦；② 图**先落库**（SQLite+NetworkX 持久化），再按 `MATERIALIZATION_LIMIT`（默认 10 万条）**物化进内存，超限直接拒绝**而非 OOM；③ 用 MCP **Prompts 把多工具流程固化成可复用编排** | **仅 3★**、MIT、push 2026-09-17 |
+| ⚠️ [`54yyyu/zotero-mcp`](https://github.com/54yyyu/zotero-mcp) | **同名但不同项目**：主流实现（5090★/405 fork），只做**语义检索+标注**，**不做知识图谱** | —— | 5090★、MIT |
+| [`amberbiology/scribl`](https://github.com/amberbiology/scribl) | 生物文献**关系语义捕获**：用**标签即图数据**写进 Zotero，再解析成图库 | ① **人类可读 DSL 存在 Zotero 标签里**——Zotero 自身即编辑器与版本管理，避免外挂库不同步；② **一份图模型多后端导出**（Cypher / GraphML / NetworkX），存储与查询解耦；③ 节点强制带**外部权威 ID**（如 UniProt URL）→ 为实体对齐留钩子 | 5★、**AGPL-3.0**、有 JOSS 论文 |
+| [`yimmy23/zotero-refs`](https://github.com/yimmy23/zotero-refs) | 每个条目四栏：References / Cited By / Related / **Citation Graph** | ① **「本地 PDF 文本层定骨架 + 在线 API 补字段」的融合**，任一侧缺失另一侧仍可用，且**逐字段标注来源**（DOI 覆盖率 699 篇语料 19%→80%）；② **边按可信度分层渲染**：实线=确证引用、虚线=provider 推荐（明确标注非真实引用）、细线=共享参考文献（bibliographic coupling）；③ 节点视觉编码（大小=被引量、实心=已入库）；④ 不确定结果**强制人工确认**（撤稿标记、行编辑保留原始引文证据） | 12★、**AGPL-3.0-or-later**、2026-09 push |
+| [`Stef4678/citation-atlas`](https://github.com/Stef4678/citation-atlas) | 把 Zotero items/collections/authors 导出为 Obsidian **`.canvas`（JSON Canvas 1.0）**引用地图 | ① **不发明格式，落到成熟宿主格式**（Obsidian 原生可编辑）→ 免费获得拖拽/聚类/涂色；② **「外部被引作品只做一层、默认上限 60」**的防爆炸策略；③ **从真实信号推导阅读状态**（标注子条目→annotated；`Read` 前缀→read），不新增私有字段 | 0★（极新）、**MIT** |
+
+> 说明：`zotero-refs` 与 `citation-atlas` **都不用 LLM**——它们的"智能"是确定性算法（多源融合 + RRF + 结构推断），
+> 这点对我们有启发：**引用/相似关系应尽量用确定性来源，LLM 只做兜底抽取**。
 
 ### 1.5 LLM 集成类插件
 
-| 项目 | 定位（按仓库自述） | 借鉴点 |
-|---|---|---|
-| [`steven-jianhao-li/zotero-AI-Butler`](https://github.com/steven-jianhao-li/zotero-AI-Butler) | 「Zotero AI 管家」：调用大模型**自动精读**论文库里的论文 → **总结为 Zotero 笔记**，支持主流大模型平台 | 「精读产出落到笔记、与条目绑定」——我们目前**没有笔记系统**，这是最值得补的一块；它的多模型抽象也值得抄 |
-| [`congcongwang0122/zotero-skill`](https://github.com/congcongwang0122/zotero-skill) | 连 Zotero **本地 API**：一键搜索、导出 BibTeX、读 PDF 全文、生成综述（含 [local-api-routes.md](https://github.com/congcongwang0122/zotero-skill/blob/main/references/local-api-routes.md)） | 「全文 + 综述」流水线，与我们的「补解析 + 深度研究」几乎同构；其 API 参考可直接用于 P5 导入实现 |
-| `joaopn/zotero_llm` | 本地/远程 LLM 配置方式 | ⚠️ **未核实**（按你提供描述记入） |
+| 项目 | 定位 | 关键机制（可借鉴） | 活跃度/许可 |
+|---|---|---|---|
+| [`steven-jianhao-li/zotero-AI-Butler`](https://github.com/steven-jianhao-li/zotero-AI-Butler) | LLM **自动精读**论文库 → 写回 **Zotero 原生笔记** | ① **生产者-消费者任务队列 + 限速（每分钟处理数）+ 可观测任务面板**（pending/running/done/failed）——这是 LLM 批处理的**必备件而非可选**；② **PDF 以 Base64 直送多模态模型**（公式/图表/复杂排版无损，纯图 PDF 也能读），可切文本模式；③ 三种触发（右键即时/巡航扫新/批量扫未总结）；④ **提示词模板可自定义 + 变量实时预览**（`{{title}}`/`{{authors}}`）；⑤ **多轮「拼接 vs 总结」两种聚合策略并显式标注 token 消耗** | **1744★/97 fork**（本批最活跃）、**AGPL-3.0** |
+| [`congcongwang0122/zotero-skill`](https://github.com/congcongwang0122/zotero-skill) | 连 Zotero 本地 API 的「整理分类 + 生成综述」skill | ① **skill 式渐进披露**（frontmatter 只写触发条件，正文命中才载入）比 MCP 全量 schema 省 context；② **直接 HTTP 调用作为 helper 脚本的 fallback**（去掉单点依赖）；③ **只读默认 + 写操作先确认**；④ 输出契约强制「可追溯字段 + 显式 blocker 命名」（Zotero 未开/本地 API 未启用/PDF 缺失） | 193★、**无 LICENSE（不可直接抄代码）** |
+| [lit-monitor（PyPI 0.11.0）](https://pypi.org/project/lit-monitor/) | 语义文献发现：按**与你自己的 Zotero 库的相似度**排序新论文 → LLM 抽结构化字段 | ① **以用户自己的库作为相关性先验**（库本身就是兴趣模型，省掉领域配置）；② **Markdown 里的 persist zone**：机器生成内容可反复重建，而**人工批注永不被覆盖**；③ `--rag-mode {vector,graph,hybrid}` 三态可切 + 显式 RRF 融合 | Beta、MIT、**不支持 Windows（硬伤）**、GitHub 仓库当前 404（**未确认**） |
 
-> 另有 [`openai/plugins` 中的 zotero skill](https://github.com/openai/plugins/blob/f812c146/plugins/zotero/skills/zotero/references/local-api-routes.md)
-> 整理了一份本地 API 路由参考，可作为 P5 的对照实现。
+> ⚠️ **前车之鉴**：lit-monitor 深度依赖 **`kuzu>=0.6`**，而 KuzuDB 仓库**已被 GitHub 标记 `archived`**
+> （最后 push 2025-10-10，329 个 open issue 无人处理）——**图数据库选型必须避开它**（详见 §5.3）。
 
 ### 1.6 插件模板（数字为调研时刻的 GitHub 元数据）
 
@@ -169,13 +172,40 @@ item types 与 fields 的权威定义在 [`zotero/zotero-schema`](https://github
   → 若未来要让本系统与 Zotero 双向互通（读它的库 / 被它调用），可基于它做插件；**本期不做**，但架构上留出 HTTP 互操作口。
 
 ### 1.7 可借鉴的关键设计点（汇总）
+
+**A. 数据模型层**（来自 Zotero 本体，§1.1/§1.2 已展开）
 1. **统一 item + children 模型**（文献/附件/笔记/图片同构，父子用 `parentItemID`）。
 2. **集合（树）+ 标签（多对多）**双轨组织，条目可多归属。
 3. **服务端检索参数 + 全文索引（FTS）**，而不是把全量数据丢给前端过滤。
 4. **通用 relations 表**承载「引用/相关/衍生」等开放关系 → 直接对接知识图谱。
 5. **精读产出→笔记**，笔记与条目强绑定（LLM 产出有人工确认位）。
 6. **附件走文件系统、DB 只存索引**；附件按父条目分目录。
-7. **只读借鉴 DB 结构**（Zotero 官方警告：直接改库会坏）→ 我们对外**只提供 API 互操作**，不碰别人的库文件。
+7. **只读借鉴 DB 结构**（官方警告：直接改库会坏）→ 我们对外**只提供 API 互操作**，不碰别人的库文件。
+
+**B. 工程机制层**（来自插件调研，最实用的 11 条）
+8. **「两工具契约」抽实体**（zotero-mcp）：服务端只提供「取未抽取文本」与「写回类型化实体」，
+   **抽取由调用方 LLM 决定** → 模型供应商与存储层解耦；我们换云/换本地不动数据层。
+9. **图先落库、按上限物化进内存，超限拒绝而非 OOM**（zotero-mcp，默认 10 万条）→ 直接用于我们的 NetworkX 视图。
+10. **边按可信度分层**（zotero-refs）：实线=确证引用（DOI/Crossref 匹配）、虚线=算法推荐（**明确标注非真实引用**）、
+    细线=共享参考文献（bibliographic coupling）→ 我们建 `cites`/`similar_to` 必须带 `source` 与置信度，**不做无差别合并**。
+11. **多源融合 + 逐字段来源标注**（zotero-refs）：本地 PDF 文本层定骨架 + 在线 API 补字段，
+    任一侧缺失另一侧仍可用（DOI 覆盖率 19%→80%）→ 我们的「摘要三级兜底」「作者/期刊回填」照此设计。
+12. **LLM 批处理的必备件：队列 + 限速 + 可观测任务面板**（AI-Butler，pending/running/done/failed）→ 不是可选项；
+    我们做「精读生成笔记」「批量视觉标注」前必须先有队列与进度。
+13. **多轮「拼接 vs 总结」两种聚合策略并显式标注 token 成本**（AI-Butler）→ 用于分段解析与报告生成。
+14. **PDF 以 Base64 直送多模态模型**（AI-Butler）→ 扫描件/复杂排版的兜底路径（比自建 OCR 管线简单）。
+15. **Markdown persist zone**（lit-monitor）：机器生成内容可反复重建，**人工批注永不被覆盖** →
+    直接用于我们的「笔记」与「导出」（LLM 段落放标记区内，重跑只更新区内）。
+16. **输出落到成熟宿主格式**（citation-atlas 的 JSON Canvas、zotero-mcp 的 D3 HTML）+ **防爆炸参数**
+    （外部被引只做一层、默认上限）→ 我们导出图谱时不发明格式。
+17. **渐进披露 + 只读默认 + 显式 blocker**（zotero-skill）：工具描述分层加载；写操作先确认；
+    失败必须点名具体关卡（服务未开/端口关闭/无匹配），不返回含糊错误。
+18. **以用户自己的库作为相关性先验**（lit-monitor）：库本身就是兴趣模型，无需领域配置 →
+    可做「新文献按与你库的相似度排序」推荐（复用我们已有的 `embedding.py`）。
+
+> **许可提示**：`scribl` / `zotero-refs` / `zotero-AI-Butler` 为 **AGPL-3.0**（传染性），
+> `citation-atlas` 为 MIT，`zotero-skill` **无 LICENSE**（默认保留所有权利）。
+> **我们只借鉴设计思想、不复制代码**；若将来要复用代码，只取 MIT/BSD 类。
 
 ---
 
@@ -346,15 +376,29 @@ CREATE VIRTUAL TABLE items_fts USING fts5(
 | L2（可选，需视觉模型） | 对无图注/用户点选的图调用 `vision.analyze_image`（**已实现**，`src/literature/vision.py`）→ 回填 caption + `caption_source=vision` + `confidence`；单次 ≤6 张 | 每图 1 次视觉调用 |
 | L3（人工） | 用户在 Lightbox 或卡片上改 caption/tags（已有 PATCH） | 0 |
 
-**视觉模型可行性（结合你的机器实测）**：
-- **云端（推荐）**：你当前 `api.deepseek.com` **无视觉模型**；只需在设置页「视觉读图」填一个 OpenAI 兼容的视觉端点：
-  DashScope `qwen-vl-max`（`https://dashscope.aliyuncs.com/compatible-mode/v1`）、智谱 `glm-4v-plus`、
-  硅基流动 Qwen3-VL 等。**零改码**（客户端已是 OpenAI 兼容），识别科研谱图数值的准确度最好。
-- **本地**：你这台 **RTX 4060 Laptop 8GB** 可跑 **Qwen2.5-VL-3B**（约 3GB，流畅）/ 7B 4-bit（约 6GB，勉强）；
-  需装 Ollama（~0.7GB）或 LM Studio/vLLM，填 `base_url=http://127.0.0.1:11434/v1` 即可接入。
-  **代价**：本地小模型读谱图轴/峰位明显弱于云端，且笔记本长时间推理发热降频。
-- **建议**：云端为主 + 本地为离线兜底（两者共用同一配置项，P2 批把「视觉读图」从文献卡片提升为**全局设置**，
-  并让科研助手的图片上传走同一条视觉链路）。
+**视觉模型可行性（你的机器实测 + 2026 年型号对照）**
+
+| 模型 | 量化 | 显存 | 8GB 卡结论 |
+|---|---|---|---|
+| **Qwen3-VL-4B**（首选） | Q4_K_M ~3.3GB | 最低 ~6GB | ✅ **舒适区**（DocVQA ~91%），Ollama tag `qwen3-vl:4b` |
+| Qwen3-VL-8B | Q4_K_M ~6.1GB | 最低 8GB | ⚠️ **8GB 是下限而非舒适区**：大图/高分辨率会顶到显存墙（DocVQA 96.1%、OCRBench 89.6%，比 4B 高约 5 点，只在 OCR/表格密集时才值得） |
+| Qwen3-VL-2B | ~1.9GB | 4GB 卡可用 | 轻量 OCR/描述够用，文档精度明显不如 4B |
+| MiniCPM-V 4.5（3.6B） | 官方 GGUF Q4 + `mmproj` | 估算 <6GB（**未确认**） | llama.cpp 路径成熟，可作为 4B 的备选 |
+| moondream2 | 1.7GB | 极低 | ❌ **上下文仅 2K**、官方自述难以理解复杂指令 → 只适合**粗粒度打标** |
+| Qwen3-VL-30B-A3B | MoE Q4 ~20GB | 超 8GB | ❌ 不可行（MoE 权重需常驻） |
+
+- **量化取舍**：视觉模型对量化比纯文本更敏感（视觉编码器也被压）。Q4_K_M ≈ OCR 精度损失 **3–5%**（可接受）；
+  Q8_0 接近全精度但显存翻倍（需 16GB+）；**Q2_K 在视觉任务上不建议**（幻觉与抽错显著上升）。
+  → **8GB 的现实结论：4B-Q4 做主力 + 需要高精度时按页调用云端**，比硬塞 8B 更稳。
+- **接入方式（三种都暴露 OpenAI 兼容端点，我们只换 `base_url`）**：
+  - **Ollama**：`http://localhost:11434/v1/`，`api_key='ollama'`（必填但被忽略）；官方确认 `/v1/chat/completions`
+    **支持 Vision（`image_url` 传 base64 data URI）**。⚠️ **两个必须注意的点**：
+    ① `image_url` **不支持远程 URL，只能 base64**；② **上下文长度无法通过 OpenAI 协议设置**，
+    必须写 `Modelfile` 的 `PARAMETER num_ctx` 后 `ollama create`——**"整篇 PDF 转图喂进去"的场景必须调这一项**。
+  - **LM Studio**（默认端口 1234）：适合人工试模型，作为产品依赖不如 Ollama 稳。
+  - **vLLM**：吞吐/并发最好，但需独立环境与较大显存余量，8GB 单机不划算。
+- **我们的落地封装**：统一「OpenAI 兼容客户端 + 可配 `base_url`/`model`」，云端与本地同一代码路径；
+  图片统一 base64 内联；**设置页显式暴露 `num_ctx` 与「是否允许上传到云端」开关**（隐私开关必须显式）。
 
 ---
 
@@ -452,13 +496,20 @@ CREATE VIRTUAL TABLE items_fts USING fts5(
 
 | 方案 | 评估 | 结论 |
 |---|---|---|
-| **SQLite `graph_nodes/graph_edges` + NetworkX 侧车图** | 零安装（stdlib）、事务/索引/可 SQL 联查、PyInstaller 友好；算法侧继续用 NetworkX（已有） | ✅ **推荐**（本期） |
-| Neo4j（社区版/嵌入式） | 查询语言强（Cypher），但需 JVM/独立进程、社区版 **GPLv3**、安装体积大、打包复杂 | ❌ 不推荐（桌面单机过重） |
-| KuzuDB | 嵌入式图库、Cypher 子集、体积小 | ⚠️ 可作未来升级（需评估 PyInstaller 打包与许可） |
-| DuckDB + 递归 CTE | 分析强，但图遍历靠手写 CTE | ⚠️ 备选（若要做大量跨文献数值统计可引入） |
+| **SQLite `graph_nodes/graph_edges`（同库）+ NetworkX 侧车图** | 零安装（stdlib `sqlite3`，含 `WITH RECURSIVE`）、事务/索引/可与文献库同库联查、**FTS5** 全文、PyInstaller 友好；算法侧继续用已有 NetworkX | ✅ **推荐（本期）**。理由：我们已经有 SQLite 作为文献库主库，**再把图放同一个库**，避免引入第二个嵌入式引擎与其打包风险 |
+| DuckDB + 递归 CTE | MIT、单文件、分析能力强（`USING KEY` 优化递归 CTE）；但需**额外的二进制扩展**，PyInstaller 有已知坑（`hook-duckdb.py` / "cannot find DuckDB module"），且与我们已选的 SQLite 功能重叠 | ⚠️ **仅在未来需要大规模跨文献数值分析时再评估**（届时可作为只读分析库并存） |
+| **KuzuDB** | 嵌入式图库、原生 Cypher + 向量/全文 | ❌ **明确避开**：`kuzudb/kuzu` 仓库**已被 GitHub 标记 archived**（最后 push 2025-10-10，329 open issues 无人处理），社区正在迁移（The Register 报道 / FalkorDB 迁移指南）。lit-monitor 深度依赖 `kuzu>=0.6` 即前车之鉴 |
+| Neo4j（社区版/嵌入式） | Cypher 与图算法生态最全 | ❌ 不推荐：**JVM + 独立进程 + 社区版 GPLv3**（Enterprise 转向 open core）三重负担，与「随桌面包一起分发」冲突 |
+| FalkorDB | 若确实需要 Cypher，是 Kuzu 的替代候选 | ⚠️ 待评估（需额外服务进程） |
 
-规模判断：内置图 5713 文献 / 6197 反应 + 用户增量（当前用户 33 图/22 图两批）→ **1e4~1e5 节点**，
-SQLite + NetworkX 完全够用（毫秒级一跳/二跳），无需图数据库。
+规模判断：内置图 5713 文献 / 6197 反应 + 用户增量（当前 33 + 22 两批）→ **1e4~1e5 节点**，
+SQLite（`WITH RECURSIVE`）+ NetworkX **毫秒级一跳/二跳完全够用**；
+算法层参考 zotero-mcp 的做法：**图先落库、按上限物化进内存，超限拒绝而非 OOM**。
+
+> 说明：这一处我与调研建议**有意分歧**——调研推荐 DuckDB 存图，但我们的文献库已选 SQLite，
+> 再引入 DuckDB 会多一个二进制依赖与打包面；在 1e4~1e5 节点量级上 SQLite 的递归 CTE 足够，
+> 因此**单一 SQLite** 更符合"桌面单机、随包分发、可回退"的约束。若未来节点量到 1e6 或要做
+> 大规模跨文献数值聚合，再把 DuckDB 作为**只读分析库**并行引入（不改主库）。
 
 ### 5.4 与成膜打分模块的联动
 
@@ -639,13 +690,25 @@ P6(视觉) ── 仅依赖「设置页全局视觉配置」，可与 P2/P3 并�
 - [congcongwang0122/zotero-skill 的 local-api-routes.md](https://github.com/congcongwang0122/zotero-skill/blob/main/references/local-api-routes.md)
 - [openai/plugins 的 zotero local-api-routes.md](https://github.com/openai/plugins/blob/f812c146/plugins/zotero/skills/zotero/references/local-api-routes.md)
 
-**插件仓库（已核实）**
-- [alisoroushmd/zotero-mcp](https://github.com/alisoroushmd/zotero-mcp)（PyPI [zotero-mcp-server](https://pypi.org/project/zotero-mcp-server/)）
-- [amberbiology/scribl](https://github.com/amberbiology/scribl)（[Zenodo v0.8.3](https://zenodo.org/records/16892066)）
-- [steven-jianhao-li/zotero-AI-Butler](https://github.com/steven-jianhao-li/zotero-AI-Butler)
-- [Stef4678/citation-atlas](https://github.com/Stef4678/citation-atlas)
-- [congcongwang0122/zotero-skill](https://github.com/congcongwang0122/zotero-skill)
-- [windingwind/zotero-plugin-template](https://github.com/windingwind/zotero-plugin-template)（按你 brief 记入，未单独核实活跃度）
+**插件仓库（已核实，含活跃度/许可）**
+- [alisoroushmd/zotero-mcp](https://github.com/alisoroushmd/zotero-mcp)（**3★**，MIT；`54yyyu/zotero-mcp` 是**同名主流项目**5090★，只做语义检索+标注、不建图）
+- [amberbiology/scribl](https://github.com/amberbiology/scribl)（5★，**AGPL-3.0**；**无 LLM**，标签 DSL 策展；[JOSS doi:10.21105/joss.06645](https://doi.org/10.21105/joss.06645)）
+- [yimmy23/zotero-refs](https://github.com/yimmy23/zotero-refs)（12★，**AGPL-3.0-or-later**；多源融合 + 边可信度分层，**无 LLM**）
+- [steven-jianhao-li/zotero-AI-Butler](https://github.com/steven-jianhao-li/zotero-AI-Butler)（**1744★**，AGPL-3.0；队列+限速+Base64 PDF+多轮聚合）
+- [congcongwang0122/zotero-skill](https://github.com/congcongwang0122/zotero-skill)（193★，**无 LICENSE**）+ [SKILL.md](https://github.com/congcongwang0122/zotero-skill/blob/main/SKILL.md)
+- [Stef4678/citation-atlas](https://github.com/Stef4678/citation-atlas)（0★，**MIT**；JSON Canvas 输出）
+- 本地 API 路由对照实现：[zotero-skill local-api-routes.md](https://github.com/congcongwang0122/zotero-skill/blob/main/references/local-api-routes.md)、[openai/plugins 同类整理](https://github.com/openai/plugins/blob/f812c146/plugins/zotero/skills/zotero/references/local-api-routes.md)
+
+**本地视觉模型与推理服务**
+- [Ollama OpenAI 兼容文档](https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx)（**Vision 仅 base64**；上下文需 `Modelfile` 的 `num_ctx`）、[qwen3-vl 模型页](https://ollama.com/library/qwen3-vl)、[moondream 模型页](https://ollama.com/library/moondream)
+- [Qwen3-VL-4B vs 8B 显存/量化对照](https://codersera.com/blog/qwen3-vl-4b-vs-qwen3-vl-8b-benchmarks-vram-guide/)
+- [MiniCPM-V 4.5 llama.cpp 部署](https://github.com/OpenSQZ/MiniCPM-V-CookBook/blob/main/deployment/llama.cpp/minicpm-v4_5_llamacpp.md)
+- [LMDeploy InternVL3-8B 量化 issue](https://github.com/InternLM/lmdeploy/issues/3988)（量化风险提示）
+
+**图存储选型依据**
+- [kuzudb/kuzu（**已 archived**）](https://github.com/kuzudb/kuzu)、[The Register 报道](https://assets.theregister.com/2025/10/14/kuzudb_abandoned/)、[FalkorDB 迁移指南](https://www.falkordb.com/blog/kuzudb-to-falkordb-migration/) —— **明确避开 KuzuDB**
+- [DuckDB FAQ](https://www.duckdb.org/faq)（MIT/非营利基金会）、[USING KEY 优化递归 CTE](https://www.duckdb.org/2025/05/23/using-key)、[递归 CTE 执行优化](https://www.duckdb.org/2026/08/25/how-duckdb-runs-recursive-ctes-faster)、[PyInstaller hook 实例](https://github.com/swisstopo/lg-gcover/blob/develop/hook-duckdb.py)、[DuckDB PyInstaller 已知坑](https://github.com/duckdb/duckdb/discussions/15608)
+- [Neo4j open core FAQ](https://neo4j.com/open-core-and-neo4j/) / [Licensing](https://neo4j.com/licensing/) —— 社区版 GPLv3、Enterprise 转 open core
 
 **本系统内部依据（只读实测）**
 - 数据目录 `%APPDATA%\COF-Film-Recommend\data`：`literature/knowledge_entries.jsonl`（11293 条）、
