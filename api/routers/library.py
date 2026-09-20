@@ -293,3 +293,84 @@ def library_relations(subject: str | None = None, object: str | None = None,
                                                predicate=predicate)}
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------- 图谱扩展（P3）
+
+def _graph_extend():
+    try:
+        from literature import graph_extend
+    except ImportError:  # pragma: no cover
+        from src.literature import graph_extend  # type: ignore
+    return graph_extend
+
+
+@router.get("/graph/stats")
+def library_graph_stats():
+    """图谱规模（节点/边数、按谓词分布）。"""
+    _db, conn = _open()
+    try:
+        return _graph_extend().graph_stats(conn)
+    finally:
+        conn.close()
+
+
+@router.get("/graph/neighbors/{paper_id}")
+def library_graph_neighbors(paper_id: str):
+    """某文献的引用 / 被引 / 相似（供 UI「关联」面板）。"""
+    _db, conn = _open()
+    try:
+        return _graph_extend().neighbors(conn, paper_id)
+    finally:
+        conn.close()
+
+
+@router.post("/graph/sync")
+def library_graph_sync(paper_id: str | None = None,
+                       kinds: str = "entities,citations,similar",
+                       fetch: bool = True, limit: int = 50):
+    """构建图谱关系（幂等）：
+
+    - `entities`：从结构化条目抽 technique/metric/property 节点与边（本地、零成本）
+    - `citations`：按 DOI 调 Crossref 取参考文献写 `cites` 边（需联网；失败跳过）
+    - `similar`：向量近邻写 `similar_to` 边（标注 source=embedding，属算法推荐）
+    """
+    db, conn = _open()
+    ge = _graph_extend()
+    want = {k.strip() for k in (kinds or "").split(",") if k.strip()}
+    try:
+        if paper_id:
+            targets = [str(paper_id)]
+        else:
+            rows = conn.execute(
+                "SELECT paper_id FROM items WHERE deleted_at IS NULL"
+                " ORDER BY added_at DESC LIMIT ?", (max(1, min(limit, 500)),)).fetchall()
+            targets = [str(r["paper_id"]) for r in rows]
+        out: dict = {"targets": len(targets), "entities": [], "citations": []}
+        for pid in targets:
+            if "entities" in want:
+                out["entities"].append(ge.sync_entities(conn, pid))
+            if "citations" in want:
+                row = conn.execute("SELECT doi FROM items WHERE paper_id=?",
+                                   (pid,)).fetchone()
+                doi = (row["doi"] if row else "") or ""
+                if doi:
+                    out["citations"].append(
+                        ge.sync_citations(conn, pid, doi, fetch=fetch))
+        if "similar" in want:
+            out["similar"] = ge.sync_similar(conn, paper_id=paper_id)
+        out["stats"] = ge.graph_stats(conn)
+        return out
+    finally:
+        conn.close()
+
+
+@router.delete("/graph/source/{source}")
+def library_graph_clear_source(source: str):
+    """按来源撤销图谱边（如 crossref / embedding / entry）。"""
+    db, conn = _open()
+    try:
+        removed = _graph_extend().clear_source(conn, source)
+        return {"ok": True, "source": source, "removed": removed}
+    finally:
+        conn.close()
