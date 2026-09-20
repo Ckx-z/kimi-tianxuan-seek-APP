@@ -212,24 +212,34 @@ def test_inbox_ingest_endpoint_creates_entry_and_links(env, monkeypatch):
 
 
 def test_inbox_ingest_reuses_existing_doi(env, monkeypatch):
-    """同 DOI 已在库中 → 不重复建条目，收件箱直接指向既有文献。"""
+    """同 DOI 已在库中 → 不重复建条目，收件箱直接指向既有文献。
+
+    **自包含**：先入库一篇（DOI=X），再入库同 DOI 的第二篇 —— 不依赖 fixture 预置
+    DOI，避免 resolver 全局缓存在全量跑时指向其它用例数据导致的假失败。
+    """
     from fastapi.testclient import TestClient
     from api.main import app
 
     library_db.ensure_ready()
     conn = library_db.connect(env["data"] / "literature" / "library.db")
-    up = reading.add_inbox_file(conn, "重复DOI.pdf", b"%PDF-1.4 dup")
+    first = reading.add_inbox_file(conn, "先入库.pdf", b"%PDF-1.4 first")
+    second = reading.add_inbox_file(conn, "同DOI再入库.pdf", b"%PDF-1.4 second")
     conn.close()
 
     from api.routers import literature as lit_router
-    # fixture 中文献 2 的 DOI 为 10.1/b
     monkeypatch.setattr(lit_router, "extract_pdf",
-                        lambda uf: {"draft": {"title": "重复", "doi": "10.1/b"}})
+                        lambda uf: {"draft": {"title": "同 DOI 文献",
+                                              "doi": "10.1000/reuse-dup"}})
     client = TestClient(app)
-    r = client.post(f"/api/library/reading/inbox/{up['inbox_id']}/ingest")
-    assert r.status_code == 201, r.text
-    assert r.json()["reused_existing"] is True
-    assert r.json()["paper_id"] == "2"
+    r1 = client.post(f"/api/library/reading/inbox/{first['inbox_id']}/ingest")
+    assert r1.status_code == 201, r1.text
+    assert r1.json()["reused_existing"] is False
+    pid = r1.json()["paper_id"]
+
+    r2 = client.post(f"/api/library/reading/inbox/{second['inbox_id']}/ingest")
+    assert r2.status_code == 201, r2.text
+    assert r2.json()["reused_existing"] is True
+    assert r2.json()["paper_id"] == pid            # 指向既有文献，不新建
 
 
 def test_inbox_ingest_requires_title(env, monkeypatch):
