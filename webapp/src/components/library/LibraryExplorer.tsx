@@ -75,7 +75,15 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function LibraryExplorer() {
+export function LibraryExplorer({
+  onSelectPaper,
+  compact,
+}: {
+  /** v1.9.8 R1 合并：选中文献时回调（由「科研知识库」驱动下方文献卡片） */
+  onSelectPaper?: (paperId: string) => void;
+  /** 精简模式：作为导航壳时隐藏右侧详情列（详情交给下方文献卡片） */
+  compact?: boolean;
+} = {}) {
   // 左栏
   const [collections, setCollections] = useState<Collection[]>([]);
   const [tags, setTags] = useState<TagRow[]>([]);
@@ -150,6 +158,8 @@ export function LibraryExplorer() {
 
   const openPaper = async (paperId: string) => {
     setSelected(paperId);
+    onSelectPaper?.(paperId);        // R1：通知外层（科研知识库）切换详情
+    if (compact) return;             // 精简模式不加载右侧详情
     setDetail(null);
     try {
       const [d, n] = await Promise.all([
@@ -272,7 +282,9 @@ export function LibraryExplorer() {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="grid min-h-[520px] grid-cols-1 border-t border-border lg:grid-cols-[220px_minmax(0,1fr)_360px]">
+        <div className={cn('grid min-h-[520px] grid-cols-1 border-t border-border',
+                           compact ? 'lg:grid-cols-[220px_minmax(0,1fr)]'
+                                   : 'lg:grid-cols-[220px_minmax(0,1fr)_360px]')}>
           {/* 左：集合 + 标签 */}
           <div className="hidden border-r border-border p-3 lg:block">
             <p className="mb-2 flex items-center gap-1 text-xs font-medium text-muted-foreground">
@@ -405,7 +417,8 @@ export function LibraryExplorer() {
             </div>
           </div>
 
-          {/* 右：详情 */}
+          {/* 右：详情（精简模式下隐藏，详情由外层文献卡片承担） */}
+          {!compact && (
           <div className="min-w-0 border-l border-border p-3">
             {!detail ? (
               <p className="mt-8 text-center text-sm text-muted-foreground">
@@ -523,6 +536,7 @@ export function LibraryExplorer() {
               </div>
             )}
           </div>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -65,6 +65,8 @@ export default function Mine() {
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [plans, setPlans] = useState<PlanItem[]>([]);
   const [online, setOnline] = useState<boolean | null>(null);
+  /** v1.9.8 R1：三栏导航壳选中的文献（驱动下方科研知识库卡片） */
+  const [focusPaperId, setFocusPaperId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   /** 导出实验记录：勾选的收藏组 id 集合 */
@@ -147,17 +149,12 @@ export default function Mine() {
         <PlansSection plans={plans} loading={loading} />
       </section>
 
-      {/* 文献库（v1.9.7 P2）：Zotero 式三栏浏览（集合 / 检索列表 / 详情+笔记） */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">文献库</h2>
-        <LibraryExplorer />
-      </section>
-
-      {/* 科研知识库（v1.9.0）：文献录入 + 结构化条目/图谱/补解析统一 */}
+      {/* 科研知识库（v1.9.0；v1.9.8 R1 合并：三栏导航壳 + 文献卡片统一为一个模块，图谱并入「关联」） */}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">科研知识库</h2>
+        <LibraryExplorer compact onSelectPaper={setFocusPaperId} />
         <LiteratureIntakeSection />
-        <LiteratureKnowledgeSection />
+        <LiteratureKnowledgeSection focusPaperId={focusPaperId} />
       </section>
 
       {/* 导出实验记录：勾选收藏组 → 分组导出 docx */}

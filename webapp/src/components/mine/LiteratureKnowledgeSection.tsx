@@ -176,11 +176,22 @@ function EntryBadge({ e }: { e: Partial<Entry> }) {
 
 // ---------- 主组件 ----------
 
-export function LiteratureKnowledgeSection() {
+export function LiteratureKnowledgeSection({
+  focusPaperId,
+}: {
+  /** v1.9.8 R1 合并：由三栏导航壳（LibraryExplorer）驱动的选中文献 */
+  focusPaperId?: string;
+} = {}) {
   const navigate = useNavigate();
   const [papers, setPapers] = useState<PaperMeta[]>([]);
   const [filter, setFilter] = useState('');
   const [paperId, setPaperId] = useState<string>('');
+
+  // R1：外部（三栏导航壳）选中文献时同步到本卡片
+  useEffect(() => {
+    if (focusPaperId && focusPaperId !== paperId) setPaperId(focusPaperId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPaperId]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<PaperDetail | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
