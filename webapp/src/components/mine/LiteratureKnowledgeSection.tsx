@@ -290,6 +290,12 @@ export function LiteratureKnowledgeSection({
 
   /** v1.9.7：文献图片数量（页签计数）——此前页签无计数，用户误以为「一直是 0」 */
   const [figureCount, setFigureCount] = useState<number | null>(null);
+  /** v1.9.8 R1：图谱关联（引用/被引/相似）——图谱并入知识库的「关联」页签 */
+  const [relations, setRelations] = useState<{
+    cites: { node: string; title: string; doi: string; external: boolean }[];
+    cited_by: { node: string; title: string }[];
+    similar: { node: string; title: string; score: number }[];
+  } | null>(null);
 
   const loadFigureCount = useCallback(async (pid: string) => {
     try {
@@ -306,6 +312,12 @@ export function LiteratureKnowledgeSection({
       void loadEntries(paperId);
       void loadAttachments(paperId);
       void loadFigureCount(paperId);
+      // R1：图谱关联（引用/被引/相似；未构建时接口返回空列表，不报错）
+      setRelations(null);
+      req<{ cites: never[]; cited_by: never[]; similar: never[] }>(
+        `/graph/neighbors/${encodeURIComponent(paperId)}`)
+        .then((d) => setRelations(d as never))
+        .catch(() => setRelations(null));
       // 加载原文元数据（老文献的结构化信息：作者/期刊/摘要等）
       req<PaperDetail>(`/papers/${encodeURIComponent(paperId)}`)
         .then(setDetail)
@@ -778,6 +790,12 @@ export function LiteratureKnowledgeSection({
                       <TabsTrigger value="figures">
                         文献图片{figureCount !== null ? `（${figureCount}）` : ''}
                       </TabsTrigger>
+                      {/* R1：图谱并入知识库 —— 该文献的引用/被引/相似 */}
+                      <TabsTrigger value="related">
+                        关联{relations
+                          ? `（${relations.cites.length + relations.cited_by.length + relations.similar.length}）`
+                          : ''}
+                      </TabsTrigger>
                       <TabsTrigger value="entries">
                         结构化条目（{entries.length}）
                       </TabsTrigger>
@@ -928,6 +946,64 @@ export function LiteratureKnowledgeSection({
                     <TabsContent value="figures" className="pt-2">
                       <LiteratureFiguresPanel key={figuresRefreshKey}
                                               fixedPaperId={paperId} />
+                    </TabsContent>
+
+                    {/* R1：关联页签 —— 引用 / 被引 / 相似（边带来源：Crossref=确证引用，embedding=算法推荐） */}
+                    <TabsContent value="related" className="space-y-3 pt-2 text-sm">
+                      {!relations ? (
+                        <p className="text-xs text-muted-foreground">
+                          暂无关联数据：可在文献库工具栏执行「构建图谱」以生成引用与相似关系。
+                        </p>
+                      ) : (
+                        <>
+                          {([
+                            ['引用（本篇引用的文献）', relations.cites, 'cites'],
+                            ['被引（引用本篇的文献）', relations.cited_by, 'cited_by'],
+                            ['相似（向量近邻，算法推荐）', relations.similar, 'similar'],
+                          ] as const).map(([label, rows, kind]) => (
+                            <div key={kind} className="rounded-lg border border-border/70 p-2.5">
+                              <p className="mb-1 text-xs font-medium text-muted-foreground">
+                                {label} · {rows.length}
+                              </p>
+                              {rows.length === 0 ? (
+                                <p className="text-xs text-muted-foreground/70">（无）</p>
+                              ) : (
+                                <ul className="space-y-1">
+                                  {rows.map((r) => {
+                                    const doi = (r as { doi?: string }).doi || '';
+                                    const score = (r as { score?: number }).score;
+                                    return (
+                                      <li key={r.node}
+                                           className="flex items-start justify-between gap-2 text-xs">
+                                        <span className="min-w-0 flex-1">
+                                          <span className="line-clamp-2">
+                                            {r.title || r.node}
+                                          </span>
+                                          {doi && (
+                                            <a href={`https://doi.org/${doi}`}
+                                               target="_blank" rel="noreferrer"
+                                               className="ml-1 text-primary underline-offset-2 hover:underline">
+                                              {doi}
+                                            </a>
+                                          )}
+                                        </span>
+                                        {typeof score === 'number' && (
+                                          <span className="shrink-0 text-muted-foreground">
+                                            相似度 {score.toFixed(3)}
+                                          </span>
+                                        )}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                          <p className="text-[11px] text-muted-foreground/70">
+                            边按来源分层：Crossref 命中为确证引用；向量近邻为算法推荐，不构成真实引用关系。
+                          </p>
+                        </>
+                      )}
                     </TabsContent>
                   </Tabs>
                 </>
