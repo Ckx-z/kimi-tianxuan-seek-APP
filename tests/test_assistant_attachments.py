@@ -237,7 +237,9 @@ def test_chat_image_fallback_plain_text(client, llm_on, monkeypatch):
     events = _sse_events(r)
     assert events[-1]["type"] == "done"
     user_contents = [m["content"] for m in seen[0] if m.get("role") == "user"]
-    assert any(isinstance(c, str) and "不支持看图" in c for c in user_contents)
+    # v1.9.7：降级提示改为「可操作指引」（如实说明未被识别 + 指向设置页/换模型）
+    assert any(isinstance(c, str) and "不支持图片输入" in c for c in user_contents)
+    assert any(isinstance(c, str) and "视觉读图" in c for c in user_contents)
     # 降级后 content 全部为纯文本（无分片列表泄漏给纯文本端点）
     assert all(isinstance(m["content"], str) for m in seen[0])
 
