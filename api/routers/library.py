@@ -374,3 +374,68 @@ def library_graph_clear_source(source: str):
         return {"ok": True, "source": source, "removed": removed}
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------- GNN 联动（P4）
+
+def _gnn_bridge():
+    try:
+        from literature import gnn_bridge
+    except ImportError:  # pragma: no cover
+        from src.literature import gnn_bridge  # type: ignore
+    return gnn_bridge
+
+
+@router.get("/gnn/candidates")
+def library_gnn_candidates(collection_id: str | None = None, tag: str | None = None,
+                           paper_id: str | None = None, limit: int = 200):
+    """可入 GNN 反馈队列的文献正样本（film_outcome 且 label=1.0，含醛/胺 SMILES）。"""
+    _db, conn = _open()
+    try:
+        return {"candidates": _gnn_bridge().collect_candidates(
+            conn, collection_id=collection_id, tag=tag, paper_id=paper_id,
+            limit=limit)}
+    finally:
+        conn.close()
+
+
+@router.post("/gnn/enqueue")
+def library_gnn_enqueue(collection_id: str | None = None, tag: str | None = None,
+                        paper_id: str | None = None, limit: int = 200,
+                        dry_run: bool = False):
+    """批量把文献正样本推入 GNN 反馈队列（幂等；dry_run 只预览）。
+
+    权重分层：用户确认过的条目 weight=2.0，LLM 提取未复核 weight=1.0；
+    每条反馈的 refs 带 `paper:<id>` / `entry:<id>` / `doi:<doi>` 以便溯源。
+    """
+    _db, conn = _open()
+    try:
+        return _gnn_bridge().enqueue(conn, collection_id=collection_id, tag=tag,
+                                     paper_id=paper_id, limit=limit, dry_run=dry_run)
+    finally:
+        conn.close()
+
+
+@router.get("/gnn/links")
+def library_gnn_links(paper_id: str | None = None):
+    """已入队反馈的溯源（不给 paper_id 时返回总览）。"""
+    bridge = _gnn_bridge()
+    _db, conn = _open()
+    try:
+        if paper_id:
+            return {"paper_id": paper_id, "links": bridge.links_for_paper(conn, paper_id)}
+        return bridge.summary(conn)
+    finally:
+        conn.close()
+
+
+@router.post("/gnn/mark-used")
+def library_gnn_mark_used(version: str, feedback_ids: str | None = None):
+    """标记反馈已用于某个 GNN 版本（供 UI「已用于 GNN 第 N 版」徽标）。"""
+    ids = [x.strip() for x in (feedback_ids or "").split(",") if x.strip()]
+    _db, conn = _open()
+    try:
+        return {"ok": True, "version": version,
+                "marked": _gnn_bridge().mark_used(conn, version, ids or None)}
+    finally:
+        conn.close()
