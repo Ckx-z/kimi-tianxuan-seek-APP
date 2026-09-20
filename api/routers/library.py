@@ -13,7 +13,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ..schemas import (LibraryCollectionCreate, LibraryCollectionRename,
+from ..schemas import (LibraryAnnotationCreate, LibraryAnnotationUpdate,
+                       LibraryCollectionCreate, LibraryCollectionRename,
                        LibraryNoteCreate, LibraryNoteUpdate, LibraryPaperPatch,
                        LibraryTagSet)
 
@@ -499,5 +500,114 @@ def library_export(format: str = "bibtex", collection_id: str | None = None,
             return {"format": "csljson", "count": len(rows),
                     "items": zio.to_csl_json(rows)}
         return {"format": "bibtex", "count": len(rows), "bibtex": zio.to_bibtex(rows)}
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------- 文献阅读（R2）
+
+def _reading():
+    try:
+        from literature import reading
+    except ImportError:  # pragma: no cover
+        from src.literature import reading  # type: ignore
+    return reading
+
+
+@router.get("/annotations")
+def library_annotations(paper_id: str | None = None,
+                        attachment_id: str | None = None):
+    """批注列表（按页码排序）。"""
+    _db, conn = _open()
+    try:
+        return {"annotations": _reading().list_annotations(
+            conn, paper_id=paper_id, attachment_id=attachment_id)}
+    finally:
+        conn.close()
+
+
+@router.post("/annotations", status_code=201)
+def library_add_annotation(req: LibraryAnnotationCreate):
+    """新增批注（高亮/便签/截图；position 为 0~1 归一化坐标）。"""
+    _db, conn = _open()
+    try:
+        return _reading().add_annotation(
+            conn, req.paper_id, type_=req.type, page=req.page,
+            position=req.position, color=req.color, text=req.text,
+            comment=req.comment, attachment_id=req.attachment_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+@router.patch("/annotations/{annotation_id}")
+def library_update_annotation(annotation_id: str, req: LibraryAnnotationUpdate):
+    """改批注（颜色/评论/页码/坐标）。"""
+    _db, conn = _open()
+    try:
+        out = _reading().update_annotation(
+            conn, annotation_id, color=req.color, comment=req.comment,
+            page=req.page, position=req.position)
+        if out is None:
+            raise HTTPException(404, f"批注不存在: {annotation_id}")
+        return out
+    finally:
+        conn.close()
+
+
+@router.delete("/annotations/{annotation_id}")
+def library_delete_annotation(annotation_id: str):
+    _db, conn = _open()
+    try:
+        if not _reading().delete_annotation(conn, annotation_id):
+            raise HTTPException(404, f"批注不存在: {annotation_id}")
+        return {"ok": True, "annotation_id": annotation_id}
+    finally:
+        conn.close()
+
+
+@router.get("/reading/queue")
+def library_reading_queue(state: str | None = None, limit: int = 100):
+    """阅读清单（含阅读状态与批注数、解析状态与缺失项）。"""
+    _db, conn = _open()
+    try:
+        return {"queue": _reading().queue(conn, state=state, limit=limit)}
+    finally:
+        conn.close()
+
+
+@router.get("/reading/plan/{paper_id}")
+def library_reading_plan(paper_id: str):
+    """读完该做什么：未入库→全量解析；已入库→只补缺失项（与列表徽标同口径）。"""
+    _db, conn = _open()
+    try:
+        return _reading().ingest_plan(conn, paper_id)
+    finally:
+        conn.close()
+
+
+@router.post("/reading/state")
+def library_reading_state(paper_id: str, state: str):
+    """设置阅读状态（unread / reading / read / ingested）。"""
+    _db, conn = _open()
+    try:
+        return {"paper_id": paper_id,
+                "reading_state": _reading().set_state(conn, paper_id, state)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+@router.post("/reading/export-note")
+def library_reading_export_note(paper_id: str, title: str = ""):
+    """把该文献的批注导出为一条笔记（Markdown，含页码与引文）。"""
+    _db, conn = _open()
+    try:
+        note = _reading().export_annotations_as_note(conn, paper_id, title=title)
+        if not note:
+            raise HTTPException(400, "该文献暂无批注，无法导出笔记")
+        return note
     finally:
         conn.close()

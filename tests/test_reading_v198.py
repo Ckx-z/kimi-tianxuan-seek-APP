@@ -1,0 +1,131 @@
+"""文献阅读模块后端（v1.9.8 R2）测试：批注 CRUD / 阅读状态 / 入库计划 / 导出笔记。"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+for p in (str(PROJECT_ROOT), str(PROJECT_ROOT / "src")):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+from literature import library_db, reading  # noqa: E402
+
+PAPERS = {
+    "1": {"title": "Partly parsed COF paper", "doi": "10.1/a", "abstract": "abs",
+          "source": "builtin"},
+    "2": {"title": "Unparsed COF paper", "doi": "10.1/b", "source": "builtin"},
+}
+ENTRIES = [{"entry_id": "e1", "paper_id": "1", "kind": "characterization",
+            "technique": "PXRD", "metrics": [{"name": "2theta", "value": 3.5, "unit": "deg"}]}]
+
+
+@pytest.fixture()
+def env(tmp_path, monkeypatch):
+    data, res = tmp_path / "data", tmp_path / "res"
+    (data / "literature").mkdir(parents=True)
+    (res / "data").mkdir(parents=True)
+    (res / "data" / "paper_titles.json").write_text(
+        json.dumps(PAPERS, ensure_ascii=False), encoding="utf-8")
+    (data / "literature" / "knowledge_entries.jsonl").write_text(
+        "\n".join(json.dumps(e, ensure_ascii=False) for e in ENTRIES), encoding="utf-8")
+    patched = []
+    for name in ("src.runtime_config", "runtime_config"):
+        mod = sys.modules.get(name)
+        if mod is not None and hasattr(mod, "user_data_root"):
+            monkeypatch.setattr(mod, "user_data_root", lambda: data)
+            monkeypatch.setattr(mod, "resource_root", lambda: res)
+            patched.append(name)
+    assert patched
+    monkeypatch.setattr(library_db, "db_path", lambda: data / "literature" / "library.db")
+    library_db.reset_ready_cache()
+    yield {"data": data}
+    library_db.reset_ready_cache()
+
+
+@pytest.fixture()
+def conn(env):
+    library_db.ensure_ready()
+    c = library_db.connect(env["data"] / "literature" / "library.db")
+    yield c
+    c.close()
+
+
+# ---------------------------------------------------------------- 批注
+
+def test_annotation_crud(conn):
+    a = reading.add_annotation(conn, "1", type_="highlight", page=4,
+                               position={"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.02},
+                               color="yellow", text="PXRD shows a peak at 2.76°",
+                               comment="主峰")
+    assert a["annotation_id"].startswith("anno_") and a["page"] == 4
+    lst = reading.list_annotations(conn, "1")
+    assert len(lst) == 1 and lst[0]["position"]["w"] == 0.3 and lst[0]["color"] == "yellow"
+
+    up = reading.update_annotation(conn, a["annotation_id"], color="green",
+                                   comment="改后评论")
+    assert up["color"] == "green" and up["comment"] == "改后评论"
+    assert reading.list_annotations(conn, "2") == []
+    assert reading.delete_annotation(conn, a["annotation_id"]) is True
+    assert reading.list_annotations(conn, "1") == []
+    with pytest.raises(ValueError):
+        reading.add_annotation(conn, "1", type_="bogus")
+
+
+# ---------------------------------------------------------------- 阅读状态
+
+def test_reading_state_transitions(conn):
+    assert reading.get_state(conn, "1") == "unread"       # 默认
+    assert reading.set_state(conn, "1", "reading") == "reading"
+    assert reading.get_state(conn, "1") == "reading"
+    assert reading.set_state(conn, "1", "ingested") == "ingested"
+    assert reading.get_state(conn, "1") == "ingested"
+    with pytest.raises(ValueError):
+        reading.set_state(conn, "1", "bogus")
+    with pytest.raises(ValueError):
+        reading.set_state(conn, "9999", "read")
+
+
+# ---------------------------------------------------------------- 入库计划 / 清单
+
+def test_ingest_plan_full_vs_missing(conn):
+    # 文献 1：有摘要 + 1 条目、无图 → 缺 figures → 只补图
+    p1 = reading.ingest_plan(conn, "1")
+    assert p1["missing_parts"] == ["figures"]
+    assert p1["parts"] == ["figures"] and p1["full_parse"] is False
+    assert p1["counts"]["entries"] == 1 and p1["counts"]["has_abstract"] is True
+    # 文献 2：三项全缺 → 全量
+    p2 = reading.ingest_plan(conn, "2")
+    assert set(p2["missing_parts"]) == {"abstract", "entries", "figures"}
+    assert p2["full_parse"] is False and len(p2["parts"]) == 3
+    assert reading.ingest_plan(conn, "9999").get("error")
+
+
+def test_queue_filters_by_state(conn):
+    reading.set_state(conn, "1", "reading")
+    q_all = reading.queue(conn)
+    assert {r["paper_id"] for r in q_all} == {"1", "2"}
+    assert all("reading_state" in r and "annotations" in r for r in q_all)
+    q_reading = reading.queue(conn, state="reading")
+    assert [r["paper_id"] for r in q_reading] == ["1"]
+    assert reading.queue(conn, state="unread")[0]["paper_id"] == "2"
+
+
+# ---------------------------------------------------------------- 批注导出笔记
+
+def test_export_annotations_as_note(conn):
+    assert reading.export_annotations_as_note(conn, "1") == {}      # 无批注 → 空
+    reading.add_annotation(conn, "1", type_="highlight", page=4,
+                           text="peak at 2.76°", comment="主峰")
+    reading.add_annotation(conn, "1", type_="image", page=5, comment="SEM 截图")
+    note = reading.export_annotations_as_note(conn, "1", title="阅读批注")
+    assert note["note_id"].startswith("note_")
+    notes = library_db.list_notes(conn, "1")
+    assert len(notes) == 1
+    md = notes[0]["content_md"]
+    assert "# 阅读批注" in md and "高亮（第 4 页）" in md
+    assert "> peak at 2.76°" in md and "截图（第 5 页）" in md

@@ -475,3 +475,24 @@ class LibraryNoteCreate(BaseModel):
 class LibraryNoteUpdate(BaseModel):
     title: str | None = None
     content_md: str | None = None
+
+
+# ---------------------------------------------------------------- 文献阅读（v1.9.8 R2）
+
+class LibraryAnnotationCreate(BaseModel):
+    """新增批注（高亮 / 便签 / 截图）。position 为 0~1 归一化坐标，缩放换页后仍可定位。"""
+    paper_id: str
+    type: str = Field("highlight", description="highlight | note | image")
+    page: int | None = None
+    position: dict | None = Field(None, description="{x,y,w,h}，0~1 相对坐标")
+    color: str = ""
+    text: str = Field("", description="原文选中文字")
+    comment: str = Field("", description="个人评论")
+    attachment_id: str | None = None
+
+
+class LibraryAnnotationUpdate(BaseModel):
+    color: str | None = None
+    comment: str | None = None
+    page: int | None = None
+    position: dict | None = None
