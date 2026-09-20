@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Query
 from ..schemas import (LibraryAnnotationCreate, LibraryAnnotationUpdate,
                        LibraryCollectionCreate, LibraryCollectionRename,
                        LibraryNoteCreate, LibraryNoteUpdate, LibraryPaperPatch,
-                       LibraryTagSet)
+                       LibraryTagSet, ReadingAskRequest, ReadingTranslateRequest)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/library", tags=["library"])
@@ -609,5 +609,46 @@ def library_reading_export_note(paper_id: str, title: str = ""):
         if not note:
             raise HTTPException(400, "该文献暂无批注，无法导出笔记")
         return note
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------- 翻译 / 问答（R2-d）
+
+def _reading_llm():
+    try:
+        from literature import reading_llm
+    except ImportError:  # pragma: no cover
+        from src.literature import reading_llm  # type: ignore
+    return reading_llm
+
+
+@router.post("/reading/translate")
+def library_reading_translate(req: ReadingTranslateRequest):
+    """段落级学术翻译（DeepSeek；批量 + 段落缓存 + DOI/SMILES/数字单位保护 + 术语校正）。"""
+    _db, conn = _open()
+    try:
+        return _reading_llm().translate_segments(
+            conn, req.segments, target_lang=req.target_lang, use_cache=req.use_cache)
+    except RuntimeError as exc:                    # 未配置 LLM → 明确指引
+        raise HTTPException(400, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"翻译失败：{type(exc).__name__}: {exc}")
+    finally:
+        conn.close()
+
+
+@router.post("/reading/ask")
+def library_reading_ask(req: ReadingAskRequest):
+    """针对单篇文献提问：上下文 = 摘要 + 选中段落 + 结构化条目 + 图表标注。"""
+    _db, conn = _open()
+    try:
+        out = _reading_llm().ask(conn, req.paper_id, req.question,
+                                 selection=req.selection, history=req.history)
+        if out.get("error"):
+            raise HTTPException(400, out["error"])
+        return out
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     finally:
         conn.close()

@@ -496,3 +496,18 @@ class LibraryAnnotationUpdate(BaseModel):
     comment: str | None = None
     page: int | None = None
     position: dict | None = None
+
+
+class ReadingTranslateRequest(BaseModel):
+    """段落级翻译请求（阅读器把当前页/整篇的段落发来，服务端批量 + 缓存）。"""
+    segments: list[str] = Field(..., min_length=1, description="待翻译段落（原顺序）")
+    target_lang: str = Field("zh", description="目标语言，默认简体中文")
+    use_cache: bool = Field(True, description="命中段落缓存则不调用模型")
+
+
+class ReadingAskRequest(BaseModel):
+    """对某篇文献提问（可带用户在原文中选中的段落）。"""
+    paper_id: str
+    question: str = Field(..., min_length=1)
+    selection: str = Field("", description="用户在 PDF 中选中的原文片段")
+    history: list[dict] = Field(default_factory=list, description="多轮历史（≤6 轮生效）")
