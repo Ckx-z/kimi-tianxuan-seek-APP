@@ -167,3 +167,83 @@ def test_inbox_rejects_non_pdf_and_empty(conn):
         reading.add_inbox_file(conn, "not-a-pdf.docx", b"PK\x03\x04 xxxx")
     with pytest.raises(ValueError):
         reading.add_inbox_file(conn, "empty.pdf", b"")
+
+
+def test_inbox_ingest_endpoint_creates_entry_and_links(env, monkeypatch):
+    """收件箱 → 入库：建条目 + 挂附件 + 回填 paper_id（元数据抽取打桩）。"""
+    from fastapi.testclient import TestClient
+    from api.main import app
+
+    library_db.ensure_ready()
+    conn = library_db.connect(env["data"] / "literature" / "library.db")
+    up = reading.add_inbox_file(conn, "外部待入库.pdf", b"%PDF-1.4 fake", note="待读")
+    conn.close()
+
+    # 打桩：PDF 元数据抽取（真实实现需要完整 PDF）
+    from api.routers import literature as lit_router
+    monkeypatch.setattr(lit_router, "extract_pdf",
+                        lambda uf: {"draft": {"title": "从 PDF 抽到的标题",
+                                              "doi": "10.1000/inbox-new",
+                                              "authors": ["Hong Xu"],
+                                              "journal": "Talanta", "year": 2026}})
+    client = TestClient(app)
+    r = client.post(f"/api/library/reading/inbox/{up['inbox_id']}/ingest")
+    assert r.status_code == 201, r.text
+    body = r.json()
+    pid = body["paper_id"]
+    assert body["reused_existing"] is False and body["needs_parse"] is True
+    assert body["entry"]["title"] == "从 PDF 抽到的标题"
+    assert body["entry"]["source"] == "reading-inbox"
+    assert body["attachment"] and body["attachment"].get("role") == "main"
+
+    # 收件箱已标记 ingested 并回填编号
+    conn = library_db.connect(env["data"] / "literature" / "library.db")
+    rec = reading.get_inbox(conn, up["inbox_id"])
+    assert rec["state"] == "ingested" and rec["paper_id"] == pid
+    conn.close()
+    # 文献条目写入**事实来源**（paper_titles.json）；DB 是镜像，随 rebuild 同步
+    # （已知滞后：下一轮在 resolver.append_paper 加镜像钩子，让三栏 UI 立即可见）
+    from literature import resolver
+    hit = resolver.resolve_paper(pid)
+    assert hit is not None
+    entry = hit[1] if isinstance(hit, tuple) else hit
+    assert entry.get("doi") == "10.1000/inbox-new"
+    assert entry.get("title") == "从 PDF 抽到的标题"
+
+
+def test_inbox_ingest_reuses_existing_doi(env, monkeypatch):
+    """同 DOI 已在库中 → 不重复建条目，收件箱直接指向既有文献。"""
+    from fastapi.testclient import TestClient
+    from api.main import app
+
+    library_db.ensure_ready()
+    conn = library_db.connect(env["data"] / "literature" / "library.db")
+    up = reading.add_inbox_file(conn, "重复DOI.pdf", b"%PDF-1.4 dup")
+    conn.close()
+
+    from api.routers import literature as lit_router
+    # fixture 中文献 2 的 DOI 为 10.1/b
+    monkeypatch.setattr(lit_router, "extract_pdf",
+                        lambda uf: {"draft": {"title": "重复", "doi": "10.1/b"}})
+    client = TestClient(app)
+    r = client.post(f"/api/library/reading/inbox/{up['inbox_id']}/ingest")
+    assert r.status_code == 201, r.text
+    assert r.json()["reused_existing"] is True
+    assert r.json()["paper_id"] == "2"
+
+
+def test_inbox_ingest_requires_title(env, monkeypatch):
+    """抽不到标题且未传 title → 明确报错，不产生空条目。"""
+    from fastapi.testclient import TestClient
+    from api.main import app
+
+    library_db.ensure_ready()
+    conn = library_db.connect(env["data"] / "literature" / "library.db")
+    up = reading.add_inbox_file(conn, "无标题.pdf", b"%PDF-1.4 notitle")
+    conn.close()
+    from api.routers import literature as lit_router
+    monkeypatch.setattr(lit_router, "extract_pdf", lambda uf: {"draft": {}})
+    client = TestClient(app)
+    r = client.post(f"/api/library/reading/inbox/{up['inbox_id']}/ingest")
+    assert r.status_code == 400
+    assert "标题" in r.json()["detail"]

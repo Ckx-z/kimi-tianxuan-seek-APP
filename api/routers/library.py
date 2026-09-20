@@ -724,3 +724,110 @@ def library_reading_inbox_delete(inbox_id: str):
         return {"ok": True, "inbox_id": inbox_id}
     finally:
         conn.close()
+
+
+@router.post("/reading/inbox/{inbox_id}/ingest", status_code=201)
+def library_reading_inbox_ingest(inbox_id: str, title: str = "",
+                                 use_pdf_metadata: bool = True):
+    """把收件箱里的 PDF 正式入库（**先读后入库**的收尾动作）。
+
+    链路（与「添加文献」一致，已核对源码）：
+      ① 复用 literature 路由的 `extract_pdf` 从 PDF 抽元数据草稿（best-effort）
+      ② `resolver.append_paper(entry)` 建条目（DOI 重复 → 409，不重复入库）
+      ③ `attachments.save_pdf(..., role='main')` 把 PDF 挂到该条目
+      ④ 标收件箱 `ingested` 并回填 `paper_id`
+    解析（抽取条目/图片/摘要，耗 token）不在本端点内执行 —— 由前端确认后
+    调用既有 `POST /api/literature/{paper_id}/parse`，避免"不点也烧钱"。
+    """
+    import io
+
+    from starlette.datastructures import UploadFile as StarletteUploadFile
+
+    _db, conn = _open()
+    try:
+        rec = _reading().get_inbox(conn, inbox_id)
+        if rec is None:
+            raise HTTPException(404, f"收件箱条目不存在: {inbox_id}")
+        from pathlib import Path
+        p = Path(rec["path"])
+        if not p.is_file():
+            raise HTTPException(404, "收件箱文件已丢失")
+        data = p.read_bytes()
+
+        # ① 抽元数据（失败不阻塞入库，标题可用参数兜底）
+        draft: dict = {}
+        if use_pdf_metadata:
+            try:
+                from . import literature as _lit
+                uf = StarletteUploadFile(file=io.BytesIO(data),
+                                         filename=rec["filename"])
+                got = _lit.extract_pdf(uf) or {}
+                draft = got.get("draft") if isinstance(got, dict) else {}
+                draft = draft if isinstance(draft, dict) else {}
+            except Exception as exc:            # noqa: BLE001
+                logger.info("收件箱入库：PDF 元数据抽取失败（继续）：%s", exc)
+                draft = {}
+
+        final_title = (title or "").strip() or str(draft.get("title") or "").strip()
+        if not final_title:
+            raise HTTPException(
+                400, "无法从 PDF 识别标题：请在「科研知识库 → 添加文献」补录标题后入库")
+
+        # ② 建条目（DOI 重复则拒绝，避免重复入库）
+        try:
+            from literature import resolver
+        except ImportError:  # pragma: no cover
+            from src.literature import resolver  # type: ignore
+        doi = resolver.normalize_doi(str(draft.get("doi") or ""))
+        if doi:
+            hit = resolver.find_by_doi(doi)
+            if hit:
+                # 已有同 DOI 文献 → 直接把收件箱指向它，不再新建
+                _reading().set_inbox_state(conn, inbox_id, "ingested",
+                                           paper_id=str(hit[0]))
+                return {"paper_id": str(hit[0]), "reused_existing": True,
+                        "inbox_id": inbox_id,
+                        "message": "该 DOI 已在文献库中，收件箱条目已指向既有文献"}
+        from datetime import datetime
+        entry = {
+            "doi": doi,
+            "title": final_title,
+            "authors": [str(a).strip() for a in (draft.get("authors") or [])
+                        if str(a).strip()],
+            "journal": str(draft.get("journal") or "").strip(),
+            "year": draft.get("year"),
+            "abstract": (str(draft.get("abstract") or "").strip() or None),
+            "in_training": False,
+            "source": "reading-inbox",
+            "added_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        }
+        try:
+            pid = resolver.append_paper(entry)
+        except OSError as exc:
+            raise HTTPException(500, f"文献库写入失败：{type(exc).__name__}: {exc}")
+        try:
+            from literature import graph_ingest
+            graph_ingest.upsert_paper_node(pid, entry)
+        except Exception as exc:  # noqa: BLE001  (# pragma: no cover)
+            logger.warning("文献节点入图失败（已入库，可重试）：%s", exc)
+
+        # ③ 挂附件（主文）
+        try:
+            from literature import attachments as att
+        except ImportError:  # pragma: no cover
+            from src.literature import attachments as att  # type: ignore
+        attach: dict | None = None
+        try:
+            attach = att.save_pdf(pid, rec["filename"], data, role="main")
+        except att.AttachmentError as exc:
+            logger.warning("附件保存失败（条目已建）：%s", exc)
+
+        # ④ 收件箱收尾
+        _reading().set_inbox_state(conn, inbox_id, "ingested", paper_id=pid)
+        conn.commit()
+        return {"paper_id": pid, "reused_existing": False, "inbox_id": inbox_id,
+                "entry": entry, "attachment": attach,
+                "needs_parse": True,
+                "next": f"POST /api/literature/{pid}/parse?auto_backfill=true"}
+    finally:
+        conn.close()
