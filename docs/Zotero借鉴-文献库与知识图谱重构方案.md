@@ -1,0 +1,580 @@
+# 借鉴 Zotero 重构「科研知识库」——调研报告 + 优化方案
+
+> 任务性质：**调研与方案设计**（未改任何代码）。
+> 取证：GitHub/官方文档（附链接） + 本系统源码 + **你机器上的真实数据**
+> （`%APPDATA%\COF-Film-Recommend\data`，1711 篇文献库 / 11293 条结构化条目 / 55 张文献图片 / 5 个附件）。
+> 待确认项已集中在文末「需要你拍板」。
+
+---
+
+## 0. 先对齐现状：你列的问题里，有些已经修好了
+
+| 你列的问题 | 当前真实状态（已实测） | 结论 |
+|---|---|---|
+| 图谱选项卡一直显示 0 | **已修（P0，已热更新到你的安装版）**：根因是 `LiteratureFiguresPanel` 的渲染分支漏了 `!fixedPaperId` 判断，固定文献模式（唯一用法）永不加载 `papers` → 画廊分支永远不可达。修后实测 **文献图片（22）+ 22 张缩略图 + 大图查看器** | ✅ 已解决，本方案只需在此基础上**增强** |
+| 补解析只能上传一份 PDF、无法上传 SI | **已支持（v1.9.3 起）**：`POST /{paper_id}/parse` 支持 `files[]` 多份（主文 + 多份 SI），按 `role` 分别解析后合并，条目带 `[主文]/[SI n]` 来源标注；附件按 sha1 去重长期留存 | ✅ 已解决；本方案增强为「拖入即识别 + 附件类型扩展」 |
+| 补解析后摘要仍显示「暂无摘要」 | **已修（P0）**：根因是回填**必须手动点按钮**，且预览不显示摘要。现解析成功即自动回填（`only_empty=True`），实测 1529 的 `abstract` 0 → 1223 字 | ✅ 已解决（后端随下次安装包生效） |
+| LLM 结构化提取失败 | **已修（v1.9.3）**：推理模型 token 预算被思考过程吃光 → 默认 16000 并自动扩容至 32000；表征白名单大小写 bug 修复（拒收率 42% → 0.5%）。实测同篇产出 211 条 | ✅ 已解决；本方案做 Prompt 结构化增强 |
+| 文献编号从 1782 递增 | **已实现**：`resolver.next_paper_id()` = 库内 `max(id)+1`，内置库到 1781 → 新文献自动 1782 起 | ✅ 已解决 |
+| 文献录入未接入知识图谱 | **部分实现**：录入即写 `LITP-<paper_id>` 文献节点（v1.9.3），条目入组时写 `reaction` 节点与 `reaction_cited_in` 边；但**缺文献↔文献关系**（引用/相似）与实体级节点 | ⚠️ 需扩展（本方案 §5） |
+
+**所以本次真正的设计重点是「结构性升级」**：数据模型（§2）、图谱联动（§5）、LLM/视觉集成（§6），
+以及把你已经确认的交互决策（报告可挑选片段、方案卡经助手讨论生成等）落到架构里。
+
+---
+
+## 1. Zotero 调研摘要
+
+### 1.1 核心数据模型（`zotero.sqlite`，SQLite）
+
+官方明确：**所有库数据都在 `zotero.sqlite`**；外部访问**只应只读**（运行中修改会因缓存层破坏文件锁导致库损坏），
+且**表结构会随版本变化**——所以正解是「只读借鉴其**模型思想**」，而不是耦合它的表。
+每条书目记录 = 「item type（journalArticle/book/…）+ 一组 fields（title/date/DOI…）+ 字段值」，
+item types 与 fields 的权威定义在 [`zotero/zotero-schema`](https://github.com/zotero/zotero-schema/tree/master)；
+**每个 item 还各自带**：一组 notes、一组 attachments、一组 tags、一组「相关条目」链接。
+附件不是塞进数据库，而是**存在数据目录中、以父 item 的 key 命名的子目录里**。
+
+表结构（社区文档与 Zotero 源码通行的命名，落地时以 `zotero-schema` 为准）：
+
+| 表 | 职责 | 关键字段 |
+|---|---|---|
+| `items` | 一切对象的主表（书目条目/附件/笔记都是 item） | `itemID`, `key`, `itemTypeID`, `libraryID`, `dateAdded`, `dateModified`, `version`, `synced` |
+| `itemTypes` | 条目类型字典（journalArticle…） | `itemTypeID`, `typeName` |
+| `fields` / `itemData` / `itemDataValues` | **EAV**：字段字典 + 值引用 + 值池 | `fieldID`,`fieldName` / `itemID`,`fieldID`,`valueID` / `valueID`,`value` |
+| `itemTypeFields` / `baseFieldMappings` | 类型↔字段约束、类型间字段映射 | — |
+| `creators` / `itemCreators` / `creatorTypes` | 作者（含 `orderIndex`、`firstName/lastName/name`） | — |
+| `itemAttachments` | 附件（item 的子类） | `itemID`, **`parentItemID`**, **`linkMode`**, **`contentType`**, `path`, `charsetID` |
+| `itemNotes` | 笔记（item 的子类） | `itemID`, **`parentItemID`**, `note`（HTML）, `title` |
+| `collections` / `collectionItems` | 集合（**支持 `parentCollectionID` 嵌套**）+ 多对多挂载 | `collectionID`,`collectionName`,`parentCollectionID` / `collectionID`,`itemID`,`orderIndex` |
+| `tags` / `itemTags` | 标签 + 多对多；`type` 区分自动/手动标签 | `tagID`,`name` / `itemID`,`tagID`,`type` |
+| `itemRelations` | 通用「主语-谓词-宾语」关系（用于**相关条目**等） | `itemID`, `predicate`, `object` |
+| `deletedItems` | 回收站 | `itemID`, `dateDeleted` |
+| `libraries` / `groups` | 个人库/群组库、可编辑性与同步版本 | `libraryID`,`type`,`editable`,`version`,`lastSync` |
+| `fulltextItems` / `fulltextItemWords` / `fulltextWords` | **全文检索索引**（PDF 文本拆词入 FTS） | — |
+| `syncCache` / `syncDeleteLog` 等 | 同步缓存与删除日志 | — |
+
+### 1.2 关键设计点（最值得借鉴的 5 条）
+
+1. **统一 item 表 + 子类型表**：书目/附件/笔记都是 `items` 里的一行，各自在 `itemAttachments`/`itemNotes` 里有扩展行，
+   用 `parentItemID` 表达父子。→ **一个「文献」天然可以挂 N 个附件与 N 条笔记**，且关系查询极简。
+   （对照我们：文献在 JSON dict、附件在 jsonl、图片在另一个 json、条目在另一个 jsonl，四者只靠 `paper_id` 字符串松散关联。）
+2. **附件文件按父条目 key 分目录存放**：文件系统承载大文件，DB 只存索引/路径。
+   （我们已经这样做了：`literature/pdfs/<paper_id>/<file_id>_<name>.pdf` ✓ 方向一致。）
+3. **EAV 元数据**：`fields`+`itemData`+`itemDataValues` 让「不同 item type 有不同字段」而不改表结构；
+   代价是查询要多次 JOIN（Zotero 为此建了大量索引与视图）。→ **我们要的是灵活但不过度**：
+   对 COF 场景，字段集合相对固定，建议**宽表 + `extra` JSON 列**（Zotero 官方也建议自定义信息放 Extra 字段）。
+4. **集合（树）+ 标签（多对多）双轨组织**：集合=人工目录（可嵌套、可多挂），标签=跨集合的横切主题；
+   两者都是多对多，且**条目可以同时属于多个集合**。（我们目前**两者都没有**。）
+5. **通用 `itemRelations(subject, predicate, object)`**：为「相关条目/引用」这类开放关系留了扩展位，
+   Zotero 的「Related」面板就是它的 UI。（这正是我们图谱缺的「文献↔文献」层。）
+
+### 1.3 本地 API（Zotero 7，`http://localhost:23119/api/`）
+
+- 设计取向：**镜像 Web API 的数据形状**（`/api/users/0/items` 与 `api.zotero.org/users/<id>/items` 同构），
+  让同一套客户端代码既能连本地库也能连云端；返回支持 `format=json|bibtex`、`limit`/`start` 分页与
+  `itemType`/`q`/`tag`/`since` 过滤（`since` 用于增量同步）。
+- 与「Connector HTTP Server」共用同一端口 **23119**（官方文档：[connector_http_server](https://www.zotero.org/support/dev/client_coding/connector_http_server)）；
+  本地 API 需在 Zotero 设置中开启（Advanced → 允许本机其他应用通信 / 对应 pref）。
+- 端点语义（你列的那批，与社区整理一致，例：[zotero-skill 的 local-api-routes.md](https://github.com/congcongwang0122/zotero-skill/blob/main/references/local-api-routes.md)、[openai/plugins 的同类整理](https://github.com/openai/plugins/blob/f812c146/plugins/zotero/skills/zotero/references/local-api-routes.md)）：
+  - `GET /api/users/0/items`（全部条目，支持 `limit/start/q/itemType/tag/since/format`）
+  - `GET /api/users/0/items/{key}`（单条）
+  - `GET /api/users/0/items/{key}/children`（**子条目** = 附件 + 笔记）
+  - `GET /api/users/0/items/{key}/fulltext`（**全文**索引内容）
+  - `GET /api/users/0/collections`、`GET /api/users/0/items/tags`（标签及计数）
+  - `GET /api/users/0/searches`（保存的检索）等
+- **对我们的借鉴价值**：① 「一个条目 → children（附件/笔记）」的子资源设计，比我们「按 paper_id 分散在 4 个文件」更好用；
+  ② `limit/start/q/tag/since` 这套**服务端检索参数**，正好补我们 `/papers` 全量返回、前端本地过滤的短板；
+  ③ `fulltext` 端点提醒我们：全文检索应是一等公民（Zotero 用 FTS 表，我们可直接用 SQLite FTS5）。
+
+### 1.4 知识图谱类插件（**仓库地址已逐个核实**，与你 brief 中名称不一致处已更正）
+
+| 项目 | 定位（按仓库自述） | 借鉴点 |
+|---|---|---|
+| [`alisoroushmd/zotero-mcp`](https://github.com/alisoroushmd/zotero-mcp) | MCP server for Zotero —— search, add papers, write Word docs with live citations（PyPI: `zotero-mcp-server`） | 把「库」暴露成一组**工具调用**，与我们科研助手的 tool registry 天然同构 |
+| [`amberbiology/scribl`](https://github.com/amberbiology/scribl) | Semantic Capture of Relationships In Biological Literature —— 从文献中抽取**关系**并转成语义/图结构（Zenodo 有 v0.8.3 发布） | 「文档→实体→关系→图」的 ETL 思路；说明业界做法是**导出图**而非把图塞进文献库 |
+| [`Stef4678/citation-atlas`](https://github.com/Stef4678/citation-atlas) | 把 Zotero 的 items / collections / **authors** 导出为 Obsidian `.canvas`（JSON Canvas）引用图 | 图谱**导出为通用格式**（便于外部工具消费）；按 collection 维度出图 |
+| `zotero-refs` | 为条目展示引用/被引/相关与引用图谱 | ⚠️ **仓库地址未核实**，仅按你提供的描述记入；落地前需确认 |
+| `lit-monitor` | 实体/关系抽取（主题、方法、材料、作者、期刊） | ⚠️ **未核实**（同上） |
+
+### 1.5 LLM 集成类插件
+
+| 项目 | 定位（按仓库自述） | 借鉴点 |
+|---|---|---|
+| [`steven-jianhao-li/zotero-AI-Butler`](https://github.com/steven-jianhao-li/zotero-AI-Butler) | 「Zotero AI 管家」：调用大模型**自动精读**论文库里的论文 → **总结为 Zotero 笔记**，支持主流大模型平台 | 「精读产出落到笔记、与条目绑定」——我们目前**没有笔记系统**，这是最值得补的一块；它的多模型抽象也值得抄 |
+| [`congcongwang0122/zotero-skill`](https://github.com/congcongwang0122/zotero-skill) | 连 Zotero **本地 API**：一键搜索、导出 BibTeX、读 PDF 全文、生成综述（含 [local-api-routes.md](https://github.com/congcongwang0122/zotero-skill/blob/main/references/local-api-routes.md)） | 「全文 + 综述」流水线，与我们的「补解析 + 深度研究」几乎同构；其 API 参考可直接用于 P5 导入实现 |
+| `joaopn/zotero_llm` | 本地/远程 LLM 配置方式 | ⚠️ **未核实**（按你提供描述记入） |
+
+> 另有 [`openai/plugins` 中的 zotero skill](https://github.com/openai/plugins/blob/f812c146/plugins/zotero/skills/zotero/references/local-api-routes.md)
+> 整理了一份本地 API 路由参考，可作为 P5 的对照实现。
+
+### 1.6 插件模板
+
+- [`windingwind/zotero-plugin-template`](https://github.com/windingwind/zotero-plugin-template)：TypeScript 类型定义、
+  构建/发布工作流、**自动热重载**、配套 `zotero-plugin-toolkit`。
+  → 若未来要让本系统与 Zotero 双向互通（读它的库 / 被它调用），可基于它做插件；**本期不做**，但架构上留出 HTTP 互操作口。
+
+### 1.7 可借鉴的关键设计点（汇总）
+1. **统一 item + children 模型**（文献/附件/笔记/图片同构，父子用 `parentItemID`）。
+2. **集合（树）+ 标签（多对多）**双轨组织，条目可多归属。
+3. **服务端检索参数 + 全文索引（FTS）**，而不是把全量数据丢给前端过滤。
+4. **通用 relations 表**承载「引用/相关/衍生」等开放关系 → 直接对接知识图谱。
+5. **精读产出→笔记**，笔记与条目强绑定（LLM 产出有人工确认位）。
+6. **附件走文件系统、DB 只存索引**；附件按父条目分目录。
+7. **只读借鉴 DB 结构**（Zotero 官方警告：直接改库会坏）→ 我们对外**只提供 API 互操作**，不碰别人的库文件。
+
+---
+
+## 2. 文献库数据模型重构方案
+
+### 2.1 现状（实测，必须如实说明）
+
+| 数据 | 现存储 | 问题 |
+|---|---|---|
+| 文献条目 | **单个 JSON dict**：内置库 `_internal/data/paper_titles.json`（1781 篇，随包）+ 用户新增**直接追加写进安装目录**；另有 `literature/literature_intake.jsonl` 审计流水 | ① 写进安装目录 → 升级安装可能被覆盖；② 无事务/并发保护（仅 `threading.Lock` + 原子替换）；③ 字段无约束；④ **无集合/标签/笔记**；⑤ `/papers` 全量返回（1711 条、只 5 个字段）、**无服务端检索/分页/排序** |
+| 附件 | `literature/pdfs_index.jsonl`（5 条）+ 文件 `literature/pdfs/<paper_id>/`（`role=main/si`, `sha1`, `pages`, `chars`） | 结构合理；缺「附件类型」扩展（数据集/代码/图）、缺外键完整性校验 |
+| 结构化条目 | `literature/knowledge_entries.jsonl`（**11293 条**，7 种 `kind`：monomer_pair 6197 / condition 2489 / film_outcome 2380 / characterization 104 / property 87 / conclusion 27 / dft 9） | 全量重写式写入；无索引；数值指标埋在 `metrics` 数组里**无法跨文献做数值检索** |
+| 文献图片 | `literature/figures_index.json`（**55 条**：spectra 44 / mechanism 9 / structure 2） | 已能展示（P0 修复）；缺集合/标签归属与视觉标注来源标记 |
+| 笔记 | **不存在** | 借鉴 Zotero 补上（LLM 精读/助手结论落笔记） |
+| 集合/标签 | **不存在**（只有单体「收藏夹」，与文献无关） | 借鉴 Zotero 补上 |
+| 知识图谱 | NetworkX 侧车图（`user_graph`）+ 随包图（5713 文献/6197 反应）：节点 `literature/reaction/monomer/solvent/catalyst/outcome`，边 `reaction_cited_in/uses_*/produces` | 碎片化（无文献↔文献关系、无实体级节点、无向量相似边） |
+
+### 2.2 目标模型（SQLite，单文件 `library.db`）
+
+**为什么是 SQLite**：单机桌面、零运维、stdlib `sqlite3`（PyInstaller 友好）、事务与外键、索引、
+**FTS5 全文检索**（Zotero 同款思路），且可平滑放到 `%APPDATA%` 用户目录（解决「写安装目录」隐患）。
+不使用 Zotero 的 EAV：COF 域字段稳定，宽表 + `extra_json` 更简单（官方也建议自定义信息进 Extra）。
+
+```sql
+-- 文献条目（书目）
+items(
+  id INTEGER PRIMARY KEY,           -- 内部自增
+  paper_id TEXT UNIQUE NOT NULL,    -- 兼容现有 paper_id（1782 起递增，保持对外不变）
+  item_type TEXT DEFAULT 'journalArticle',
+  title TEXT, abstract TEXT, journal TEXT, year INTEGER, doi TEXT UNIQUE, url TEXT,
+  authors_json TEXT,                -- [{first,last,order}]（顺序敏感）
+  source TEXT,                      -- builtin | crossref | user-intake | zotero-import
+  extra_json TEXT,                  -- 扩展字段（Zotero「Extra」思路）
+  added_at TEXT, updated_at TEXT, deleted_at TEXT, version INTEGER DEFAULT 1
+);
+
+-- 附件（主文/SI/图/数据/代码）—— 借鉴 itemAttachments
+attachments(
+  id INTEGER PRIMARY KEY, file_id TEXT UNIQUE, item_id INTEGER REFERENCES items(id),
+  role TEXT,                        -- main | si | figure | dataset | code | other
+  filename TEXT, path TEXT, sha1 TEXT, size INTEGER, pages INTEGER, chars INTEGER,
+  mime TEXT, link_mode TEXT DEFAULT 'imported_file',
+  caption TEXT, page INTEGER, created_at TEXT
+);
+
+-- 文献图片（图谱）—— 与附件解耦：既可是附件抽出的，也可是截图/生成图
+figures(
+  id INTEGER PRIMARY KEY, fig_id TEXT UNIQUE, item_id INTEGER REFERENCES items(id),
+  attachment_id INTEGER REFERENCES attachments(id),   -- 来源附件（可空）
+  figure_type TEXT, caption TEXT, caption_source TEXT, -- pdf | vision | user | none
+  tags_json TEXT, meta_json TEXT, file TEXT, mime TEXT, size INTEGER,
+  page INTEGER, score_note TEXT, created_at TEXT, updated_at TEXT
+);
+
+-- 结构化条目（LLM 提取结果）
+entries(
+  id INTEGER PRIMARY KEY, entry_id TEXT UNIQUE, item_id INTEGER REFERENCES items(id),
+  group_id TEXT, kind TEXT, experiment TEXT, evidence TEXT,
+  source TEXT, status TEXT, graph_indexed INTEGER DEFAULT 0,
+  payload_json TEXT, created_at TEXT, updated_at TEXT
+);
+entry_metrics(                      -- 数值指标规范化（跨文献数值检索的关键）
+  id INTEGER PRIMARY KEY, entry_id TEXT REFERENCES entries(entry_id),
+  name TEXT, value REAL, unit TEXT, technique TEXT, sample TEXT
+);
+
+-- 笔记（借鉴 Zotero itemNotes）—— LLM 精读/助手结论/人工笔记统一落这里
+notes(
+  id INTEGER PRIMARY KEY, note_id TEXT UNIQUE, item_id INTEGER REFERENCES items(id),
+  parent_note_id INTEGER,           -- 支持笔记嵌套（Zotero 同款）
+  title TEXT, content_md TEXT, source TEXT,  -- user | assistant | llm
+  created_at TEXT, updated_at TEXT
+);
+
+-- 集合（树）+ 多对多挂载（借鉴 collections/collectionItems）
+collections(id INTEGER PRIMARY KEY, collection_id TEXT UNIQUE, name TEXT,
+            parent_id INTEGER, order_index INTEGER, created_at TEXT);
+collection_items(collection_id INTEGER, item_id INTEGER, order_index INTEGER,
+                 PRIMARY KEY(collection_id, item_id));
+
+-- 标签（多对多；type 区分自动/手动，借鉴 tags/itemTags）
+tags(id INTEGER PRIMARY KEY, name TEXT UNIQUE, type TEXT DEFAULT 'manual');
+item_tags(item_id INTEGER, tag_id INTEGER, PRIMARY KEY(item_id, tag_id));
+
+-- 通用关系（借鉴 itemRelations）—— 文献↔文献、条目↔图谱节点
+relations(id INTEGER PRIMARY KEY, subject TEXT, predicate TEXT, object TEXT,
+          meta_json TEXT, created_at TEXT);
+
+-- 图谱（DB 内的可查询镜像；侧车图仍保留为算法视图）
+graph_nodes(node_id TEXT PRIMARY KEY, node_type TEXT, name TEXT, meta_json TEXT);
+graph_edges(subject TEXT, predicate TEXT, object TEXT,
+            meta_json TEXT, PRIMARY KEY(subject, predicate, object));
+
+-- 全文检索（借鉴 Zotero FTS）
+CREATE VIRTUAL TABLE items_fts USING fts5(
+  paper_id UNINDEXED, title, abstract, fulltext, authors, tags, content='');
+```
+
+**关系图（一句话）**：`items` 是中心；`attachments/figures/entries/notes` 都是它的「子资源」；
+`collections/tags` 是与 `items` 的多对多；`relations/graph_*` 承载跨条目与图谱关系。
+
+### 2.3 多附件关联（主文 + 多份 SI）
+
+- **模型层**：一条 `items` 记录 → N 条 `attachments`，`role ∈ {main, si, figure, dataset, code}`；
+  **允许多个 `main`**（例如正文 + 勘误），UI 默认折叠 SI。
+- **落盘层**：`data/literature/pdfs/<paper_id>/<file_id>_<name>.pdf`（保持现状，不迁移文件）；
+- **解析层**：`POST /{paper_id}/parse` 已支持多文件 → 只需把「角色判定」从「第 1 个是主文」升级为
+  **文件名/内容启发式**（`SI|supp|mmc|supporting` → si）+ **UI 拖拽时手动改角色**；
+- **完整性**：`attachments.item_id` 外键 + `sha1` 唯一去重（已有）+ 删除文献时级联（软删 `deleted_at`）。
+
+### 2.4 图谱数据存储方案
+
+- **DB 内**：`figures`（图片本身，文件在 `literature/figures/`）+ `graph_nodes/graph_edges`（可 SQL 查询的图镜像）
+  + `relations`（开放关系）；
+- **算法侧**：保留 NetworkX 侧车图（`user_graph`）作为「合并视图」——因为随包图（5713 文献/6197 反应）是
+  只读大图，把它整体导入 DB 收益低；采取**「内置图只读 + 用户图入 DB」**的混合策略，
+  查询时用 `graph_edges` 与侧车图做并集（现有 `query_graphrag` 已支持合并，改造点小）。
+- **向量**：现有 `literature/embedding.py`（本地 bge-m3 或在线 text-embedding-v4）已能对**条目**做向量检索 →
+  新增 `entry_vectors(entry_id, vector_blob)` 与 `paper_vectors(paper_id, vector_blob)`，
+  用于生成 `similar_to` 边与「跨文献数值检索」。
+
+---
+
+## 3. 图谱功能修复方案
+
+### 3.1 「显示为零」——已修复，附根因（保留备查）
+
+- **根因**：`LiteratureFiguresPanel` 渲染分支 `loading ? … : papers.length === 0 ? 「文献库为空」 : <画廊>`
+  未区分「固定文献模式」；而该面板**全项目只以固定模式使用**（`LiteratureKnowledgeSection` 传 `fixedPaperId`），
+  固定模式的 effect 提前 return、**永不加载 `papers`** → `papers` 恒空 → 画廊永远不可达。
+- **修复**（P0 已完成并实测）：分支改为 `!fixedPaperId && papers.length === 0`，固定模式按 `shown.length` 判空态；
+  并在页签显示数量（`文献图片（22）`）。
+- **数据侧结论**：接口与文件一直是好的（`/figures?paper_id=1529` → 22；`/figures/{id}/file` → 200 image/jpeg），
+  所以**不需要重建图谱数据**，只需把它纳入新模型（`figures.item_id`）并补组织维度。
+
+### 3.2 「文献图片」选项卡设计（已按你的决策实现，此处补完整信息架构）
+
+```
+文献卡片
+├─ 头部：标题 · 期刊/年 · DOI · 来源标签 · 操作（补解析 / 上传主文SI / GNN反馈 / 编辑）
+├─ 页签（顺序按你的决策）
+│   ① 原文信息        —— 元数据（含摘要，已自动回填）+ 附件列表（主文/SI，可改角色）
+│   ② 文献图片（N）   —— 本次新增/修复的重点
+│   ③ 结构化条目（M）
+│   ④ 笔记（新增，借鉴 Zotero）      ← §6 精读产出落这里
+│   ⑤ 关联（新增）    —— 引用/被引/相似（借鉴 zotero-refs）
+└─ 底部：所属集合 / 标签（新增，借鉴 Zotero）
+```
+
+**文献图片页签**：
+- 顶栏：类型筛选（全部/结构图/光谱/机理图）+ **来源筛选（内嵌图/页渲染/上传/截图）** + 「读图提取数值」（视觉模型）+ 「上传图片」；
+- 画廊：缩略图（可点开放大，**已实现 Lightbox**：大图、上/下一张、页码与来源、改标注、下载原图、←/→/Esc）；
+- 标注编辑（已有，走 `PATCH /figures/{fig_id}`）：caption / tags / type，新增 `caption_source` 显示
+  （`pdf`=取自 PDF 图注 / `vision`=视觉模型生成 / `user`=人工改过）。
+
+### 3.3 图片标注功能设计
+
+| 层级 | 机制 | 成本 |
+|---|---|---|
+| L1（默认，零成本） | 入库时用 **PDF 图注文本** 作 caption（已实现）；无图注则生成占位「Fig. 5（第 7 页，无图注）」 | 0 |
+| L2（可选，需视觉模型） | 对无图注/用户点选的图调用 `vision.analyze_image`（**已实现**，`src/literature/vision.py`）→ 回填 caption + `caption_source=vision` + `confidence`；单次 ≤6 张 | 每图 1 次视觉调用 |
+| L3（人工） | 用户在 Lightbox 或卡片上改 caption/tags（已有 PATCH） | 0 |
+
+**视觉模型可行性（结合你的机器实测）**：
+- **云端（推荐）**：你当前 `api.deepseek.com` **无视觉模型**；只需在设置页「视觉读图」填一个 OpenAI 兼容的视觉端点：
+  DashScope `qwen-vl-max`（`https://dashscope.aliyuncs.com/compatible-mode/v1`）、智谱 `glm-4v-plus`、
+  硅基流动 Qwen3-VL 等。**零改码**（客户端已是 OpenAI 兼容），识别科研谱图数值的准确度最好。
+- **本地**：你这台 **RTX 4060 Laptop 8GB** 可跑 **Qwen2.5-VL-3B**（约 3GB，流畅）/ 7B 4-bit（约 6GB，勉强）；
+  需装 Ollama（~0.7GB）或 LM Studio/vLLM，填 `base_url=http://127.0.0.1:11434/v1` 即可接入。
+  **代价**：本地小模型读谱图轴/峰位明显弱于云端，且笔记本长时间推理发热降频。
+- **建议**：云端为主 + 本地为离线兜底（两者共用同一配置项，P2 批把「视觉读图」从文献卡片提升为**全局设置**，
+  并让科研助手的图片上传走同一条视觉链路）。
+
+---
+
+## 4. 补解析功能增强方案
+
+### 4.1 多文件上传（主文 + 多份 SI）——已支持，增强项如下
+
+- 现状：`POST /{paper_id}/parse`（`files[]` 多份、`role` 自动分配、最多 8 份/篇、≤20MB/份、sha1 去重、长期留存、可复用）；
+- **增强**：
+  1. **拖拽 + 角色自动识别**：文件名 `SI|supp|supporting|mmc|ESI` → `si`，其余 → `main`；UI 可改；
+  2. **解析进度**：长文献按段解析耗时数分钟 → 前端显示「第 k/N 段」（已有秒级进度，补段级）；
+  3. **附件类型扩展**：`dataset/code/other`（借鉴 Zotero 附件不限 PDF）；
+  4. **失败可续**：某份 PDF 解析失败不影响其余（现已如此），失败项在附件列表标红并可单独重试。
+
+### 4.2 摘要提取修复（已修）+ 加固
+
+- 已修：解析成功即 `update_paper_fields(only_empty=True)` 自动回填（含 abstract），预览显示摘要与字数；
+- **加固建议**：
+  1. **摘要定位**：若 LLM 未返回摘要，用「Abstract/摘要」关键词附近段落二次抽取（`_META_PROMPT` 已要求 abstract，加一次定位重试）；
+  2. **多来源兜底**：Crossref `abstract`（若 DOI 命中）→ LLM 抽取 → 首段启发式，三级回退；
+  3. **人工兜底**：预览里提供「手动粘贴摘要」入口（写 `PATCH /papers`，`only_empty=False` 时允许覆盖）。
+
+### 4.3 LLM 结构化提取优化（Prompt 模板见 §6.2）
+
+- 现状：已修复推理模型预算与白名单大小写；7 种 `kind`；逐条试校验、默认只勾合法条目；
+- **优化**：
+  1. **分维度多次调用**（而非一次抽全）：`metadata` / `monomer_pair+film_outcome` / `conditions` /
+     `characterization+metrics` / `property` / `dft` / `conclusion` 各一次，单次输出短 → 更少截断、更易校验；
+  2. **JSON Schema 约束 + 修复重试**（见 §6.2）；
+  3. **数值规范化**：`metrics` 抽出后统一 `name/value/unit` 并写入 `entry_metrics`（跨文献数值检索的前提）；
+  4. **SMILES 纪律**：只接受正文出现的 SMILES；`monomer_pair` 缺 SMILES → 标记 invalid（已有）。
+
+### 4.4 文献编号递增——已满足
+
+`resolver.next_paper_id()` = `max(库内 id)+1`；内置库到 **1781** → 新文献 **1782** 起；
+迁移到 SQLite 后该语义**保持不变**（`paper_id` 对外不变，`items.id` 仅内部用）。
+
+---
+
+## 5. 知识图谱构建方案
+
+### 5.1 节点与关系定义（在现有基础上扩展）
+
+**已有**（v1.9.3）：节点 `literature`（`LITP-<paper_id>`）、`reaction`、`monomer`、`solvent`、`catalyst`、`outcome`；
+边 `reaction_uses_solvent` / `reaction_uses_catalyst` / `reaction_produces` / `reaction_cited_in`。
+
+**新增（借鉴 zotero-mcp 的「文档-实体-关系」与 lit-monitor 的实体抽取）**：
+
+| 新节点 | 说明 | 来源 |
+|---|---|---|
+| `technique` | 表征手段（PXRD/FTIR/BET/SEM…） | 已有 `normalize_technique` 归一化表 |
+| `metric` | 数值指标实例（比表面积 2105 m²/g） | `entry_metrics` |
+| `property` | 材料属性（带隙/接触角/截留率…） | `property` 条目 |
+| `concept` | 主题/方法（如「溶剂热成膜」「界面聚合」） | LLM 主题抽取 + 关键词 |
+| `note` | 精读笔记/结论 | 新 `notes` 表 |
+| `paper`（引用层） | 与 `literature` 区分：**被引用的外部文献**（无 PDF） | Crossref/DOI |
+| `author` / `journal` | 作者、期刊 | 元数据 |
+
+**新增边**：
+
+| 边 | 语义 | 构建方式 |
+|---|---|---|
+| `cites` / `cited_by` | 文献↔文献引用 | DOI 匹配 + Crossref `reference` 字段（有则用，无则留空） |
+| `similar_to`（带 `score`） | 语义相似 | **向量近邻**（`embedding.py` 已有，条目级 → 聚合到文献级） |
+| `reports_metric` / `reports_property` | 文献/实验组→数值/属性 | 结构化条目 → 图 |
+| `uses_technique` | 文献/实验组→表征手段 | 同上 |
+| `authored_by` / `published_in` | 文献→作者/期刊 | 元数据 |
+| `note_of` | 笔记→文献/条目 | 新 `notes` 表 |
+| `has_collection` / `has_tag` | 文献→集合/标签（图侧可见） | 新表 |
+
+### 5.2 自动构建流程
+
+```
+① 录入（DOI/Crossref/上传 PDF/Zotero 导入）
+   → items + attachments（不依赖 LLM）
+② 补解析（多文件）
+   → 文本层提取 → LLM 分维度结构化抽取 → entries + entry_metrics
+   → 逐条试校验 annotate_entries（人工在预览里勾选/改）
+③ 入图（用户确认后）
+   → graph_ingest.sync_group（已有：reaction/monomer/solvent/catalyst/outcome + cited_in）
+   → 新增 sync_entities：technique/metric/property/concept 节点与边
+   → 新增 sync_paper_relations：cites/similar_to/authored_by/published_in
+④ 精读（可选，LLM/视觉）
+   → notes（人工确认后）→ note_of 边
+⑤ 图查询/检索
+   → query_graphrag（已有五路召回 + 图检索）
+   → 新增：跨文献数值检索（entry_metrics 的 SQL）+ 相似文献（paper_vectors）
+```
+
+**关键原则**（沿用你已确认的口径）：**LLM 只提出候选，用户确认后才入图**；
+图谱写入幂等（同一 `(subject, predicate, object)` 不重复）；每条边带 `meta_json.source`
+（`llm_extract` / `user` / `crossref` / `embedding`）以便追溯与撤销。
+
+### 5.3 存储方案
+
+| 方案 | 评估 | 结论 |
+|---|---|---|
+| **SQLite `graph_nodes/graph_edges` + NetworkX 侧车图** | 零安装（stdlib）、事务/索引/可 SQL 联查、PyInstaller 友好；算法侧继续用 NetworkX（已有） | ✅ **推荐**（本期） |
+| Neo4j（社区版/嵌入式） | 查询语言强（Cypher），但需 JVM/独立进程、社区版 **GPLv3**、安装体积大、打包复杂 | ❌ 不推荐（桌面单机过重） |
+| KuzuDB | 嵌入式图库、Cypher 子集、体积小 | ⚠️ 可作未来升级（需评估 PyInstaller 打包与许可） |
+| DuckDB + 递归 CTE | 分析强，但图遍历靠手写 CTE | ⚠️ 备选（若要做大量跨文献数值统计可引入） |
+
+规模判断：内置图 5713 文献 / 6197 反应 + 用户增量（当前用户 33 图/22 图两批）→ **1e4~1e5 节点**，
+SQLite + NetworkX 完全够用（毫秒级一跳/二跳），无需图数据库。
+
+### 5.4 与成膜打分模块的联动
+
+**已有链路**（可复用，无需重造）：
+- 文献正样本 → KB 条目的「一键打分验证」（`film_outcome` 条目 → 打分页预填）；
+- `src/predictor/gnn_feedback.py`：反馈队列（`data/feedback/gnn_feedback.jsonl`），
+  `source ∈ {score_correction, literature_pdf, experiment_csv}`，`confirm/reject/export_csv`；
+- `src/predictor/gnn_jobs.start_retrain(feedback_ids=...)`：导出 CSV → 微调 → 版本管理（激活/回退）。
+
+**新增联动设计**：
+1. **「文献 → GNN 训练集」批量入口**：在文献库支持按 `collections/tags` 筛选后，一键把
+   「该集合内所有 `film_outcome=film` 条目」批量推入反馈队列（当前只能逐条点）；
+2. **置信度分层**：条目带 `source`（llm_extract/user）与 `valid` → 入队时标注权重
+   （用户确认过的 = 高权重，LLM 未复核 = 低权重），对应 `start_retrain` 的 `feedback_pos_w`；
+3. **闭环可追溯**：每条反馈记录回指 `entry_id`/`paper_id` → 在文献卡片上显示「已用于 GNN 第 N 版」徽标；
+4. **反向**：GNN 版本页面显示「本版新增来自文献的正样本 N 条」。
+
+---
+
+## 6. LLM 集成方案
+
+### 6.1 架构设计
+
+```
+                    ┌──────────── 统一设置（设置页）─────────────┐
+                    │ 解析 LLM（文本）   │ 视觉读图（VLM）        │
+                    │ base_url/key/model │ base_url/key/model     │
+                    └─────────┬──────────┴───────────┬────────────┘
+                              │                      │
+   ┌──────────────┐   ┌───────▼────────┐   ┌─────────▼─────────┐
+   │ 云端 OpenAI  │   │ llm_extract.py │   │ vision.py          │
+   │ 兼容端点     │◄──┤ (结构化抽取)    │   │ (图→描述/数值)      │
+   │ 本地 Ollama/ │   │ + JSON Schema  │   │ + caption 回填      │
+   │ LM Studio/vLLM│  │ + 修复重试     │   │ + 人工确认          │
+   └──────────────┘   └───────┬────────┘   └─────────┬─────────┘
+                              │                      │
+                    ┌─────────▼──────────────────────▼─────────┐
+                    │ 全部产出走「候选 → 用户确认 → 落库/入图」  │
+                    │ 预览可勾选/编辑；来源与置信度随条目持久化  │
+                    └──────────────────────────────────────────┘
+```
+- **本地 vs 云端**：同一套 OpenAI 兼容客户端（已有），只换 `base_url`；设置页两种 provider 并存
+  （文本一个、视觉一个，可分别指向不同服务）；
+- **缓存**：`src/llm/client.py` 已有磁盘缓存（`llm_cache/`）；结构化抽取按 `(paper_id, prompt_version, 段哈希)` 缓存，
+  重解析不重复烧钱；
+- **降级**：未配置 LLM → 现有 SMILES 正则降级（保留）；视觉未配置 → 只做 L1 图注（保留）。
+
+### 6.2 Prompt 模板（分维度 + Schema 约束）
+
+```text
+[system] 你是 COF 文献信息抽取器。只输出 JSON，不得编造；原文没有的字段留空。
+[user]
+【任务维度】{dimension}          # metadata | monomer_pair | conditions | characterization | property | dft | conclusion
+【输出 Schema】{json_schema}     # 例：characterization → {technique, sample, metrics:[{name,value,unit}], conclusion, evidence}
+【证据要求】evidence 必须是原文逐字片段（≤200 字），不得改写。
+【正文】
+{chunk_text}
+
+# 校验与重试
+1) 先做 JSON.parse；失败 → 把错误信息回灌，重试 1 次；
+2) 再做 schema 校验（必填/类型/单位枚举）；失败 → 只回灌违规字段，重试 1 次；
+3) 仍失败 → 该维度标记 failed，其余维度照常入库（不因一条坏数据丢整篇）。
+```
+**与现有实现的衔接**：`llm_extract._PROMPT` 已含 SMILES 纪律与 technique 规范写法；
+本次改造为「按维度拆调用 + Schema 校验 + 局部重试」，并把 `technique` 走 `normalize_technique` 归一化（已有）。
+
+### 6.3 视觉模型集成
+
+- 复用 `vision.py`（已实现：OpenAI 兼容多模态调用、预算自动扩容、严格 JSON、>5MB 拒绝、
+  `confidence` 与 `notes` 回传）；新增能力：
+  1. **文献图片自动标注**（§3.3 L2）→ 写 `figures.caption` + `caption_source=vision`；
+  2. **科研助手图片理解**：助手上传图片时，若主模型不支持图片 → 先跑视觉模型，把
+     「【图片 视觉解读】…」并入文本（纯文本模型也能"看图"）；
+  3. **截图**：Electron 主进程加 `desktopCapturer` IPC（`preload.cjs` 已有 contextBridge 基础设施），
+     浏览器降级 `getDisplayMedia`；
+  4. 成本控制：单次 ≤6 张、图片 ≤5MB、结果缓存（同 sha1 不重复调用）。
+
+### 6.4 用户确认机制（贯穿全部 LLM 产出）
+
+| 产出 | 确认方式 | 现状 |
+|---|---|---|
+| 结构化条目 | 解析预览：逐条勾选、非法条目禁用并显示原因 | ✅ 已有 |
+| 文献图片 | 预览网格勾选（内嵌图默认勾、页渲染默认不勾） | ✅ 已有 |
+| 元数据回填 | 自动但**只补空字段**，预览显示 updated/skipped，可关闭 | ✅ 已有（P0） |
+| 图片标注 | 卡片/ Lightbox 内可改，`caption_source` 标注来源 | ⚠️ 部分（改动入口已有，`caption_source` 待加） |
+| 笔记（精读） | 新：LLM 生成 → 草稿态 → 用户确认/编辑后生效 | ❌ 需新增 |
+| 图谱入图 | 新：边带 `source`，提供「撤销本次入图」入口 | ⚠️ 需新增 |
+
+---
+
+## 7. 实施计划
+
+### 7.1 优先级排序（每批可独立交付、可回退）
+
+| 批次 | 内容 | 为什么这个顺序 |
+|---|---|---|
+| **P0（已完成）** | 图谱渲染分支修复 + 文献图片页签（改名/移位/计数/Lightbox）+ 摘要自动回填 | 用户可感知的直接缺陷，改动小、可立即热更新 |
+| **P1** | **SQLite 化 + 数据迁移**（items/attachments/figures/entries/notes/collections/tags/relations）+ 服务端检索（`q/limit/start/sort/tag/collection`）+ API 兼容层 | 一切后续能力的地基；先做「行为等价的替换」，UI 不变、风险可控 |
+| **P2** | **集合/标签/笔记 + 三栏 UI**（左：集合树/标签；中：条目列表；右：详情含 5 个页签）+ 精读生成笔记 | 借鉴 Zotero 的核心体验；依赖 P1 |
+| **P3** | **图谱扩展**：文献↔文献（cites/similar_to）、technique/metric/property/concept 节点、`entry_metrics` 数值检索、图查询 UI（引用/相似面板） | 依赖 P1 的 `relations/graph_*`；直接回应「文献之间缺乏关联」 |
+| **P4** | **GNN 联动批量化**（集合/标签筛选 → 批量入反馈队列、权重分层、可追溯徽标） | 依赖 P3 的组织维度 |
+| **P5** | **互操作**：Zotero 本地 API 导入（23119）、BibTeX/CSL-JSON 导出 | 独立、低风险、对科研工作流增益大 |
+| **P6** | 视觉批（图片自动标注 L2、助手图片理解、截图） | 依赖用户选定云端/本地视觉模型 |
+
+### 7.2 预估工时
+
+| 批次 | 工时 | 说明 |
+|---|---|---|
+| P1 SQLite 化 + 迁移 + API 兼容 | **14–20 h** | 含 schema、迁移脚本（4 个文件 → DB）、双读校验、回归测试 |
+| P2 集合/标签/笔记 + 三栏 UI | **16–22 h** | 前端工作量为主（含空态/拖拽/批量操作） |
+| P3 图谱扩展 | **12–18 h** | 实体抽取 prompt、入图幂等、引用匹配（Crossref）、相似边（向量） |
+| P4 GNN 联动批量化 | **6–8 h** | 复用现有反馈队列与重训链路 |
+| P5 Zotero 互操作（导入/导出） | **8–12 h** | 本地 API 客户端 + 映射 + BibTeX/CSL-JSON 生成 |
+| P6 视觉批 | **10–14 h** | 含设置页全局化、助手图片链路、截图 IPC（需重打 Electron 壳） |
+| **合计** | **约 66–94 h** | 按批交付，每批都可先热更新 UI 部分给你验收 |
+
+### 7.3 依赖关系
+
+```
+P0 ✅ ─► P1(SQLite+检索) ─┬─► P2(集合/标签/笔记 + 三栏 UI) ─► P4(GNN 批量联动)
+                          ├─► P3(图谱扩展) ────────────────────┘
+                          └─► P5(Zotero 导入/导出)
+P6(视觉) ── 仅依赖「设置页全局视觉配置」，可与 P2/P3 并行
+```
+
+### 7.4 风险与应对
+
+| 风险 | 影响 | 应对 |
+|---|---|---|
+| **数据迁移损坏**（11293 条目 / 1711 文献 / 55 图 / 5 附件） | 高 | 迁移前**整目录快照**（`E:\cof-build\`）；迁移脚本**只读原文件**、写新 DB；迁移后跑**双读校验**（逐字段比对计数与抽样）；保留原文件 30 天不删 |
+| 「写安装目录」隐患（现在新文献直接写 `_internal/data/paper_titles.json`） | 中（升级会丢） | P1 起**一律写 `%APPDATA%` 用户目录**；启动时若发现安装目录有增量 → 自动并入用户库并提示 |
+| 升级导致内置库被覆盖 | 中 | 内置库改为**只读资源**（`_internal/data/builtin_library.json`），用户增量独立存放；`items.source` 区分 |
+| 引用关系数据源不稳定（Crossref 限速/缺失） | 中 | `cites` 边**尽力而为**：有则建、无则跳过并标注 `source=missing`；不阻塞主流程 |
+| 视觉模型成本/隐私 | 中 | 默认关闭；单次 ≤6 张 + 缓存；本地模型可选（离线、免费） |
+| SQLite 与 PyInstaller/多进程 | 中 | 单进程写（后端唯一）、WAL 模式；打包时确认 `sqlite3` 与 FTS5 可用（stdlib 自带，需在冻结自证里加一条 FTS5 检查） |
+| 前端大改的体验回退 | 中 | 用现有 `scripts/rollback_ui.ps1` + 每批 UI 快照；三栏 UI 先在「我的」页内做灰度，不动其他页面 |
+| 助手与图谱/文献库的耦合加深 | 低-中 | 工具层保持「只读优先、写操作二次确认」；新增工具（`search_library`/`get_item`/`list_collections`）纳入现有 `registry` 与确认门 |
+
+---
+
+## 8. 需要你拍板（4 件）
+
+1. **是否接受「SQLite 单文件库」替换现有 4 个 JSON/JSONL 文件**？（我会保留原文件做只读备份 + 迁移校验；
+   好处是事务/索引/检索/集合标签笔记都变成自然能力）
+2. **集合体系怎么定**：完全自由建集合树（Zotero 式），还是先给一套默认集合
+   （如「COF 成膜 / 表征方法 / 计算 / 综述 / 待读」）+ 自定义？（我建议后者，开箱即用）
+3. **P1 是否保持 UI 不变**（先做行为等价的存储替换，让你在老界面上先验证"什么都没坏"），
+   还是 P1+P2 一起上（直接给三栏新界面）？（我建议先 P1 验证，再 P2 上新 UI）
+4. **文献↔文献引用关系**：允许我调用 **Crossref**（按 DOI 取 references）来建 `cites` 边吗？
+   （有网络请求、免费、无 key；不调用则只能建「相似」边，无引用关系）
+
+---
+
+## 9. 来源清单（本报告引用的全部外部链接）
+
+**官方文档**
+- [Direct Access to the Zotero SQLite Database](https://www.zotero.org/support/dev/client_coding/direct_sqlite_database_access) —— 数据都在 `zotero.sqlite`、**外部只应只读**、表结构随版本变化、item types/fields 见 zotero-schema、附件按父 item key 分目录、每个 item 自带 notes/attachments/tags/related items
+- [Zotero 数据 schema 仓库](https://github.com/zotero/zotero-schema/tree/master) —— item types 与 fields 的权威定义（落地时以此为准）
+- [Zotero Connector HTTP Server](https://www.zotero.org/support/dev/client_coding/connector_http_server) —— 本地服务端口 23119 的官方说明
+- [Zotero 开发者文档入口](https://www.zotero.org/support/dev/start) / [Web API](https://www.zotero.org/support/dev/web_api) —— 本地 API 与 Web API 同构的依据
+- [CSL/Zotero Metadata Field Index](https://aurimasv.github.io/z2csl/typeMap.xml) —— 字段名↔CSL 映射（导出 BibTeX/CSL-JSON 会用到）
+
+**本地 API 路由参考（社区整理）**
+- [congcongwang0122/zotero-skill 的 local-api-routes.md](https://github.com/congcongwang0122/zotero-skill/blob/main/references/local-api-routes.md)
+- [openai/plugins 的 zotero local-api-routes.md](https://github.com/openai/plugins/blob/f812c146/plugins/zotero/skills/zotero/references/local-api-routes.md)
+
+**插件仓库（已核实）**
+- [alisoroushmd/zotero-mcp](https://github.com/alisoroushmd/zotero-mcp)（PyPI [zotero-mcp-server](https://pypi.org/project/zotero-mcp-server/)）
+- [amberbiology/scribl](https://github.com/amberbiology/scribl)（[Zenodo v0.8.3](https://zenodo.org/records/16892066)）
+- [steven-jianhao-li/zotero-AI-Butler](https://github.com/steven-jianhao-li/zotero-AI-Butler)
+- [Stef4678/citation-atlas](https://github.com/Stef4678/citation-atlas)
+- [congcongwang0122/zotero-skill](https://github.com/congcongwang0122/zotero-skill)
+- [windingwind/zotero-plugin-template](https://github.com/windingwind/zotero-plugin-template)（按你 brief 记入，未单独核实活跃度）
+
+**本系统内部依据（只读实测）**
+- 数据目录 `%APPDATA%\COF-Film-Recommend\data`：`literature/knowledge_entries.jsonl`（11293 条）、
+  `literature/figures_index.json`（55 条）、`literature/pdfs_index.jsonl`（5 条）、`favorites/`（13 条）、
+  `feedback/gnn_feedback.jsonl`；内置库 `_internal/data/paper_titles.json`（1781 篇，**新文献被追加写在这里**）
+- 关键源码：`src/literature/{resolver,attachments,figures,knowledge,graph_ingest,pdf_figures,vision,embedding}.py`、
+  `src/references/titles.py`、`src/predictor/{gnn_feedback,gnn_jobs}.py`、
+  `api/routers/literature.py`、`webapp/src/components/mine/LiteratureFiguresPanel.tsx`
