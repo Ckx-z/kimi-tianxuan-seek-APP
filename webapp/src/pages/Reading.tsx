@@ -118,6 +118,40 @@ function Reading() {
     }
   };
 
+  /** R2-n：读完一键入库 —— 建条目+挂附件（后端聚合）→ 确认后解析 → 置已入库 */
+  const ingestInboxItem = async () => {
+    if (!inboxId) return;
+    const ok = window.confirm(
+      '把这份 PDF 正式入库？\n\n本步会：① 抽取元数据并创建文献条目（编号 1782+）'
+      + '② 把 PDF 作为主文附件挂到该条目。\n\n'
+      + '（大模型解析不在本步执行 —— 入库后请在右栏点「提取解析并入库」，'
+      + '那一步耗时数分钟并产生 token 费用。）\n\n继续？');
+    if (!ok) return;
+    setIngesting(true);
+    try {
+      const r = await fetch(`/api/library/reading/inbox/${inboxId}/ingest`,
+                            { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || `入库失败（${r.status}）`);
+      const pid = d.paper_id as string;
+      toast.success(d.reused_existing
+        ? `该 DOI 已在库中，已指向既有文献 #${pid}`
+        : `已入库：文献 #${pid}（已挂主文附件）`);
+      setInboxId('');
+      setPaperId(pid);
+      // 解析（耗 token 的一步）不在这里自动跑：入库后该文献已在阅读器打开，
+      // 右栏「提取解析并入库」按钮会显示出来，由用户确认后触发（避免双重扣费）。
+      toast.info('下一步：在右栏点「提取解析并入库」完成条目/图片抽取');
+      await loadInbox();
+      await open(pid);
+      await loadQueue();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '入库失败');
+    } finally {
+      setIngesting(false);
+    }
+  };
+
   const discardInbox = async (id: string) => {
     try {
       await fetch(`/api/library/reading/inbox/${id}`, { method: 'DELETE' });
@@ -456,9 +490,16 @@ function Reading() {
                   <p>这份 PDF 只在阅读清单里（不占库编号）。读完后入库会走「添加文献 → 解析」流程，
                      生成条目并把解析结果写入科研知识库。</p>
                   <p className="rounded-md bg-muted/30 p-2">
-                    入库按钮在下一轮接入（需要先核对入库端点签名）；当前可先在
-                    「科研知识库 → ＋添加文献」上传同一份 PDF 完成入库。
+                    点下方按钮即可正式入库：自动抽元数据 → 创建条目（编号 1782+）→ 挂上主文附件。
+                    入库后在右栏点「提取解析并入库」完成条目/图片抽取。
                   </p>
+                  <Button size="sm" className="h-7 text-xs" disabled={ingesting}
+                          onClick={() => void ingestInboxItem()}>
+                    {ingesting
+                      ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      : <FileText className="mr-1 h-3 w-3" />}
+                    {ingesting ? '入库中…' : '读完入库（建条目 + 挂附件）'}
+                  </Button>
                 </div>
               ) : !plan ? (
                 <p className="mt-8 text-center text-xs text-muted-foreground">
