@@ -75,6 +75,51 @@ function Reading() {
   const [annoPage, setAnnoPage] = useState('');
   const [annoComment, setAnnoComment] = useState('');
   const [annoColor, setAnnoColor] = useState('yellow');
+  /** R2-h：入库/补缺执行中 */
+  const [ingesting, setIngesting] = useState(false);
+
+  /**
+   * 真触发解析入库：
+   * 把该文献**已存的附件**取回，再按现有 `/api/literature/parse` 流程提交
+   * （复用既有解析管线：LLM 分维度抽取 + 试校验 + 自动回填缺失元数据）。
+   * 已入库的文献走同一入口 —— 解析管线按「只补空字段」语义处理，不覆盖已有内容。
+   */
+  const runIngest = async () => {
+    if (!paperId || !main) {
+      toast.error('该文献没有可解析的 PDF 附件');
+      return;
+    }
+    const what = plan?.full_parse
+      ? '全量解析（元数据 + 结构化条目 + 文献图片）'
+      : `只补缺失项：${(plan?.parts ?? []).map((p) => PART_LABEL[p] ?? p).join('、')}`;
+    const ok = window.confirm(
+      `将执行：${what}\n\n会调用大模型解析该 PDF，可能耗时数分钟并产生 token 费用。继续？`);
+    if (!ok) return;
+    setIngesting(true);
+    try {
+      const blob = await (await fetch(
+        `/api/literature/attachments/${main.file_id}/file`)).blob();
+      const fd = new FormData();
+      fd.append('files', new File([blob], main.filename || 'main.pdf',
+                                  { type: 'application/pdf' }));
+      const r = await fetch(
+        `/api/literature/parse?paper_id=${encodeURIComponent(paperId)}&auto_backfill=true`,
+        { method: 'POST', body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || `解析失败（${r.status}）`);
+      await fetch(`/api/library/reading/state?paper_id=${encodeURIComponent(paperId)}`
+                  + '&state=ingested', { method: 'POST' });
+      const p = await fetch(`/api/library/reading/plan/${encodeURIComponent(paperId)}`)
+        .then((x) => x.json());
+      setPlan(p);
+      await loadQueue();
+      toast.success(`解析完成并入库（条目/图片已更新，阅读状态→已入库）`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '解析失败');
+    } finally {
+      setIngesting(false);
+    }
+  };
 
   const addAnnotation = async () => {
     if (!paperId || (!selText.trim() && !annoComment.trim())) return;
@@ -340,12 +385,13 @@ function Reading() {
                       </p>
                     )}
                     <Button size="sm" className="mt-2 h-7 text-xs"
-                            onClick={() => toast.info(
-                              plan.full_parse
-                                ? '将执行全量解析（下一轮接入此处触发，当前可在知识库卡片「补解析」）'
-                                : `将只补缺失项：${plan.parts.map((p) => PART_LABEL[p] ?? p).join('、')}`)}>
-                      <FileText className="mr-1 h-3 w-3" />
-                      {plan.full_parse ? '提取解析并入库' : '补全缺失解析'}
+                            disabled={ingesting}
+                            onClick={() => void runIngest()}>
+                      {ingesting
+                        ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        : <FileText className="mr-1 h-3 w-3" />}
+                      {ingesting ? '解析中…（可能数分钟）'
+                                 : plan.full_parse ? '提取解析并入库' : '补全缺失解析'}
                     </Button>
                   </div>
 
