@@ -16,6 +16,7 @@ import { BookOpen, CheckCircle2, FileText, Languages, Loader2, NotebookPen,
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
+import { PdfViewer } from '@/components/reading/PdfViewer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -457,9 +458,8 @@ function Reading() {
             {/* 中：PDF */}
             <div className="min-w-0 border-r border-border">
               {inboxId ? (
-                <iframe title={`inbox-${inboxId}`}
-                        src={`/api/library/reading/inbox/${inboxId}/file`}
-                        className="h-[600px] w-full bg-muted/20" />
+                <PdfViewer src={`/api/library/reading/inbox/${inboxId}/file`}
+                           onSelectText={(t, p) => { setSelText(t); setAnnoPage(String(p)); }} />
               ) : !paperId ? (
                 <p className="mt-24 text-center text-sm text-muted-foreground">
                   <BookOpen className="mx-auto mb-2 h-6 w-6" />
@@ -474,11 +474,8 @@ function Reading() {
                   </span>
                 </p>
               ) : (
-                <iframe
-                  title={`paper-${paperId}`}
-                  src={`/api/literature/attachments/${main.file_id}/file`}
-                  className="h-[600px] w-full bg-muted/20"
-                />
+                <PdfViewer src={`/api/literature/attachments/${main.file_id}/file`}
+                           onSelectText={(t, p) => { setSelText(t); setAnnoPage(String(p)); }} />
               )}
             </div>
 
