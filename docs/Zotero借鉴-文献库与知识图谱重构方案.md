@@ -34,24 +34,28 @@ item types 与 fields 的权威定义在 [`zotero/zotero-schema`](https://github
 **每个 item 还各自带**：一组 notes、一组 attachments、一组 tags、一组「相关条目」链接。
 附件不是塞进数据库，而是**存在数据目录中、以父 item 的 key 命名的子目录里**。
 
-表结构（社区文档与 Zotero 源码通行的命名，落地时以 `zotero-schema` 为准）：
+表结构（**一手来源**：[`resource/schema/userdata.sql`](https://github.com/zotero/zotero/blob/main/resource/schema/userdata.sql)
+与 [`system.sql`](https://github.com/zotero/zotero/blob/main/resource/schema/system.sql)，非猜测）：
 
-| 表 | 职责 | 关键字段 |
-|---|---|---|
-| `items` | 一切对象的主表（书目条目/附件/笔记都是 item） | `itemID`, `key`, `itemTypeID`, `libraryID`, `dateAdded`, `dateModified`, `version`, `synced` |
-| `itemTypes` | 条目类型字典（journalArticle…） | `itemTypeID`, `typeName` |
-| `fields` / `itemData` / `itemDataValues` | **EAV**：字段字典 + 值引用 + 值池 | `fieldID`,`fieldName` / `itemID`,`fieldID`,`valueID` / `valueID`,`value` |
-| `itemTypeFields` / `baseFieldMappings` | 类型↔字段约束、类型间字段映射 | — |
-| `creators` / `itemCreators` / `creatorTypes` | 作者（含 `orderIndex`、`firstName/lastName/name`） | — |
-| `itemAttachments` | 附件（item 的子类） | `itemID`, **`parentItemID`**, **`linkMode`**, **`contentType`**, `path`, `charsetID` |
-| `itemNotes` | 笔记（item 的子类） | `itemID`, **`parentItemID`**, `note`（HTML）, `title` |
-| `collections` / `collectionItems` | 集合（**支持 `parentCollectionID` 嵌套**）+ 多对多挂载 | `collectionID`,`collectionName`,`parentCollectionID` / `collectionID`,`itemID`,`orderIndex` |
-| `tags` / `itemTags` | 标签 + 多对多；`type` 区分自动/手动标签 | `tagID`,`name` / `itemID`,`tagID`,`type` |
-| `itemRelations` | 通用「主语-谓词-宾语」关系（用于**相关条目**等） | `itemID`, `predicate`, `object` |
-| `deletedItems` | 回收站 | `itemID`, `dateDeleted` |
-| `libraries` / `groups` | 个人库/群组库、可编辑性与同步版本 | `libraryID`,`type`,`editable`,`version`,`lastSync` |
-| `fulltextItems` / `fulltextItemWords` / `fulltextWords` | **全文检索索引**（PDF 文本拆词入 FTS） | — |
-| `syncCache` / `syncDeleteLog` 等 | 同步缓存与删除日志 | — |
+| 表 | 职责 | 关键字段 | 关系 |
+|---|---|---|---|
+| `items` | **一切对象**（书目/附件/笔记/批注）公共属性 | `itemID` PK, `itemTypeID`, `libraryID`, `key`, `dateAdded`, `dateModified`, `version`, `clientVersion`, `synced` | UNIQUE(libraryID,key)；FK libraryID→libraries CASCADE |
+| `itemTypes` / `fields` / `itemTypeFields` / `baseFieldMappings` | 类型字典 / 字段字典 / 「某类型有哪些字段+顺序+默认隐藏」/ 类型特有字段↔基础字段映射 | `typeName` / `fieldName` / (`itemTypeID`,`fieldID`,`hide`,`orderIndex`) / (`itemTypeID`,`baseFieldID`,`fieldID`) | 定义来自 [`zotero/zotero-schema`](https://github.com/zotero/zotero-schema/tree/master) |
+| `creatorTypes` / `itemTypeCreatorTypes` / `creators` / `itemCreators` | 角色字典 / 类型↔角色合法性 / 责任者实体（去重）/ 条目↔责任者（**含 `orderIndex` 与角色**） | `first/lastName`, `fieldMode` | `itemCreators` PK(itemID,creatorID,creatorTypeID,orderIndex)，UNIQUE(itemID,orderIndex) |
+| `itemData` + `itemDataValues` + `fields` | **EAV 三件套**：事实表 / 值池（值去重） / 字段字典 | (`itemID`,`fieldID`,`valueID`) / (`valueID`,`value` UNIQUE) | 见下 §1.2 |
+| `itemAttachments` | 附件专属元数据 | `itemID` PK, **`parentItemID`**, **`linkMode`**, `contentType`, `path`, `syncState`, `storageHash` | FK parentItemID→items（**NULL=独立附件**） |
+| `itemNotes` | 笔记专属数据 | `itemID` PK, `parentItemID`, **`note`（HTML 字符串）**, `title` | NULL=独立笔记；非 NULL=条目子笔记 |
+| `itemAnnotations` | **PDF 批注**（挂在附件下） | `itemID` PK, `parentItemID`, `type`, `text`, `comment`, `color`, `pageLabel`, `position` | FK parentItemID→**itemAttachments(itemID)** |
+| `collections` + `collectionItems` | 集合（`parentCollectionID` **自引用→任意深度嵌套**）+ 多对多 + 手动排序 | `collectionName`, `parentCollectionID`, `key` / (`collectionID`,`itemID`,`orderIndex`) | 全 FK CASCADE |
+| `tags` + `itemTags` | 库级标签字典（`name` UNIQUE）+ 关联 | (`itemID`,`tagID`,**`type`**) | **`type` 0=手动 / 1=自动**（自动标签可整类清除） |
+| `itemRelations` + `relationPredicates` | 通用「条目↔任意 URI」关系 | (`itemID`,`predicateID`,`object`) / `predicate`（如 `owl:sameAs` / `dc:relation` / `dc:replaces`） | 开放关系，不限于文献间 |
+| `libraries` / `groups` / `groupItems` | 个人库/群组库/群组成员 | `type`,`editable`,`version`,`storageVersion`,`lastSync` | — |
+| `deletedItems` / `deletedCollections` / `deletedSearches` | **回收站（软删除，独立表）** | ID PK + `dateDeleted` | 条目本身仍在 `items`；API：`/items/trash`、`includeTrashed=1` |
+| `fulltextItems` | 全文索引状态 | `indexedPages`,`totalPages`,`indexedChars`,`totalChars`,`version` | 词级表（`fulltextWords` 等）**未确认**（另一 schema 文件） |
+| `syncedSettings` / `settings` | 库级可同步设置（**标签颜色存这里**，见 §1.5）/ 本机设置 | `setting`,`value`,`version` | — |
+
+补充：`key` 是 **8 字符库内唯一串**（规则 `/[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}/`），
+附件实体放在 `<data dir>/storage/<itemKey>/`（**不是** DB 里）。
 
 ### 1.2 关键设计点（最值得借鉴的 5 条）
 
@@ -60,31 +64,76 @@ item types 与 fields 的权威定义在 [`zotero/zotero-schema`](https://github
    （对照我们：文献在 JSON dict、附件在 jsonl、图片在另一个 json、条目在另一个 jsonl，四者只靠 `paper_id` 字符串松散关联。）
 2. **附件文件按父条目 key 分目录存放**：文件系统承载大文件，DB 只存索引/路径。
    （我们已经这样做了：`literature/pdfs/<paper_id>/<file_id>_<name>.pdf` ✓ 方向一致。）
-3. **EAV 元数据**：`fields`+`itemData`+`itemDataValues` 让「不同 item type 有不同字段」而不改表结构；
-   代价是查询要多次 JOIN（Zotero 为此建了大量索引与视图）。→ **我们要的是灵活但不过度**：
-   对 COF 场景，字段集合相对固定，建议**宽表 + `extra` JSON 列**（Zotero 官方也建议自定义信息放 Extra 字段）。
-4. **集合（树）+ 标签（多对多）双轨组织**：集合=人工目录（可嵌套、可多挂），标签=跨集合的横切主题；
-   两者都是多对多，且**条目可以同时属于多个集合**。（我们目前**两者都没有**。）
-5. **通用 `itemRelations(subject, predicate, object)`**：为「相关条目/引用」这类开放关系留了扩展位，
+3. **EAV 元数据（`fields`+`itemData`+`itemDataValues`）**：让「不同 item type 有不同字段」而**不改 DDL**
+   （`itemTypeFields` 决定某类型有哪些字段/顺序/默认隐藏，插件还能加 customFields），`itemDataValues` 把重复值去重。
+   **代价**：取一个字段要 `items ⋈ itemData ⋈ itemDataValues ⋈ fields` 四表 JOIN；值统一为 TEXT，
+   **排序/范围过滤拿不到类型化索引**；索引只有 `itemData(itemID,fieldID)` 主键与 `fieldID`/`valueID` 单列。
+   （诚实标注：官方文档**只说明**字段集取决于 item type、定义在 zotero-schema，**没有解释**为何用 EAV——
+   上面的动机是调研推断。）
+   → **给我们的结论**：我们不做「开放自定义类型/字段」，**宽表 + JSON 列**远比 EAV 查询友好；
+   但必须保留 Zotero 的三样东西：**`key`（稳定外部标识，Zotero 用 8 字符串）**、
+   **`version`（乐观并发/增量同步）**、**软删除表**。
+4. **集合（树）+ 标签（多对多）双轨组织**：集合=人工目录（`parentCollectionID` 自引用、**任意深度**、
+   条目可多归属、集合内可手动排序），标签=跨集合的横切属性（`tags` 是库级字典 + `itemTags.type` 区分
+   **0=手动 / 1=自动**，自动标签可整类清除；**标签颜色不存在 tags 表，而存在库级 `syncedSettings` 的
+   `tagColors`，彩色上限 `MAX_COLORED_TAGS=9`**）。（我们目前两者都没有。）
+5. **通用 `itemRelations(itemID, predicateID, object)` + `relationPredicates` 字典**：谓词是 URI 形式
+   （`owl:sameAs` / `dc:relation` / `dc:replaces`），为「相关/引用/替代」这类关系留了统一扩展位，
    Zotero 的「Related」面板就是它的 UI。（这正是我们图谱缺的「文献↔文献」层。）
+6. **附件 linkMode 有 5 种**（源码常量）：`0` imported_file（**存副本**，纳入同步，删条目即删文件）、
+   `1` imported_url（网页快照）、`2` linked_file（**只记路径**，不同步、不随条目删）、`3` linked_url（只记 URI）、
+   `4` embedded_image（笔记内嵌图）；path 用前缀区分来源：`storage:<filename>`（实体在 `<data dir>/storage/<itemKey>/`）
+   与 `attachments:<相对路径>`（在 Linked Attachment Base Directory 下时）。
+7. **「主文 + SI」在 Zotero 没有专属类型**：官方论坛答复是「SI 应挂到**同一父条目**下」，
+   即 1 个书目 item + N 个子附件，靠文件名/title 区分。
+   → **我们的 `role=main|si` 显式建模比它更清楚**，保留即可（并可扩展 `dataset/code`）。
+8. **笔记是 HTML 而非 Markdown**（`itemNotes.note` 存 HTML 字符串、含 `data-schema-version`），
+   且笔记本身就是 item（`itemTypeID=note`）、可作条目子笔记或独立笔记。
+   → 我们面向 LLM 与渲染，**建议存 Markdown**（`notes.content_md`），导出/互操作时再转 HTML。
+9. **软删除是独立表**（`deletedItems`/`deletedCollections`/`deletedSearches` 只存 ID + `dateDeleted`），
+   配合 API 的 `/items/trash` 与 `includeTrashed=1`。（我们用 `deleted_at` 列即可，但语义照抄。）
 
-### 1.3 本地 API（Zotero 7，`http://localhost:23119/api/`）
+### 1.3 本地 API（Zotero 7+，`http://localhost:23119/api/`）
 
-- 设计取向：**镜像 Web API 的数据形状**（`/api/users/0/items` 与 `api.zotero.org/users/<id>/items` 同构），
-  让同一套客户端代码既能连本地库也能连云端；返回支持 `format=json|bibtex`、`limit`/`start` 分页与
-  `itemType`/`q`/`tag`/`since` 过滤（`since` 用于增量同步）。
-- 与「Connector HTTP Server」共用同一端口 **23119**（官方文档：[connector_http_server](https://www.zotero.org/support/dev/client_coding/connector_http_server)）；
-  本地 API 需在 Zotero 设置中开启（Advanced → 允许本机其他应用通信 / 对应 pref）。
-- 端点语义（你列的那批，与社区整理一致，例：[zotero-skill 的 local-api-routes.md](https://github.com/congcongwang0122/zotero-skill/blob/main/references/local-api-routes.md)、[openai/plugins 的同类整理](https://github.com/openai/plugins/blob/f812c146/plugins/zotero/skills/zotero/references/local-api-routes.md)）：
-  - `GET /api/users/0/items`（全部条目，支持 `limit/start/q/itemType/tag/since/format`）
-  - `GET /api/users/0/items/{key}`（单条）
-  - `GET /api/users/0/items/{key}/children`（**子条目** = 附件 + 笔记）
-  - `GET /api/users/0/items/{key}/fulltext`（**全文**索引内容）
-  - `GET /api/users/0/collections`、`GET /api/users/0/items/tags`（标签及计数）
-  - `GET /api/users/0/searches`（保存的检索）等
-- **对我们的借鉴价值**：① 「一个条目 → children（附件/笔记）」的子资源设计，比我们「按 paper_id 分散在 4 个文件」更好用；
-  ② `limit/start/q/tag/since` 这套**服务端检索参数**，正好补我们 `/papers` 全量返回、前端本地过滤的短板；
-  ③ `fulltext` 端点提醒我们：全文检索应是一等公民（Zotero 用 FTS 表，我们可直接用 SQLite FTS5）。
+官方文档页（此前我按旧路径 404，正确地址）：[Local API](https://www.zotero.org/support/dev/web_api/v3/local_api)。
+
+- **开启与认证**：必须在 Zotero **Settings → Advanced → “Allow other applications on this computer to
+  communicate with Zotero”** 勾选，否则一律 `403`；地址固定 23119（不可配），仅实现 **API v3**。
+  **读请求免认证、无限速、默认不分页**（省略 `limit` 即全量返回）；写请求（Zotero 10+）需先
+  `POST /api/local/authorize`（带 `Zotero-Server-ID`）弹窗取本地 key，与 zotero.org 的 key 无关。
+- **与 Web API 的一致性**：**同一套 v3 schema、同一 JSON 形状**（`key/version/library/links/meta/data`），
+  官方称 Basics / Write / File Uploads / Full-Text 各端点「work identically under that prefix」。
+  差异：无 Atom（`format=atom` → 501）、type/field 名本地化、默认不分页、无 Backoff 限速、
+  Zotero 10+ 的 version 是**本地版本**且响应带 `Zotero-Server-ID` / `Zotero-Schema-Version`、
+  群组元数据精简只读、不支持分块 PATCH 上传（405）。
+- **端点清单**（`/users/0/...` 即「本地用户库」）：
+
+| 端点 | 语义 | 关键参数 |
+|---|---|---|
+| `GET /api/` | 探测运行中的客户端与版本 | 响应头 `Zotero-API-Version`（本地仅 v3） |
+| `/users/0/items` | 全部条目（不含回收站，**含子条目**） | `format(json/bibtex/biblatex/csljson/ris/keys/versions)`, `include(data,bib,citation)`, `limit`, `start`, `sort`, `direction`, `itemKey`, `itemType`, `q`, `qmode`, `tag`, `since`, `includeTrashed` |
+| `/users/0/items/top`、`/items/trash` | 仅顶层条目 / 回收站 | 同上 |
+| `/users/0/items/{key}` | 单个条目 | `format`, `include` |
+| `/users/0/items/{key}/children` | **子条目 = 附件 + 笔记 + 批注** | `limit/start/sort` |
+| `/users/0/items/{key}/fulltext` | 附件全文（`content` + `indexedPages/totalPages`） | 404 = 无全文 |
+| `/users/0/fulltext?since=` | 全库全文变更清单 | `since` 必填 |
+| `/items/{key}/file`、`/file/view`、`/file/view/url` | **本地独有**：302 跳 `file://` 本地文件 / 返回纯文本 URL | — |
+| `/users/0/collections`、`/collections/top`、`/collections/{key}/collections`、`/collections/{key}/items` | 集合与子集合、集合内条目 | `limit/start/sort/since` |
+| `/users/0/items/tags`、`/tags`、`/tags/{name}`、`/items/{key}/tags`、`/collections/{key}/tags` | 标签（响应含 `meta.type` 与 `meta.numItems`） | `q`, `qmode(contains/startsWith)`, `tag`, `since` |
+| `/users/0/searches`、`/searches/{key}/items` | 保存的检索；**后者为本地独有**：真正执行检索 | 同 items |
+| `/itemTypes`、`/itemFields`、`/itemTypeFields?itemType=`、`/itemTypeCreatorTypes`、`/creatorFields`、`/items/new?itemType=` | schema 字典与新建模板 | `itemType`（`locale` 被忽略） |
+
+- **对我们的借鉴价值**：① `/items/{key}/children` 的**子资源设计**（附件+笔记+批注一次拿全）
+  正是我们「按 `paper_id` 分散在 4 个文件」缺的；② `limit/start/q/qmode/tag/since/sort/direction`
+  这套**服务端检索参数**直接补我们 `/papers` 全量返回、前端本地过滤的短板；
+  ③ `format=bibtex|csljson|ris` 说明**导出格式应内建**；④ `/items/{key}/file` 302 到本地文件的做法，
+  比我们返回文件流更省内存（大 PDF 友好）；⑤ `fulltext` + `fulltext?since=` 提示全文检索与**增量**是一等公民
+  （我们可直接用 SQLite FTS5 + `version`）。
+- **无官方 OpenAPI/Swagger**（未找到）；官方端点的权威定义在
+  `zotero/zotero` 的 `resource/schema/*.sql` 与 `chrome/content/zotero/xpcom/server/server_localAPI.js`。
+  可复用的类型资产：[windingwind/zotero-types](https://github.com/windingwind/zotero-types)（插件内 `Zotero.*` JS API，
+  **不覆盖 HTTP JSON 形状**）、[dzackgarza/zotero-local-write-api 的 openapi.yaml](https://github.com/dzackgarza/zotero-local-write-api/blob/main/openapi.yaml)
+  （真 OpenAPI 3.1，但描述的是该第三方 add-on 自建端点，**非官方**）。
 
 ### 1.4 知识图谱类插件（**仓库地址已逐个核实**，与你 brief 中名称不一致处已更正）
 
@@ -107,10 +156,16 @@ item types 与 fields 的权威定义在 [`zotero/zotero-schema`](https://github
 > 另有 [`openai/plugins` 中的 zotero skill](https://github.com/openai/plugins/blob/f812c146/plugins/zotero/skills/zotero/references/local-api-routes.md)
 > 整理了一份本地 API 路由参考，可作为 P5 的对照实现。
 
-### 1.6 插件模板
+### 1.6 插件模板（数字为调研时刻的 GitHub 元数据）
 
-- [`windingwind/zotero-plugin-template`](https://github.com/windingwind/zotero-plugin-template)：TypeScript 类型定义、
-  构建/发布工作流、**自动热重载**、配套 `zotero-plugin-toolkit`。
+- [`windingwind/zotero-plugin-template`](https://github.com/windingwind/zotero-plugin-template)：
+  **AGPL-3.0**，**846★ / 178 fork**，`pushed_at = 2026-03-09`（仍活跃，open issues 6）。
+  提供：全量 TS 类型（依赖 zotero-types）；事件驱动骨架（`bootstrap.js` → `src/hooks.ts` 的 onStartup/onShutdown）；
+  丰富示例（通知、右键菜单、额外列、侧栏/Reader 面板、prefs 面板、快捷键）；**自动热重载**
+  （`npm start` 拉起开发版 Zotero，改 `src`/`addon` 即重载）；构建/发布流水线（zotero-plugin-scaffold + esbuild，
+  `npm run build` 出 `.xpi`，`npm run release` 走 GitHub Actions 发 Release 与 `update.json`）。
+  配套 [`zotero-plugin-toolkit`](https://github.com/windingwind/zotero-plugin-toolkit)（**MIT**，199★，2026-07-21）
+  与 [`zotero-types`](https://github.com/windingwind/zotero-types)（85★，2026-08-01）。
   → 若未来要让本系统与 Zotero 双向互通（读它的库 / 被它调用），可基于它做插件；**本期不做**，但架构上留出 HTTP 互操作口。
 
 ### 1.7 可借鉴的关键设计点（汇总）
@@ -148,13 +203,16 @@ item types 与 fields 的权威定义在 [`zotero/zotero-schema`](https://github
 -- 文献条目（书目）
 items(
   id INTEGER PRIMARY KEY,           -- 内部自增
+  key TEXT UNIQUE,                  -- 稳定外部标识（借鉴 Zotero 8 字符串 key，供导出/互操作/引用）
   paper_id TEXT UNIQUE NOT NULL,    -- 兼容现有 paper_id（1782 起递增，保持对外不变）
   item_type TEXT DEFAULT 'journalArticle',
   title TEXT, abstract TEXT, journal TEXT, year INTEGER, doi TEXT UNIQUE, url TEXT,
-  authors_json TEXT,                -- [{first,last,order}]（顺序敏感）
+  authors_json TEXT,                -- [{first,last,order}]（顺序敏感，借鉴 itemCreators.orderIndex）
   source TEXT,                      -- builtin | crossref | user-intake | zotero-import
   extra_json TEXT,                  -- 扩展字段（Zotero「Extra」思路）
-  added_at TEXT, updated_at TEXT, deleted_at TEXT, version INTEGER DEFAULT 1
+  added_at TEXT, updated_at TEXT,
+  deleted_at TEXT,                  -- 软删除（借鉴 deletedItems，但用列而非独立表）
+  version INTEGER DEFAULT 1         -- 乐观并发/增量（借鉴 Zotero version）
 );
 
 -- 附件（主文/SI/图/数据/代码）—— 借鉴 itemAttachments
@@ -191,19 +249,23 @@ entry_metrics(                      -- 数值指标规范化（跨文献数值�
 notes(
   id INTEGER PRIMARY KEY, note_id TEXT UNIQUE, item_id INTEGER REFERENCES items(id),
   parent_note_id INTEGER,           -- 支持笔记嵌套（Zotero 同款）
-  title TEXT, content_md TEXT, source TEXT,  -- user | assistant | llm
+  title TEXT, content_md TEXT,      -- 我们存 Markdown（Zotero 存 HTML；导出时再转）
+  source TEXT,                      -- user | assistant | llm
   created_at TEXT, updated_at TEXT
 );
 
 -- 集合（树）+ 多对多挂载（借鉴 collections/collectionItems）
 collections(id INTEGER PRIMARY KEY, collection_id TEXT UNIQUE, name TEXT,
-            parent_id INTEGER, order_index INTEGER, created_at TEXT);
+            parent_id INTEGER, order_index INTEGER, created_at TEXT, deleted_at TEXT);
 collection_items(collection_id INTEGER, item_id INTEGER, order_index INTEGER,
                  PRIMARY KEY(collection_id, item_id));
 
--- 标签（多对多；type 区分自动/手动，借鉴 tags/itemTags）
-tags(id INTEGER PRIMARY KEY, name TEXT UNIQUE, type TEXT DEFAULT 'manual');
+-- 标签（多对多；type 区分自动/手动，借鉴 tags/itemTags；颜色存 settings 而非标签表）
+tags(id INTEGER PRIMARY KEY, name TEXT UNIQUE, type TEXT DEFAULT 'manual');  -- manual | auto
 item_tags(item_id INTEGER, tag_id INTEGER, PRIMARY KEY(item_id, tag_id));
+
+-- 库级设置（借鉴 syncedSettings：标签颜色等放这里，而非污染 tags 表）
+settings(key TEXT PRIMARY KEY, value_json TEXT, updated_at TEXT);
 
 -- 通用关系（借鉴 itemRelations）—— 文献↔文献、条目↔图谱节点
 relations(id INTEGER PRIMARY KEY, subject TEXT, predicate TEXT, object TEXT,
@@ -554,12 +616,26 @@ P6(视觉) ── 仅依赖「设置页全局视觉配置」，可与 P2/P3 并�
 
 **官方文档**
 - [Direct Access to the Zotero SQLite Database](https://www.zotero.org/support/dev/client_coding/direct_sqlite_database_access) —— 数据都在 `zotero.sqlite`、**外部只应只读**、表结构随版本变化、item types/fields 见 zotero-schema、附件按父 item key 分目录、每个 item 自带 notes/attachments/tags/related items
-- [Zotero 数据 schema 仓库](https://github.com/zotero/zotero-schema/tree/master) —— item types 与 fields 的权威定义（落地时以此为准）
-- [Zotero Connector HTTP Server](https://www.zotero.org/support/dev/client_coding/connector_http_server) —— 本地服务端口 23119 的官方说明
-- [Zotero 开发者文档入口](https://www.zotero.org/support/dev/start) / [Web API](https://www.zotero.org/support/dev/web_api) —— 本地 API 与 Web API 同构的依据
+- [Zotero **Local API**（正确地址）](https://www.zotero.org/support/dev/web_api/v3/local_api) —— 开启开关与 403、23119、仅 v3、读免认证/默认不分页、写需 `POST /api/local/authorize` + `Zotero-Server-ID`、`/searches/{key}/items` 与 `/items/{key}/file` 为本地独有
+- [Web API Basics](https://www.zotero.org/support/dev/web_api/v3/basics) —— 端点与查询参数（`format/include/limit/start/sort/direction/itemType/q/qmode/tag/since/includeTrashed`）、浏览器缓存
+- [Full-Text Content Requests](https://www.zotero.org/support/dev/web_api/v3/fulltext_content) —— `/items/{key}/fulltext` 与 `/fulltext?since=` 的字段与状态码
+- [Write Requests](https://www.zotero.org/support/dev/web_api/v3/write_requests) —— 条目 JSON 形状、relations 谓词（`owl:sameAs`/`dc:relation`/`dc:replaces`）、tags `type`、`parentItem`、key 规则
+- [Item Type/Field Requests](https://www.zotero.org/support/dev/web_api/v3/types_and_fields) —— `/itemTypes`、`/itemFields`、`/itemTypeFields`、`/items/new` 与 `https://api.zotero.org/schema`
+- [JSON Objects in the API](https://www.zotero.org/support/dev/web_api/json)、[Adding Files](https://www.zotero.org/support/attaching_files)、[Notes](https://www.zotero.org/support/notes) —— linkMode 早期来源、stored vs linked、子条目 vs 独立条目、child note vs standalone note
+- [Zotero 数据 schema 仓库](https://github.com/zotero/zotero-schema/tree/master) —— item types 与 fields 的权威定义
+- [Zotero Connector HTTP Server](https://www.zotero.org/support/dev/client_coding/connector_http_server) —— 本地 23119 端口的官方说明
+- [Zotero Forums：Journal paper with supporting information](https://forums.zotero.org/discussion/comment/510471/) —— 「SI 挂同一父条目」的官方论坛依据
 - [CSL/Zotero Metadata Field Index](https://aurimasv.github.io/z2csl/typeMap.xml) —— 字段名↔CSL 映射（导出 BibTeX/CSL-JSON 会用到）
 
-**本地 API 路由参考（社区整理）**
+**一手源码（表结构与行为的真正依据）**
+- [`resource/schema/userdata.sql`](https://github.com/zotero/zotero/blob/main/resource/schema/userdata.sql) —— §1.1 全部表/字段/主外键/索引
+- [`resource/schema/system.sql`](https://github.com/zotero/zotero/blob/main/resource/schema/system.sql) —— 系统字典表（`fieldFormats` 已标 unused）
+- [`xpcom/attachments.js`](https://github.com/zotero/zotero/blob/main/chrome/content/zotero/xpcom/attachments.js) —— `LINK_MODE_*`（含 `EMBEDDED_IMAGE=4`）、`storage:` / `attachments:` 前缀与 `storage/<key>/` 目录
+- [`xpcom/data/tags.js`](https://github.com/zotero/zotero/blob/main/chrome/content/zotero/xpcom/data/tags.js) —— `itemTags.type` 0/1、自动标签批量清除、`tagColors` 存 `SyncedSettings`、`MAX_COLORED_TAGS=9`
+- [`xpcom/data/notes.js`](https://github.com/zotero/zotero/blob/main/chrome/content/zotero/xpcom/data/notes.js) —— 笔记内容为 HTML、`data-schema-version`
+- [`xpcom/data/dataObjects.js`](https://github.com/zotero/zotero/blob/main/chrome/content/zotero/xpcom/data/dataObjects.js) —— relations 读取、deleted* 表、version/synced 维护
+
+**本地 API 路由参考（社区整理，作对照实现）**
 - [congcongwang0122/zotero-skill 的 local-api-routes.md](https://github.com/congcongwang0122/zotero-skill/blob/main/references/local-api-routes.md)
 - [openai/plugins 的 zotero local-api-routes.md](https://github.com/openai/plugins/blob/f812c146/plugins/zotero/skills/zotero/references/local-api-routes.md)
 
