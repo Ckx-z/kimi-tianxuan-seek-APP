@@ -366,7 +366,26 @@ def _plain_content(content) -> str:
                 has_image = True
         out = "".join(texts)
         if has_image:
-            out += "\n[用户上传了图片，当前模型不支持看图，请基于已有文字信息回答]"
+            # v1.9.7：不再给含糊的「不支持看图」，而是**给出可操作的两条出路**，
+            # 并顺带探测视觉读图是否可用（不依赖视觉模型也能给出准确指引）。
+            hint = ""
+            try:
+                try:
+                    from literature import vision
+                except ImportError:
+                    from src.literature import vision  # type: ignore
+                st = vision.status()
+                if st.get("available"):
+                    hint = ("（本机已配置视觉读图：可在「文献库 → 文献图片」用它读图；"
+                            "助手侧的看图回复需要把助手模型换成支持图片输入的模型）")
+                else:
+                    hint = ("（未启用视觉读图：到「设置 → 文献解析 LLM → 视觉读图」填一个"
+                            "支持图片输入的模型，即可让图片被识别；或直接把图片文字/数据"
+                            "贴成文本发给我）")
+            except Exception:  # pragma: no cover
+                hint = "（如需看图，请改用支持图片输入的模型）"
+            out += ("\n[用户上传了图片，但当前助手模型不支持图片输入，图片内容未被识别。"
+                    f"请基于已有文字信息回答，并如实说明这一点。{hint}]")
         return out
     return str(content or "")
 
