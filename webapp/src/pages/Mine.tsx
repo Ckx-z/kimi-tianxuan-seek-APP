@@ -28,6 +28,7 @@ import { FavoritesSection } from '@/components/mine/FavoritesSection';
 import { PlansSection } from '@/components/mine/PlansSection';
 import { LiteratureIntakeSection } from '@/components/mine/LiteratureIntakeSection';
 import { LiteratureKnowledgeSection } from '@/components/mine/LiteratureKnowledgeSection';
+import { LibraryExplorer } from '@/components/library/LibraryExplorer';
 
 /** 导出备份：打包四类数据为 JSON Blob 下载 */
 async function exportBackup() {
@@ -144,6 +145,12 @@ export default function Mine() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">我的方案库</h2>
         <PlansSection plans={plans} loading={loading} />
+      </section>
+
+      {/* 文献库（v1.9.7 P2）：Zotero 式三栏浏览（集合 / 检索列表 / 详情+笔记） */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">文献库</h2>
+        <LibraryExplorer />
       </section>
 
       {/* 科研知识库（v1.9.0）：文献录入 + 结构化条目/图谱/补解析统一 */}
