@@ -166,16 +166,30 @@ def set_state(conn, paper_id: str, state: str) -> str:
 # ---------------------------------------------------------------- 阅读清单 / 入库计划
 
 def queue(conn, *, state: str | None = None, limit: int = 100) -> list[dict]:
-    """阅读清单：按状态筛选，附解析状态（缺什么）。"""
+    """阅读清单：按状态筛选，附解析状态（缺什么）。
+
+    v1.9.8：**有 PDF 附件的排在最前**（能真正打开阅读的优先），其余按编号倒序，
+    避免"清单很长但点开都是无附件"的体验。
+    """
     ensure_schema(conn)
+    # 注意：search_papers 单次最多 500 条，而「带附件的文献」可能落在很后面
+    # （实测 1529/2/1 都在前 500 之外）→ 必须分页取全量后再排序。
+    papers: list[dict] = []
+    for offset in range(0, 5000, 500):
+        chunk = _db().search_papers(conn, limit=500, offset=offset)["papers"]
+        papers.extend(chunk)
+        if len(chunk) < 500:
+            break
     rows = []
-    for p in _db().search_papers(conn, limit=max(1, min(limit, 500)))["papers"]:
+    for p in papers:
         st = get_state(conn, p["paper_id"])
         if state and st != state:
             continue
         rows.append({**p, "reading_state": st,
                      "annotations": len(list_annotations(conn, p["paper_id"]))})
-    return rows
+    rows.sort(key=lambda r: (0 if r.get("attachments_count") else 1,
+                             -int(r["paper_id"]) if str(r["paper_id"]).isdigit() else 0))
+    return rows[:max(1, int(limit))]
 
 
 def ingest_plan(conn, paper_id: str) -> dict:
