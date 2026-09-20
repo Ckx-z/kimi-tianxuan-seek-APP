@@ -158,7 +158,7 @@ class TestConformerEndpoints:
         monkeypatch.setattr(
             dft_conformers, "generate_conformers",
             lambda smiles, engine_name, n_gen=50, max_confs=20,
-            e_window_kj=10.0, timeout=3600: [
+            e_window_kj=10.0, timeout=3600, threads=None: [
                 {"id": "fake-00", "xyz": "1\nx\nC 0 0 0\n",
                  "rel_e_kj": 0.0, "rel_e_kcal": 0.0, "boltzmann_w": 1.0}])
         r = client.post("/api/dft/conformers/generate",

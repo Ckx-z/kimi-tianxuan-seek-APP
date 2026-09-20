@@ -25,6 +25,27 @@ def _isolate_dft_job_store(tmp_path_factory):
 
 
 @pytest.fixture(autouse=True, scope="session")
+def _isolate_literature_library(tmp_path_factory):
+    """v1.9.8：把文献库写入隔离到临时目录，**杜绝测试污染随包文献库**。
+
+    背景（事故）：`titles` 的 overlay 仅在「frozen 或显式设置 COF_DATA_DIR」时生效；
+    否则 `resolver.append_paper` 写的是**仓库里的 data/paper_titles.json**（随包库）。
+    本轮曾因此把 3 篇测试文献冻进 v1.9.8 安装包（已还原 + 重新冻结），排查还发现
+    13 个用例长期在写随包库。此处 session 级设置 COF_DATA_DIR：
+      · 写入 → 用户 overlay（临时目录），首次写入自动全量复制内置库；
+      · 读取 → 内置库打底 + overlay 覆盖/新增（`titles._load()` 的合并语义）。
+    """
+    data_dir = tmp_path_factory.mktemp("cof_data_root")
+    old = os.environ.get("COF_DATA_DIR")
+    os.environ["COF_DATA_DIR"] = str(data_dir)
+    yield
+    if old is None:
+        os.environ.pop("COF_DATA_DIR", None)
+    else:
+        os.environ["COF_DATA_DIR"] = old
+
+
+@pytest.fixture(autouse=True, scope="session")
 def _no_docker_autostart():
     """测试会话禁用 CREST Docker 探测的 Docker Desktop 自动拉起
     （docker_engine_ready 检测到引擎未运行时会尝试启动 Docker Desktop，

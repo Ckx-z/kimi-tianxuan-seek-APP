@@ -124,7 +124,22 @@ def enrich_references(refs) -> list:
 def _papers_path() -> Path:
     """文献库【写】路径（委托 titles.writable_titles_path：overlay 生效时
     永远写用户库，首次写入自动全量复制内置库；测试 monkeypatch
-    titles.TITLES_PATH 一处即生效）。"""
+    titles.TITLES_PATH 一处即生效）。
+
+    v1.9.8 纵深防护：pytest 环境下若 overlay 未生效（未设 COF_DATA_DIR），
+    写入会落到**仓库里的随包文献库** —— 本轮已因此把 3 篇测试文献冻进安装包。
+    这里直接拒绝，并给出修法，避免同类事故再次发生。
+    """
+    import os
+    overlay_on = True
+    try:
+        overlay_on = bool(titles._overlay_active())
+    except Exception:  # pragma: no cover
+        overlay_on = True
+    if os.environ.get("PYTEST_CURRENT_TEST") and not overlay_on:
+        raise RuntimeError(
+            "测试环境禁止写入随包文献库（会污染发版产物）：请在用例 fixture 中设置 "
+            "COF_DATA_DIR 指向临时目录，或 monkeypatch titles.TITLES_PATH。")
     return titles.writable_titles_path()
 
 

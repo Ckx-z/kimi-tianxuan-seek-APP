@@ -43,6 +43,10 @@ def env(tmp_path, monkeypatch):
     assert patched
     monkeypatch.setattr(library_db, "db_path", lambda: data / "literature" / "library.db")
     library_db.reset_ready_cache()
+    # v1.9.8 关键：**必须让 overlay 生效**。titles 的 overlay 只在「frozen 或显式
+    # 设置 COF_DATA_DIR」时激活；否则 resolver.append_paper 会写进仓库里的随包文献库
+    # （既污染发版产物，也让"写 tmp、读仓库"的 API 用例假失败 —— 本轮事故根因）。
+    monkeypatch.setenv("COF_DATA_DIR", str(data))
     # v1.9.8：文献库加载器在进程内会缓存数据目录 → 切到本用例 tmp 目录后，
     # 把相关模块从 sys.modules 摘掉，强制下一次惰性 import 重新读取被 patch 的路径
     # （否则全量跑时可能读到上一个用例的数据，导致 API 级用例假失败）
@@ -195,12 +199,6 @@ def test_mirror_paper_makes_new_entry_visible(env):
     conn.close()
 
 
-@pytest.mark.xfail(
-    reason="已知测试隔离限制（非产品缺陷）：文献库加载路径在更底层模块缓存数据目录，"
-           "fixture 里清 sys.modules 仍未解决 → 全量跑会读到上一用例的数据；"
-           "单独跑本文件 100% 通过，产品流程已用真实 HTTP 端到端验证。"
-           "待文献库加载器提供显式 reload() 接口后解除。",
-    strict=False)
 def test_inbox_ingest_endpoint_creates_entry_and_links(env, monkeypatch):
     """收件箱 → 入库：建条目 + 挂附件 + 回填 paper_id（元数据抽取打桩）。"""
     from fastapi.testclient import TestClient
@@ -243,9 +241,6 @@ def test_inbox_ingest_endpoint_creates_entry_and_links(env, monkeypatch):
     assert entry.get("title") == "从 PDF 抽到的标题"
 
 
-@pytest.mark.xfail(
-    reason="已知测试隔离限制（非产品缺陷）：同上，加载器缓存未随 tmp 目录切换而清空。",
-    strict=False)
 def test_inbox_ingest_reuses_existing_doi(env, monkeypatch):
     """同 DOI 已在库中 → 不重复建条目，收件箱直接指向既有文献。
 
