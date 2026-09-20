@@ -77,6 +77,54 @@ function Reading() {
   const [annoColor, setAnnoColor] = useState('yellow');
   /** R2-h：入库/补缺执行中 */
   const [ingesting, setIngesting] = useState(false);
+  /** R2-k：阅读收件箱（外部上传的 PDF，先读后入库） */
+  const [inbox, setInbox] = useState<{ inbox_id: string; filename: string;
+    state: string; size: number }[]>([]);
+  const [inboxId, setInboxId] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  const loadInbox = useCallback(async () => {
+    try {
+      const r = await fetch('/api/library/reading/inbox?state=pending');
+      const d = r.ok ? await r.json() : { inbox: [] };
+      setInbox(d.inbox ?? []);
+    } catch {
+      setInbox([]);
+    }
+  }, []);
+
+  useEffect(() => { void loadInbox(); }, [loadInbox]);
+
+  const uploadPdf = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const r = await fetch('/api/library/reading/upload', { method: 'POST', body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || `上传失败（${r.status}）`);
+      toast.success(d.duplicate ? '该文件已在阅读清单中' : '已加入阅读清单（尚未入库）');
+      await loadInbox();
+      setPaperId('');
+      setInboxId(d.inbox_id);
+      setPlan(null);
+      setAtts([]);
+      setAnnos([]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '上传失败');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const discardInbox = async (id: string) => {
+    try {
+      await fetch(`/api/library/reading/inbox/${id}`, { method: 'DELETE' });
+      if (inboxId === id) { setInboxId(''); }
+      await loadInbox();
+    } catch { /* 已提示 */ }
+  };
 
   /**
    * 真触发解析入库：
@@ -283,6 +331,41 @@ function Reading() {
                           lg:grid-cols-[260px_minmax(0,1fr)_320px]">
             {/* 左：阅读清单 */}
             <div className="hidden border-r border-border lg:block">
+              {/* R2-k：外部上传（先读后入库） */}
+              <div className="border-b border-border p-2">
+                <label className="flex cursor-pointer items-center justify-center gap-1
+                                  rounded-md border border-dashed border-border px-2 py-2
+                                  text-[11px] text-muted-foreground hover:bg-accent">
+                  {uploading
+                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                    : <Upload className="h-3 w-3" />}
+                  {uploading ? '上传中…' : '上传 PDF 到这里阅读（暂不入库）'}
+                  <input type="file" accept="application/pdf" className="hidden"
+                         onChange={(e) => void uploadPdf(e.target.files?.[0])} />
+                </label>
+                {inbox.length > 0 && (
+                  <ul className="mt-1.5 space-y-1">
+                    {inbox.map((it) => (
+                      <li key={it.inbox_id}
+                          className={cn('flex items-center justify-between gap-1 rounded-md px-2 py-1 text-[11px]',
+                                        inboxId === it.inbox_id ? 'bg-primary/10' : 'hover:bg-accent/60')}>
+                        <button type="button" className="min-w-0 flex-1 truncate text-left"
+                                title={it.filename}
+                                onClick={() => { setInboxId(it.inbox_id); setPaperId('');
+                                                 setPlan(null); setAtts([]); setAnnos([]); }}>
+                          {it.filename}
+                          <span className="ml-1 text-muted-foreground">待入库</span>
+                        </button>
+                        <button type="button" title="从清单移除"
+                                onClick={() => void discardInbox(it.inbox_id)}
+                                className="shrink-0 text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <div className="flex flex-wrap gap-1 border-b border-border p-2">
                 {STATES.map((s) => (
                   <button key={s.key || 'all'} type="button"
@@ -339,7 +422,11 @@ function Reading() {
 
             {/* 中：PDF */}
             <div className="min-w-0 border-r border-border">
-              {!paperId ? (
+              {inboxId ? (
+                <iframe title={`inbox-${inboxId}`}
+                        src={`/api/library/reading/inbox/${inboxId}/file`}
+                        className="h-[600px] w-full bg-muted/20" />
+              ) : !paperId ? (
                 <p className="mt-24 text-center text-sm text-muted-foreground">
                   <BookOpen className="mx-auto mb-2 h-6 w-6" />
                   从左侧清单选择一篇文献开始阅读
@@ -363,7 +450,17 @@ function Reading() {
 
             {/* 右：入库计划 + 阅读状态 + 批注 */}
             <div className="min-w-0 p-3">
-              {!plan ? (
+              {inboxId && !plan ? (
+                <div className="space-y-2 text-[11px] text-muted-foreground">
+                  <p className="text-xs font-medium text-foreground">尚未入库的外部文献</p>
+                  <p>这份 PDF 只在阅读清单里（不占库编号）。读完后入库会走「添加文献 → 解析」流程，
+                     生成条目并把解析结果写入科研知识库。</p>
+                  <p className="rounded-md bg-muted/30 p-2">
+                    入库按钮在下一轮接入（需要先核对入库端点签名）；当前可先在
+                    「科研知识库 → ＋添加文献」上传同一份 PDF 完成入库。
+                  </p>
+                </div>
+              ) : !plan ? (
                 <p className="mt-8 text-center text-xs text-muted-foreground">
                   选择文献后显示解析状态与入库动作
                 </p>
