@@ -34,6 +34,12 @@ interface PaperRow {
   doi: string;
   source: string;
   added_at: string;
+  /** v1.9.8 R1-d：解析状态（供列表徽标；也是 R2「补缺解析」的判定依据） */
+  parse_status?: 'parsed' | 'partial' | 'none';
+  missing_parts?: string[];
+  entries_count?: number;
+  figures_count?: number;
+  has_abstract?: boolean;
 }
 interface Collection {
   collection_id: string;
@@ -400,6 +406,29 @@ export function LibraryExplorer({
                       {p.year ? ` · ${p.year}` : ''}
                       {p.doi ? ` · ${p.doi}` : ''}
                     </span>
+                    {/* R1-d：解析状态徽标（未解析 / 部分 / 已解析），缺失项以提示列出 */}
+                    {p.parse_status && (
+                      <span
+                        title={p.missing_parts?.length
+                          ? `缺少：${p.missing_parts.map((m) => (
+                              m === 'abstract' ? '摘要' : m === 'entries' ? '结构化条目' : '文献图片'
+                            )).join('、')}`
+                          : '摘要、结构化条目、文献图片均已就绪'}
+                        className={cn(
+                          'mt-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px]',
+                          p.parse_status === 'parsed'
+                            ? 'border-primary/40 bg-primary/10 text-primary'
+                            : p.parse_status === 'partial'
+                              ? 'border-gold/50 bg-gold-muted/40 text-gold-foreground'
+                              : 'border-border bg-muted/40 text-muted-foreground',
+                        )}
+                      >
+                        {p.parse_status === 'parsed' ? '已解析'
+                          : p.parse_status === 'partial' ? '部分解析' : '未解析'}
+                        {p.parse_status !== 'parsed' && p.missing_parts?.length
+                          ? ` · 缺 ${p.missing_parts.length} 项` : ''}
+                      </span>
+                    )}
                   </span>
                 </button>
               ))}
