@@ -648,13 +648,29 @@ def search_papers(conn: sqlite3.Connection, *, q: str = "", limit: int = 50,
     nulls_last = f"({col} IS NULL), {col} {order}"
     total = conn.execute(
         f"SELECT COUNT(*) c FROM items i WHERE {clause}", params).fetchone()["c"]
+    # v1.9.8 R1：列表行附带**解析状态**（摘要/结构化条目/文献图片 三项），
+    # 供中栏显示徽标，并作为 R2「读后入库 / 补缺解析」的判定依据。
     rows = conn.execute(
-        f"SELECT i.paper_id,i.title,i.journal,i.year,i.doi,i.source,i.added_at"
+        f"SELECT i.paper_id,i.title,i.journal,i.year,i.doi,i.source,i.added_at,"
+        f" (SELECT COUNT(*) FROM entries e WHERE e.item_id=i.id) AS entries_count,"
+        f" (SELECT COUNT(*) FROM figures f WHERE f.item_id=i.id) AS figures_count,"
+        f" (SELECT COUNT(*) FROM attachments a WHERE a.item_id=i.id) AS attachments_count,"
+        f" CASE WHEN i.abstract IS NULL OR i.abstract='' THEN 0 ELSE 1 END AS has_abstract"
         f" FROM items i WHERE {clause} ORDER BY {nulls_last} LIMIT ? OFFSET ?",
         [*params, max(1, min(int(limit or 50), 500)), max(0, int(offset or 0))]).fetchall()
-    return {"total": int(total), "count": len(rows), "offset": int(offset or 0),
-            "limit": int(limit or 50),
-            "papers": [dict(r) for r in rows]}
+    papers = []
+    for r in rows:
+        d = dict(r)
+        has_abs = bool(d.pop("has_abstract", 0))
+        done = sum((has_abs, d["entries_count"] > 0, d["figures_count"] > 0))
+        d["has_abstract"] = has_abs
+        d["parse_status"] = ("parsed" if done >= 2 else "partial" if done == 1 else "none")
+        d["missing_parts"] = [name for name, ok in
+                              (("abstract", has_abs), ("entries", d["entries_count"] > 0),
+                               ("figures", d["figures_count"] > 0)) if not ok]
+        papers.append(d)
+    return {"total": int(total), "count": len(papers), "offset": int(offset or 0),
+            "limit": int(limit or 50), "papers": papers}
 
 
 def _fts_query(q: str) -> str:

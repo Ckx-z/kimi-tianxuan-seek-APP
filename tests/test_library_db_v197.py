@@ -185,6 +185,25 @@ def test_search_papers_sort_and_source(conn):
     assert [p["paper_id"] for p in only_user["papers"]] == ["1782"]
 
 
+def test_search_papers_parse_status(conn):
+    """v1.9.8 R1：列表行带解析状态（摘要/条目/图片 三项）供中栏徽标。
+
+    断言「状态与三项计数自洽」而非硬编码某篇文献的状态（fixture 里各文献
+    的条目/图片归属会随用例演进，硬编码易脆）。
+    """
+    res = library_db.search_papers(conn, limit=10)
+    assert res["papers"], "应有文献"
+    for p in res["papers"]:
+        done = sum((bool(p["has_abstract"]), p["entries_count"] > 0,
+                    p["figures_count"] > 0))
+        expect = "parsed" if done >= 2 else "partial" if done == 1 else "none"
+        assert p["parse_status"] == expect, p
+        assert len(p["missing_parts"]) == 3 - done, p
+    # 详情行必须带上这三个计数字段（UI 徽标与 R2「补缺」判定都依赖）
+    assert {"entries_count", "figures_count", "has_abstract",
+            "parse_status", "missing_parts"} <= set(res["papers"][0].keys())
+
+
 def test_search_papers_by_collection_and_tag(conn):
     library_db.assign_collection(conn, "1", "col_cof_film", add=True)
     res = library_db.search_papers(conn, collection_id="col_cof_film")
