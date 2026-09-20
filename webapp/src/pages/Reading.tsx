@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { BookOpen, CheckCircle2, FileText, Languages, Loader2, NotebookPen,
-         Upload } from 'lucide-react';
+         Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -71,6 +71,42 @@ function Reading() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [busy, setBusy] = useState(false);
+  /** R2-g：手动批注（页码 + 原文片段 + 评论 + 颜色） */
+  const [annoPage, setAnnoPage] = useState('');
+  const [annoComment, setAnnoComment] = useState('');
+  const [annoColor, setAnnoColor] = useState('yellow');
+
+  const addAnnotation = async () => {
+    if (!paperId || (!selText.trim() && !annoComment.trim())) return;
+    try {
+      const r = await fetch('/api/library/annotations', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paper_id: paperId, type: 'highlight',
+          page: annoPage.trim() ? Number(annoPage) : null,
+          color: annoColor, text: selText.trim(), comment: annoComment.trim(),
+        }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.detail || String(r.status));
+      }
+      setAnnoComment('');
+      const n = await fetch(`/api/library/annotations?paper_id=${encodeURIComponent(paperId)}`)
+        .then((x) => (x.ok ? x.json() : { annotations: [] }));
+      setAnnos(n.annotations ?? []);
+      toast.success('批注已保存');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '保存批注失败');
+    }
+  };
+
+  const removeAnnotation = async (id: string) => {
+    try {
+      await fetch(`/api/library/annotations/${id}`, { method: 'DELETE' });
+      setAnnos((prev) => prev.filter((x) => x.annotation_id !== id));
+    } catch { /* 已提示 */ }
+  };
 
   const doTranslate = async () => {
     const text = selText.trim();
@@ -377,17 +413,47 @@ function Reading() {
                     </p>
                     {annos.length === 0 ? (
                       <p className="mt-1 text-[11px] text-muted-foreground">
-                        暂无批注（高亮/便签/截图将在下一轮接入阅读器）
+                        暂无批注（高亮/便签/截图将在下一轮接入阅读器；当前可手动记录）
                       </p>
                     ) : (
                       <ul className="mt-1 space-y-1">
                         {annos.map((a) => (
-                          <li key={a.annotation_id} className="text-[11px] text-muted-foreground">
-                            第 {a.page ?? '-'} 页 · {a.text || a.comment || a.type}
+                          <li key={a.annotation_id}
+                              className="flex items-start justify-between gap-1 text-[11px] text-muted-foreground">
+                            <span className="min-w-0 flex-1">
+                              第 {a.page ?? '-'} 页 · {a.text || a.comment || a.type}
+                            </span>
+                            <button type="button" title="删除批注"
+                                    onClick={() => void removeAnnotation(a.annotation_id)}
+                                    className="shrink-0 hover:text-destructive">
+                              <Trash2 className="h-3 w-3" />
+                            </button>
                           </li>
                         ))}
                       </ul>
                     )}
+                    {/* R2-g：手动记批注（页码 / 颜色 / 评论；原文片段复用上方选中框） */}
+                    <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
+                      <div className="flex items-center gap-1">
+                        <Input value={annoPage} onChange={(e) => setAnnoPage(e.target.value)}
+                               className="h-7 w-16 text-xs" placeholder="页码" />
+                        <select value={annoColor} onChange={(e) => setAnnoColor(e.target.value)}
+                                className="h-7 rounded-md border border-input bg-background px-1 text-[11px]">
+                          <option value="yellow">黄</option>
+                          <option value="green">绿</option>
+                          <option value="blue">蓝</option>
+                          <option value="red">红</option>
+                        </select>
+                        <Input value={annoComment} onChange={(e) => setAnnoComment(e.target.value)}
+                               onKeyDown={(e) => { if (e.key === 'Enter') void addAnnotation(); }}
+                               className="h-7 flex-1 text-xs" placeholder="评论（可选）" />
+                      </div>
+                      <Button size="sm" className="h-7 text-xs"
+                              disabled={!selText.trim() && !annoComment.trim()}
+                              onClick={() => void addAnnotation()}>
+                        添加批注（原文用上方选中框）
+                      </Button>
+                    </div>
                     <Button size="sm" variant="outline" className="mt-2 h-7 text-xs"
                             disabled={annos.length === 0} onClick={() => void exportNote()}>
                       批注导出为笔记
