@@ -7,8 +7,34 @@
 
 - [ ] 用户已明确给出**版本号**与**发版确认**（这是本项目的硬性纪律）。
 - [ ] `git status` 干净（仅允许 `ppt/` 等既有未跟踪项）；全部测试通过。
+- [ ] **随包文献库未被测试/调试数据污染**（v1.9.8 血的教训，见 §0b）。
 - [ ] 无遗留进程占用产物：`Get-Process cof-backend` 必须为空（否则 PyInstaller
       清目录时会 `[WinError 5] 拒绝访问`，本轮已踩过）。
+
+## 0b. 随包文献库清洁检查（v1.9.8 新增，**必做**）
+
+**事故经过**：v1.9.8 准备期发现 `data/paper_titles.json` 由 1711 条变成 **1714 条** ——
+我的验证流程通过 HTTP 调 `/api/library/reading/inbox/{id}/ingest` 与 `/api/literature/confirm`
+时，`resolver.append_paper` **写进了仓库里的随包文献库**（该写入路径不受测试里
+`runtime_config` 路径打桩约束），于是 3 篇测试文献（`source: reading-inbox`）被冻进了安装包。
+**这同时解释了那两条 API 级用例"单独跑通过、全量跑失败"**：写入与读取都落到仓库库文件上，
+与 tmp 目录里的 DB 镜像不一致。
+
+发版前**必须**执行：
+
+```powershell
+# 1) 条数与来源分布（应为 1711、无 reading-inbox）
+py -c "import json;d=json.loads(open('data/paper_titles.json',encoding='utf-8').read());print(len(d));print({s:sum(1 for v in d.values() if isinstance(v,dict) and v.get('source')==s) for s in ('builtin','user-intake','reading-inbox')})"
+# 2) 与 git 版本比对（有差异就要先弄清是"用户真实新增"还是"测试污染"）
+git status --short data/paper_titles.json
+# 3) 若是污染 → 还原后**重新冻结**（打包里已含旧数据，必须重打）
+git checkout -- data/paper_titles.json
+# 4) 冻结后复核包内数据
+py -c "import json;d=json.loads(open(r'dist-backend\cof-backend\_internal\data\paper_titles.json',encoding='utf-8').read());print(len(d))"
+```
+
+**待修（下批）**：让 `resolver` 的写入路径识别测试环境（或统一走
+`runtime_config.user_data_root()`），从根上杜绝"测试数据写进随包库"。
 
 ## 1. 版本号三处同步（改完再构建）
 
