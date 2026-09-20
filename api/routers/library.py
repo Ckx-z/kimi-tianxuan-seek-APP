@@ -805,6 +805,8 @@ def library_reading_inbox_ingest(inbox_id: str, title: str = "",
             pid = resolver.append_paper(entry)
         except OSError as exc:
             raise HTTPException(500, f"文献库写入失败：{type(exc).__name__}: {exc}")
+        # v1.9.8：同步进镜像，三栏文献库/阅读清单立即可见（best-effort，失败不阻塞）
+        _db.mirror_paper(pid, entry)
         try:
             from literature import graph_ingest
             graph_ingest.upsert_paper_node(pid, entry)

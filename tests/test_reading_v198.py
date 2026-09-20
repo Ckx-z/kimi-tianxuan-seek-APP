@@ -169,6 +169,25 @@ def test_inbox_rejects_non_pdf_and_empty(conn):
         reading.add_inbox_file(conn, "empty.pdf", b"")
 
 
+def test_mirror_paper_makes_new_entry_visible(env):
+    """v1.9.8：新入库文献应**立即**出现在 DB 镜像（三栏 UI / 阅读清单读的是镜像）。"""
+    library_db.ensure_ready()
+    entry = {"doi": "10.1000/mirror-new", "title": "镜像同步测试文献",
+             "authors": ["Hong Xu"], "journal": "Talanta", "year": 2026,
+             "abstract": "mirror hook", "source": "reading-inbox",
+             "added_at": "2026-09-20T12:00:00+08:00"}
+    assert library_db.mirror_paper("1999", entry) is True
+    conn = library_db.connect(env["data"] / "literature" / "library.db")
+    row = conn.execute("SELECT title,doi,source FROM items WHERE paper_id='1999'"
+                       ).fetchone()
+    assert row is not None
+    assert row["doi"] == "10.1000/mirror-new" and row["title"] == "镜像同步测试文献"
+    # 且可被服务端检索命中（FTS 已刷新）
+    hit = library_db.search_papers(conn, q="镜像同步")
+    assert hit["total"] == 1 and hit["papers"][0]["paper_id"] == "1999"
+    conn.close()
+
+
 @pytest.mark.xfail(
     reason="已知测试隔离限制：文献库加载路径存在进程级缓存，全量跑时可能读到上一用例的"
            "数据目录（单独跑该文件 100% 通过；产品流程已用真实 HTTP 端到端验证）。"

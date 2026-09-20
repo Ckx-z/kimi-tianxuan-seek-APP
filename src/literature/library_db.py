@@ -581,6 +581,28 @@ def upsert_paper(conn: sqlite3.Connection, paper_id: str, entry: dict,
     return {"id": item_id, "paper_id": pid}
 
 
+def mirror_paper(paper_id: str, entry: dict) -> bool:
+    """把**刚写入事实来源**的文献同步进 DB 镜像（v1.9.8 R2-l）。
+
+    背景：`resolver.append_paper` 写的是 `paper_titles.json`（事实来源），而三栏 UI /
+    阅读清单读的是本 DB 镜像 —— 不加这一步，新入库文献要等 `rebuild()` 才可见。
+
+    设计：**best-effort** —— 失败只记日志、绝不阻塞入库主流程（镜像随时可重建）。
+    """
+    try:
+        if not is_initialized():
+            return False                      # 尚未迁移过 → 无需镜像（rebuild 时会全量同步）
+        conn = connect()
+        try:
+            upsert_paper(conn, str(paper_id), entry)
+            return True
+        finally:
+            conn.close()
+    except Exception as exc:                  # noqa: BLE001
+        logger.warning("文献镜像同步失败（不影响入库）：%s", exc)
+        return False
+
+
 def get_paper(conn: sqlite3.Connection, paper_id: str) -> dict | None:
     row = conn.execute(
         "SELECT * FROM items WHERE paper_id=? AND deleted_at IS NULL",

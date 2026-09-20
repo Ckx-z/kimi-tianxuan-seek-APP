@@ -158,6 +158,12 @@ def confirm(req: LiteratureConfirm):
         pid = r.append_paper(entry)
     except OSError as exc:
         raise HTTPException(500, f"文献库写入失败：{type(exc).__name__}: {exc}")
+    # v1.9.8：同步进 SQLite 镜像，让三栏文献库/阅读清单**立即可见**（best-effort）
+    try:
+        from literature import library_db
+        library_db.mirror_paper(pid, entry)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("文献镜像同步失败（已入库，可 rebuild）：%s", exc)
     # v1.9.3（第 7 点）：新文献立即写入本机知识图谱的「文献节点」
     # （node_type=literature，标题/摘要可被助手 query_graphrag 检索命中）；
     # 失败不回滚入库，如实标注 graph_indexed=false 可重试。
