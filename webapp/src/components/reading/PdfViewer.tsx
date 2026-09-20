@@ -19,13 +19,26 @@ pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 export function PdfViewer({
   src,
   onSelectText,
+  annotations = [],
 }: {
   src: string;
-  /** 选中文本回调（第二参为页码，供批注自动填页码） */
-  onSelectText?: (text: string, page: number) => void;
+  /** 选中文本回调（含页码与归一化坐标，供批注自动填页码并画出高亮） */
+  onSelectText?: (text: string, page: number, position: {
+    x: number; y: number; w: number; h: number;
+    rects?: { x: number; y: number; w: number; h: number }[];
+  }) => void;
+  /** 该文献的批注（按页画出高亮；position 为 0~1 归一化坐标） */
+  annotations?: {
+    annotation_id: string; page: number | null; color: string; text: string;
+    comment: string; position?: {
+      x?: number; y?: number; w?: number; h?: number;
+      rects?: { x: number; y: number; w: number; h: number }[];
+    };
+  }[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textRef = useRef<HTMLDivElement | null>(null);
+  const pageRef = useRef<HTMLDivElement | null>(null);
   const docRef = useRef<pdfjs.PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const [numPages, setNumPages] = useState(0);
@@ -110,8 +123,37 @@ export function PdfViewer({
     const sel = window.getSelection();
     const text = (sel?.toString() || '').trim();
     if (!text) return;
-    onSelectText?.(text, page);
+    // 计算选中区域的**归一化坐标**（相对页面容器），供批注高亮复现
+    let position = { x: 0, y: 0, w: 0, h: 0,
+                     rects: [] as { x: number; y: number; w: number; h: number }[] };
+    const box = pageRef.current?.getBoundingClientRect();
+    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    if (box && range && box.width > 0 && box.height > 0) {
+      const rects = Array.from(range.getClientRects())
+        .filter((r) => r.width > 1 && r.height > 1)
+        .slice(0, 8)
+        .map((r) => ({
+          x: +((r.left - box.left) / box.width).toFixed(4),
+          y: +((r.top - box.top) / box.height).toFixed(4),
+          w: +(r.width / box.width).toFixed(4),
+          h: +(r.height / box.height).toFixed(4),
+        }));
+      const first = rects[0];
+      if (first) {
+        position = { ...first, rects };
+      }
+    }
+    onSelectText?.(text, page, position);
     setHint(`已选中 ${text.length} 字（第 ${page} 页）→ 已填入右侧翻译/批注框`);
+  };
+
+  /** 当前页的批注高亮（颜色 → 半透明色块） */
+  const pageAnnots = annotations.filter((a) => a.page === page);
+  const COLOR_CLASS: Record<string, string> = {
+    yellow: 'bg-yellow-300/40 border-yellow-500/60',
+    green: 'bg-green-300/40 border-green-600/60',
+    blue: 'bg-blue-300/40 border-blue-600/60',
+    red: 'bg-red-300/40 border-red-600/60',
   };
 
   return (
@@ -158,13 +200,32 @@ export function PdfViewer({
             {error}
           </p>
         )}
-        <div className="relative mx-auto w-fit shadow-sm">
+        <div ref={pageRef} className="relative mx-auto w-fit shadow-sm">
           <canvas ref={canvasRef} className="block bg-white" />
           {/* 文字层覆盖在 canvas 上（透明文字，可选中） */}
           <div ref={textRef}
                className="pdf-text-layer absolute left-0 top-0 select-text
                           [&_span]:absolute [&_span]:whitespace-pre [&_span]:text-transparent
                           [&_span]:origin-top-left [&_span::selection]:bg-primary/30" />
+          {/* 批注高亮层（v1.9.8 R2-p）：按归一化坐标画回页面 */}
+          <div className="pointer-events-none absolute left-0 top-0 h-full w-full">
+            {pageAnnots.map((a) => {
+              const pos = a.position || {};
+              const parts = pos.rects?.length
+                ? pos.rects
+                : (typeof pos.x === 'number' && typeof pos.w === 'number'
+                    ? [{ x: pos.x, y: pos.y ?? 0, w: pos.w, h: pos.h ?? 0.02 }]
+                    : []);
+              const cls = COLOR_CLASS[a.color] || COLOR_CLASS.yellow;
+              return parts.map((r, i) => (
+                <div key={`${a.annotation_id}-${i}`}
+                     title={a.comment || a.text || '批注'}
+                     className={`absolute rounded-[2px] border ${cls}`}
+                     style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%`,
+                              width: `${r.w * 100}%`, height: `${r.h * 100}%` }} />
+              ));
+            })}
+          </div>
         </div>
       </div>
     </div>

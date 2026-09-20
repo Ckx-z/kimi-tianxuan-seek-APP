@@ -76,6 +76,9 @@ function Reading() {
   const [annoPage, setAnnoPage] = useState('');
   const [annoComment, setAnnoComment] = useState('');
   const [annoColor, setAnnoColor] = useState('yellow');
+  /** R2-p：划选区域的归一化坐标（随批注一起入库 → 可在 PDF 上画回高亮） */
+  const [selPos, setSelPos] = useState<{ x: number; y: number; w: number; h: number;
+    rects?: { x: number; y: number; w: number; h: number }[] } | null>(null);
   /** R2-h：入库/补缺执行中 */
   const [ingesting, setIngesting] = useState(false);
   /** R2-k：阅读收件箱（外部上传的 PDF，先读后入库） */
@@ -213,6 +216,7 @@ function Reading() {
           paper_id: paperId, type: 'highlight',
           page: annoPage.trim() ? Number(annoPage) : null,
           color: annoColor, text: selText.trim(), comment: annoComment.trim(),
+          position: selPos ?? {},
         }),
       });
       if (!r.ok) {
@@ -459,7 +463,10 @@ function Reading() {
             <div className="min-w-0 border-r border-border">
               {inboxId ? (
                 <PdfViewer src={`/api/library/reading/inbox/${inboxId}/file`}
-                           onSelectText={(t, p) => { setSelText(t); setAnnoPage(String(p)); }} />
+                           annotations={[]}
+                           onSelectText={(t, p, pos) => {
+                             setSelText(t); setAnnoPage(String(p)); setSelPos(pos);
+                           }} />
               ) : !paperId ? (
                 <p className="mt-24 text-center text-sm text-muted-foreground">
                   <BookOpen className="mx-auto mb-2 h-6 w-6" />
@@ -475,7 +482,10 @@ function Reading() {
                 </p>
               ) : (
                 <PdfViewer src={`/api/literature/attachments/${main.file_id}/file`}
-                           onSelectText={(t, p) => { setSelText(t); setAnnoPage(String(p)); }} />
+                           annotations={annos}
+                           onSelectText={(t, p, pos) => {
+                             setSelText(t); setAnnoPage(String(p)); setSelPos(pos);
+                           }} />
               )}
             </div>
 
