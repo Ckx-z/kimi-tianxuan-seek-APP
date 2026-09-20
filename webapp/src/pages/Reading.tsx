@@ -218,7 +218,7 @@ function Reading() {
     try {
       const [p, a, n] = await Promise.all([
         fetch(`/api/library/reading/plan/${encodeURIComponent(pid)}`).then((r) => r.json()),
-        fetch(`/api/literature/papers/${encodeURIComponent(pid)}/attachments`)
+        fetch(`/api/literature/${encodeURIComponent(pid)}/attachments`)
           .then((r) => (r.ok ? r.json() : { attachments: [] })).catch(() => ({ attachments: [] })),
         fetch(`/api/library/annotations?paper_id=${encodeURIComponent(pid)}`)
           .then((r) => (r.ok ? r.json() : { annotations: [] })).catch(() => ({ annotations: [] })),
