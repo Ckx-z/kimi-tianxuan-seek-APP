@@ -233,10 +233,18 @@ export function PdfViewer({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       renderTaskRef.current?.cancel();
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
-      const task = p.render({ canvasContext: ctx, viewport,
-                              canvas } as unknown as Parameters<typeof p.render>[0]);
+      // F1：按**屏幕像素比**渲染（此前直接用 CSS 尺寸 → 高分屏上字迹发虚）
+      const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+      const cssW = Math.floor(viewport.width);
+      const cssH = Math.floor(viewport.height);
+      canvas.width = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
+      canvas.style.width = `${cssW}px`;
+      canvas.style.height = `${cssH}px`;
+      const task = p.render({
+        canvasContext: ctx, viewport, canvas,
+        transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
+      } as unknown as Parameters<typeof p.render>[0]);
       renderTaskRef.current = task as unknown as { cancel: () => void };
       await task.promise;
 
@@ -244,8 +252,12 @@ export function PdfViewer({
       const holder = textRef.current;
       if (holder) {
         holder.innerHTML = '';
-        holder.style.width = `${Math.floor(viewport.width)}px`;
-        holder.style.height = `${Math.floor(viewport.height)}px`;
+        holder.style.width = `${cssW}px`;
+        holder.style.height = `${cssH}px`;
+        // F1 关键：pdf.js 4.x 的文字层用 CSS 变量 --scale-factor 定位每个 span；
+        // 不设它 → span 与画布文字错位 → "划不中/选不准"（此前正是这个原因）
+        holder.style.setProperty('--scale-factor', String(scale));
+        holder.style.setProperty('--total-scale-factor', String(scale));
         const layer = new pdfjs.TextLayer({
           textContentSource: p.streamTextContent(),
           container: holder,
@@ -306,7 +318,7 @@ export function PdfViewer({
   };
 
   return (
-    <div className="flex h-[600px] flex-col">
+    <div className="flex h-full min-h-[460px] flex-col">
       <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/20 px-2 py-1.5">
         <Button size="sm" variant="outline" className="h-7 w-7 p-0"
                 disabled={page <= 1} onClick={() => go(page - 1)}>

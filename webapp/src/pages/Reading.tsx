@@ -366,8 +366,8 @@ function Reading() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="grid min-h-[600px] grid-cols-1 border-t border-border
-                          lg:grid-cols-[260px_minmax(0,1fr)_320px]">
+          <div className="grid grid-cols-1 border-t border-border lg:h-[calc(100vh-210px)]
+                        lg:min-h-[560px] lg:grid-cols-[240px_minmax(0,1fr)_360px]">
             {/* 左：阅读清单 */}
             <div className="hidden border-r border-border lg:block">
               {/* R2-k：外部上传（先读后入库） */}
