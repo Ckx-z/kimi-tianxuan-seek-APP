@@ -45,11 +45,51 @@ def _isolate_literature_library(tmp_path_factory):
     data_dir = tmp_path_factory.mktemp("cof_data_root")
     old = os.environ.get("COF_DATA_DIR")
     os.environ["COF_DATA_DIR"] = str(data_dir)
+    # v1.9.8 修 test_routing 偶发：若干模块在**导入时**就把 user_data_root() 固化成了
+    # 模块级常量（gnn_jobs.GNN_MODELS_DIR/JOBS_DIR/REGISTRY_PATH、gnn_feedback.FEEDBACK_PATH）。
+    # 本夹具在 collection/import **之后**才执行，于是这些常量可能仍指向**真实数据目录** ——
+    # "能否找到 GNN 模型/反馈文件"随导入顺序漂移，表现为偶发失败。
+    # 这里把已导入模块的常量**显式刷新**到隔离目录，使整场测试路径确定。
+    _refresh_module_level_paths()
     yield
     if old is None:
         os.environ.pop("COF_DATA_DIR", None)
     else:
         os.environ["COF_DATA_DIR"] = old
+
+
+def _refresh_module_level_paths() -> None:
+    """把导入期固化的数据路径常量重算到当前 COF_DATA_DIR（失败即忽略）。"""
+    import sys
+
+    try:
+        from src import runtime_config
+    except ImportError:  # pragma: no cover
+        return
+    root = runtime_config.user_data_root()
+    targets = {
+        "src.predictor.gnn_jobs": {
+            "GNN_MODELS_DIR": root / "gnn_models",
+            "JOBS_DIR": root / "gnn_jobs",
+        },
+        "src.predictor.gnn_feedback": {
+            "FEEDBACK_PATH": root / "feedback" / "gnn_feedback.jsonl",
+        },
+    }
+    for mod_name, attrs in targets.items():
+        mod = sys.modules.get(mod_name)
+        if mod is None:
+            continue
+        for attr, value in attrs.items():
+            try:
+                setattr(mod, attr, value)
+            except Exception:  # pragma: no cover
+                pass
+        if mod_name.endswith("gnn_jobs") and hasattr(mod, "GNN_MODELS_DIR"):
+            try:  # REGISTRY_PATH 派生自 GNN_MODELS_DIR
+                mod.REGISTRY_PATH = mod.GNN_MODELS_DIR / "registry.json"
+            except Exception:  # pragma: no cover
+                pass
 
 
 @pytest.fixture(autouse=True, scope="session")
