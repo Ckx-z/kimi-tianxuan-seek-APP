@@ -211,6 +211,10 @@ export function LibraryExplorer({
         setTotal(rows.length);
         return;
       }
+      // 竞态防护：非全文模式下，全文检索的结果**不得覆盖**混合检索结果
+      // （模式切换时防抖会先后触发两次请求，慢的那次会把 sources 冲掉 →
+      //  表现为"行在、来源徽标为空"，本缺陷已实测确认）
+      if (searchMode !== 'full') return;
       const params = new URLSearchParams({
         q, sort, direction, limit: '50', offset: String(offset),
       });
@@ -515,22 +519,30 @@ export function LibraryExplorer({
                       {p.year ? ` · ${p.year}` : ''}
                       {p.doi ? ` · ${p.doi}` : ''}
                     </span>
-                    {/* C1：混合检索的来源标注（哪几路命中） */}
-                    {p.sources && p.sources.length > 0 && (
+                    {/* C1：混合检索的来源标注（哪几路命中）
+                        注意：非全文模式**无条件渲染**（无来源时显示占位），
+                        否则一旦 sources 为空就完全看不见，难以判断是"没命中"还是"没渲染" */}
+                    {searchMode !== 'full' && (
                       <span className="mt-1 flex flex-wrap items-center gap-1">
-                        {p.sources.map((s) => (
-                          <span key={s}
-                                className={cn('rounded-full border px-1.5 py-0.5 text-[10px]',
-                                  s === 'graph'
-                                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600'
-                                    : 'border-sky-500/40 bg-sky-500/10 text-sky-600')}>
-                            {s === 'graph' ? '图谱' : '向量'}
-                          </span>
-                        ))}
-                        {typeof p.score === 'number' && (
-                          <span className="text-[10px] text-muted-foreground">
-                            RRF {p.score.toFixed(4)}
-                          </span>
+                        {(p.sources && p.sources.length > 0) ? (
+                          <>
+                            {p.sources.map((s) => (
+                              <span key={s}
+                                    className={cn('rounded-full border px-1.5 py-0.5 text-[10px]',
+                                      s === 'graph'
+                                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600'
+                                        : 'border-sky-500/40 bg-sky-500/10 text-sky-600')}>
+                                {s === 'graph' ? '图谱' : '向量'}
+                              </span>
+                            ))}
+                            {typeof p.score === 'number' && (
+                              <span className="text-[10px] text-muted-foreground">
+                                RRF {p.score.toFixed(4)}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">来源：—</span>
                         )}
                       </span>
                     )}
