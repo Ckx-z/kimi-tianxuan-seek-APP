@@ -614,15 +614,46 @@ def library_annotations(paper_id: str | None = None,
 
 @router.post("/annotations", status_code=201)
 def library_add_annotation(req: LibraryAnnotationCreate):
-    """新增批注（高亮/便签/截图；position 为 0~1 归一化坐标）。"""
+    """新增批注（高亮/便签/截图；position 为 0~1 归一化坐标）。
+
+    `image_base64`（type=image）→ 解码后落盘到
+    `literature/annotations/<paper_id>/<annotation_id>.png`。
+    """
     _db, conn = _open()
     try:
+        image_data = None
+        if req.image_base64:
+            import base64
+            raw = req.image_base64.strip()
+            if raw.startswith("data:"):
+                raw = raw.split(",", 1)[-1]
+            try:
+                image_data = base64.b64decode(raw, validate=False)
+            except Exception as exc:  # noqa: BLE001
+                raise HTTPException(400, f"截图 base64 解码失败：{type(exc).__name__}")
+            if not image_data:
+                raise HTTPException(400, "截图内容为空")
         return _reading().add_annotation(
             conn, req.paper_id, type_=req.type, page=req.page,
             position=req.position, color=req.color, text=req.text,
-            comment=req.comment, attachment_id=req.attachment_id)
+            comment=req.comment, attachment_id=req.attachment_id,
+            image_data=image_data)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+@router.get("/annotations/{annotation_id}/image")
+def library_annotation_image(annotation_id: str):
+    """取区域截图（批注缩略图 / 大图查看用）。"""
+    _db, conn = _open()
+    try:
+        p = _reading().annotation_image_path(conn, annotation_id)
+        if p is None:
+            raise HTTPException(404, "该批注没有截图或文件已丢失")
+        from fastapi.responses import FileResponse
+        return FileResponse(str(p), media_type="image/png")
     finally:
         conn.close()
 

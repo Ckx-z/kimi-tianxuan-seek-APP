@@ -489,6 +489,9 @@ class LibraryAnnotationCreate(BaseModel):
     text: str = Field("", description="原文选中文字")
     comment: str = Field("", description="个人评论")
     attachment_id: str | None = None
+    image_base64: str | None = Field(
+        None, description="区域截图（type=image 时）：PNG 的 base64；"
+                          "可带 data:image/png;base64, 前缀。上限 8MB")
 
 
 class LibraryAnnotationUpdate(BaseModel):
