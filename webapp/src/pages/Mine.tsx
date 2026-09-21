@@ -170,7 +170,10 @@ export default function Mine() {
                     onClick={() => setFocusPaperId('')}>
               ← 返回文献列表
             </Button>
-            <LiteratureKnowledgeSection focusPaperId={focusPaperId} detailOnly />
+            {/* key 绑定文献编号 → 换文献时**强制重挂载**，杜绝"每篇详情都一样/串了上一篇"的
+                状态复用问题（该组件内部有自己的 paperId/条目/图片/关联状态） */}
+            <LiteratureKnowledgeSection key={focusPaperId}
+                                        focusPaperId={focusPaperId} detailOnly />
           </div>
         ) : (
           <>
