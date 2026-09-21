@@ -18,6 +18,7 @@ from .tools.dft import query_dft
 from .tools.brief import get_daily_brief
 from .tools.favorites import list_favorites_tool, manage_favorite, manage_favorite_impact
 from .tools.graphrag import query_graphrag_tool
+from .tools.litgraph import TOOL_SCHEMA as LIT_GRAPH_SCHEMA, lit_graph_tool
 from .tools.history import list_prediction_history
 from .tools.plan import generate_plan_card_impact, generate_plan_card_tool
 from .tools.predict import predict_film
@@ -79,6 +80,11 @@ TOOLS: dict = {
                 },
             },
         },
+    },
+    # G1+G2：文献关系图（引用/相似/实体/指标）—— 与 query_graphrag 的化学反应网络互补
+    "lit_graph": {
+        "handler": lambda args: lit_graph_tool(args),
+        "schema": LIT_GRAPH_SCHEMA,
     },
     "read_experiment_records": {
         "handler": lambda args: read_experiment_records(
