@@ -885,11 +885,21 @@ def search_metrics(conn: sqlite3.Connection, *, name: str = "",
                    min_value: float | None = None,
                    max_value: float | None = None,
                    technique: str | None = None, limit: int = 100) -> list[dict]:
-    """跨文献数值检索（`entry_metrics` 的价值所在）。"""
+    """跨文献数值检索（`entry_metrics` 的价值所在）。
+
+    v1.9.8：**指标名同义词归一化** —— 真实数据里指标名多为英文
+    （`Langmuir surface area`、`pore size`…），中文查询（"比表面积"）原本命中 0；
+    现在用 `metric_aliases.expand_metric_name()` 双向展开成 OR 条件，中英互查都能命中。
+    """
     where, params = ["1=1"], []
     if name:
-        where.append("m.name LIKE ?")
-        params.append(f"%{name}%")
+        try:
+            from literature import metric_aliases
+        except ImportError:  # pragma: no cover
+            from src.literature import metric_aliases  # type: ignore
+        terms = metric_aliases.expand_metric_name(name)
+        where.append("(" + " OR ".join(["m.name LIKE ?"] * len(terms)) + ")")
+        params.extend(f"%{t}%" for t in terms)
     if min_value is not None:
         where.append("m.value >= ?")
         params.append(float(min_value))
