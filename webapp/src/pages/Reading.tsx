@@ -72,6 +72,15 @@ function Reading() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [busy, setBusy] = useState(false);
+  /** F4：当前用于翻译/问答的模型名（与「设置 → 文献解析 LLM」同一套配置） */
+  const [llmModel, setLlmModel] = useState('');
+
+  useEffect(() => {
+    fetch('/api/literature/llm-settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.model) setLlmModel(String(d.model)); })
+      .catch(() => { /* 拿不到就不显示模型名 */ });
+  }, []);
   /** F1b：三栏宽度可拖拽调整（默认收窄侧栏，把空间让给 PDF） */
   const [leftW, setLeftW] = useState(200);
   const [rightW, setRightW] = useState(300);
@@ -443,7 +452,7 @@ function Reading() {
                   </button>
                 ))}
               </div>
-              <div className="max-h-[560px] overflow-y-auto">
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 {loading && (
                   <p className="p-3 text-center text-xs text-muted-foreground">
                     <Loader2 className="mx-auto h-4 w-4 animate-spin" />
@@ -611,7 +620,11 @@ function Reading() {
 
                   <div className="rounded-lg border border-border/70 p-2.5">
                     <p className="flex items-center gap-1 text-xs font-medium">
-                      <Languages className="h-3.5 w-3.5" />翻译 / 提问（DeepSeek）
+                      <Languages className="h-3.5 w-3.5" />翻译 / 提问
+                      <span className="ml-1 font-normal text-muted-foreground">
+                        （{llmModel ? `使用 ${llmModel}` : '使用文献解析模型'}
+                        <span className="text-muted-foreground/70"> · 设置 → 文献解析 LLM</span>）
+                      </span>
                     </p>
                     <Textarea value={selText} rows={3} className="mt-1.5 text-xs"
                               onChange={(e) => setSelText(e.target.value)}
