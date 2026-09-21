@@ -486,6 +486,13 @@ export function LibraryExplorer({
                 {activeTag && ` · 标签：${activeTag}`}
                 {searchMode !== 'full' && ` · 模式：${
                   searchMode === 'hybrid' ? '混合(RRF)' : searchMode === 'vector' ? '向量' : '图谱'}`}
+              {/* 临时诊断（下轮移除）：混合模式下直接把映射结果打出来 */}
+              {searchMode !== 'full' && (
+                <span className="ml-2 text-[10px] text-amber-600">
+                  [诊断 行={papers.length} sources={JSON.stringify(papers[0]?.sources ?? null)}
+                  {' '}score={String(papers[0]?.score ?? null)}]
+                </span>
+              )}
               </span>
               {/* C1：降级提示（如向量模型不可用 → 自动退化为图谱路） */}
               {degraded && (
