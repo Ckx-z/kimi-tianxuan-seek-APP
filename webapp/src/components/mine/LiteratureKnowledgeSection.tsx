@@ -684,7 +684,8 @@ export function LiteratureKnowledgeSection({
 
   return (
     <Card>
-      <CardHeader className={detailOnly ? '!hidden' : 'pb-2'}>
+      {!detailOnly && (
+      <CardHeader className="pb-2">
         <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-lg">
           <span className="flex items-center gap-2">
             <BookOpen className="h-4 w-4 text-gold" />
@@ -709,6 +710,7 @@ export function LiteratureKnowledgeSection({
           </p>
         )}
       </CardHeader>
+      )}
       <CardContent className="p-4 pt-2">
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

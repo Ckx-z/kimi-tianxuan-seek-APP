@@ -181,8 +181,8 @@ export default function Mine() {
             <GraphInsights />
           </>
         )}
-        {intakeOpen && <LiteratureIntakeSection />}
-        <LiteratureKnowledgeSection focusPaperId={focusPaperId} />
+        {/* F2c：这两行是 R1 时期的遗留（无条件再渲染一次文献录入 + 知识库卡片），
+            正是"两份科研知识库"的来源 —— 现已由上方分支统一承载，删除 */}
       </section>
 
       {/* 导出实验记录：勾选收藏组 → 分组导出 docx */}
