@@ -170,9 +170,7 @@ export default function Mine() {
                     onClick={() => setFocusPaperId('')}>
               ← 返回文献列表
             </Button>
-            {/* 注：F2c（隐藏该组件自带的标题/筛选/列表）需要动它的内部结构，
-                留作下一步单独处理；此处先保持原样 */}
-            <LiteratureKnowledgeSection focusPaperId={focusPaperId} />
+            <LiteratureKnowledgeSection focusPaperId={focusPaperId} detailOnly />
           </div>
         ) : (
           <>

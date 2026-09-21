@@ -178,9 +178,13 @@ function EntryBadge({ e }: { e: Partial<Entry> }) {
 
 export function LiteratureKnowledgeSection({
   focusPaperId,
+  detailOnly,
 }: {
   /** v1.9.8 R1 合并：由三栏导航壳（LibraryExplorer）驱动的选中文献 */
   focusPaperId?: string;
+  /** F2c：详情视图模式 —— 隐藏本组件自带的标题与文献列表，只留文献卡片
+      （避免与上方三栏列表形成"两份科研知识库"） */
+  detailOnly?: boolean;
 } = {}) {
   const navigate = useNavigate();
   const [papers, setPapers] = useState<PaperMeta[]>([]);
@@ -680,7 +684,7 @@ export function LiteratureKnowledgeSection({
 
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className={detailOnly ? '!hidden' : 'pb-2'}>
         <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-lg">
           <span className="flex items-center gap-2">
             <BookOpen className="h-4 w-4 text-gold" />
@@ -715,9 +719,9 @@ export function LiteratureKnowledgeSection({
             文献库为空：先在上方「文献录入」入库文献。
           </p>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-            {/* 文献列表 */}
-            <div className="space-y-2">
+          <div className={detailOnly ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-[260px_1fr]'}>
+            {/* 文献列表（detailOnly 时隐藏：上方三栏列表已承担导航职责） */}
+            <div className={detailOnly ? 'hidden' : 'space-y-2'}>
               <input
                 className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-sm"
                 placeholder="筛选文献（标题 / #编号）"
