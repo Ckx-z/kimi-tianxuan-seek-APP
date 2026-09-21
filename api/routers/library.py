@@ -421,6 +421,48 @@ def library_analytics(kind: str = "pagerank", force: bool = False, top_k: int = 
         conn.close()
 
 
+# ---------------------------------------------------------------- 图谱导出（C5）
+
+def _graph_export():
+    try:
+        from literature import graph_export
+    except ImportError:  # pragma: no cover
+        from src.literature import graph_export  # type: ignore
+    return graph_export
+
+
+@router.get("/graph/export")
+def library_graph_export(format: str = "jsoncanvas", paper_id: str | None = None,
+                         depth: int = 1, max_nodes: int = 200):
+    """图谱导出（防爆炸：`depth` 默认 1 层、`max_nodes` 默认 200）：
+
+    - `jsoncanvas`：Obsidian **JSON Canvas 1.0**（可拖拽编辑，返回 JSON）
+    - `graphml`：GraphML XML（Gephi / yEd / Cytoscape 可直接打开）
+    - `html`：**离线自包含**可交互页面（不引 CDN；拖拽/缩放/悬停）
+    """
+    ge = _graph_export()
+    _db, conn = _open()
+    try:
+        f = (format or "jsoncanvas").lower()
+        if f in ("jsoncanvas", "canvas", "json"):
+            return ge.to_json_canvas(conn, paper_id=paper_id, depth=depth,
+                                     max_nodes=max_nodes)
+        if f == "graphml":
+            from fastapi.responses import Response
+            xml = ge.to_graphml(conn, paper_id=paper_id, depth=depth,
+                                max_nodes=max_nodes)
+            return Response(content=xml, media_type="application/graphml+xml",
+                            headers={"Content-Disposition":
+                                     'attachment; filename="cof-graph.graphml"'})
+        if f in ("html", "d3"):
+            from fastapi.responses import HTMLResponse
+            return HTMLResponse(ge.to_html(conn, paper_id=paper_id, depth=depth,
+                                           max_nodes=max_nodes))
+        raise HTTPException(400, "format 必须是 jsoncanvas | graphml | html")
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------- GNN 联动（P4）
 
 def _gnn_bridge():
