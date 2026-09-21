@@ -57,6 +57,50 @@ export function PdfViewer({
   const [findHits, setFindHits] = useState<{ page: number; snippet: string }[]>([]);
   const [finding, setFinding] = useState(false);
   const [showFind, setShowFind] = useState(false);
+  /** v1.9.8 R2 增强：整页双语对照 */
+  const [biOn, setBiOn] = useState(false);
+  const [biBusy, setBiBusy] = useState(false);
+  const [biPage, setBiPage] = useState(0);
+  const [biPairs, setBiPairs] = useState<{ src: string; dst: string }[]>([]);
+
+  /** 取当前页文字 → 切段 → 调后端段落翻译（同段走缓存，不重复计费） */
+  const loadBilingual = useCallback(async (targetPage: number) => {
+    const doc = docRef.current;
+    if (!doc) return;
+    setBiBusy(true);
+    setBiPairs([]);
+    try {
+      const p = await doc.getPage(targetPage);
+      const content = await p.getTextContent();
+      const raw = (content.items as { str?: string }[]).map((it) => it.str || '').join(' ');
+      // 简单切段：按句子聚合到 ~360 字符，避免一句话被切断
+      const sentences = raw.split(/(?<=[.!?。！？])\s+/);
+      const segments: string[] = [];
+      let buf = '';
+      for (const s of sentences) {
+        if (!s.trim()) continue;
+        buf = buf ? `${buf} ${s}` : s;
+        if (buf.length >= 360) { segments.push(buf); buf = ''; }
+      }
+      if (buf.trim()) segments.push(buf);
+      const use = segments.slice(0, 12);            // 单页最多 12 段，控制成本
+      if (use.length === 0) { toast.info('本页没有可提取的文字（可能是扫描件）'); return; }
+      const r = await fetch('/api/library/reading/translate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ segments: use }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || `翻译失败（${r.status}）`);
+      const dst: string[] = d.translations ?? [];
+      setBiPairs(use.map((s, i) => ({ src: s, dst: dst[i] || '' })));
+      setBiPage(targetPage);
+      if (d.cached) toast.info(`其中 ${d.cached} 段命中缓存（未重复计费）`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '翻译失败');
+    } finally {
+      setBiBusy(false);
+    }
+  }, []);
 
   /** 跨页查找（逐页取文字层；最多扫 80 页，避免超大 PDF 卡住界面） */
   const runFind = useCallback(async () => {
@@ -281,6 +325,13 @@ export function PdfViewer({
             </div>
           )}
         </div>
+        {/* v1.9.8 R2 增强：整页双语对照（段落级翻译，后端按段缓存） */}
+        <Button size="sm" variant={biOn ? 'default' : 'outline'} className="h-7 px-2 text-[11px]"
+                disabled={biBusy}
+                title="把当前页按段落翻译成中文，左侧原文右侧译文"
+                onClick={() => { const next = !biOn; setBiOn(next); if (next) void loadBilingual(page); }}>
+          双语{biBusy ? '…' : biOn ? '开' : '对照'}
+        </Button>
         {/* v1.9.8 R2 增强：目录大纲 */}
         {outline.length > 0 && (
           <div className="relative">
@@ -345,6 +396,44 @@ export function PdfViewer({
             })}
           </div>
         </div>
+        {/* v1.9.8 R2 增强：双语对照栏（左原文右译文，段落级） */}
+        {biOn && (
+          <div className="absolute right-2 top-2 z-10 max-h-[560px] w-[420px] overflow-auto
+                          rounded-md border border-border bg-background/95 p-2 shadow-lg">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-[11px] font-medium">
+                双语对照 · 第 {biPage || page} 页（{biPairs.length} 段）
+              </span>
+              <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground"
+                      onClick={() => setBiOn(false)}>关闭</button>
+            </div>
+            {biBusy && (
+              <p className="py-4 text-center text-[11px] text-muted-foreground">
+                <Loader2 className="mx-auto mb-1 h-4 w-4 animate-spin" />正在翻译本页…
+              </p>
+            )}
+            {!biBusy && biPairs.length === 0 && (
+              <p className="py-3 text-center text-[11px] text-muted-foreground">
+                本页没有可取的文字（扫描件需先做 OCR）
+              </p>
+            )}
+            <div className="space-y-2">
+              {biPairs.map((pair, i) => (
+                <div key={i} className="grid grid-cols-2 gap-1.5 border-b border-border/50 pb-1.5">
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">{pair.src}</p>
+                  <p className="text-[11px] leading-relaxed">{pair.dst || '（未译）'}</p>
+                </div>
+              ))}
+            </div>
+            {biPairs.length > 0 && (
+              <button type="button"
+                      className="mt-1 text-[10px] text-primary hover:underline"
+                      onClick={() => void loadBilingual(page)}>
+                重新翻译本页（命中缓存则不计费）
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
