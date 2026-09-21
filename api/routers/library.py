@@ -378,6 +378,49 @@ def library_graph_clear_source(source: str):
         conn.close()
 
 
+# ---------------------------------------------------------------- 引用图分析（C2）
+
+def _graph_analytics():
+    try:
+        from literature import graph_analytics
+    except ImportError:  # pragma: no cover
+        from src.literature import graph_analytics  # type: ignore
+    return graph_analytics
+
+
+@router.get("/analytics")
+def library_analytics(kind: str = "pagerank", force: bool = False, top_k: int = 20):
+    """引用图分析（C2）：
+
+    - `pagerank`：被引权重（有向 `cites`；**奖励入边** —— 被引越多分越高）
+    - `communities`：社区发现（`cites + similar_to` 无向合并）
+    - `bridges`：桥梁文献（介数中心性，大图 k 采样近似）
+    - `timeline`：按年份的文献分布
+    - `all`：一次返回以上四项
+
+    结果带缓存（默认 TTL 1 小时，`force=true` 强制重算）；图规模超上限时**拒绝物化**
+    并说明原因，而不是耗尽内存。
+    """
+    ga = _graph_analytics()
+    _db, conn = _open()
+    try:
+        k = (kind or "pagerank").lower()
+        if k == "pagerank":
+            return ga.pagerank(conn, top_k=top_k, force=force)
+        if k == "communities":
+            return ga.communities(conn, top_k=top_k, force=force)
+        if k == "bridges":
+            return ga.bridges(conn, top_k=top_k, force=force)
+        if k == "timeline":
+            return ga.timeline(conn)
+        if k == "all":
+            return ga.summary(conn)
+        raise HTTPException(400, "kind 必须是 pagerank | communities | bridges | "
+                                 "timeline | all")
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------- GNN 联动（P4）
 
 def _gnn_bridge():
