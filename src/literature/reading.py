@@ -190,24 +190,46 @@ def delete_inbox(conn, inbox_id: str, *, remove_file: bool = True) -> bool:
 def add_annotation(conn, paper_id: str, *, type_: str = "highlight",
                    page: int | None = None, position: dict | None = None,
                    color: str = "", text: str = "", comment: str = "",
-                   attachment_id: str | None = None) -> dict:
+                   attachment_id: str | None = None,
+                   image_data: bytes | None = None) -> dict:
     ensure_schema(conn)
     if type_ not in ("highlight", "note", "image"):
         raise ValueError("type 必须是 highlight | note | image")
     db = _db()
     anno_id = f"anno_{uuid.uuid4().hex[:12]}"
     now = db._now()
+    # v1.9.8：区域截图批注（image_data 落盘 → image_file 记路径）
+    image_file: str | None = None
+    if image_data:
+        if len(image_data) > 8 * 1024 * 1024:
+            raise ValueError("截图过大（上限 8MB）")
+        path = _annotation_dir(str(paper_id)) / f"{anno_id}.png"
+        path.write_bytes(image_data)
+        image_file = str(path)
     conn.execute(
         "INSERT INTO item_annotations(annotation_id,paper_id,attachment_id,type,page,"
-        "position_json,color,text,comment,created_at,updated_at)"
-        " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        "position_json,color,text,comment,image_file,created_at,updated_at)"
+        " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
         (anno_id, str(paper_id), attachment_id, type_, page,
          json.dumps(position or {}, ensure_ascii=False), color, text, comment,
-         now, now))
+         image_file, now, now))
     conn.commit()
     return {"annotation_id": anno_id, "paper_id": str(paper_id), "type": type_,
             "page": page, "position": position or {}, "color": color,
-            "text": text, "comment": comment, "created_at": now}
+            "text": text, "comment": comment, "image_file": image_file,
+            "created_at": now}
+
+
+def annotation_image_path(conn, annotation_id: str):
+    """取批注截图路径（无图或文件已丢失 → None）。"""
+    ensure_schema(conn)
+    row = conn.execute("SELECT image_file FROM item_annotations WHERE annotation_id=?",
+                       (annotation_id,)).fetchone()
+    if row is None or not row["image_file"]:
+        return None
+    from pathlib import Path
+    p = Path(row["image_file"])
+    return p if p.is_file() else None
 
 
 def list_annotations(conn, paper_id: str | None = None,
