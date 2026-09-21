@@ -21,6 +21,7 @@ export function PdfViewer({
   src,
   onSelectText,
   annotations = [],
+  onCaptureRegion,
 }: {
   src: string;
   /** 选中文本回调（含页码与归一化坐标，供批注自动填页码并画出高亮） */
@@ -36,6 +37,9 @@ export function PdfViewer({
       rects?: { x: number; y: number; w: number; h: number }[];
     };
   }[];
+  /** v1.9.8：拖框截图的回调（base64 PNG + 页码 + 归一化坐标） */
+  onCaptureRegion?: (base64: string, page: number, position: {
+    x: number; y: number; w: number; h: number }) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textRef = useRef<HTMLDivElement | null>(null);
@@ -62,6 +66,48 @@ export function PdfViewer({
   const [biBusy, setBiBusy] = useState(false);
   const [biPage, setBiPage] = useState(0);
   const [biPairs, setBiPairs] = useState<{ src: string; dst: string }[]>([]);
+  /** v1.9.8 R2 增强：区域截图（拖框 → canvas 取像素 → base64 回调） */
+  const [captureOn, setCaptureOn] = useState(false);
+  const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number }
+    | null>(null);
+
+  /** 从 canvas 裁出选中区域并回调 base64（归一化坐标一并回传，便于入库与复现） */
+  const finishCapture = useCallback(() => {
+    const canvas = canvasRef.current;
+    const box = pageRef.current?.getBoundingClientRect();
+    if (!canvas || !box || !drag) return;
+    const left = Math.min(drag.x0, drag.x1);
+    const top = Math.min(drag.y0, drag.y1);
+    const w = Math.abs(drag.x1 - drag.x0);
+    const h = Math.abs(drag.y1 - drag.y0);
+    setDrag(null);
+    setCaptureOn(false);
+    if (w < 6 || h < 6) return;                    // 误点忽略
+    const sx = Math.round(left * (canvas.width / box.width));
+    const sy = Math.round(top * (canvas.height / box.height));
+    const sw = Math.max(1, Math.round(w * (canvas.width / box.width)));
+    const sh = Math.max(1, Math.round(h * (canvas.height / box.height)));
+    const off = document.createElement('canvas');
+    off.width = sw;
+    off.height = sh;
+    const ctx = off.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    const position = {
+      x: +(left / box.width).toFixed(4), y: +(top / box.height).toFixed(4),
+      w: +(w / box.width).toFixed(4), h: +(h / box.height).toFixed(4),
+    };
+    off.toBlob((blob) => {
+      if (!blob) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result || '');
+        const b64 = dataUrl.split(',', 2)[1] || '';
+        if (b64) onCaptureRegion?.(b64, page, position);
+      };
+      reader.readAsDataURL(blob);
+    }, 'image/png');
+  }, [drag, page, onCaptureRegion]);
 
   /** 取当前页文字 → 切段 → 调后端段落翻译（同段走缓存，不重复计费） */
   const loadBilingual = useCallback(async (targetPage: number) => {
@@ -325,6 +371,13 @@ export function PdfViewer({
             </div>
           )}
         </div>
+        {/* v1.9.8 R2 增强：区域截图（拖框截取当前页） */}
+        <Button size="sm" variant={captureOn ? 'default' : 'outline'}
+                className="h-7 px-2 text-[11px]"
+                title="开启后在页面上按住拖框，即可把该区域存为图片批注"
+                onClick={() => { setCaptureOn((v) => !v); setDrag(null); }}>
+          截图{captureOn ? '中…' : ''}
+        </Button>
         {/* v1.9.8 R2 增强：整页双语对照（段落级翻译，后端按段缓存） */}
         <Button size="sm" variant={biOn ? 'default' : 'outline'} className="h-7 px-2 text-[11px]"
                 disabled={biBusy}
@@ -369,8 +422,33 @@ export function PdfViewer({
             {error}
           </p>
         )}
-        <div ref={pageRef} className="relative mx-auto w-fit shadow-sm">
+        <div ref={pageRef} className="relative mx-auto w-fit shadow-sm"
+             style={captureOn ? { cursor: 'crosshair' } : undefined}
+             onMouseDown={(e) => {
+               if (!captureOn) return;
+               const box = pageRef.current?.getBoundingClientRect();
+               if (!box) return;
+               e.preventDefault();
+               const x = e.clientX - box.left;
+               const y = e.clientY - box.top;
+               setDrag({ x0: x, y0: y, x1: x, y1: y });
+             }}
+             onMouseMove={(e) => {
+               if (!drag || !captureOn) return;
+               const box = pageRef.current?.getBoundingClientRect();
+               if (!box) return;
+               setDrag({ ...drag, x1: e.clientX - box.left, y1: e.clientY - box.top });
+             }}
+             onMouseUp={() => { if (captureOn && drag) finishCapture(); }}>
           <canvas ref={canvasRef} className="block bg-white" />
+          {/* 拖框提示矩形 */}
+          {captureOn && drag && (
+            <div className="pointer-events-none absolute border-2 border-primary/70
+                            bg-primary/10"
+                 style={{ left: Math.min(drag.x0, drag.x1), top: Math.min(drag.y0, drag.y1),
+                          width: Math.abs(drag.x1 - drag.x0),
+                          height: Math.abs(drag.y1 - drag.y0) }} />
+          )}
           {/* 文字层覆盖在 canvas 上（透明文字，可选中） */}
           <div ref={textRef}
                className="pdf-text-layer absolute left-0 top-0 select-text
