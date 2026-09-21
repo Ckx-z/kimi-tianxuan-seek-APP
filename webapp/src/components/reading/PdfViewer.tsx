@@ -9,6 +9,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
+// F1d 关键修复：**必须引入 pdf.js 官方文字层样式**。
+// 官方 CSS 负责 span 的 transform: scale(var(--scale-factor))、overflow 裁剪等；
+// 之前用手写 Tailwind 类代替 → span 定位与容器缩放不匹配 → 文字层溢出容器、
+// 盖到整个界面上（表现为"界面混乱/文字重叠"），同时划词也对不准。
+import 'pdfjs-dist/web/pdf_viewer.css';
 import { ChevronLeft, ChevronRight, List, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -487,11 +492,10 @@ export function PdfViewer({
                           width: Math.abs(drag.x1 - drag.x0),
                           height: Math.abs(drag.y1 - drag.y0) }} />
           )}
-          {/* 文字层覆盖在 canvas 上（透明文字，可选中） */}
+          {/* 文字层：使用 pdf.js 官方 `.textLayer` 样式（F1d），容器自身裁剪溢出 */}
           <div ref={textRef}
-               className="pdf-text-layer absolute left-0 top-0 select-text
-                          [&_span]:absolute [&_span]:whitespace-pre [&_span]:text-transparent
-                          [&_span]:origin-top-left [&_span::selection]:bg-primary/30" />
+               className="textLayer"
+               style={{ position: 'absolute', left: 0, top: 0, overflow: 'hidden' }} />
           {/* 批注高亮层（v1.9.8 R2-p）：按归一化坐标画回页面 */}
           <div className="pointer-events-none absolute left-0 top-0 h-full w-full">
             {pageAnnots.map((a) => {
