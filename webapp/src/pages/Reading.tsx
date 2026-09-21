@@ -395,8 +395,10 @@ function Reading() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="grid grid-cols-1 border-t border-border lg:h-[calc(100vh-210px)]
-                        lg:min-h-[560px] lg:[grid-template-columns:var(--reading-cols)]"
+          <div className="grid grid-cols-1 overflow-hidden border-t border-border
+                        lg:h-[calc(100vh-210px)] lg:min-h-[560px]
+                        lg:[grid-template-columns:var(--reading-cols)]
+                        grid-rows-[minmax(0,1fr)]"
              style={{ ['--reading-cols' as string]: `${leftW}px minmax(0,1fr) ${rightW}px` } as React.CSSProperties}>
             {/* 左：阅读清单 */}
             <div className="relative hidden border-r border-border lg:block">

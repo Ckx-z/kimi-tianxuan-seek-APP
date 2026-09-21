@@ -438,10 +438,14 @@ export function LibraryExplorer({
       <CardContent className="p-0">
         <div className={cn('grid grid-cols-1 overflow-hidden border-t border-border',
                            'h-[calc(100vh-340px)] min-h-[420px]',
+                           // 关键：把行高约束为「容器高度」（否则行高 auto → 内容撑高后被
+                           // overflow-hidden 裁掉，内层 overflow-y-auto 拿不到受限高度 →
+                           // 列表永远不出现滚动条、拉不动）
+                           'grid-rows-[minmax(0,1fr)]',
                            compact ? 'lg:grid-cols-[220px_minmax(0,1fr)]'
                                    : 'lg:grid-cols-[220px_minmax(0,1fr)_360px]')}>
           {/* 左：集合 + 标签 */}
-          <div className="hidden border-r border-border p-3 lg:block">
+          <div className="hidden overflow-y-auto border-r border-border p-3 lg:block">
             <p className="mb-2 flex items-center gap-1 text-xs font-medium text-muted-foreground">
               <BookOpen className="h-3.5 w-3.5" />集合
             </p>
