@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BookOpen, ChevronRight, FolderPlus, Loader2, NotebookPen, Plus,
-  RefreshCw, Search, Tag as TagIcon, Trash2, X,
+  RefreshCw, Search, Sparkles, Tag as TagIcon, Trash2, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -109,6 +109,53 @@ export function LibraryExplorer({
   const [searchMode, setSearchMode] = useState<'full' | 'vector' | 'graph' | 'hybrid'>('full');
   const [degraded, setDegraded] = useState(false);
   const [routeNotes, setRouteNotes] = useState<string[]>([]);
+  /** v1.9.8 C3/C5：补全与导出 */
+  const [enriching, setEnriching] = useState(false);
+
+  /** C3：批量补全缺失元数据（默认只处理缺年份的文献；联网但免费） */
+  const enrichMissing = async () => {
+    let missing = 0;
+    try {
+      const st = await (await fetch('/api/library/enrich/status')).json();
+      missing = Number(st?.missing_year || 0);
+    } catch { /* 状态拿不到也允许继续 */ }
+    const ok = window.confirm(
+      `用 OpenAlex / Semantic Scholar 补全元数据？\n\n`
+      + `将处理**缺少年份**的文献（当前 ${missing} 篇，每次最多 20 篇），`
+      + `按 DOI 查询（免费、无需 key、约 1 秒/篇）。\n`
+      + `只补空字段，不覆盖已有内容。继续？`);
+    if (!ok) return;
+    setEnriching(true);
+    try {
+      const r = await fetch('/api/library/enrich?limit=20', { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || `补全失败（${r.status}）`);
+      toast.success(`补全完成：处理 ${d.targets} 篇（成功 ${d.enriched}、跳过 ${d.skipped}、`
+                    + `错误 ${d.errors}）`);
+      await Promise.all([loadStatus(), search(0)]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '补全失败');
+    } finally {
+      setEnriching(false);
+    }
+  };
+
+  /** C5：导出关联图谱（jsoncanvas 下载 / graphml 下载 / html 新窗口打开） */
+  const exportGraph = (format: string) => {
+    const url = `/api/library/graph/export?format=${format}&max_nodes=300`;
+    if (format === 'html') {
+      window.open(url, '_blank');
+      toast.info('已在新窗口打开离线图谱（可拖拽/缩放）');
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = format === 'graphml' ? 'cof-graph.graphml' : 'cof-graph.canvas';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast.success(`已导出 ${format === 'graphml' ? 'GraphML' : 'Obsidian 画布'}`);
+  };
   const [direction, setDirection] = useState('desc');
   const [papers, setPapers] = useState<PaperRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -310,6 +357,24 @@ export function LibraryExplorer({
                     disabled={busy} onClick={() => void rebuild()}>
               <RefreshCw className={cn('mr-1 h-3 w-3', busy && 'animate-spin')} />重建索引
             </Button>
+            {/* v1.9.8 C3：OpenAlex / Semantic Scholar 补全（免费无 key） */}
+            <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                    disabled={enriching}
+                    title="按 DOI 从 OpenAlex / Semantic Scholar 补全缺失的年份、期刊与被引量（只补空、不覆盖）"
+                    onClick={() => void enrichMissing()}>
+              <Sparkles className={cn('mr-1 h-3 w-3', enriching && 'animate-pulse')} />
+              {enriching ? '补全中…' : '补全元数据'}
+            </Button>
+            {/* v1.9.8 C5：图谱导出（JSON Canvas / GraphML / 离线 HTML） */}
+            <select className="h-7 rounded-md border border-input bg-background px-1 text-[11px]"
+                    value=""
+                    title="导出关联图谱：Obsidian 画布 / GraphML（Gephi、yEd）/ 离线可交互页面"
+                    onChange={(e) => { if (e.target.value) exportGraph(e.target.value); }}>
+              <option value="">导出图谱…</option>
+              <option value="jsoncanvas">Obsidian 画布（.canvas）</option>
+              <option value="graphml">GraphML（Gephi/yEd）</option>
+              <option value="html">离线可交互页面</option>
+            </select>
           </div>
         </div>
       </CardHeader>
