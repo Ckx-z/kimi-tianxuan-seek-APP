@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, List, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +48,9 @@ export function PdfViewer({
   const [error, setError] = useState('');
   const [pageInput, setPageInput] = useState('1');
   const [hint, setHint] = useState('');
+  /** v1.9.8 R2 增强：目录大纲 */
+  const [outline, setOutline] = useState<{ title: string; page: number }[]>([]);
+  const [showOutline, setShowOutline] = useState(false);
 
   // 载入文档
   useEffect(() => {
@@ -57,13 +60,31 @@ export function PdfViewer({
     docRef.current?.destroy();
     docRef.current = null;
     pdfjs.getDocument({ url: src }).promise
-      .then((doc) => {
+      .then(async (doc) => {
         if (cancelled) { void doc.destroy(); return; }
         docRef.current = doc;
         setNumPages(doc.numPages);
         setPage(1);
         setPageInput('1');
         setLoading(false);
+        // v1.9.8 R2 增强：目录大纲（有则显示「目录」，点击跳页）
+        try {
+          const outline = await doc.getOutline();
+          const items: { title: string; page: number }[] = [];
+          for (const it of (outline ?? []).slice(0, 60)) {
+            let pageNo: number | null = null;
+            try {
+              const dest = typeof it.dest === 'string'
+                ? await doc.getDestination(it.dest) : it.dest;
+              if (Array.isArray(dest) && dest[0]) {
+                pageNo = (await doc.getPageIndex(dest[0])) + 1;
+              }
+            } catch { /* 该条目无有效目标，跳过页码 */ }
+            if (it.title) items.push({ title: String(it.title).slice(0, 80),
+                                       page: pageNo ?? 1 });
+          }
+          if (!cancelled) setOutline(items);
+        } catch { if (!cancelled) setOutline([]); }
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -186,6 +207,29 @@ export function PdfViewer({
         <span className="ml-auto text-[11px] text-muted-foreground">
           {hint || '选中文字即可翻译 / 记批注'}
         </span>
+        {/* v1.9.8 R2 增强：目录大纲 */}
+        {outline.length > 0 && (
+          <div className="relative">
+            <Button size="sm" variant="outline" className="h-7 px-2 text-[11px]"
+                    onClick={() => setShowOutline((v) => !v)}>
+              <List className="mr-1 h-3 w-3" />目录（{outline.length}）
+            </Button>
+            {showOutline && (
+              <div className="absolute right-0 z-10 mt-1 max-h-72 w-72 overflow-auto
+                              rounded-md border border-border bg-popover p-1 shadow-md">
+                {outline.map((o, i) => (
+                  <button key={`${o.title}-${i}`} type="button"
+                          onClick={() => { go(o.page); setShowOutline(false); }}
+                          className="flex w-full items-baseline justify-between gap-2 rounded
+                                     px-2 py-1 text-left text-[11px] hover:bg-accent">
+                    <span className="min-w-0 flex-1 truncate" title={o.title}>{o.title}</span>
+                    <span className="shrink-0 text-muted-foreground">p.{o.page}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-auto bg-muted/10 p-3"
