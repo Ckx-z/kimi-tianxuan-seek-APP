@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  BookOpen, ChevronRight, FolderPlus, Loader2, NotebookPen, Plus,
+  BookOpen, ChevronRight, FolderPlus, Loader2, Network, NotebookPen, Plus,
   RefreshCw, Search, Sparkles, Tag as TagIcon, Trash2, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -113,6 +113,8 @@ export function LibraryExplorer({
   const [hybridBusy, setHybridBusy] = useState(false);
   /** v1.9.8 C3/C5：补全与导出 */
   const [enriching, setEnriching] = useState(false);
+  /** G0：构建图谱进行中 */
+  const [graphBusy, setGraphBusy] = useState(false);
 
   /** C3：批量补全缺失元数据（默认只处理缺年份的文献；联网但免费） */
   const enrichMissing = async () => {
@@ -139,6 +141,38 @@ export function LibraryExplorer({
       toast.error(e instanceof Error ? e.message : '补全失败');
     } finally {
       setEnriching(false);
+    }
+  };
+
+  /** G0：构建图谱（同步 cites / similar_to / 实体），完成后通知分析面板刷新 */
+  const buildGraph = async () => {
+    let papers = 0;
+    try {
+      const st = await (await fetch('/api/library/enrich/status')).json();
+      papers = Number(st?.with_doi || 0);
+    } catch { /* 拿不到状态也允许继续 */ }
+    const limit = Number(window.prompt(
+      `构建文献图谱（同步文献间关系）\n\n`
+      + `将处理最近入库的 N 篇（你的库中约 ${papers} 篇有 DOI 可直接查引用）：\n`
+      + `· cites：按 DOI 调 Crossref 取参考文献（每篇 1 次网络请求）\n`
+      + `· similar_to：用本地向量算近邻（首次需加载模型，较慢）\n`
+      + `· 实体：从已解析条目抽技术/指标/属性\n\n`
+      + `建议先点「补全元数据」把年份补齐。请输入处理篇数（建议 50）：`, '50'));
+    if (!limit || Number.isNaN(limit)) return;
+    setGraphBusy(true);
+    try {
+      const r = await fetch(`/api/library/graph/sync?kinds=citations,similar,entities`
+                            + `&limit=${Math.max(1, Math.min(500, limit))}`, { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || `构建失败（${r.status}）`);
+      const st = d.stats || {};
+      toast.success(`图谱已更新：节点 ${st.nodes ?? '-'} · 边 ${st.edges ?? '-'}`
+                    + `（${Object.entries(st.by_predicate || {}).map(([k, v]) => `${k}:${v}`).join(' ')}）`);
+      window.dispatchEvent(new CustomEvent('cof:graph-updated'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '构建图谱失败');
+    } finally {
+      setGraphBusy(false);
     }
   };
 
@@ -368,6 +402,14 @@ export function LibraryExplorer({
             <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
                     disabled={busy} onClick={() => void rebuild()}>
               <RefreshCw className={cn('mr-1 h-3 w-3', busy && 'animate-spin')} />重建索引
+            </Button>
+            {/* G0：构建图谱（让引用图分析与图查询有数据） */}
+            <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                    disabled={graphBusy}
+                    title="同步文献间关系：cites（按 DOI 调 Crossref）、similar_to（向量近邻）、实体（技术/指标/属性）"
+                    onClick={() => void buildGraph()}>
+              <Network className={cn('mr-1 h-3 w-3', graphBusy && 'animate-pulse')} />
+              {graphBusy ? '建图中…' : '构建图谱'}
             </Button>
             {/* v1.9.8 C3：OpenAlex / Semantic Scholar 补全（免费无 key） */}
             <Button size="sm" variant="outline" className="h-7 px-2 text-xs"

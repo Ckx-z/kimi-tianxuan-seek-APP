@@ -52,6 +52,13 @@ export function GraphInsights() {
 
   useEffect(() => { void loadAnalytics(false); }, [loadAnalytics]);
 
+  // G0：图谱构建完成后自动刷新（由 LibraryExplorer 的「构建图谱」广播）
+  useEffect(() => {
+    const onUpdated = () => { void loadAnalytics(true); };
+    window.addEventListener('cof:graph-updated', onUpdated);
+    return () => window.removeEventListener('cof:graph-updated', onUpdated);
+  }, [loadAnalytics]);
+
   const runQuery = async () => {
     if (!dsl.trim()) return;
     setLoadingQ(true);
