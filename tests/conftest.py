@@ -13,6 +13,13 @@ import os
 
 import pytest
 
+# 注意（v1.9.8 排查结论）：**不要**在这里（模块导入期）设置 COF_DATA_DIR ——
+# 实测会立刻破坏 8 个其他用例（1 failed + 7 errors），因为 gnn_jobs / gnn_feedback /
+# dft jobs / p4b 模板等模块在导入时就按 user_data_root() 固化了路径。
+# 正确做法（下一轮实施）：把文献库隔离收窄到 `titles.TITLES_PATH`
+# + `library_db.db_path` + reading/annotations 目录，而不是改全局数据根；
+# 当前仍用下方 session 夹具（含注释说明其导入顺序局限）。
+
 
 @pytest.fixture(autouse=True, scope="session")
 def _isolate_dft_job_store(tmp_path_factory):
