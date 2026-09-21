@@ -918,3 +918,100 @@ def library_reading_inbox_ingest(inbox_id: str, title: str = "",
                 "next": f"POST /api/literature/{pid}/parse?auto_backfill=true"}
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------- 混合检索（C1）
+
+def _hybrid_search():
+    try:
+        from literature import hybrid_search
+    except ImportError:  # pragma: no cover
+        from src.literature import hybrid_search  # type: ignore
+    return hybrid_search
+
+
+@router.get("/search/hybrid")
+def library_search_hybrid(q: str, mode: str = "hybrid", top_k: int = 10):
+    """三态检索：`vector`（向量）/ `graph`（图）/ `hybrid`（RRF 融合）。
+
+    每篇结果带 `sources`（命中来自哪几路）、`ranks` 与 `contributions`（各路贡献），
+    向量不可用时自动降级为 graph-only（`degraded=true` + `notes` 说明原因）。
+    """
+    hs = _hybrid_search()
+    _db, conn = _open()
+    try:
+        return hs.hybrid_search(conn, q, mode=mode, top_k=top_k)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------- 元数据补全（C3）
+
+def _openalex():
+    try:
+        from literature import openalex
+    except ImportError:  # pragma: no cover
+        from src.literature import openalex  # type: ignore
+    return openalex
+
+
+@router.get("/enrich/status")
+def library_enrich_status():
+    """补全总览：多少篇有 DOI / 缺 year / 已补被引数 / 被引 Top10。"""
+    _db, conn = _open()
+    try:
+        return _openalex().status(conn)
+    finally:
+        conn.close()
+
+
+@router.post("/enrich")
+def library_enrich(paper_id: str | None = None, limit: int = 20,
+                   only_missing_year: bool = True, force: bool = False):
+    """按 DOI 从 **OpenAlex / Semantic Scholar** 补全（免费、无需 key）。
+
+    - 单篇：`paper_id=1529`；批量：不传 `paper_id`，按 `limit` 处理
+    - 只补空（已有 year/journal 不覆盖）；被引量与参考文献数写入 `graph_metrics`
+    - 幂等（补过的默认跳过；`force=true` 重算）；**失败逐条记录不影响其它条目**
+    """
+    ox = _openalex()
+    _db, conn = _open()
+    try:
+        if paper_id:
+            return ox.enrich_paper(conn, paper_id, force=force)
+        return ox.enrich_batch(conn, limit=limit, only_missing_year=only_missing_year)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(500, f"补全失败：{type(exc).__name__}: {exc}")
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------- 图查询 DSL（C4）
+
+def _graph_query():
+    try:
+        from literature import graph_query
+    except ImportError:  # pragma: no cover
+        from src.literature import graph_query  # type: ignore
+    return graph_query
+
+
+@router.get("/graph/query")
+def library_graph_query(q: str, nl: bool = False):
+    """受限**只读**图查询 DSL。
+
+    `nl=true` 时先用 LLM 把自然语言翻成 DSL（**仅允许白名单算子**，非法输出拒绝）。
+    可用算子：neighbors / path / by_entity / by_metric / cites_of / top
+    """
+    gq = _graph_query()
+    _db, conn = _open()
+    try:
+        dsl = gq.translate_nl(q) if nl else q
+        out = gq.execute(conn, dsl)
+        return {**out, "dsl": dsl if not nl else gq.parse(dsl)["raw"]}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
