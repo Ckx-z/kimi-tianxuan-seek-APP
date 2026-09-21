@@ -51,7 +51,33 @@ def _db():
 def ensure_schema(conn) -> None:
     conn.executescript(SCHEMA)
     conn.executescript(INBOX_SCHEMA)
+    _ensure_image_column(conn)
     conn.commit()
+
+
+def _ensure_image_column(conn) -> None:
+    """v1.9.8：`item_annotations.image_file`（区域截图批注的图片路径）。
+
+    SQLite 的 ALTER TABLE 没有 IF NOT EXISTS → 先查 PRAGMA 再决定是否加列，
+    这样已有 item_annotations 的老库也能平滑升级。
+    """
+    try:
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(item_annotations)")}
+    except Exception:  # pragma: no cover
+        return
+    if cols and "image_file" not in cols:
+        conn.execute("ALTER TABLE item_annotations ADD COLUMN image_file TEXT")
+
+
+def _annotation_dir(paper_id: str):
+    """区域截图存放目录：literature/annotations/<paper_id>/"""
+    try:
+        from src import runtime_config
+    except ImportError:  # pragma: no cover
+        import runtime_config  # type: ignore
+    d = runtime_config.user_data_root() / "literature" / "annotations" / str(paper_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 # ---------------------------------------------------------------- 阅读收件箱
