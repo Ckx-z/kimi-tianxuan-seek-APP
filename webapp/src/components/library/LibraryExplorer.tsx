@@ -40,6 +40,9 @@ interface PaperRow {
   entries_count?: number;
   figures_count?: number;
   has_abstract?: boolean;
+  /** v1.9.8 C1：混合检索命中来源（vector / graph）与融合得分 */
+  sources?: string[];
+  score?: number;
 }
 interface Collection {
   collection_id: string;
@@ -102,6 +105,10 @@ export function LibraryExplorer({
   // 中栏
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('paper_id');
+  /** v1.9.8 C1：检索模式 —— full=全文(FTS) / vector=向量 / graph=图 / hybrid=RRF 融合 */
+  const [searchMode, setSearchMode] = useState<'full' | 'vector' | 'graph' | 'hybrid'>('full');
+  const [degraded, setDegraded] = useState(false);
+  const [routeNotes, setRouteNotes] = useState<string[]>([]);
   const [direction, setDirection] = useState('desc');
   const [papers, setPapers] = useState<PaperRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -138,6 +145,25 @@ export function LibraryExplorer({
   const search = useCallback(async (offset = 0) => {
     setLoading(true);
     try {
+      // C1：非全文模式走混合检索（RRF 融合 + 逐条来源标注）
+      if (searchMode !== 'full' && offset === 0) {
+        const r = await fetch(`/api/library/search/hybrid?q=${encodeURIComponent(q)}`
+                              + `&mode=${searchMode}&top_k=100`);
+        const d = r.ok ? await r.json() : { results: [] };
+        setDegraded(Boolean(d.degraded));
+        setRouteNotes(d.notes ?? []);
+        const rows = (d.results ?? []).map((x: {
+          paper_id: string; title: string; journal: string; year: number | null;
+          doi: string; sources?: string[]; score?: number;
+        }) => ({
+          paper_id: x.paper_id, title: x.title, journal: x.journal, year: x.year,
+          doi: x.doi, source: '', added_at: '',
+          sources: x.sources ?? [], score: x.score,
+        }));
+        setPapers(rows);
+        setTotal(rows.length);
+        return;
+      }
       const params = new URLSearchParams({
         q, sort, direction, limit: '50', offset: String(offset),
       });
@@ -151,7 +177,7 @@ export function LibraryExplorer({
     } finally {
       setLoading(false);
     }
-  }, [q, sort, direction, activeCollection, activeTag]);
+  } , [q, sort, direction, activeCollection, activeTag, searchMode]);
 
   useEffect(() => { void loadSidebar(); void loadStatus(); }, [loadSidebar, loadStatus]);
 
@@ -368,6 +394,16 @@ export function LibraryExplorer({
                 <option value="added_at">按入库时间</option>
                 <option value="title">按标题</option>
               </select>
+              {/* v1.9.8 C1：三态检索开关（向量 / 图 / RRF 融合） */}
+              <select value={searchMode}
+                      onChange={(e) => setSearchMode(e.target.value as typeof searchMode)}
+                      title="检索模式：全文为 FTS 关键词；向量/图/混合走服务端融合检索（命中会标注来源）"
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs">
+                <option value="full">全文检索</option>
+                <option value="vector">向量召回</option>
+                <option value="graph">图谱召回</option>
+                <option value="hybrid">混合（RRF）</option>
+              </select>
               <Button size="sm" variant="outline" className="h-8 px-2 text-xs"
                       onClick={() => setDirection(direction === 'desc' ? 'asc' : 'desc')}>
                 {direction === 'desc' ? '倒序' : '正序'}
@@ -379,7 +415,15 @@ export function LibraryExplorer({
                 共 {total} 篇
                 {activeCollection && ` · 集合：${collections.find((c) => c.collection_id === activeCollection)?.name ?? ''}`}
                 {activeTag && ` · 标签：${activeTag}`}
+                {searchMode !== 'full' && ` · 模式：${
+                  searchMode === 'hybrid' ? '混合(RRF)' : searchMode === 'vector' ? '向量' : '图谱'}`}
               </span>
+              {/* C1：降级提示（如向量模型不可用 → 自动退化为图谱路） */}
+              {degraded && (
+                <span className="text-amber-600" title={routeNotes.join('；')}>
+                  已降级（仅图谱路）
+                </span>
+              )}
               {loading && <Loader2 className="h-3 w-3 animate-spin" />}
             </div>
 
@@ -406,6 +450,25 @@ export function LibraryExplorer({
                       {p.year ? ` · ${p.year}` : ''}
                       {p.doi ? ` · ${p.doi}` : ''}
                     </span>
+                    {/* C1：混合检索的来源标注（哪几路命中） */}
+                    {p.sources && p.sources.length > 0 && (
+                      <span className="mt-1 flex flex-wrap items-center gap-1">
+                        {p.sources.map((s) => (
+                          <span key={s}
+                                className={cn('rounded-full border px-1.5 py-0.5 text-[10px]',
+                                  s === 'graph'
+                                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600'
+                                    : 'border-sky-500/40 bg-sky-500/10 text-sky-600')}>
+                            {s === 'graph' ? '图谱' : '向量'}
+                          </span>
+                        ))}
+                        {typeof p.score === 'number' && (
+                          <span className="text-[10px] text-muted-foreground">
+                            RRF {p.score.toFixed(4)}
+                          </span>
+                        )}
+                      </span>
+                    )}
                     {/* R1-d：解析状态徽标（未解析 / 部分 / 已解析），缺失项以提示列出 */}
                     {p.parse_status && (
                       <span
