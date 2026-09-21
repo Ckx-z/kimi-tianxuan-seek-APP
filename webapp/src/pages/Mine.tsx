@@ -163,12 +163,24 @@ export default function Mine() {
             {intakeOpen ? '收起添加文献' : '＋ 添加文献（DOI / 标题 / 上传 PDF+SI）'}
           </Button>
         </div>
-        {/* F0 修复：录入区放到三栏壳**上方** —— 原来渲染在下方（壳高 520px+），
-            点「＋添加文献」后视口内看不到任何变化，用户会以为按钮不可用 */}
-        {intakeOpen && <LiteratureIntakeSection />}
-        <LibraryExplorer compact onSelectPaper={setFocusPaperId} />
-        {/* v1.9.8 C2/C4：引用图分析 + 只读图查询（知识图谱能力进入界面） */}
-        <GraphInsights />
+        {/* F2：点文献 → **整块切换**到详情视图（不再挤在右栏内滚动） */}
+        {focusPaperId ? (
+          <div className="space-y-2">
+            <Button variant="outline" size="sm" className="h-7 text-xs"
+                    onClick={() => setFocusPaperId('')}>
+              ← 返回文献列表
+            </Button>
+            <LiteratureKnowledgeSection focusPaperId={focusPaperId} />
+          </div>
+        ) : (
+          <>
+            {/* F0：录入区放在三栏壳上方（展开即可见） */}
+            {intakeOpen && <LiteratureIntakeSection />}
+            <LibraryExplorer compact onSelectPaper={setFocusPaperId} />
+            {/* C2/C4：引用图分析 + 只读图查询 */}
+            <GraphInsights />
+          </>
+        )}
         {intakeOpen && <LiteratureIntakeSection />}
         <LiteratureKnowledgeSection focusPaperId={focusPaperId} />
       </section>

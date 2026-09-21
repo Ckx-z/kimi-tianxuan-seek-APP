@@ -433,7 +433,8 @@ export function LibraryExplorer({
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className={cn('grid min-h-[520px] grid-cols-1 border-t border-border',
+        <div className={cn('grid grid-cols-1 border-t border-border',
+                           'h-[calc(100vh-340px)] min-h-[420px]',
                            compact ? 'lg:grid-cols-[220px_minmax(0,1fr)]'
                                    : 'lg:grid-cols-[220px_minmax(0,1fr)_360px]')}>
           {/* 左：集合 + 标签 */}
