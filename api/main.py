@@ -42,6 +42,32 @@ async def lifespan(_app: FastAPI):
         dft_router.jobs.load_persisted_jobs()
     except Exception:
         pass
+
+    # v1.9.8：后台预热本地嵌入模型（bge-m3）。
+    # 动机：首次向量/混合检索需在服务端加载模型，实测要 30–60 秒 —— 用户会以为
+    # "搜索没反应"（本轮已实测踩坑）。放到启动后台线程里加载，把这段等待从
+    # 用户操作期挪到应用启动期；失败不影响任何功能（检索时会再尝试一次）。
+    try:
+        import threading
+
+        def _warm_embedding() -> None:
+            try:
+                from literature import embedding
+            except ImportError:  # pragma: no cover
+                try:
+                    from src.literature import embedding  # type: ignore
+                except ImportError:
+                    return
+            try:
+                if embedding.provider() == "local":
+                    embedding.embed_texts(["预热：COF 成膜"])
+            except Exception:
+                pass
+
+        threading.Thread(target=_warm_embedding, name="warm-embedding",
+                         daemon=True).start()
+    except Exception:
+        pass
     yield
 
 
