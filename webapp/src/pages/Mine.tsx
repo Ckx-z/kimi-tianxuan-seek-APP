@@ -29,6 +29,7 @@ import { PlansSection } from '@/components/mine/PlansSection';
 import { LiteratureIntakeSection } from '@/components/mine/LiteratureIntakeSection';
 import { LiteratureKnowledgeSection } from '@/components/mine/LiteratureKnowledgeSection';
 import { LibraryExplorer } from '@/components/library/LibraryExplorer';
+import { GraphInsights } from '@/components/library/GraphInsights';
 
 /** 导出备份：打包四类数据为 JSON Blob 下载 */
 async function exportBackup() {
@@ -163,6 +164,8 @@ export default function Mine() {
           </Button>
         </div>
         <LibraryExplorer compact onSelectPaper={setFocusPaperId} />
+        {/* v1.9.8 C2/C4：引用图分析 + 只读图查询（知识图谱能力进入界面） */}
+        <GraphInsights />
         {intakeOpen && <LiteratureIntakeSection />}
         <LiteratureKnowledgeSection focusPaperId={focusPaperId} />
       </section>
