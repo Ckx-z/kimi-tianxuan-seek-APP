@@ -229,6 +229,9 @@ export function PdfViewer({
     const doc = docRef.current;
     const canvas = canvasRef.current;
     if (!doc || !canvas) return;
+    // F1c：**立刻清空文字层**（之前在被取消的渲染路径上会残留上一页的 span →
+    // 表现就是"翻页后上一页的字卡在这一页"）
+    if (textRef.current) textRef.current.innerHTML = '';
     try {
       const p = await doc.getPage(page);
       const viewport = p.getViewport({ scale });

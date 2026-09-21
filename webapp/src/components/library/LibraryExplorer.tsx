@@ -151,14 +151,17 @@ export function LibraryExplorer({
       const st = await (await fetch('/api/library/enrich/status')).json();
       papers = Number(st?.with_doi || 0);
     } catch { /* 拿不到状态也允许继续 */ }
-    const limit = Number(window.prompt(
+    // 注意：Electron **不支持 window.prompt**（调用即返回空 → 表现为"点了没反应"），
+    // 因此这里只用 confirm（Electron 支持），篇数固定 50，可在提示里说明。
+    const limit = 50;
+    const ok = window.confirm(
       `构建文献图谱（同步文献间关系）\n\n`
-      + `将处理最近入库的 N 篇（你的库中约 ${papers} 篇有 DOI 可直接查引用）：\n`
+      + `将处理最近入库的 50 篇（你的库中约 ${papers} 篇有 DOI 可直接查引用）：\n`
       + `· cites：按 DOI 调 Crossref 取参考文献（每篇 1 次网络请求）\n`
       + `· similar_to：用本地向量算近邻（首次需加载模型，较慢）\n`
       + `· 实体：从已解析条目抽技术/指标/属性\n\n`
-      + `建议先点「补全元数据」把年份补齐。请输入处理篇数（建议 50）：`, '50'));
-    if (!limit || Number.isNaN(limit)) return;
+      + `建议先点「补全元数据」把年份补齐。继续？`);
+    if (!ok) return;
     setGraphBusy(true);
     try {
       const r = await fetch(`/api/library/graph/sync?kinds=citations,similar,entities`
