@@ -109,6 +109,8 @@ export function LibraryExplorer({
   const [searchMode, setSearchMode] = useState<'full' | 'vector' | 'graph' | 'hybrid'>('full');
   const [degraded, setDegraded] = useState(false);
   const [routeNotes, setRouteNotes] = useState<string[]>([]);
+  /** 混合检索进行中（首次会加载本地向量模型，可能数十秒） */
+  const [hybridBusy, setHybridBusy] = useState(false);
   /** v1.9.8 C3/C5：补全与导出 */
   const [enriching, setEnriching] = useState(false);
 
@@ -194,6 +196,11 @@ export function LibraryExplorer({
     try {
       // C1：非全文模式走混合检索（RRF 融合 + 逐条来源标注）
       if (searchMode !== 'full' && offset === 0) {
+        // 首次向量检索需在服务端加载本地嵌入模型（实测 30–60s）→ 必须清空列表并提示，
+        // 否则会长时间显示**上一次的结果**，让人误以为徽标/检索没生效（已实测踩坑）
+        setPapers([]);
+        setTotal(0);
+        setHybridBusy(true);
         const r = await fetch(`/api/library/search/hybrid?q=${encodeURIComponent(q)}`
                               + `&mode=${searchMode}&top_k=100`);
         const d = r.ok ? await r.json() : { results: [] };
@@ -209,6 +216,7 @@ export function LibraryExplorer({
         }));
         setPapers(rows);
         setTotal(rows.length);
+        setHybridBusy(false);
         return;
       }
       // 竞态防护：非全文模式下，全文检索的结果**不得覆盖**混合检索结果
@@ -486,11 +494,11 @@ export function LibraryExplorer({
                 {activeTag && ` · 标签：${activeTag}`}
                 {searchMode !== 'full' && ` · 模式：${
                   searchMode === 'hybrid' ? '混合(RRF)' : searchMode === 'vector' ? '向量' : '图谱'}`}
-              {/* 临时诊断（下轮移除）：混合模式下直接把映射结果打出来 */}
-              {searchMode !== 'full' && (
+              {/* C1：检索进行中提示（首次向量检索要加载本地模型，实测 30–60s） */}
+              {hybridBusy && (
                 <span className="ml-2 text-[10px] text-amber-600">
-                  [诊断 行={papers.length} sources={JSON.stringify(papers[0]?.sources ?? null)}
-                  {' '}score={String(papers[0]?.score ?? null)}]
+                  正在做{searchMode === 'hybrid' ? '混合' : searchMode === 'vector' ? '向量' : '图谱'}
+                  检索…（首次会加载本地向量模型，可能 30–60 秒）
                 </span>
               )}
               </span>
