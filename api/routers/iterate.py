@@ -322,3 +322,33 @@ def list_plans(favorite_id: str | None = None):
                  if str(p.get("favorite_id") or "") == favorite_id]
     plans.sort(key=lambda p: str(p.get("created_at") or ""), reverse=True)
     return {"plans": plans, "count": len(plans)}
+
+
+@router.delete("/plans/{plan_id}")
+def delete_plan(plan_id: str):
+    """删除指定方案卡（F3：此前**没有任何删除入口**，卡片只能堆积）。
+
+    匹配顺序：`plan_id` / `id` 字段 → 文件名（`plan_<id>.json` 的 stem）。
+    返回 `{deleted, plan_id, file}`；未找到 404。
+    """
+    target = (plan_id or "").strip()
+    if not target:
+        raise HTTPException(400, "plan_id 不能为空")
+    candidates = sorted(PLANS_DIR.glob("plan_*.json")) if PLANS_DIR.is_dir() else []
+    for path in candidates:
+        try:
+            obj = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        ids = {str(obj.get("plan_id") or ""), str(obj.get("id") or ""), path.stem}
+        # 文件名形态 plan_<id>.json → 也接受去掉前缀的写法
+        ids.add(path.stem[5:] if path.stem.startswith("plan_") else path.stem)
+        if target in ids:
+            try:
+                path.unlink()
+            except OSError as exc:
+                raise HTTPException(500, f"删除失败：{type(exc).__name__}: {exc}")
+            return {"deleted": True, "plan_id": target, "file": path.name}
+    raise HTTPException(404, f"方案不存在: {target}")

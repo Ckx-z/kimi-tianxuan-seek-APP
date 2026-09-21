@@ -250,8 +250,33 @@ function TemplatesManager() {
 /** 单个方案卡（可展开） */
 function PlanRow({ plan }: { plan: PlanItem }) {
   const [open, setOpen] = useState(false);
+  /** F3：删除方案卡（此前没有任何删除入口） */
+  const [deleted, setDeleted] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const card = plan.plan_card;
   const conditions = (card?.conditions ?? {}) as Record<string, unknown>;
+
+  const handleDeletePlan = async () => {
+    const name = plan.template_name || card?.template || `#${plan.plan_id}`;
+    if (!window.confirm(`删除方案「${name}」？\n\n此操作不可撤销。`)) return;
+    setDeleting(true);
+    try {
+      const r = await fetch(`/api/iterate/plans/${encodeURIComponent(plan.plan_id)}`,
+                            { method: 'DELETE' });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.detail || `删除失败（${r.status}）`);
+      }
+      setDeleted(true);
+      toast.success('方案已删除');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '删除失败');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (deleted) return null;
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -270,6 +295,18 @@ function PlanRow({ plan }: { plan: PlanItem }) {
         <div className="flex shrink-0 items-center gap-3">
           <span className="text-xs text-muted-foreground">
             {formatDateTime(plan.created_at) || plan.plan_id}
+          </span>
+          {/* F3：删除键（stopPropagation 避免触发展开/收起） */}
+          <span
+            role="button"
+            tabIndex={0}
+            title="删除该方案卡"
+            className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            onClick={(e) => { e.stopPropagation(); void handleDeletePlan(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); void handleDeletePlan(); } }}
+          >
+            {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Trash2 className="h-3.5 w-3.5" />}
           </span>
           <ChevronDown
             className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
