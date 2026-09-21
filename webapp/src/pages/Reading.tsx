@@ -72,6 +72,26 @@ function Reading() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [busy, setBusy] = useState(false);
+  /** F1b：三栏宽度可拖拽调整（默认收窄侧栏，把空间让给 PDF） */
+  const [leftW, setLeftW] = useState(200);
+  const [rightW, setRightW] = useState(300);
+
+  const startResize = (side: 'left' | 'right') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const base = side === 'left' ? leftW : rightW;
+    const onMove = (ev: MouseEvent) => {
+      const delta = side === 'left' ? ev.clientX - startX : startX - ev.clientX;
+      const next = Math.min(520, Math.max(140, base + delta));
+      if (side === 'left') setLeftW(next); else setRightW(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
   /** R2-g：手动批注（页码 + 原文片段 + 评论 + 颜色） */
   const [annoPage, setAnnoPage] = useState('');
   const [annoComment, setAnnoComment] = useState('');
@@ -367,9 +387,14 @@ function Reading() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="grid grid-cols-1 border-t border-border lg:h-[calc(100vh-210px)]
-                        lg:min-h-[560px] lg:grid-cols-[240px_minmax(0,1fr)_360px]">
+                        lg:min-h-[560px] lg:[grid-template-columns:var(--reading-cols)]"
+             style={{ ['--reading-cols' as string]: `${leftW}px minmax(0,1fr) ${rightW}px` } as React.CSSProperties}>
             {/* 左：阅读清单 */}
-            <div className="hidden border-r border-border lg:block">
+            <div className="relative hidden border-r border-border lg:block">
+              {/* F1b：拖拽调宽手柄 */}
+              <div onMouseDown={startResize('left')} title="拖动调整宽度"
+                   className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize
+                              hover:bg-primary/40" />
               {/* R2-k：外部上传（先读后入库） */}
               <div className="border-b border-border p-2">
                 <label className="flex cursor-pointer items-center justify-center gap-1
@@ -514,7 +539,10 @@ function Reading() {
             </div>
 
             {/* 右：入库计划 + 阅读状态 + 批注 */}
-            <div className="min-w-0 p-3">
+            <div className="relative min-w-0 p-3">
+              <div onMouseDown={startResize('right')} title="拖动调整宽度"
+                   className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-col-resize
+                              hover:bg-primary/40" />
               {inboxId && !plan ? (
                 <div className="space-y-2 text-[11px] text-muted-foreground">
                   <p className="text-xs font-medium text-foreground">尚未入库的外部文献</p>

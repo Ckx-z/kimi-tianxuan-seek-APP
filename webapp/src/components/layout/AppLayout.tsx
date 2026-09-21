@@ -196,7 +196,7 @@ export default function AppLayout() {
       {/* 右侧内容区 */}
       <main className="ml-60 flex-1">
         <div key={location.pathname}
-             className="page-enter mx-auto w-full max-w-[1200px] px-8 py-7">
+             className="page-enter mx-auto w-full max-w-[1800px] px-6 py-6">
           <Outlet />
         </div>
       </main>

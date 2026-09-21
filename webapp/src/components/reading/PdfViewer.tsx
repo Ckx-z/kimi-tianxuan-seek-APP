@@ -44,6 +44,8 @@ export function PdfViewer({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textRef = useRef<HTMLDivElement | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
+  /** F1b：滚动容器（用于自适应缩放时测量可用宽高） */
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const docRef = useRef<pdfjs.PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const [numPages, setNumPages] = useState(0);
@@ -274,6 +276,27 @@ export function PdfViewer({
 
   useEffect(() => { void render(); }, [render, numPages]);
 
+  /** F1b：文档载入后**自适应容器**（默认铺满可视区，避免页面显小、四周留大片空白） */
+  useEffect(() => {
+    const doc = docRef.current;
+    const box = scrollRef.current;
+    if (!doc || !box || numPages === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const p = await doc.getPage(1);
+        const base = p.getViewport({ scale: 1 });
+        const availW = Math.max(200, box.clientWidth - 28);
+        const availH = Math.max(200, box.clientHeight - 28);
+        const fit = Math.min(availW / base.width, availH / base.height);
+        if (!cancelled && fit > 0.3 && fit < 4) setScale(+fit.toFixed(3));
+      } catch { /* 自适应失败则保持当前缩放 */ }
+    })();
+    return () => { cancelled = true; };
+    // numPages 变化（换文档）时重算；scale 变化不重算，避免用户手动缩放被覆盖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numPages]);
+
   const go = (next: number) => {
     const clamped = Math.min(Math.max(1, next), Math.max(1, numPages));
     setPage(clamped);
@@ -422,7 +445,7 @@ export function PdfViewer({
         )}
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-auto bg-muted/10 p-3"
+      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto bg-muted/10 p-3"
            onMouseUp={capture}>
         {loading && (
           <p className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
