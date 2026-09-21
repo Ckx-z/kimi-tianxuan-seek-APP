@@ -485,6 +485,30 @@ function Reading() {
                            annotations={annos}
                            onSelectText={(t, p, pos) => {
                              setSelText(t); setAnnoPage(String(p)); setSelPos(pos);
+                           }}
+                           onCaptureRegion={async (b64, p, pos) => {
+                             try {
+                               const r = await fetch('/api/library/annotations', {
+                                 method: 'POST',
+                                 headers: { 'Content-Type': 'application/json' },
+                                 body: JSON.stringify({
+                                   paper_id: paperId, type: 'image', page: p,
+                                   position: pos, comment: '区域截图',
+                                   image_base64: b64,
+                                 }),
+                               });
+                               if (!r.ok) {
+                                 const d = await r.json().catch(() => ({}));
+                                 throw new Error(d.detail || `保存截图失败（${r.status}）`);
+                               }
+                               const n = await fetch(
+                                 `/api/library/annotations?paper_id=${encodeURIComponent(paperId)}`)
+                                 .then((x) => (x.ok ? x.json() : { annotations: [] }));
+                               setAnnos(n.annotations ?? []);
+                               toast.success('区域截图已存为批注');
+                             } catch (e) {
+                               toast.error(e instanceof Error ? e.message : '保存截图失败');
+                             }
                            }} />
               )}
             </div>
@@ -612,6 +636,16 @@ function Reading() {
                           <li key={a.annotation_id}
                               className="flex items-start justify-between gap-1 text-[11px] text-muted-foreground">
                             <span className="min-w-0 flex-1">
+                              {/* v1.9.8：区域截图批注显示缩略图（点击看大图） */}
+                              {a.type === 'image' && (
+                                <a href={`/api/library/annotations/${a.annotation_id}/image`}
+                                   target="_blank" rel="noreferrer" title="点击查看大图">
+                                  <img
+                                    src={`/api/library/annotations/${a.annotation_id}/image`}
+                                    alt="区域截图"
+                                    className="mb-1 max-h-24 rounded border border-border/70" />
+                                </a>
+                              )}
                               第 {a.page ?? '-'} 页 · {a.text || a.comment || a.type}
                             </span>
                             <button type="button" title="删除批注"
