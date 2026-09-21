@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import { ChevronLeft, ChevronRight, List, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +52,43 @@ export function PdfViewer({
   /** v1.9.8 R2 增强：目录大纲 */
   const [outline, setOutline] = useState<{ title: string; page: number }[]>([]);
   const [showOutline, setShowOutline] = useState(false);
+  /** v1.9.8 R2 增强：文档内查找 */
+  const [findQ, setFindQ] = useState('');
+  const [findHits, setFindHits] = useState<{ page: number; snippet: string }[]>([]);
+  const [finding, setFinding] = useState(false);
+  const [showFind, setShowFind] = useState(false);
+
+  /** 跨页查找（逐页取文字层；最多扫 80 页，避免超大 PDF 卡住界面） */
+  const runFind = useCallback(async () => {
+    const doc = docRef.current;
+    const needle = findQ.trim().toLowerCase();
+    if (!doc || !needle) return;
+    setFinding(true);
+    setFindHits([]);
+    try {
+      const hits: { page: number; snippet: string }[] = [];
+      const maxPage = Math.min(doc.numPages, 80);
+      for (let i = 1; i <= maxPage; i += 1) {
+        const p = await doc.getPage(i);
+        const content = await p.getTextContent();
+        const text = (content.items as { str?: string }[])
+          .map((it) => it.str || '').join(' ');
+        const idx = text.toLowerCase().indexOf(needle);
+        if (idx >= 0) {
+          hits.push({ page: i,
+                      snippet: text.slice(Math.max(0, idx - 20), idx + needle.length + 30) });
+        }
+        if (hits.length >= 50) break;
+      }
+      setFindHits(hits);
+      if (hits.length > 0) go(hits[0].page);
+      else toast.info(`未找到「${findQ.trim()}」（已扫描前 ${maxPage} 页）`);
+    } catch {
+      toast.error('查找失败');
+    } finally {
+      setFinding(false);
+    }
+  }, [findQ]);
 
   // 载入文档
   useEffect(() => {
@@ -207,6 +245,42 @@ export function PdfViewer({
         <span className="ml-auto text-[11px] text-muted-foreground">
           {hint || '选中文字即可翻译 / 记批注'}
         </span>
+        {/* v1.9.8 R2 增强：文档内查找 */}
+        <div className="relative">
+          <Button size="sm" variant="outline" className="h-7 px-2 text-[11px]"
+                  onClick={() => setShowFind((v) => !v)}>
+            查找{findHits.length > 0 ? `（${findHits.length}）` : ''}
+          </Button>
+          {showFind && (
+            <div className="absolute right-0 z-10 mt-1 w-80 rounded-md border border-border
+                            bg-popover p-2 shadow-md">
+              <div className="flex items-center gap-1">
+                <Input value={findQ} onChange={(e) => setFindQ(e.target.value)}
+                       onKeyDown={(e) => { if (e.key === 'Enter') void runFind(); }}
+                       placeholder="在本文中查找…" className="h-7 text-xs" />
+                <Button size="sm" className="h-7 px-2 text-[11px]" disabled={finding}
+                        onClick={() => void runFind()}>
+                  {finding ? <Loader2 className="h-3 w-3 animate-spin" /> : '搜索'}
+                </Button>
+              </div>
+              {findHits.length > 0 && (
+                <ul className="mt-1.5 max-h-56 overflow-auto">
+                  {findHits.map((h) => (
+                    <li key={h.page}>
+                      <button type="button"
+                              onClick={() => { go(h.page); setShowFind(false); }}
+                              className="w-full rounded px-1.5 py-1 text-left text-[11px]
+                                         hover:bg-accent">
+                        <span className="font-medium">p.{h.page}</span>
+                        <span className="ml-1 text-muted-foreground">…{h.snippet}…</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
         {/* v1.9.8 R2 增强：目录大纲 */}
         {outline.length > 0 && (
           <div className="relative">
