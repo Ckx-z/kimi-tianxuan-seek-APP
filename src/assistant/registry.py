@@ -20,7 +20,8 @@ from .tools.favorites import list_favorites_tool, manage_favorite, manage_favori
 from .tools.graphrag import query_graphrag_tool
 from .tools.litgraph import TOOL_SCHEMA as LIT_GRAPH_SCHEMA, lit_graph_tool
 from .tools.history import list_prediction_history
-from .tools.plan import generate_plan_card_impact, generate_plan_card_tool
+from .tools.plan import (delete_plan_card_tool, generate_plan_card_impact,
+                         generate_plan_card_tool, update_plan_card_tool)
 from .tools.predict import predict_film
 from .tools.records import (draft_experiment_record,
                             draft_experiment_record_impact,
@@ -209,6 +210,55 @@ TOOLS: dict = {
                                   "description": "收藏备注（add 可选）"},
                     },
                     "required": ["action"],
+                },
+            },
+        },
+    },
+    # F3.3：方案卡的修改与删除（写操作，需二次确认）
+    "update_plan_card": {
+        "handler": lambda args: update_plan_card_tool(
+            args.get("plan_id", ""), args.get("amounts") or {},
+            note=args.get("note") or ""),
+        "confirm": lambda args: (
+            f"将把与该用户讨论确认的用量写入方案卡 {args.get('plan_id')}"
+            f"（{len(args.get('amounts') or {})} 项），是否继续？"),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "update_plan_card",
+                "description": "【写操作，需用户二次确认】把**与用户讨论确认的用量**"
+                               "（醛/胺比、溶剂、催化剂当量、温度、时间、浓度等）写入"
+                               "已有方案卡的条件区，并标注来源为「与助手讨论确认」。"
+                               "**必须先与用户确认具体用量**再调用，不要自行填数。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "plan_id": {"type": "string", "description": "方案卡 ID"},
+                        "amounts": {"type": "object",
+                                    "description": "用量键值对，如 "
+                                                   "{\"aldehyde_amine_ratio\": \"1:1.2\", "
+                                                   "\"temperature\": \"120 °C\"}"},
+                        "note": {"type": "string", "description": "可选说明（记入方案卡）"},
+                    },
+                    "required": ["plan_id", "amounts"],
+                },
+            },
+        },
+    },
+    "delete_plan_card": {
+        "handler": lambda args: delete_plan_card_tool(args.get("plan_id", "")),
+        "confirm": lambda args: (f"将删除方案卡 {args.get('plan_id')}，"
+                                 f"此操作不可撤销，是否继续？"),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "delete_plan_card",
+                "description": "【写操作，需用户二次确认】删除方案库中的一张方案卡。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"plan_id": {"type": "string",
+                                               "description": "方案卡 ID"}},
+                    "required": ["plan_id"],
                 },
             },
         },

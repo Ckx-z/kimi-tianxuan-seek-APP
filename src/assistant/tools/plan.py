@@ -133,6 +133,75 @@ def generate_plan_card_tool(ald_smiles: str, amine_smiles: str,
     }
 
 
+def _find_plan_file(plan_id: str):
+    """按 plan_id / id 字段 / 文件名定位方案卡文件（与删除接口同口径）。"""
+    target = (plan_id or "").strip()
+    if not target:
+        return None
+    plans_dir = generated_plans.PLANS_DIR
+    if not plans_dir.is_dir():
+        return None
+    for path in sorted(plans_dir.glob("plan_*.json")):
+        try:
+            obj = generated_plans._read_json(path)
+        except Exception:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        ids = {str(obj.get("plan_id") or ""), str(obj.get("id") or ""), path.stem}
+        ids.add(path.stem[5:] if path.stem.startswith("plan_") else path.stem)
+        if target in ids:
+            return path
+    return None
+
+
+def update_plan_card_tool(plan_id: str, amounts: dict | None = None,
+                          note: str = "") -> dict:
+    """把**与用户讨论确认的用量**写进已有方案卡的条件（F3.3 写操作，需二次确认）。"""
+    path = _find_plan_file(plan_id)
+    if path is None:
+        return {"text": f"未找到方案卡：{plan_id}", "details": {}, "is_error": True}
+    if not amounts:
+        return {"text": "未提供用量（amounts 为空）：请先与用户确认具体用量再更新",
+                "details": {"plan_id": plan_id}, "is_error": True}
+    try:
+        obj = generated_plans._read_json(path)
+        card = obj.get("plan_card") or {}
+        try:
+            from recommend import plan_card_llm as pcl
+        except ImportError:  # pragma: no cover
+            from src.recommend import plan_card_llm as pcl  # type: ignore
+        obj["plan_card"] = pcl.apply_dosages(card, amounts, source="discussed")
+        obj["updated_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
+        if note:
+            obj["update_note"] = str(note)[:300]
+        path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        fields = obj["plan_card"].get("dosage_fields") or []
+        return {"text": f"已更新方案卡 {obj.get('plan_id') or plan_id}：写入用量 "
+                        f"{len(fields)} 项（{', '.join(fields[:6])}）",
+                "details": {"plan_id": obj.get("plan_id") or plan_id,
+                            "dosage_fields": fields, "file": path.name},
+                "is_error": False}
+    except Exception as exc:  # noqa: BLE001
+        return {"text": f"更新方案卡失败：{type(exc).__name__}: {exc}",
+                "details": {}, "is_error": True}
+
+
+def delete_plan_card_tool(plan_id: str) -> dict:
+    """删除方案卡（F3.3 写操作，需二次确认）。"""
+    path = _find_plan_file(plan_id)
+    if path is None:
+        return {"text": f"未找到方案卡：{plan_id}", "details": {}, "is_error": True}
+    try:
+        path.unlink()
+        return {"text": f"已删除方案卡 {plan_id}", "details": {"plan_id": plan_id,
+                                                              "file": path.name},
+                "is_error": False}
+    except OSError as exc:
+        return {"text": f"删除失败：{type(exc).__name__}: {exc}",
+                "details": {}, "is_error": True}
+
+
 def generate_plan_card_impact(args: dict) -> str:
     args = args if isinstance(args, dict) else {}
     tpl = args.get("template_id") or "内置侯老师法 v3.9"
