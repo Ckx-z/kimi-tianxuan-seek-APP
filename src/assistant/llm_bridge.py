@@ -101,6 +101,44 @@ def _normalize_tool_calls(message: dict) -> list[dict]:
     return out
 
 
+def _has_image_parts(messages: list) -> bool:
+    """本轮消息里是否带图片分片（决定要不要切到视觉模型）。"""
+    for m in messages or []:
+        if not isinstance(m, dict):
+            continue
+        content = m.get("content")
+        if not isinstance(content, list):
+            continue
+        for part in content:
+            if isinstance(part, dict) and part.get("type") == "image_url":
+                return True
+    return False
+
+
+def _vision_override() -> dict:
+    """带图消息优先用「文献解析 LLM → 视觉读图」里配的模型/端点/Key。
+
+    P6：用户上传图片/截图时，当前对话模型可能不支持图片输入；只要用户在设置里
+    配了视觉模型（端点/key 留空会自动回退解析 LLM 配置），这里就整体切过去。
+    没配 → 返回 {}，沿用对话模型；端点若仍拒绝图片，由 loop 降级成纯文本提示
+    （用户会看到「不支持看图」而不是报错）。
+    """
+    try:
+        try:
+            from literature import vision
+        except ImportError:  # pragma: no cover
+            from src.literature import vision  # type: ignore
+        if not vision.is_enabled():
+            return {}
+        cfg = vision.resolve_config()
+    except Exception:                     # 配置读不出来也不该让对话挂掉
+        return {}
+    if not (cfg.get("base_url") and cfg.get("api_key") and cfg.get("model")):
+        return {}
+    return {"base_url": cfg["base_url"], "api_key": cfg["api_key"],
+            "model": cfg["model"]}
+
+
 def chat_completion_with_tools(messages: list, tools: list,
                                max_tokens: int = AGENT_MAX_TOKENS,
                                temperature: float = AGENT_TEMPERATURE
@@ -114,6 +152,9 @@ def chat_completion_with_tools(messages: list, tools: list,
     cfg = llm_client._resolve()  # 门面内部配置解析（密钥不出此模块）
     if not cfg:
         raise LLMCallError("LLM 未配置")
+    if _has_image_parts(messages):
+        # P6：带图的那一轮切到视觉模型（配了才切，没配保持原样）
+        cfg = {**cfg, **_vision_override()}
 
     payload: dict[str, Any] = {
         "model": cfg.get("model") or "",

@@ -51,3 +51,9 @@ contextBridge.exposeInMainWorld('updater', {
 contextBridge.exposeInMainWorld('shell', {
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 });
+
+// 截图（P6）：科研助手「截图提问」。浏览器（非 Electron）里 window.cofDesktop 为
+// undefined，前端据此隐藏截图按钮，不做能力假设。
+contextBridge.exposeInMainWorld('cofDesktop', {
+  captureScreen: () => ipcRenderer.invoke('capture-screen'),
+});

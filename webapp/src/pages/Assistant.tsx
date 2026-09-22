@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Bot, CheckCircle2, Circle, Eye, FilePlus2, FileText, Image as ImageIcon, MessageSquarePlus, Microscope, Paperclip, Pencil, RefreshCw, Send, Settings as SettingsIcon, Trash2, X } from 'lucide-react';
+import { Bot, Camera, CheckCircle2, Circle, Eye, FilePlus2, FileText, Image as ImageIcon, Loader2, MessageSquarePlus, Microscope, Paperclip, Pencil, RefreshCw, Send, Settings as SettingsIcon, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -375,6 +375,50 @@ export default function Assistant() {
   const removePendingFile = useCallback((idx: number) => {
     setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
   }, []);
+
+  // ---------- 截图提问（P6，仅 Electron 桌面端） ----------
+  const desktopCapture = typeof window !== 'undefined'
+    && typeof (window as unknown as { cofDesktop?: { captureScreen?: unknown } })
+      .cofDesktop?.captureScreen === 'function';
+  const [capturing, setCapturing] = useState(false);
+  /** 视觉模型是否可用：为 false 时提醒用户「图可能读不了」（不阻断发送） */
+  const [visionOk, setVisionOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch('/api/literature/llm-settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setVisionOk(d?.vision_status?.available === true))
+      .catch(() => setVisionOk(null));
+  }, []);
+
+  const captureScreen = useCallback(async () => {
+    const api = (window as unknown as {
+      cofDesktop?: { captureScreen?: () => Promise<
+        { ok: boolean; dataUrl?: string; mime?: string; error?: string }> };
+    }).cofDesktop;
+    if (!api?.captureScreen) {
+      toast.error('截图仅桌面应用内可用');
+      return;
+    }
+    setCapturing(true);
+    try {
+      const r = await api.captureScreen();
+      if (!r?.ok || !r.dataUrl) {
+        toast.error(`截图失败：${r?.error || '未知原因'}`);
+        return;
+      }
+      const blob = await (await fetch(r.dataUrl)).blob();
+      const mime = r.mime || blob.type || 'image/png';
+      const stamp = new Date().toTimeString().slice(0, 8).replace(/:/g, '');
+      addFiles([new File([blob], `截图_${stamp}.${mime === 'image/jpeg' ? 'jpg' : 'png'}`,
+                         { type: mime })]);
+      toast.success('已截取主屏画面，可在输入框里提问');
+    } catch (e) {
+      toast.error(`截图失败：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setCapturing(false);
+    }
+  }, [addFiles]);
 
   // ---------- 深度研究执行（v1.6.0 P1） ----------
   const runResearch = useCallback(async (
@@ -1134,6 +1178,14 @@ export default function Assistant() {
                 })}
               </div>
             )}
+            {/* P6：带了图片但没配视觉模型 → 如实提醒（不阻断发送） */}
+            {visionOk === false
+              && pendingFiles.some((f) => /\.(png|jpe?g|webp)$/i.test(f.name)) && (
+              <p className="mb-2 text-xs text-warning">
+                未配置视觉模型：图片可能无法被识别。请到「设置 → 文献解析 LLM → 视觉读图」
+                开启并填写模型名（可沿用解析端点/Key）。
+              </p>
+            )}
             <div className="flex items-end gap-2">
               {/* 附件选择（隐藏 input） */}
               <input
@@ -1156,6 +1208,20 @@ export default function Assistant() {
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
+              {desktopCapture && (
+                <Button
+                  variant="outline"
+                  onClick={() => void captureScreen()}
+                  disabled={streaming || uploading || capturing
+                            || pendingFiles.length >= ATTACHMENT_MAX_COUNT}
+                  className="h-9 w-9 shrink-0 p-0"
+                  title="截取主屏画面并作为附件（可让助手看谱图/结构/曲线）"
+                >
+                  {capturing
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Camera className="h-4 w-4" />}
+                </Button>
+              )}
               <Textarea
                 ref={inputRef}
                 value={input}

@@ -22,7 +22,8 @@
  *     主窗口加载完成后向渲染进程发 'backend-version-mismatch' 事件
  */
 
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, desktopCapturer, dialog, ipcMain, screen, shell } =
+  require('electron');
 const { spawn, execSync } = require('child_process');
 const net = require('net');
 const http = require('http');
@@ -473,6 +474,43 @@ function isExternalHttpUrl(url) {
     return false;
   }
 }
+
+// 截图（P6）：科研助手「截图提问」——把主屏当前画面截成 PNG dataURL 交渲染进程。
+// 用 desktopCapturer 的缩略图通道（Windows 上无需额外授权），尺寸取屏幕物理像素、
+// 最长边封顶 2560×1440，避免 dataURL 过大撑爆附件上限（10MB）。
+ipcMain.handle('capture-screen', async () => {
+  try {
+    const display = screen.getPrimaryDisplay();
+    const scale = display.scaleFactor || 1;
+    const size = {
+      width: Math.min(Math.round(display.size.width * scale), 2560),
+      height: Math.min(Math.round(display.size.height * scale), 1440),
+    };
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: size });
+    if (!sources || sources.length === 0) {
+      return { ok: false, error: '没有可捕获的屏幕' };
+    }
+    // 多屏时优先主屏（display_id 匹配），否则取第一块
+    const target = sources.find((s) => String(s.display_id) === String(display.id)) || sources[0];
+    const image = target.thumbnail;
+    if (!image || image.isEmpty()) {
+      return { ok: false, error: '截图内容为空（可能被系统权限拦截）' };
+    }
+    const px = image.getSize();
+    // PNG 在深色界面上可能 >5MB（视觉模型单图上限），超了就降级成 JPEG 再交出去
+    let dataUrl = image.toDataURL();
+    let mime = 'image/png';
+    if (dataUrl.length > 4_000_000) {
+      dataUrl = `data:image/jpeg;base64,${image.toJPEG(85).toString('base64')}`;
+      mime = 'image/jpeg';
+    }
+    return { ok: true, dataUrl, mime, name: target.name || 'screen',
+             width: px.width, height: px.height };
+  } catch (err) {
+    console.warn('[electron] 截图失败:', err);
+    return { ok: false, error: String((err && err.message) || err) };
+  }
+});
 
 // 渲染进程经 preload（window.shell.openExternal）请求系统浏览器打开外链
 ipcMain.handle('open-external', (_event, url) => {
