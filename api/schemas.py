@@ -360,6 +360,20 @@ class LiteratureFigureUpdate(BaseModel):
         None, description="与成膜打分联动回写备注（如：本系统打分 0.85）")
 
 
+class FigureCaptionRequest(BaseModel):
+    """单图视觉标注请求（v2.0.1 P6）：请求体可省略，字段全部可选。"""
+    hint: str = Field("", description="读图提示（可选），如「只看 PXRD 峰位」")
+
+
+class FigureCaptionBatchRequest(BaseModel):
+    """按文献批量视觉标注请求（v2.0.1 P6）。"""
+    fig_ids: list[str] | None = Field(
+        None, description="指定要标注的图 id 列表；缺省=该文献全部图")
+    limit: int = Field(10, ge=1, le=50,
+                       description="本次最多处理几张（控制视觉 API 费用，上限 50）")
+    force: bool = Field(False, description="true 时已有视觉/人工标注的图也重做")
+
+
 class GnnFeedbackCreate(BaseModel):
     """GNN 打分纠错反馈（v1.8.0）。"""
     ald_smiles: str = Field(..., description="醛单体 SMILES")

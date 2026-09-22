@@ -5,10 +5,13 @@
  * - SMILES 输入 → RDKit 生成 2D 结构图入库
  * - 图谱操作：下载 / 编辑标注 / 删除（二次确认）
  * - 与成膜打分联动：structure 类「导入成膜打分」→ /toolbox/query?a=或b= 预填
+ * - v2.0.1（P6）：AI 识别（视觉标注）—— 单张 / 批量调云端视觉模型读图，
+ *   写入图注并标注来源（caption_source=vision）。**仅在设置页启用视觉读图后
+ *   显示这些按钮**（未启用时不显示灰按钮误导用户）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Download, FlaskConical, ImagePlus, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Download, FlaskConical, ImagePlus, Loader2, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +34,10 @@ import {
 } from '@/components/ui/select';
 
 const BASE = '/api/literature';
+/** v2.0.1：视觉标注（AI 识别）端点挂在文献库路由下（/api/library/...） */
+const LIB_BASE = '/api/library';
+/** 单次「AI 识别全部」最多处理几张（控制视觉 API 费用，与后端上限一致） */
+const BATCH_LIMIT = 10;
 
 // ---------- 类型 ----------
 
@@ -54,6 +61,17 @@ interface FigureMeta {
   size: number;
   score_note?: string | null;
   created_at: string;
+  /** v2.0.1：图注来源 pdf（原文抽取）| vision（视觉标注）| user（人工）| none */
+  caption_source?: string;
+}
+
+interface BatchCaptionResult {
+  ok: boolean;
+  requested: number;
+  captioned: number;
+  skipped: number;
+  failed: number;
+  errors: { fig_id: string; error: string }[];
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -62,6 +80,23 @@ const TYPE_LABEL: Record<string, string> = {
   mechanism: '机理图',
 };
 
+/** 图注来源徽标（vision=本系统视觉模型读图；pdf=PDF 原文抽取） */
+const SOURCE_BADGE: Record<string, { label: string; className: string }> = {
+  vision: { label: '视觉标注', className: 'border-gold/60 bg-gold-muted text-gold-foreground' },
+  pdf: { label: '原文', className: '' },
+  user: { label: '人工', className: '' },
+};
+
+function CaptionSourceBadge({ source }: { source?: string }) {
+  const spec = source ? SOURCE_BADGE[source] : undefined;
+  if (!spec) return null;
+  return (
+    <Badge variant="outline" className={`text-[10px] ${spec.className}`}>
+      {spec.label}
+    </Badge>
+  );
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
@@ -69,6 +104,32 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers: init?.body && !(init.body instanceof FormData)
         ? { 'Content-Type': 'application/json' }
         : undefined,
+      ...init,
+    });
+  } catch {
+    toast.error('无法连接后端服务，请确认服务已启动');
+    throw new Error('backend-unavailable');
+  }
+  if (!res.ok) {
+    let message = `请求失败（${res.status}）`;
+    try {
+      const data = await res.json();
+      if (typeof data?.detail === 'string') message = data.detail;
+    } catch {
+      /* 非 JSON */
+    }
+    toast.error(message);
+    throw new Error(message);
+  }
+  return (await res.json()) as T;
+}
+
+/** 视觉标注端点专用请求（文献库路由；错误 detail 直接 toast，如"未启用视觉"） */
+async function requestLibrary<T>(path: string, init?: RequestInit): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${LIB_BASE}${path}`, {
+      headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
       ...init,
     });
   } catch {
@@ -125,6 +186,31 @@ export function LiteratureFiguresPanel({
   const [editCaption, setEditCaption] = useState('');
   const [editTags, setEditTags] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<FigureMeta | null>(null);
+
+  /** v2.0.1：视觉读图可用性（设置页开启且模型配好才为 true）→ 决定是否显示 AI 识别按钮 */
+  const [visionAvailable, setVisionAvailable] = useState(false);
+  /** v2.0.1：正在识别的单张图 id（该卡片显示 loading） */
+  const [captioningId, setCaptioningId] = useState<string | null>(null);
+  /** v2.0.1：批量识别中（无取消能力 → 期间按钮 disabled，并显示已耗时） */
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchElapsed, setBatchElapsed] = useState(0);
+
+  useEffect(() => {
+    request<{ vision_status?: { available?: boolean } }>('/llm-settings')
+      .then((d) => setVisionAvailable(d.vision_status?.available === true))
+      .catch(() => setVisionAvailable(false));
+  }, []);
+
+  useEffect(() => {
+    if (!batchBusy) {
+      setBatchElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const id = window.setInterval(
+      () => setBatchElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => window.clearInterval(id);
+  }, [batchBusy]);
 
   const refreshFigures = useCallback(async (pid: string) => {
     try {
@@ -247,6 +333,57 @@ export function LiteratureFiguresPanel({
     }
   };
 
+  /** v2.0.1：单张 AI 识别（视觉标注）——成功刷新该图，失败显示后端给的中文原因 */
+  const captionOne = async (fig: FigureMeta) => {
+    setCaptioningId(fig.fig_id);
+    try {
+      const data = await requestLibrary<{
+        ok: boolean;
+        error?: string | null;
+        caption?: string | null;
+      }>(`/figures/${encodeURIComponent(fig.fig_id)}/caption`, { method: 'POST' });
+      if (!data.ok) {
+        toast.error(data.error || '视觉识别失败（未写入标注）');
+        return;
+      }
+      toast.success(`已写入视觉标注：${(data.caption ?? '').slice(0, 50)}`);
+      await refreshFigures(paperId);
+    } catch {
+      /* 已 toast（含 409 未启用 / 404 图不存在） */
+    } finally {
+      setCaptioningId(null);
+    }
+  };
+
+  /** v2.0.1：批量 AI 识别（后端按 page 顺序、跳过已有视觉/人工标注；单张失败不影响其余） */
+  const captionAll = async () => {
+    if (!paperId) return;
+    setBatchBusy(true);
+    try {
+      const data = await requestLibrary<BatchCaptionResult>(
+        `/papers/${encodeURIComponent(paperId)}/figures/caption`,
+        { method: 'POST', body: JSON.stringify({ limit: BATCH_LIMIT }) });
+      const parts = [`成功 ${data.captioned} 张`];
+      if (data.skipped) parts.push(`跳过 ${data.skipped} 张（已有标注）`);
+      if (data.failed) parts.push(`失败 ${data.failed} 张`);
+      if (data.captioned > 0) {
+        toast.success(`AI 识别完成：${parts.join('，')}`);
+      } else if (data.failed > 0) {
+        toast.error(`AI 识别失败：${data.errors?.[0]?.error ?? '未知原因'}`);
+      } else {
+        toast.info(`没有需要识别的图：${parts.join('，')}`);
+      }
+      if (data.failed > 0 && data.captioned > 0) {
+        toast.warning(`有 ${data.failed} 张未识别成功：${data.errors?.[0]?.error ?? ''}`);
+      }
+      await refreshFigures(paperId);
+    } catch {
+      /* 已 toast */
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
   const shown = figures.filter((f) => typeFilter === 'all' || f.figure_type === typeFilter);
   /** v1.9.7：点击缩略图放大（Lightbox）——此前只有小图与"下载原图"，用户看不到大图 */
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
@@ -331,6 +468,23 @@ export function LiteratureFiguresPanel({
                 <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
                 上传图谱
               </Button>
+              {/* v2.0.1：AI 识别全部（仅在视觉读图可用时显示；批量中无取消能力 → disabled） */}
+              {visionAvailable && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={batchBusy || captioningId !== null || shown.length === 0}
+                  title={`用视觉模型逐张识别本文献的图片并写入标注（单次最多 ${BATCH_LIMIT} 张，已有视觉/人工标注的会跳过；可能产生 API 费用）`}
+                  onClick={() => void captionAll()}
+                >
+                  {batchBusy ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  {batchBusy ? `AI 识别中… ${batchElapsed}s` : 'AI 识别全部'}
+                </Button>
+              )}
             </div>
 
             {/* 画廊 */}
@@ -364,6 +518,10 @@ export function LiteratureFiguresPanel({
                       >
                         {TYPE_LABEL[f.figure_type]}
                       </Badge>
+                      {/* v2.0.1：图注来源（视觉标注 / 原文抽取 / 人工） */}
+                      <span className="absolute right-1.5 top-1.5">
+                        <CaptionSourceBadge source={f.caption_source} />
+                      </span>
                     </button>
                     <div className="space-y-1 p-2">
                       <p className="line-clamp-2 min-h-8 text-xs text-foreground" title={f.caption}>
@@ -404,6 +562,23 @@ export function LiteratureFiguresPanel({
                         >
                           <Download className="h-3 w-3" />
                         </a>
+                        {/* v2.0.1：单张 AI 识别（视觉标注；仅在视觉读图可用时显示） */}
+                        {visionAvailable && (
+                          <button
+                            type="button"
+                            disabled={captioningId !== null || batchBusy}
+                            title="AI 识别：用视觉模型读出图中描述与数值，并写入该图标注（可能产生 API 费用）"
+                            className="inline-flex h-6 items-center rounded border border-border px-1.5 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+                            onClick={() => void captionOne(f)}
+                          >
+                            {captioningId === f.fig_id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3 w-3" />
+                            )}
+                            <span className="ml-1">AI 识别</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           title="编辑标注"
@@ -589,6 +764,7 @@ export function LiteratureFiguresPanel({
                 <Badge variant="outline" className="text-[10px]">
                   {zoomFigure ? TYPE_LABEL[zoomFigure.figure_type] : ''}
                 </Badge>
+                {zoomFigure && <CaptionSourceBadge source={zoomFigure.caption_source} />}
                 <span className="line-clamp-1">
                   {zoomFigure?.caption || '（无图注）'}
                 </span>
@@ -632,6 +808,22 @@ export function LiteratureFiguresPanel({
               <span className="flex gap-2">
                 {zoomFigure && (
                   <>
+                    {visionAvailable && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={captioningId !== null || batchBusy}
+                        title="AI 识别：用视觉模型读出图中描述与数值并写入标注（可能产生 API 费用）"
+                        onClick={() => void captionOne(zoomFigure)}
+                      >
+                        {captioningId === zoomFigure.fig_id ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="mr-1 h-3 w-3" />
+                        )}
+                        AI 识别
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm"
                             onClick={() => {
                               setEditTarget(zoomFigure);

@@ -16,9 +16,9 @@ import pytest
 # 注意（v1.9.8 排查结论）：**不要**在这里（模块导入期）设置 COF_DATA_DIR ——
 # 实测会立刻破坏 8 个其他用例（1 failed + 7 errors），因为 gnn_jobs / gnn_feedback /
 # dft jobs / p4b 模板等模块在导入时就按 user_data_root() 固化了路径。
-# 正确做法（下一轮实施）：把文献库隔离收窄到 `titles.TITLES_PATH`
-# + `library_db.db_path` + reading/annotations 目录，而不是改全局数据根；
-# 当前仍用下方 session 夹具（含注释说明其导入顺序局限）。
+# v2.0.1 起：下方 session 夹具设置 COF_DATA_DIR 之后，用 `_refresh_module_level_paths()`
+# 把**所有**导入期固化常量（gnn 两处 + literature 六个模块的写盘路径）重算到隔离目录；
+# tests/test_test_isolation_redline.py 会守住这条红线（一旦漏掉某常量就失败）。
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -59,7 +59,14 @@ def _isolate_literature_library(tmp_path_factory):
 
 
 def _refresh_module_level_paths() -> None:
-    """把导入期固化的数据路径常量重算到当前 COF_DATA_DIR（失败即忽略）。"""
+    """把导入期固化的数据路径常量重算到当前 COF_DATA_DIR（失败即忽略）。
+
+    v2.0.1 扩容（事故驱动）：此前只覆盖 gnn 两处，于是 `literature.resolver.INTAKE_PATH`
+    等**导入期常量**仍指向真实数据目录 —— 跑一次 `test_literature_autobackfill_v197.py`
+    就会往仓库 `data/literature/literature_intake.jsonl` 追加审计行、并把占位文献
+    mirror 进真实 `library.db`（实测真实库被覆盖了 paper 1 / paper 2 的标题，
+    审计流水累积 335 行全是测试垃圾）。本函数现在覆盖文献链路所有写盘常量。
+    """
     import sys
 
     try:
@@ -67,6 +74,7 @@ def _refresh_module_level_paths() -> None:
     except ImportError:  # pragma: no cover
         return
     root = runtime_config.user_data_root()
+    lit = root / "literature"
     targets = {
         "src.predictor.gnn_jobs": {
             "GNN_MODELS_DIR": root / "gnn_models",
@@ -76,6 +84,20 @@ def _refresh_module_level_paths() -> None:
             "FEEDBACK_PATH": root / "feedback" / "gnn_feedback.jsonl",
         },
     }
+    # 文献链路：这些常量都写成 user_data_root()/... ，必须逐个重算
+    lit_targets = {
+        "resolver": {"INTAKE_PATH": lit / "literature_intake.jsonl"},
+        "figures": {"FIGURES_DIR": lit / "figures",
+                    "INDEX_PATH": lit / "figures_index.json"},
+        "pdf_figures": {"STAGING_DIR": lit / "figure_staging"},
+        "knowledge": {"ENTRIES_PATH": lit / "knowledge_entries.jsonl"},
+        "attachments": {"PDFS_DIR": lit / "pdfs",
+                        "INDEX_PATH": lit / "pdfs_index.jsonl"},
+        "embedding": {"EMB_PATH": root / "graphrag_user" / "literature_emb.jsonl"},
+    }
+    for base in ("", "src."):
+        for short, attrs in lit_targets.items():
+            targets[f"{base}literature.{short}"] = attrs
     for mod_name, attrs in targets.items():
         mod = sys.modules.get(mod_name)
         if mod is None:

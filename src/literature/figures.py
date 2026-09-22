@@ -4,7 +4,11 @@
 - 文件本体：user_data_root()/literature/figures/<fig_id>.<ext>
 - 元数据：  user_data_root()/literature/figures_index.json
   [{"fig_id", "paper_id", "figure_type", "caption", "tags", "meta",
-    "file", "mime", "size", "score_note", "created_at", "updated_at"}]
+    "file", "mime", "size", "score_note", "created_at", "updated_at",
+    "caption_source"}]
+  `caption_source`（v2.0.1）语义与 library_db.figures 表一致：
+  pdf=PDF 文本层抽取 / vision=视觉模型读图 / user=人工编辑 / none=无图注；
+  老索引记录没有该字段时，读取处按「有图注→pdf，无图注→none」派生（不回写文件）。
 
 structure 类支持 SMILES → RDKit 2D 结构图（SVG 主口径，无需 cairo；
 PNG 仅当 cairo 可用时生成，失败不阻塞）。索引写入走临时文件原子替换。
@@ -40,6 +44,8 @@ INDEX_PATH = runtime_config.user_data_root() / "literature" / "figures_index.jso
 
 ALLOWED_TYPES = {"structure", "spectra", "mechanism"}
 ALLOWED_EXTS = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
+#: v2.0.1：图注来源（与 library_db.ALLOWED_CAPTION_SOURCES 同一约定）
+ALLOWED_CAPTION_SOURCES = ("pdf", "vision", "user", "none")
 MAX_FIG_BYTES = 20 * 1024 * 1024  # 单图 ≤20MB
 SVG_WIDTH, SVG_HEIGHT = 420, 300  # SMILES 2D 渲染尺寸
 
@@ -146,6 +152,14 @@ def render_structure_png(smiles: str) -> bytes | None:
         return None
 
 
+def _default_caption_source(rec: dict) -> str:
+    """老记录没有 caption_source 时按语义派生（有图注→pdf，否则 none）。"""
+    src = str(rec.get("caption_source") or "").strip().lower()
+    if src in ALLOWED_CAPTION_SOURCES:
+        return src
+    return "pdf" if str(rec.get("caption") or "").strip() else "none"
+
+
 def add_figure(paper_id: str, figure_type: str, caption: str,
                tags: list[str], meta: dict, ext: str, data: bytes,
                score_note: str | None = None) -> dict:
@@ -168,11 +182,17 @@ def add_figure(paper_id: str, figure_type: str, caption: str,
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     (FIGURES_DIR / fname).write_bytes(data)
 
+    caption = (caption or "").strip()
+    # v2.0.1：图注来源 —— PDF 自动抽取（pdf_figures.import_staged）→ pdf；
+    # 人工上传且填了图注 → user；无图注 → none
+    caption_source = ("pdf" if str(meta.get("source") or "") == "pdf_extract"
+                      else "user") if caption else "none"
     rec = {
         "fig_id": fig_id,
         "paper_id": str(paper_id).strip(),
         "figure_type": figure_type,
-        "caption": (caption or "").strip(),
+        "caption": caption,
+        "caption_source": caption_source,
         "tags": [str(t).strip() for t in (tags or []) if str(t).strip()],
         "meta": meta,
         "file": fname,
@@ -218,7 +238,9 @@ def list_figures(paper_id: str | None = None,
             continue
         if tag and tag not in (rec.get("tags") or []):
             continue
-        out.append(dict(rec))
+        item = dict(rec)
+        item["caption_source"] = _default_caption_source(item)
+        out.append(item)
     out.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return out
 
@@ -226,7 +248,9 @@ def list_figures(paper_id: str | None = None,
 def get_figure(fig_id: str) -> dict | None:
     for rec in _load():
         if rec.get("fig_id") == fig_id:
-            return dict(rec)
+            item = dict(rec)
+            item["caption_source"] = _default_caption_source(item)
+            return item
     return None
 
 
@@ -234,17 +258,67 @@ def figure_file_path(rec: dict) -> Path:
     return FIGURES_DIR / str(rec.get("file") or "")
 
 
+def resolve_figure_file(rec: dict | str) -> Path | None:
+    """图谱记录 → 实际可读文件路径；找不到返回 None。
+
+    `file` 列的真实语义（v2.0.1 核实）：**裸文件名**（如 `fig_1a2b3c4d5e6f.png`），
+    由 `add_figure` 写入 `FIGURES_DIR = user_data_root()/literature/figures/`；
+    `library_db` 迁移时也是**原样搬运** figures_index.json 的 `file` 字段。
+    为兼容历史/外部数据（绝对路径、带子目录的相对路径、暂存区文件），
+    这里按候选根逐一探测，全部不存在才返回 None（调用方据此报"文件缺失"）。
+    """
+    name = str((rec.get("file") if isinstance(rec, dict) else rec) or "").strip()
+    if not name:
+        return None
+    raw = Path(name)
+    candidates: list[Path] = []
+    if raw.is_absolute():
+        candidates.append(raw)
+    else:
+        candidates.append(FIGURES_DIR / name)
+        try:
+            root = runtime_config.user_data_root() / "literature"
+            candidates += [root / "figures" / name, root / name,
+                           root / "figure_staging" / name]
+        except Exception:  # pragma: no cover - 路径解析异常按"找不到"处理
+            pass
+    for cand in candidates:
+        try:
+            if cand.is_file():
+                return cand
+        except OSError:  # pragma: no cover
+            continue
+    return None
+
+
 def update_figure(fig_id: str, caption: str | None = None,
                   tags: list[str] | None = None, meta: dict | None = None,
-                  score_note: str | None = None) -> dict | None:
-    """更新标注（caption/tags/meta/score_note）；至少改一项。"""
+                  score_note: str | None = None,
+                  caption_source: str | None = None) -> dict | None:
+    """更新标注（caption/tags/meta/score_note/caption_source）；至少改一项。
+
+    `caption_source`（v2.0.1）：显式传入时必须合法；只改 caption（且**文本确实变了**）
+    而未传 source 时视为**人工编辑**（source=user），避免把视觉/PDF 标注与人工修改混淆；
+    只改标签/备注（图注文本不变）时保留原来源。
+    """
+    if caption_source is not None and \
+            str(caption_source).strip().lower() not in ALLOWED_CAPTION_SOURCES:
+        raise FigureError(
+            f"caption_source 必须是 {list(ALLOWED_CAPTION_SOURCES)} 之一")
     with _lock:
         items = list(_load())
         for rec in items:
             if rec.get("fig_id") != fig_id:
                 continue
             if caption is not None:
-                rec["caption"] = (caption or "").strip()
+                new_caption = (caption or "").strip()
+                # 图注**文本真的变了**才算人工编辑（只改标签/备注时不夺走原来源）
+                if caption_source is None and \
+                        new_caption != str(rec.get("caption") or "").strip():
+                    rec["caption_source"] = "user"
+                rec["caption"] = new_caption
+            if caption_source is not None:
+                rec["caption_source"] = str(caption_source).strip().lower()
             if tags is not None:
                 rec["tags"] = [str(t).strip() for t in tags if str(t).strip()]
             if meta is not None:

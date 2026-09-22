@@ -22,6 +22,7 @@ import json
 import logging
 import re
 import urllib.request
+from pathlib import Path
 
 try:
     from literature import llm_extract          # 路由/测试使用裸名实例（优先）
@@ -33,6 +34,14 @@ logger = logging.getLogger(__name__)
 MAX_IMAGE_BYTES = 5 * 1024 * 1024     # 单图上限（base64 后约 6.7MB，多数端点可接受）
 DEFAULT_MAX_TOKENS = 16000            # 推理型视觉模型要留足思考预算（同文本解析口径）
 MAX_METRICS_PER_FIGURE = 8
+#: v2.0.1：图注（caption）拼接规则 —— description 为主 + 最多 4 条关键数值，总长 ≤300 字
+CAPTION_MAX_CHARS = 300
+CAPTION_METRICS = 4
+#: 未启用时的统一错误文案（API 层据此回 409；前端 toast 直接展示）
+NOT_ENABLED_ERROR = "视觉模型未启用或配置不完整"
+#: 后缀 → MIME（caption_figure 按文件后缀判类型；svg 不支持视觉识别）
+_MIME_BY_SUFFIX = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                   ".webp": "image/webp", ".gif": "image/gif"}
 
 _PROMPT = (
     "你是科研文献图表分析助手。请阅读这张来自 COF（共价有机框架）文献的图，"
@@ -196,6 +205,94 @@ def analyze_image(data: bytes, mime: str = "image/png", hint: str = "",
         "confidence": str(obj.get("confidence") or "").strip().lower(),
         "notes": str(obj.get("notes") or "").strip()[:200],
         "budget_expanded": bool(info.get("max_tokens", 0) > max_tokens),
+    }
+
+
+# ---------------------------------------------------------------- 图注（caption）
+#
+# v2.0.1 P6：把「读图结果」变成可入库的一句话图注（文献图视觉标注）。
+# 诚实性约束：**只用模型真的返回的内容** —— description 原文 + 模型给出的 metrics，
+# 不做任何推断、补全或改写；数值缺单位就按模型给的空着。
+
+def _format_metric(m: dict) -> str:
+    name = str(m.get("name") or "").strip()
+    value = m.get("value")
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    unit = str(m.get("unit") or "").strip()
+    return f"{name} {value}{(' ' + unit) if unit else ''}".strip()
+
+
+def build_caption(analysis: dict, *,
+                  max_chars: int = CAPTION_MAX_CHARS,
+                  max_metrics: int = CAPTION_METRICS) -> str:
+    """分析结果 → 图注文本（description 为主，追加「关键数值：名称 数值 单位、…」）。"""
+    desc = str((analysis or {}).get("description") or "").strip()
+    parts: list[str] = []
+    for m in ((analysis or {}).get("metrics") or [])[:max_metrics]:
+        if not isinstance(m, dict) or m.get("value") is None:
+            continue
+        if not str(m.get("name") or "").strip():
+            continue
+        parts.append(_format_metric(m))
+    if parts:
+        extra = "关键数值：" + "、".join(parts)
+        text = f"{desc} {extra}".strip() if desc else extra
+    else:
+        text = desc
+    return text[:max(0, int(max_chars))]
+
+
+def caption_figure(*, data: bytes | None = None,
+                   path: str | Path | None = None,
+                   mime: str = "image/png", hint: str = "") -> dict:
+    """单图 → 可入库图注（复用 `analyze_image`，任何失败都返回结构化结果，不抛异常）。
+
+    返回 `{ok, caption, technique, metrics, confidence, notes, error, figure_type,
+    analysis}`（`analysis` 为视觉原始结果，供 API 回给前端展示；失败时为 None）。
+
+    - `path` 与 `data` 二选一（都给时以 `data` 为准）；路径带后缀时按后缀定 MIME；
+    - SVG 矢量图**不送模型**（视觉端点只吃位图）→ 明确报错，不让用户白花钱；
+    - `is_enabled()` 为假 → `ok=False` 且 `error=NOT_ENABLED_ERROR`（不抛异常）。
+    """
+    base = {"ok": False, "caption": "", "technique": "", "metrics": [],
+            "confidence": "", "notes": "", "error": "", "figure_type": "",
+            "analysis": None}
+    if not is_enabled():
+        return {**base, "error": NOT_ENABLED_ERROR}
+    raw = data
+    if raw is None and path is not None:
+        p = Path(path)
+        suffix = p.suffix.lower()
+        if suffix == ".svg":
+            return {**base, "error": "SVG 矢量图不支持视觉识别（请用 PNG/JPG 等位图）"}
+        try:
+            raw = p.read_bytes()
+        except Exception as exc:  # noqa: BLE001 - 读不到文件按结构化失败返回
+            return {**base,
+                    "error": f"读取图片失败：{type(exc).__name__}: {exc}"}
+        mime = _MIME_BY_SUFFIX.get(suffix) or mime
+    if not raw:
+        return {**base, "error": "图片为空（未提供 data 也未提供可读的 path）"}
+    try:
+        analysis = analyze_image(raw, mime=mime or "image/png", hint=hint)
+    except Exception as exc:  # noqa: BLE001 - 上层（路由/助手）绝不因视觉失败而 500
+        return {**base, "error": f"{type(exc).__name__}: {exc}"}
+    figure_type = str((analysis or {}).get("figure_type") or "").strip().lower()
+    if not (analysis or {}).get("ok"):
+        return {**base, "figure_type": figure_type,
+                "error": str((analysis or {}).get("error") or "视觉调用失败")}
+    caption = build_caption(analysis)
+    return {
+        "ok": bool(caption),
+        "caption": caption,
+        "technique": str(analysis.get("technique") or "").strip(),
+        "metrics": analysis.get("metrics") or [],
+        "confidence": str(analysis.get("confidence") or "").strip(),
+        "notes": str(analysis.get("notes") or "").strip(),
+        "error": None if caption else "视觉模型未返回可用描述",
+        "figure_type": figure_type,
+        "analysis": analysis,
     }
 
 

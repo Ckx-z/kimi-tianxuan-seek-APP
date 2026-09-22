@@ -19,6 +19,9 @@ from .tools.brief import get_daily_brief
 from .tools.favorites import list_favorites_tool, manage_favorite, manage_favorite_impact
 from .tools.graphrag import query_graphrag_tool
 from .tools.litgraph import TOOL_SCHEMA as LIT_GRAPH_SCHEMA, lit_graph_tool
+from .tools.litfigure import TOOL_SCHEMA as VIEW_FIGURE_SCHEMA
+from .tools.litfigure import confirm_impact as view_figure_impact
+from .tools.litfigure import view_figure
 from .tools.history import list_prediction_history
 from .tools.plan import (delete_plan_card_tool, generate_plan_card_impact,
                          generate_plan_card_tool, update_plan_card_tool)
@@ -86,6 +89,12 @@ TOOLS: dict = {
     "lit_graph": {
         "handler": lambda args: lit_graph_tool(args),
         "schema": LIT_GRAPH_SCHEMA,
+    },
+    # P6（v2.0.1）：文献图视觉读图（list 只列图；read 调云端视觉模型，可能产生费用）
+    "view_figure": {
+        "handler": lambda args: view_figure(args),
+        "confirm": view_figure_impact,
+        "schema": VIEW_FIGURE_SCHEMA,
     },
     "read_experiment_records": {
         "handler": lambda args: read_experiment_records(

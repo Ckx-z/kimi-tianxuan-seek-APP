@@ -57,6 +57,10 @@ DEFAULT_COLLECTIONS: list[tuple[str, str]] = [
 ALLOWED_ITEM_FIELDS = ("title", "abstract", "journal", "year", "doi", "url",
                        "authors_json", "source", "extra_json", "item_type")
 
+#: `figures.caption_source` 的合法取值（语义见建表注释）：
+#: pdf=PDF 文本层抽取的图注 / vision=视觉模型读图 / user=人工编辑 / none=无图注
+ALLOWED_CAPTION_SOURCES = ("pdf", "vision", "user", "none")
+
 
 def db_path() -> Path:
     """文献库 DB 路径（用户可写目录，**不再写安装目录**）。"""
@@ -844,6 +848,171 @@ def delete_note(conn: sqlite3.Connection, note_id: str) -> bool:
     cur = conn.execute("DELETE FROM notes WHERE note_id=?", (note_id,))
     conn.commit()
     return bool(cur.rowcount)
+
+
+# ------------------------------------------------- 文献图片（figures）
+# v2.0.1 P6：视觉标注写入层。
+#
+# 写入分工（**重要**）：`figures_index.json`（src/literature/figures.py）是事实来源，
+# 本表是**镜像**（可随时 rebuild）。因此视觉标注由调用方写两处：
+# 1) 本模块（DB 镜像：caption / caption_source / meta_json）；
+# 2) `figures.update_figure()`（事实来源，否则 rebuild 会把视觉标注丢掉）。
+# 具体流水线见 `src/literature/figure_caption.py`。
+
+def _figure_dict(row: sqlite3.Row | dict | None) -> dict | None:
+    """figures 行 → 对外 dict（meta/tags 解成对象，technique 提到顶层便于前端/助手用）。"""
+    if row is None:
+        return None
+    out = dict(row)
+    try:
+        meta = json.loads(out.get("meta_json") or "{}")
+    except Exception:
+        meta = {}
+    out["meta"] = meta if isinstance(meta, dict) else {}
+    try:
+        tags = json.loads(out.get("tags_json") or "[]")
+    except Exception:
+        tags = []
+    out["tags"] = tags if isinstance(tags, list) else []
+    out["technique"] = str(out["meta"].get("technique") or "")
+    return out
+
+
+def get_figure(conn: sqlite3.Connection, fig_id: str) -> dict | None:
+    """按 fig_id 取图（DB 镜像行；不存在返回 None）。
+
+    注意与 `src/literature/figures.get_figure(fig_id)` 的区别：那个读的是**事实来源**
+    索引（无需 conn、按 JSON 文件），本函数读的是 DB 镜像行（带 caption_source 列）。
+    """
+    row = conn.execute("SELECT * FROM figures WHERE fig_id=?",
+                       (str(fig_id),)).fetchone()
+    return _figure_dict(row)
+
+
+def list_figures(conn: sqlite3.Connection, paper_id: str | None = None,
+                 limit: int = 200, offset: int = 0) -> list[dict]:
+    """列图（可按 paper_id 过滤），**按 page 升序**（无页码的排最后）。
+
+    与 `figures.list_figures()`（事实来源，按 created_at 倒序）互补：
+    本函数供"按页顺序批量读图"这类需要页码排序的场景使用。
+    """
+    where, params = "", []
+    if paper_id:
+        where = "WHERE paper_id=?"
+        params.append(str(paper_id))
+    rows = conn.execute(
+        f"SELECT * FROM figures {where}"
+        f" ORDER BY (page IS NULL), page, created_at, fig_id LIMIT ? OFFSET ?",
+        [*params, max(1, min(int(limit or 200), 2000)),
+         max(0, int(offset or 0))]).fetchall()
+    return [_figure_dict(r) for r in rows]
+
+
+def mirror_figure(conn: sqlite3.Connection, rec: dict, *,
+                  commit: bool = True) -> dict | None:
+    """把事实来源（figures_index.json）里的一条图**镜像**进 DB（缺则插入）。
+
+    为什么需要：`figures` 表只在迁移时由 `figures_index.json` 灌入，而
+    `/figures/upload` 等新增图**不写 DB** —— 直接调 `set_figure_caption` 会因
+    "图不存在" 而写不进去。本函数幂等（fig_id 唯一），已存在则原样返回，不覆盖
+    已有标注（避免把用户/视觉标注冲掉）。
+    """
+    fig_id = str((rec or {}).get("fig_id") or "").strip()
+    if not fig_id:
+        return None
+    row = conn.execute("SELECT fig_id FROM figures WHERE fig_id=?", (fig_id,)).fetchone()
+    if row is None:
+        pid = str(rec.get("paper_id") or "")
+        meta = rec.get("meta") if isinstance(rec.get("meta"), dict) else {}
+        caption = str(rec.get("caption") or "")
+        source = str(rec.get("caption_source") or "").strip()
+        if source not in ALLOWED_CAPTION_SOURCES:
+            source = "pdf" if caption.strip() else "none"
+        page = meta.get("page") if isinstance(meta.get("page"), int) else None
+        conn.execute(
+            "INSERT OR IGNORE INTO figures(fig_id,item_id,paper_id,figure_type,"
+            "caption,caption_source,tags_json,meta_json,file,mime,size,page,"
+            "score_note,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (fig_id, _item_id(conn, pid), pid, rec.get("figure_type"), caption,
+             source,
+             json.dumps(rec.get("tags") or [], ensure_ascii=False),
+             json.dumps(meta, ensure_ascii=False, default=str),
+             rec.get("file"), rec.get("mime"), rec.get("size"), page,
+             rec.get("score_note"), rec.get("created_at"), rec.get("updated_at")))
+        if commit:
+            conn.commit()
+    return get_figure(conn, fig_id)
+
+
+def _clean_metrics(metrics) -> list[dict]:
+    """指标列表清洗：只保留 {name, value(数值), unit}，非法项丢弃（不编造）。"""
+    out: list[dict] = []
+    if not isinstance(metrics, (list, tuple)):
+        return out
+    for m in metrics:
+        if not isinstance(m, dict):
+            continue
+        name = str(m.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            value = float(m.get("value"))
+        except (TypeError, ValueError):
+            continue
+        out.append({"name": name, "value": value,
+                    "unit": str(m.get("unit") or "").strip()})
+    return out
+
+
+def set_figure_caption(conn: sqlite3.Connection, fig_id: str, caption: str, *,
+                       source: str = "vision", technique: str | None = None,
+                       metrics: list | None = None, notes: str | None = None,
+                       confidence: str | None = None,
+                       commit: bool = True) -> dict | None:
+    """写图注 + 标注来源（视觉标注落库的主入口），返回更新后的 figure dict。
+
+    - `source` 必须是 pdf|vision|user|none 之一，非法值抛 `ValueError`；
+    - 附带信息（technique/metrics/notes/confidence）**合并**进 `meta_json`：
+      已有键一律保留（不整体覆盖），只覆盖本次显式传入的字段；
+    - 旧图注（原文抽取的 PDF 图注）非空且与新图注不同时，保存在
+      `meta_json.caption_prev`，便于人工复核/回退（不是覆盖式丢弃）；
+    - `fig_id` 不存在返回 `None`（调用方据此回 404）。
+    """
+    src = str(source or "").strip().lower()
+    if src not in ALLOWED_CAPTION_SOURCES:
+        raise ValueError(f"caption_source 非法：{source!r}，"
+                         f"只能是 {'|'.join(ALLOWED_CAPTION_SOURCES)}")
+    row = conn.execute("SELECT * FROM figures WHERE fig_id=?",
+                       (str(fig_id),)).fetchone()
+    if row is None:
+        return None
+    try:
+        meta = json.loads(row["meta_json"] or "{}")
+        if not isinstance(meta, dict):
+            meta = {}
+    except Exception:
+        meta = {}
+    text = str(caption or "").strip()
+    prev = str(row["caption"] or "").strip()
+    if prev and prev != text and not str(meta.get("caption_prev") or "").strip():
+        meta["caption_prev"] = prev
+    if technique is not None:
+        meta["technique"] = str(technique or "").strip()
+    if metrics is not None:
+        meta["metrics"] = _clean_metrics(metrics)
+    if notes is not None:
+        meta["notes"] = str(notes or "").strip()
+    if confidence is not None:
+        meta["confidence"] = str(confidence or "").strip().lower()
+    now = _now()
+    conn.execute(
+        "UPDATE figures SET caption=?, caption_source=?, meta_json=?, updated_at=?"
+        " WHERE fig_id=?",
+        (text, src, json.dumps(meta, ensure_ascii=False, default=str), now,
+         str(fig_id)))
+    if commit:
+        conn.commit()
+    return get_figure(conn, fig_id)
 
 
 # ---------------------------------------------------------------- 关系 / 统计

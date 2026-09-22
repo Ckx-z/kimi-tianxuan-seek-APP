@@ -5,6 +5,13 @@
 文献 1529 已成功解析（抽出 22 张图）但 `abstract` 仍为空即此因。
 
 本文件锁定：解析成功后自动回填（只补空字段、绝不覆盖），可关闭，且幂等。
+
+v2.0.1 补隔离（**此前本文件会写真实用户数据目录**）：`resolver.INTAKE_PATH` 是
+**导入期固化**的模块常量 —— 而 conftest 的 `COF_DATA_DIR` 会话夹具在 collection
+（模块导入）之后才生效，于是 `confirm` 会把测试流水追加进真实
+`data/literature/literature_intake.jsonl`，`mirror_paper` 还会把占位文献写进真实
+`library.db`（实测 9/20、9/22 多次运行已留下垃圾记录）。现在显式把
+INTAKE_PATH / db_path / 图暂存目录一起打桩到 tmp_path。
 """
 
 from __future__ import annotations
@@ -22,7 +29,8 @@ for p in (str(PROJECT_ROOT), str(PROJECT_ROOT / "src")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from literature import graph_ingest, llm_extract  # noqa: E402
+from literature import (graph_ingest, library_db, llm_extract,  # noqa: E402
+                        pdf_figures, resolver)
 from references import titles  # noqa: E402
 
 from api.main import app  # noqa: E402
@@ -50,6 +58,14 @@ def isolate(tmp_path, monkeypatch):
             monkeypatch.setattr(mod, "TITLES_PATH", tmp_path / "paper_titles.json")
             patched.append(mod)
     monkeypatch.setattr(graph_ingest, "_app_root", lambda: tmp_path)
+    # v2.0.1：审计流水 / DB 镜像 / 图暂存都别落到真实用户目录
+    for name in ("literature.resolver", "src.literature.resolver"):
+        mod = sys.modules.get(name)
+        if mod is not None:
+            monkeypatch.setattr(mod, "INTAKE_PATH",
+                                tmp_path / "literature_intake.jsonl")
+    monkeypatch.setattr(library_db, "db_path", lambda: tmp_path / "library.db")
+    monkeypatch.setattr(pdf_figures, "STAGING_DIR", tmp_path / "figure_staging")
     (tmp_path / "paper_titles.json").write_text("{}", encoding="utf-8")
     for mod in patched:
         mod.reload()

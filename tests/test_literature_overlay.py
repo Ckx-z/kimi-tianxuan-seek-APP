@@ -154,14 +154,26 @@ class TestOverlayWrite:
         assert json.loads(overlay_env["bundled"].read_text(encoding="utf-8")) == MINI_LIB
 
     def test_intake_default_location_under_literature_dir(self, monkeypatch):
-        """审计流水默认位置：user_data_root/literature/literature_intake.jsonl。"""
+        """审计流水默认位置：user_data_root/literature/literature_intake.jsonl。
+
+        v2.0.1：conftest 会把 INTAKE_PATH 固定到隔离目录（防测试写真实数据，
+        见 tests/conftest.py::_refresh_module_level_paths）。被隔离后再拿「环境现值」
+        与 user_data_root() 比对，等于在断言泄漏行为 —— 所以这里显式按
+        「无 COF_DATA_DIR 的环境」重新求值该常量，再验证默认位置公式。
+        """
         monkeypatch.delenv("COF_DATA_DIR", raising=False)
+        import importlib
+        from src import runtime_config
+        fresh = importlib.reload(resolver)     # 以当前（无 COF_DATA_DIR）环境重算常量
         try:
-            from src import runtime_config
-        except ImportError:
-            import runtime_config  # type: ignore
-        assert resolver.INTAKE_PATH == (
-            runtime_config.user_data_root() / "literature" / "literature_intake.jsonl")
+            assert fresh.INTAKE_PATH == (
+                runtime_config.user_data_root() / "literature" / "literature_intake.jsonl")
+        finally:
+            # 关键顺序：必须**先**恢复 COF_DATA_DIR 再重算常量，否则会把真实数据路径
+            # 留在模块里（变成下一个用例的隔离红线失败）——monkeypatch 的自动撤销
+            # 发生在测试结束之后，晚于这里。
+            monkeypatch.undo()
+            importlib.reload(resolver)
 
 
 # ---------------------------------------------------------------- 源码开发态不变

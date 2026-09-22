@@ -14,7 +14,8 @@ import logging
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 
-from ..schemas import (LibraryAnnotationCreate, LibraryAnnotationUpdate,
+from ..schemas import (FigureCaptionBatchRequest, FigureCaptionRequest,
+                       LibraryAnnotationCreate, LibraryAnnotationUpdate,
                        LibraryCollectionCreate, LibraryCollectionRename,
                        LibraryNoteCreate, LibraryNoteUpdate, LibraryPaperPatch,
                        LibraryTagSet, ReadingAskRequest, ReadingTranslateRequest)
@@ -30,6 +31,15 @@ def _db():
     except ImportError:  # pragma: no cover
         from src.literature import library_db  # type: ignore
     return library_db
+
+
+def _figure_caption():
+    """视觉标注流水线（读图 → 视觉模型 → 写 DB 镜像 + 图谱索引）。"""
+    try:
+        from literature import figure_caption
+    except ImportError:  # pragma: no cover
+        from src.literature import figure_caption  # type: ignore
+    return figure_caption
 
 
 def _open():
@@ -293,6 +303,78 @@ def library_relations(subject: str | None = None, object: str | None = None,
         return {"relations": db.list_relations(conn, subject=subject,
                                                object_=object,
                                                predicate=predicate)}
+    finally:
+        conn.close()
+
+
+# ------------------------------------------------- 文献图视觉标注（v2.0.1 P6）
+#
+# 说明：图的本体与索引在 `src/literature/figures.py`（`/api/literature/figures/...`），
+# 本组端点负责**视觉标注写入**（DB 镜像 caption/caption_source/meta + 事实来源索引）。
+# 视觉模型未启用 → 409（前端据此提示去设置页，不显示误导性的灰按钮）。
+
+def _require_vision():
+    """视觉读图可用性检查；不可用直接 409（中文说明去设置页开哪个开关）。"""
+    try:
+        from literature import vision
+    except ImportError:  # pragma: no cover
+        from src.literature import vision  # type: ignore
+    if not vision.is_enabled():
+        raise HTTPException(409, _figure_caption().VISION_HINT)
+    return vision
+
+
+def _figures_module():
+    try:
+        from literature import figures
+    except ImportError:  # pragma: no cover
+        from src.literature import figures  # type: ignore
+    return figures
+
+
+@router.post("/figures/{fig_id}/caption")
+def library_caption_figure(fig_id: str, req: FigureCaptionRequest | None = None):
+    """对单张文献图做视觉标注（AI 识别），写回图注并返回分析结果。
+
+    - 请求体可选：`{hint?: str}`（读图提示，如「只看 PXRD 峰位」）；
+    - 视觉未启用 → 409（`detail` 说明去设置页开哪个开关）；
+    - 图不存在 → 404；模型报错/文件缺失 → 200 且 `ok:false` + `error`（前端显示原因）。
+    """
+    _require_vision()
+    _db, conn = _open()
+    try:
+        # 事实来源（图谱索引）优先；索引里没有时退回 DB 镜像行（历史数据兜底）
+        fig = _figures_module().get_figure(fig_id) or _db.get_figure(conn, fig_id)
+        if fig is None:
+            raise HTTPException(404, f"图谱不存在：{fig_id}")
+        out = _figure_caption().caption_one(
+            conn, fig, hint=str((req.hint if req else "") or ""), save=True)
+    finally:
+        conn.close()
+    if not out.get("ok"):
+        return {"ok": False, "fig_id": fig_id, "error": out.get("error") or "视觉读图失败",
+                "figure": fig}
+    return {"ok": True, "fig_id": fig_id, "figure": out.get("figure"),
+            "analysis": out.get("analysis"), "caption": out.get("caption")}
+
+
+@router.post("/papers/{paper_id}/figures/caption")
+def library_caption_paper_figures(paper_id: str,
+                                  req: FigureCaptionBatchRequest | None = None):
+    """按文献批量视觉标注（AI 识别全部）：单张失败不影响其余。
+
+    - 默认跳过已有 `caption_source ∈ {vision, user}` 的图，`force=true` 才重做；
+    - 按 `page` 升序处理，`limit`（默认 10，上限 50）只作用于真正要处理的图；
+    - 视觉未启用 → 409；返回 `{ok, requested, captioned, skipped, failed,
+      errors:[{fig_id, error}], figures:[...]}`。
+    """
+    _require_vision()
+    body = req or FigureCaptionBatchRequest()
+    _db, conn = _open()
+    try:
+        return _figure_caption().caption_paper(
+            conn, paper_id, fig_ids=body.fig_ids, limit=body.limit,
+            force=bool(body.force))
     finally:
         conn.close()
 

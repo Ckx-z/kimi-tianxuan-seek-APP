@@ -30,6 +30,8 @@ const TOOL_LABEL: Record<string, string> = {
   get_monomer_props: '单体性质',
   cas_resolve: 'CAS 解析',
   lookup_paper_doi: '文献 DOI 查询',
+  /** v2.0.1：文献图视觉读图（P6） */
+  view_figure: '文献图读图',
 };
 
 export type ConfirmDecision = 'confirm' | 'cancel';
