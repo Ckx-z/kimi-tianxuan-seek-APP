@@ -69,13 +69,18 @@ def _ensure_image_column(conn) -> None:
         conn.execute("ALTER TABLE item_annotations ADD COLUMN image_file TEXT")
 
 
-def _annotation_dir(paper_id: str):
-    """区域截图存放目录：literature/annotations/<paper_id>/"""
+def _annotation_root():
+    """批注图片根目录：literature/annotations/（删除前用于校验路径归属）"""
     try:
         from src import runtime_config
     except ImportError:  # pragma: no cover
         import runtime_config  # type: ignore
-    d = runtime_config.user_data_root() / "literature" / "annotations" / str(paper_id)
+    return runtime_config.user_data_root() / "literature" / "annotations"
+
+
+def _annotation_dir(paper_id: str):
+    """区域截图存放目录：literature/annotations/<paper_id>/"""
+    d = _annotation_root() / str(paper_id)
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -277,11 +282,30 @@ def update_annotation(conn, annotation_id: str, *, color: str | None = None,
 
 
 def delete_annotation(conn, annotation_id: str) -> bool:
+    """删除批注；截图批注**连带删除落盘 PNG**（避免 annotations 目录无限膨胀）。
+
+    安全约束：只删「批注根目录之内」的文件 —— 库里若存了异常路径则不动手；
+    图片清理失败也不影响批注本身的删除（返回仍按数据库行的删除结果）。
+    """
     ensure_schema(conn)
+    row = conn.execute("SELECT image_file FROM item_annotations WHERE annotation_id=?",
+                       (annotation_id,)).fetchone()
     cur = conn.execute("DELETE FROM item_annotations WHERE annotation_id=?",
                        (annotation_id,))
     conn.commit()
-    return bool(cur.rowcount)
+    if not cur.rowcount:
+        return False
+    img = row["image_file"] if row is not None else None
+    if img:
+        try:
+            from pathlib import Path
+            p = Path(img)
+            root = _annotation_root().resolve()
+            if p.is_file() and root in p.resolve().parents:
+                p.unlink()
+        except Exception as e:      # 图片清理失败不影响批注删除本身
+            logger.debug("删除批注图片失败 %s: %s", img, e)
+    return True
 
 
 # ---------------------------------------------------------------- 阅读状态

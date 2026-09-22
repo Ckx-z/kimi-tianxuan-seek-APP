@@ -51,6 +51,8 @@ export function PdfViewer({
   const pageRef = useRef<HTMLDivElement | null>(null);
   /** F1b：滚动容器（用于自适应缩放时测量可用宽高） */
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  /** F4：用户是否手动缩放过 —— 手动之后拖动面板不再强行覆盖其缩放选择 */
+  const userZoomRef = useRef(false);
   const docRef = useRef<pdfjs.PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const [numPages, setNumPages] = useState(0);
@@ -284,26 +286,61 @@ export function PdfViewer({
 
   useEffect(() => { void render(); }, [render, numPages]);
 
-  /** F1b：文档载入后**自适应容器**（默认铺满可视区，避免页面显小、四周留大片空白） */
-  useEffect(() => {
+  /** 按容器可用宽高算自适应缩放；返回 null 表示尺寸异常/取页失败 → 保持当前缩放 */
+  const fitScale = useCallback(async (): Promise<number | null> => {
     const doc = docRef.current;
     const box = scrollRef.current;
-    if (!doc || !box || numPages === 0) return;
+    if (!doc || !box) return null;
+    try {
+      const p = await doc.getPage(1);
+      const base = p.getViewport({ scale: 1 });
+      const availW = Math.max(200, box.clientWidth - 28);
+      const availH = Math.max(200, box.clientHeight - 28);
+      const fit = Math.min(availW / base.width, availH / base.height);
+      if (fit > 0.3 && fit < 4) return +fit.toFixed(3);
+    } catch { /* 自适应失败则保持当前缩放 */ }
+    return null;
+  }, []);
+
+  /** F1b：文档载入后**自适应容器**（默认铺满可视区，避免页面显小、四周留大片空白） */
+  useEffect(() => {
+    if (numPages === 0) return;
+    userZoomRef.current = false;      // 换文档 → 重新允许自适应接管
     let cancelled = false;
     (async () => {
-      try {
-        const p = await doc.getPage(1);
-        const base = p.getViewport({ scale: 1 });
-        const availW = Math.max(200, box.clientWidth - 28);
-        const availH = Math.max(200, box.clientHeight - 28);
-        const fit = Math.min(availW / base.width, availH / base.height);
-        if (!cancelled && fit > 0.3 && fit < 4) setScale(+fit.toFixed(3));
-      } catch { /* 自适应失败则保持当前缩放 */ }
+      const s = await fitScale();
+      if (!cancelled && s) setScale(s);
     })();
     return () => { cancelled = true; };
     // numPages 变化（换文档）时重算；scale 变化不重算，避免用户手动缩放被覆盖
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numPages]);
+  }, [numPages, fitScale]);
+
+  /**
+   * F4：容器尺寸变化（拖动左右侧栏、窗口缩放、折叠面板）后**立即重算自适应**。
+   * 修的是「拖宽侧栏后 PDF 还是原来那个尺寸、右侧留大片空白」。
+   * 已手动缩放过的（点了 +/-）不覆盖，避免与用户意图打架。
+   */
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box || numPages === 0) return;
+    let timer: number | undefined;
+    let lastSize = `${box.clientWidth}x${box.clientHeight}`;
+    const ro = new ResizeObserver(() => {
+      const now = `${box.clientWidth}x${box.clientHeight}`;
+      if (now === lastSize) return;      // 高度随内容变化会自触发 → 尺寸没变就跳过
+      lastSize = now;
+      if (userZoomRef.current) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(async () => {
+        const s = await fitScale();
+        // 变化 <1% 就不重渲染：避免「改尺寸→重算→内容高度变→再触发」来回抖
+        if (s) setScale((cur) => (Math.abs(cur - s) > 0.01 ? s : cur));
+      }, 120);                            // 拖动过程中防抖，松手后落定
+    });
+    ro.observe(box);
+    return () => { ro.disconnect(); window.clearTimeout(timer); };
+  }, [numPages, fitScale]);
 
   const go = (next: number) => {
     const clamped = Math.min(Math.max(1, next), Math.max(1, numPages));
@@ -365,14 +402,27 @@ export function PdfViewer({
         </Button>
         <span className="mx-1 h-4 w-px bg-border" />
         <Button size="sm" variant="outline" className="h-7 w-7 p-0"
-                onClick={() => setScale((s) => Math.max(0.5, +(s - 0.2).toFixed(2)))}>
+                title="缩小"
+                onClick={() => { userZoomRef.current = true;
+                                 setScale((s) => Math.max(0.5, +(s - 0.2).toFixed(2))); }}>
           <ZoomOut className="h-3.5 w-3.5" />
         </Button>
-        <span className="w-10 text-center text-[11px] text-muted-foreground">
+        {/* F4：点百分比 → 回到「自适应容器」（清除手动缩放标记，拖侧栏又会自动跟随） */}
+        <button type="button" title="点击恢复自适应容器"
+                className="w-11 rounded px-1 text-center text-[11px] text-muted-foreground
+                           hover:bg-accent hover:text-foreground"
+                onClick={async () => {
+                  userZoomRef.current = false;
+                  const s = await fitScale();
+                  if (s) setScale(s);
+                  setHint('已恢复自适应容器大小');
+                }}>
           {Math.round(scale * 100)}%
-        </span>
+        </button>
         <Button size="sm" variant="outline" className="h-7 w-7 p-0"
-                onClick={() => setScale((s) => Math.min(3, +(s + 0.2).toFixed(2)))}>
+                title="放大"
+                onClick={() => { userZoomRef.current = true;
+                                 setScale((s) => Math.min(3, +(s + 0.2).toFixed(2))); }}>
           <ZoomIn className="h-3.5 w-3.5" />
         </Button>
         <span className="ml-auto text-[11px] text-muted-foreground">
