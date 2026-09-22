@@ -341,23 +341,31 @@ function PlanRow({ plan }: { plan: PlanItem }) {
 
               {/* 条件 */}
               {/* F3.2：用量来源标注（讨论确认 / 模型建议 / 模板默认） */}
-              {(card?.dosage_source || card?.dosage_rationale) && (
-                <p className="mb-1.5 text-xs text-muted-foreground">
-                  用量来源：
-                  <span className="font-medium text-foreground">
-                    {card.dosage_source === 'discussed' ? '与助手讨论确认'
-                      : card.dosage_source === 'literature' ? '模型依据文献建议'
-                      : card.dosage_source === 'default' ? '模板默认（可手动补充）'
-                      : '未标注'}
-                  </span>
-                  {Array.isArray(card.dosage_fields) && card.dosage_fields.length > 0 && (
-                    <span className="ml-1">· 字段 {card.dosage_fields.length} 项</span>
-                  )}
-                  {card.dosage_rationale && (
-                    <span className="ml-1">· {String(card.dosage_rationale).slice(0, 80)}</span>
-                  )}
-                </p>
-              )}
+              {(() => {
+                const d = (card ?? {}) as {
+                  dosage_source?: string; dosage_fields?: unknown[];
+                  dosage_rationale?: string;
+                };
+                if (!d.dosage_source && !d.dosage_rationale) return null;
+                const fields = Array.isArray(d.dosage_fields) ? d.dosage_fields : [];
+                return (
+                  <p className="mb-1.5 text-xs text-muted-foreground">
+                    用量来源：
+                    <span className="font-medium text-foreground">
+                      {d.dosage_source === 'discussed' ? '与助手讨论确认'
+                        : d.dosage_source === 'literature' ? '模型依据文献建议'
+                        : d.dosage_source === 'default' ? '模板默认（可手动补充）'
+                        : '未标注'}
+                    </span>
+                    {fields.length > 0 && (
+                      <span className="ml-1">· 字段 {fields.length} 项</span>
+                    )}
+                    {d.dosage_rationale && (
+                      <span className="ml-1">· {String(d.dosage_rationale).slice(0, 80)}</span>
+                    )}
+                  </p>
+                );
+              })()}
               {Object.keys(conditions).length > 0 && (
                 <div>
                   <div className="mb-1.5 text-xs font-semibold text-muted-foreground">成膜条件</div>
