@@ -187,6 +187,9 @@ export function LiteratureKnowledgeSection({
   detailOnly?: boolean;
 } = {}) {
   const navigate = useNavigate();
+  /** F3 修复：本实例的"锁定文献"（外层用 key=paperId 保证一实例只服务一篇；
+      用它挡住 loadPapers 的"回落列表第一篇"行为） */
+  const focusRef = useRef<string>(focusPaperId || '');
   const [papers, setPapers] = useState<PaperMeta[]>([]);
   const [filter, setFilter] = useState('');
   const [paperId, setPaperId] = useState<string>('');
@@ -256,7 +259,10 @@ export function LiteratureKnowledgeSection({
       const data = await req<{ papers: PaperMeta[] }>('/papers');
       setPapers(data.papers ?? []);
       const list = data.papers ?? [];
-      const target = selectId ?? list[0]?.paper_id ?? '';
+      // F3 修复（关键）：**有指定文献时绝不回落到列表第一篇**。
+      // 此前 `selectId ?? list[0]?.paper_id` 会在详情视图（无参调用）里把 paperId
+      // 覆盖成最新一篇 → 表现为"每篇文献的结构化条目与图谱都一样"。
+      const target = selectId || focusRef.current || list[0]?.paper_id || '';
       if (target) setPaperId(target);
       return target;
     } catch {
