@@ -278,6 +278,19 @@ def adopt_suggestion(suggestion_id: str, template_id: str | None = None) -> dict
         template=template,
     )
 
+    # F3.2 接线：把建议里的**用量写进卡片的 conditions**
+    # （此前只放在 adjustments_applied 里，卡片与界面上看不到任何用量 —— 用户反馈
+    #  "方案卡没有任何作用"的根因）。来源标注为 discussed（来自与助手的讨论/建议）。
+    adjustments = _extract_adjustments(suggestion)
+    try:
+        try:
+            from recommend import plan_card_llm as _pcl
+        except ImportError:  # pragma: no cover
+            from src.recommend import plan_card_llm as _pcl  # type: ignore
+        card = _pcl.apply_dosages(card, adjustments, source="discussed")
+    except Exception as exc:  # noqa: BLE001  用量写入失败不影响出卡
+        logger.warning("用量写入 conditions 失败（卡片仍生成）：%s", exc)
+
     existing = _load_existing_plans()
     now = datetime.now().astimezone()
     plan = {
@@ -287,7 +300,7 @@ def adopt_suggestion(suggestion_id: str, template_id: str | None = None) -> dict
         "suggestion_id": suggestion.get("suggestion_id") or suggestion_id,
         "template_name": template_name,
         "plan_card": card,
-        "adjustments_applied": _extract_adjustments(suggestion),
+        "adjustments_applied": adjustments,
         "created_at": now.isoformat(timespec="seconds"),
     }
 
