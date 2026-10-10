@@ -112,17 +112,24 @@ class Psi4NotInstalledError(DftError):
 def psi4_timeout(n_atoms: int | None = None) -> int:
     """精度档超时秒数（环境变量 COF_DFT_TIMEOUT_PSI4 可覆盖）。
 
-    未覆盖时按复合物原子数自适应。v1.5.1 重新标定：默认 24 线程下
-    >90 原子全档（6 次 SCF）实测约 1.5–2.5 小时，5400s 必超时，
-    故 >90 档放宽到 10800s；配合 quick 档/仅结合能模式可远快于此。
+    未覆盖时按复合物原子数自适应：
+
+    - ≤50 原子：1800s（默认；分钟级小体系）
+    - >50 原子：**10800s（3 小时）**
+
+    v2.0.2 实测修正（用户真实作业，90 原子 ωB97X-D3BJ/def2-SVP）：
+    阶段 1–3（counterpoise 3 次 SCF + 2 个单体单点）耗时 2732s（45.5 分钟），
+    阶段 4（复合物 SCF + wfn 性质）还需约 1200s → 全程约 65–70 分钟。
+    也就是说旧的「≤90 原子 → 3600s」**必然超时**（那次的复合物 SCF 被 kill 时
+    已迭代到第 8 步、ΔE=1.05e-5 / RMS=1.49e-6，只差 1~2 次迭代）。
+    原子数本身不是耗时的好代理（基组/元素/F 含量/DIIS 行为影响更大），
+    因此不再按 90 分档，>50 一律给 3 小时；真要收紧要靠环境变量显式设置。
     """
     env = os.environ.get("COF_DFT_TIMEOUT_PSI4", "").strip()
     if env.isdigit():
         return int(env)
     if n_atoms is None or n_atoms <= 50:
         return DEFAULT_TIMEOUT
-    if n_atoms <= 90:
-        return 3600
     return 10800
 
 

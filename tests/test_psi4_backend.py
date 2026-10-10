@@ -96,18 +96,33 @@ class TestScriptGeneration:
 
 
 class TestTimeoutTiersV151:
-    """v1.5.1 超时重分档：>90 原子放宽到 10800s（5400s 在大体系 6 次 SCF 下必超时）。"""
+    """超时分档：≤50 原子 1800s，>50 原子一律 10800s（3 小时）。
+
+    v2.0.2 修正：旧的「≤90 → 3600s」在用户真实的 90 原子作业上**必然超时**
+    （实测阶段 1–3 就用了 2732s，全程约 65–70 分钟），故取消 90 这一档。
+    """
 
     def test_tiers(self):
         assert pb.psi4_timeout(None) == 1800
         assert pb.psi4_timeout(50) == 1800
-        assert pb.psi4_timeout(51) == 3600
-        assert pb.psi4_timeout(90) == 3600
+        assert pb.psi4_timeout(51) == 10800
+        assert pb.psi4_timeout(90) == 10800      # 用户那次的规模：必须给 3 小时
         assert pb.psi4_timeout(91) == 10800
 
     def test_env_override(self, monkeypatch):
         monkeypatch.setenv("COF_DFT_TIMEOUT_PSI4", "600")
         assert pb.psi4_timeout(200) == 600
+
+    def test_env_override_can_also_raise(self, monkeypatch):
+        """用户想把 90 原子放宽到 3 小时（默认已是 10800）或更长，环境变量优先。"""
+        monkeypatch.setenv("COF_DFT_TIMEOUT_PSI4", "21600")
+        assert pb.psi4_timeout(90) == 21600
+
+    def test_env_override_ignores_garbage(self, monkeypatch):
+        monkeypatch.setenv("COF_DFT_TIMEOUT_PSI4", "3h")
+        assert pb.psi4_timeout(90) == 10800      # 非法值 → 退回按原子数
+        monkeypatch.setenv("COF_DFT_TIMEOUT_PSI4", "")
+        assert pb.psi4_timeout(90) == 10800
 
 
 class TestWithPropsV151:
