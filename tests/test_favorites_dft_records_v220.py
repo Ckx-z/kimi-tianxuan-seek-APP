@@ -1,4 +1,4 @@
-﻿"""档案卡与 DFT 分条记录（v220）测试。
+"""档案卡与 DFT 分条记录（v220）测试。
 
 覆盖：
 - 相同计算条件重复收藏 → 不新增（更新同一条）且标号不变；
@@ -144,22 +144,34 @@ class TestConditionFingerprintAndLabels:
             {**BASE_CONDITIONS, "n_samples": 24},
             # 是否算性质不同
             {**BASE_CONDITIONS, "with_props": False},
-            # 目标分子（X）不同
+            # 目标分子（X）不同 —— 这一条属于**另一个标号分组**，要从 A 重新开始
             {**BASE_CONDITIONS, "x_type": "custom", "x_smiles": "c1ccccc1"},
         ]
-        labels = ["B", "C", "D", "E", "F"]
+        # v2.20 用户口径：标号按「单体组 + 目标分子」分组，每组独立从 A 开始。
+        # 前 4 个变体只是"同一次计算的变体"（档位/构象/采样/性质）→ 同组，续 B、C、D、E；
+        # 第 5 个换了目标分子 → 新组，回到 A。
+        expect = [
+            ["A", "B"],
+            ["A", "B", "C"],
+            ["A", "B", "C", "D"],
+            ["A", "B", "C", "D", "E"],
+            ["A", "B", "C", "D", "E", "A"],
+        ]
         for i, cond in enumerate(variants):
             body = _post_entry(fid, {"job_id": f"j{i + 2}",
                                      "e_bind_kcal": -1.0 - i,
                                      "conditions": cond})
-            assert _labels(body["dft_entries"]) == ["A"] + labels[: i + 1]
+            assert _labels(body["dft_entries"]) == expect[i], (
+                f"第 {i + 1} 个变体的标号应为 {expect[i]}，"
+                f"实际 {_labels(body['dft_entries'])}")
         assert len(body["dft_entries"]) == 6
         assert len({e["condition_key"] for e in body["dft_entries"]}) == 6
 
-        # 后端模式不同也算条件不同（dimer → pair）
+        # 后端模式不同也算条件不同（dimer → pair）：mode 不参与标号分组 →
+        # 与前面 4 个变体同组（同单体组 + 同目标分子），因此续在 E 之后取 F
         body = _post_entry(fid, {"job_id": "j_pair", "e_bind_kcal": -0.5,
                                  "conditions": {**BASE_CONDITIONS, "mode": "pair"}})
-        assert _labels(body["dft_entries"]) == ["A", "B", "C", "D", "E", "F", "G"]
+        assert _labels(body["dft_entries"]) == ["A", "B", "C", "D", "E", "A", "F"]
 
         # 标签超过 26 条走双字母（直接验证标号生成器口径）
         assert fav_store._label_at(0) == "A"
@@ -188,13 +200,14 @@ class TestConditionFingerprintAndLabels:
         assert _labels(body["dft_entries"]) == ["A", "B"]
         assert body["archive_type"] == "dft_pair"
 
-        # 混入一条二聚体记录 → 卡片回到 COF 单体组类型（仍全部可见）
+        # 混入一条二聚体记录：v2.20 用户口径「含任一 pair 记录即为双分子特殊卡」
+        # → 仍判 dft_pair（旧 all 规则下会回落成 cof_monomer_group，已按用户决策改）
         body = _post_entry(fid, {"job_id": "d1", "e_bind_kcal": -4.0,
                                  "conditions": dict(BASE_CONDITIONS)})
         assert len(body["dft_entries"]) == 3
-        assert body["archive_type"] == "cof_monomer_group"
+        assert body["archive_type"] == "dft_pair"
         # GET 与列表接口同样带出档案卡类型（前端据此选卡片样式）
-        assert client.get(f"/api/favorites/{fid}").json()["archive_type"] == "cof_monomer_group"
+        assert client.get(f"/api/favorites/{fid}").json()["archive_type"] == "dft_pair"
 
 
 # ---------------------------------------------------------------- 失败记录删除
@@ -353,7 +366,9 @@ class TestLegacyCompatibility:
         on_disk = json.loads((fav_dir / f"{fid}.json").read_text(encoding="utf-8"))
         assert on_disk["dft_entries"] == legacy_entries
 
-        # 新条件 → 新增一条，标号顺延 C（不与历史条目的派生标号冲突）
+        # 新条件 → 新增一条：该条带完整条件（已知分组），而历史条目没有条件信息
+        # 无法归组 —— 卡里此时只有一个已知分组，历史条目按"通配"并入同一条序列，
+        # 因此新记录顺延取 C，而不是另起一个 A 造成同卡重复标号。
         body = _post_entry(fid, {"job_id": "new1", "e_bind_kcal": -1.5,
                                  "conditions": dict(BASE_CONDITIONS)})
         labels = _labels_of(body)

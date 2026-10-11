@@ -193,10 +193,14 @@ def _entry_mode(entry: dict) -> str:
 
 
 def _archive_type_of(entries: list[dict]) -> str:
-    """档案卡类型（响应字段）：仅当 DFT 记录全部来自 pair（任意双分子）模式
-    → 双分子 DFT 计算特殊档案卡；无记录/含二聚体记录 → COF 单体组档案卡。"""
+    """档案卡类型（响应字段）：DFT 记录里**只要有一条 pair（任意双分子）**
+    → 双分子 DFT 计算特殊档案卡；无记录 → COF 单体组档案卡。
+
+    v2.20 用户口径：原文「若为双分子计算模式，生成特殊档案卡」→ 采用 any 而非 all；
+    此前 all 规则下，pair 卡里混入一条二聚体记录就会回落成单体组卡（反直觉）。
+    """
     modes = [_entry_mode(e) for e in entries if isinstance(e, dict)]
-    if modes and all(m == "pair" for m in modes):
+    if any(m == "pair" for m in modes):
         return ARCHIVE_TYPE_PAIR
     return ARCHIVE_TYPE_COF
 
@@ -228,8 +232,33 @@ def _label_index(label) -> int | None:
 
 
 def _label_key(entry: dict) -> str:
-    """标号序列的分组键：同「条件指纹」的记录共用一条 A/B/C 序列。"""
-    return str(entry.get("condition_key") or "")
+    """标号序列的分组键：同一「**单体组 + 目标分子**」共用一条 A/B/C 序列。
+
+    v2.20 用户口径：标号按「单体组 + 目标分子」分组，**每组独立从 A 开始**
+    （换目标分子或换单体组 → 重新从 A 数；同一组合的多次尝试才是 A、B、C…）。
+    与 condition_key 的区别：本键**不含**档位/初始构象/采样数等"同一次计算的变体"，
+    否则换个档位就会另起一组，与"同一组合的多次尝试"意图不符。
+    """
+    cond = entry.get("conditions") if isinstance(entry.get("conditions"), dict) else {}
+
+    def pick(*names: str) -> str:
+        for name in names:
+            value = cond.get(name)
+            if value in (None, ""):
+                value = entry.get(name)
+            if value not in (None, ""):
+                return str(value).strip()
+        return ""
+
+    a = pick('a_smiles', 'ald_smiles', 'smiles_a')
+    b = pick('b_smiles', 'amine_smiles', 'smiles_b')
+    if not (a and b):
+        # 单体对不完整 → 无法判断属于哪个「单体组」，视为**无法归组**（返回空串）。
+        # 这类条目（老数据迁移进来的、只带 job_id/x_type 的）由 _next_label_after
+        # 按"通配"并入唯一的分组一起编号，避免同卡出现重复的 A、A。
+        return ""
+    target = pick("x_smiles", "x_type")      # 目标分子（pair 模式下即分子 B）
+    return f"{a}|{b}|{target}"
 
 
 def _next_label(used: set[str], start: int = 0) -> str:
@@ -248,16 +277,32 @@ def _used_labels(entries: list[dict]) -> set[str]:
             for e in entries if _label_index(e.get("label")) is not None}
 
 
-def _next_label_after(entries: list[dict]) -> str:
-    """新增记录的标号：**取最后（最大）一个已用标号的下一个字母**，而非回填空档。
+def _next_label_after(entries: list[dict], group_key: str = "") -> str:
+    """新增记录的标号：在**同一分组内**取最大已用标号的下一个字母（不回填空档）。
 
-    删除记录后不复用被删掉的字母（删 B 后新记录取 D，不占用空出来的 B），
-    这样标号在时间轴上单调、不会被误读成"历史记录换了号"。
+    分组 = 「单体组 + 目标分子」（见 `_label_key`）：同一组合的多次计算得到
+    A、B、C…；换目标分子/换单体组则该组**从 A 重新开始**（v2.20 用户口径）。
+    删除记录后不复用被删掉的字母（删 B 后同组新记录取 D），使标号在时间轴上单调。
+    `group_key` 为空时退化为"整卡连续"（兼容内部旧调用）。
     """
-    indexes = [_label_index(e.get("label")) for e in entries]
+    if group_key:
+        # 通配规则：若卡里**只有一个已知分组**（就是本次要编号的这个），
+        # 则把"拿不到分组信息"的历史条目（老数据迁移进来的、只带 job_id 的）
+        # 视为同组一起数 —— 否则它们会与新记录各排一个 A，同一张卡出现重复标号。
+        # 卡里存在多个已知分组时不通配，严格"每组独立从 A 开始"（用户口径）。
+        known_other = {_label_key(e) for e in entries
+                       if isinstance(e, dict) and _label_key(e)
+                       and _label_key(e) != group_key}
+        allow_wildcard = not known_other
+        same = [e for e in entries if isinstance(e, dict)
+                and (_label_key(e) == group_key
+                     or (allow_wildcard and not _label_key(e)))]
+    else:
+        same = [e for e in entries if isinstance(e, dict)]
+    indexes = [_label_index(e.get("label")) for e in same]
     tops = [i for i in indexes if i is not None]
     start = (max(tops) + 1) if tops else 0
-    return _next_label(_used_labels(entries), start=start)
+    return _next_label(_used_labels(same), start=start)
 
 
 def _label_view(entry: dict, index: int, seq: dict[str, int]) -> str:
@@ -1126,7 +1171,7 @@ def add_dft_entry(fav_id: str, entry: dict) -> dict:
         merged["created_at"] = old.get("created_at") or merged.get("created_at")
         entries[dup_index] = merged
     else:
-        entry["label"] = _next_label_after(entries)
+        entry["label"] = _next_label_after(entries, _label_key(entry))
         entries.append(entry)
 
     fav["dft_entries"] = entries

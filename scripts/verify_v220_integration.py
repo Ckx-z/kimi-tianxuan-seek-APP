@@ -459,22 +459,21 @@ def step2_archive_card(client, fav_store) -> dict:
               and pair_fav.get("archive_type") == "dft_pair",
               "DFT 记录全部来自 pair 模式 → archive_type == dft_pair（双分子 DFT 特殊卡）",
               f"HTTP {r.status_code} archive_type={pair_fav.get('archive_type')!r}")
-        # 观察项：pair 卡里再混入一条 dimer 记录，archive_type 的派生结果
+        # 用户口径（v2.20 定夺）：只要含任一 pair 记录 → 判为双分子 DFT 特殊卡
         r = client.post(f"/api/favorites/{fav2_id}/dft-entries", json={
             "job_id": "dft_verify_pair_2", "mode": "dimer", "method": "GFN2-xTB",
             "backend": "xtb", "x_type": "self_stack",
         })
         mixed = r.json() if r.status_code == 200 else {}
         note("pair 卡混入一条 dimer 记录后 archive_type="
-             f"{mixed.get('archive_type')!r}（store 文档口径：仅当全部条目为 "
-             "pair 才判 dft_pair，见 src/favorites/store.py::_archive_type_of）")
+             f"{mixed.get('archive_type')!r}（v2.20 用户口径：含任一 pair 记录即为 "
+             "dft_pair，见 src/favorites/store.py::_archive_type_of）")
         fav2_path = Path(fav_store.FAVORITES_DIR) / f"{fav2_id}.json"
         d2 = read_json(fav2_path) if fav2_path.is_file() else {}
-        check(mixed.get("archive_type") == "cof_monomer_group"
-              and d2.get("archive_type", "cof_monomer_group")
-              == "cof_monomer_group",
-              "archive_type 随条目构成变化被重算（磁盘旧值 dft_pair 未残留）",
-              f"响应={mixed.get('archive_type')!r} 磁盘={d2.get('archive_type')!r}",
+        check(mixed.get("archive_type") == "dft_pair"
+              and "archive_type" not in d2,
+              "混入 dimer 后仍判 dft_pair，且磁盘不残留派生副本",
+              f"响应={mixed.get('archive_type')!r} 磁盘键={sorted(d2)}",
               kind="consistency")
 
     return {"fav_id": fav_id, "fav_path": fav_path, "fav2_id": fav2_id}
@@ -672,8 +671,9 @@ def step3_dft_entries(client, fav_store, fav_id: str, fav_path: Path) -> dict:
     d8 = r.json() if r.status_code == 200 else {}
     labels = [e.get("label") for e in (d8.get("dft_entries") or [])]
     note("同一张卡里换「目标分子」（x_type/x_smiles 变化，method 相同）后标号="
-         f"{labels}（store 口径：标号按整张卡的条目顺序连续分配，不按"
-         "「单体组+目标分子」重置——实现见 src/favorites/store.py::_next_label_after）")
+         f"{labels}（v2.20 用户口径：标号按「单体组 + 目标分子」分组，"
+         "各组独立从 A 开始 —— 实现见 src/favorites/store.py::_label_key / "
+         "_next_label_after）")
     r = client.delete(f"/api/favorites/{fav_id}/dft-entries/2")
     check(r.status_code == 200, "（清理）删除该观察条目 → 200", _detail(r))
 
