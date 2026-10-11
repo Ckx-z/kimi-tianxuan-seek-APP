@@ -102,7 +102,11 @@ class TestTimeoutTiersV151:
     （实测阶段 1–3 就用了 2732s，全程约 65–70 分钟），故取消 90 这一档。
     """
 
-    def test_tiers(self):
+    def test_tiers(self, monkeypatch):
+        # 必须清掉环境变量：本机可能已用 setx 设了 COF_DFT_TIMEOUT_PSI4（放宽到 3h），
+        # 而环境变量优先级最高 → 不清就会让"未设置时的默认分档"断言失败。
+        # 教训：测试不能依赖宿主环境变量。
+        monkeypatch.delenv("COF_DFT_TIMEOUT_PSI4", raising=False)
         assert pb.psi4_timeout(None) == 1800
         assert pb.psi4_timeout(50) == 1800
         assert pb.psi4_timeout(51) == 10800
