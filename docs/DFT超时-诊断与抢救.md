@@ -118,5 +118,6 @@ App 没有"重试/续算"接口，但有**结果缓存**：新建作业时先算
 4. **阈值要有科学依据**：1e-6 vs 判据 1e-6 就是过严，白跑一次。
 5. 环境坑（本次实测）：**xTB 在当前 shell 下无法在 `%TEMP%` 写入**（`forrtl: severe (256)
    ... file CONOUT$`，崩在 `restart.f90` 写 `xtbrestart`），因此用 pytest 默认临时目录的
-   DFT 真跑用例会失败；把临时目录放进仓库内即可全绿：
-   `pytest tests --basetemp=.tmp_xtb\pytest-tmp`。已用 `git stash` 证明与本次改动无关。
+   DFT 真跑用例会失败；临时目录放进仓库内即可全绿 —— 现已通过仓库根 `pytest.ini` 的
+   `addopts = --basetemp=.tmp_xtb/pytest-tmp` **固定为默认**，无需手动传参。
+   已用 `git stash` 证明与本次改动无关。
