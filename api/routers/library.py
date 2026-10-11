@@ -312,6 +312,11 @@ def library_relations(subject: str | None = None, object: str | None = None,
 # 说明：图的本体与索引在 `src/literature/figures.py`（`/api/literature/figures/...`），
 # 本组端点负责**视觉标注写入**（DB 镜像 caption/caption_source/meta + 事实来源索引）。
 # 视觉模型未启用 → 409（前端据此提示去设置页，不显示误导性的灰按钮）。
+#
+# v2.0.2（端点前缀统一）：下面两个 `*_response` 函数是视觉标注端点**唯一的实现**，
+# 被两组路由共用 —— 本模块的历史路径与 `api/routers/literature.py` 的 canonical
+# 路径（`/api/literature/figures/{fig_id}/caption` 等）都只是转发到它们，
+# 不存在第二份业务逻辑（`tests/test_figure_caption_routes_v202.py` 用打桩守住这一点）。
 
 def _require_vision():
     """视觉读图可用性检查；不可用直接 409（中文说明去设置页开哪个开关）。"""
@@ -332,9 +337,9 @@ def _figures_module():
     return figures
 
 
-@router.post("/figures/{fig_id}/caption")
-def library_caption_figure(fig_id: str, req: FigureCaptionRequest | None = None):
-    """对单张文献图做视觉标注（AI 识别），写回图注并返回分析结果。
+def caption_figure_response(fig_id: str,
+                            req: FigureCaptionRequest | None = None) -> dict:
+    """**单图**视觉标注的唯一实现（两组端点共用；语义见下方两个端点 docstring）。
 
     - 请求体可选：`{hint?: str}`（读图提示，如「只看 PXRD 峰位」）；
     - 视觉未启用 → 409（`detail` 说明去设置页开哪个开关）；
@@ -358,10 +363,9 @@ def library_caption_figure(fig_id: str, req: FigureCaptionRequest | None = None)
             "analysis": out.get("analysis"), "caption": out.get("caption")}
 
 
-@router.post("/papers/{paper_id}/figures/caption")
-def library_caption_paper_figures(paper_id: str,
-                                  req: FigureCaptionBatchRequest | None = None):
-    """按文献批量视觉标注（AI 识别全部）：单张失败不影响其余。
+def caption_paper_figures_response(
+        paper_id: str, req: FigureCaptionBatchRequest | None = None) -> dict:
+    """**按文献批量**视觉标注的唯一实现（两组端点共用）：单张失败不影响其余。
 
     - 默认跳过已有 `caption_source ∈ {vision, user}` 的图，`force=true` 才重做；
     - 按 `page` 升序处理，`limit`（默认 10，上限 50）只作用于真正要处理的图；
@@ -377,6 +381,30 @@ def library_caption_paper_figures(paper_id: str,
             force=bool(body.force))
     finally:
         conn.close()
+
+
+@router.post("/figures/{fig_id}/caption")
+def library_caption_figure(fig_id: str, req: FigureCaptionRequest | None = None):
+    """[历史路径，行为不变] 对单张文献图做视觉标注（AI 识别）。
+
+    v2.0.2 起 canonical 路径是 `POST /api/literature/figures/{fig_id}/caption`
+    （文献图片的其它端点都在 `/api/literature/...`）；本路径保留给既有调用方，
+    两者转发到同一实现 `caption_figure_response`，返回体与错误码完全一致。
+    """
+    return caption_figure_response(fig_id, req)
+
+
+@router.post("/papers/{paper_id}/figures/caption")
+def library_caption_paper_figures(paper_id: str,
+                                  req: FigureCaptionBatchRequest | None = None):
+    """[历史路径，行为不变] 按文献批量视觉标注（AI 识别全部）。
+
+    v2.0.2 起 canonical 路径是
+    `POST /api/literature/papers/{paper_id}/figures/caption`
+    （前端已改为逐张调单图端点，本批量端点仍供 API 消费者使用）；
+    两者转发到同一实现 `caption_paper_figures_response`。
+    """
+    return caption_paper_figures_response(paper_id, req)
 
 
 # ---------------------------------------------------------------- 图谱扩展（P3）

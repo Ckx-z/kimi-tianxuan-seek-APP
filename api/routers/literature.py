@@ -19,7 +19,8 @@ from datetime import datetime
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from ..schemas import (LiteratureConfirm, LiteratureEntriesBatch,
+from ..schemas import (FigureCaptionBatchRequest, FigureCaptionRequest,
+                       LiteratureConfirm, LiteratureEntriesBatch,
                        LiteratureEntryUpdate, LiteratureFigureFromSmiles,
                        LiteratureFigureUpdate, LiteratureFiguresAnalyze,
                        LiteratureFiguresImport,
@@ -458,6 +459,50 @@ def delete_figure(fig_id: str):
     if not f.delete_figure(fig_id):
         raise HTTPException(404, f"图谱不存在: {fig_id}")
     return {"deleted": True, "fig_id": fig_id}
+
+
+# ---------------------------------------------------------------------------
+# 文献图片视觉标注（AI 识别）canonical 路径（v2.0.2）
+#
+# 这两个端点此前只挂在文献库路由下（`/api/library/figures/{id}/caption`、
+# `/api/library/papers/{pid}/figures/caption`），而文献图片的其它端点都在
+# `/api/literature/...` → 前端要维护两个 base。现在 canonical 路径归位到本路由，
+# 实现**只有一份**（`api/routers/library.py` 的 `caption_figure_response` /
+# `caption_paper_figures_response`）；旧路径保留可用、行为不变。
+# ---------------------------------------------------------------------------
+
+def _caption_api():
+    """视觉标注端点的共享实现模块（惰性 import，沿用本文件的既有约定）。"""
+    from . import library as library_router
+    return library_router
+
+
+@router.post("/figures/{fig_id}/caption")
+def caption_figure_endpoint(fig_id: str, req: FigureCaptionRequest | None = None):
+    """对单张文献图做视觉标注（AI 识别），写回图注并返回分析结果。
+
+    - 请求体可选：`{hint?: str}`（读图提示，如「只看 PXRD 峰位」）；
+    - 视觉未启用 → 409（`detail` 说明去设置页开哪个开关）；
+    - 图不存在 → 404；模型报错/文件缺失 → 200 且 `ok:false` + `error`（前端显示原因）；
+    - 与历史路径 `POST /api/library/figures/{fig_id}/caption` **共用同一份实现**，
+      返回体与错误码完全一致。
+    """
+    return _caption_api().caption_figure_response(fig_id, req)
+
+
+@router.post("/papers/{paper_id}/figures/caption")
+def caption_paper_figures_endpoint(paper_id: str,
+                                   req: FigureCaptionBatchRequest | None = None):
+    """按文献批量视觉标注（AI 识别全部）：单张失败不影响其余。
+
+    - 默认跳过已有 `caption_source ∈ {vision, user}` 的图，`force=true` 才重做；
+    - 按 `page` 升序处理，`limit`（默认 10，上限 50）只作用于真正要处理的图；
+    - 视觉未启用 → 409；返回 `{ok, requested, captioned, skipped, failed,
+      errors:[{fig_id, error}], figures:[...]}`；
+    - 与历史路径 `POST /api/library/papers/{paper_id}/figures/caption`
+      **共用同一份实现**（前端已改为逐张调单图端点，本端点保留给 API 消费者）。
+    """
+    return _caption_api().caption_paper_figures_response(paper_id, req)
 
 
 # ---------------------------------------------------------------------------

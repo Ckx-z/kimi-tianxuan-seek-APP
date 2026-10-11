@@ -8,10 +8,13 @@
  * - v2.0.1（P6）：AI 识别（视觉标注）—— 单张 / 批量调云端视觉模型读图，
  *   写入图注并标注来源（caption_source=vision）。**仅在设置页启用视觉读图后
  *   显示这些按钮**（未启用时不显示灰按钮误导用户）。
+ * - v2.0.2：视觉标注端点归位到 `/api/literature/...`（本文件只用这一个 base，
+ *   不再有 `/api/library` 专用封装）；「AI 识别全部」改为**逐张**调单图端点，
+ *   显示「第 i / n 张」并**可取消**（已完成的保留，不回滚），单张失败不中断整批。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Download, FlaskConical, ImagePlus, Loader2, Pencil, Sparkles, Trash2 } from 'lucide-react';
+import { Ban, Download, FlaskConical, ImagePlus, Loader2, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,10 +35,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  captionCancelledSummary,
+  captionNothingToDoMessage,
+  captionProgressLabel,
+  captionRunSummary,
+  planCaptionRun,
+  runCaptionQueue,
+} from './figureCaptionQueue';
+import type { CaptionRun } from './figureCaptionQueue';
 
+/** 文献图谱/视觉标注统一走文献路由（图的本体、上传、删除、改标注、AI 识别都在这里） */
 const BASE = '/api/literature';
-/** v2.0.1：视觉标注（AI 识别）端点挂在文献库路由下（/api/library/...） */
-const LIB_BASE = '/api/library';
 /** 单次「AI 识别全部」最多处理几张（控制视觉 API 费用，与后端上限一致） */
 const BATCH_LIMIT = 10;
 
@@ -65,13 +76,12 @@ interface FigureMeta {
   caption_source?: string;
 }
 
-interface BatchCaptionResult {
+/** 单图视觉标注响应（POST /api/literature/figures/{fig_id}/caption） */
+interface SingleCaptionResult {
   ok: boolean;
-  requested: number;
-  captioned: number;
-  skipped: number;
-  failed: number;
-  errors: { fig_id: string; error: string }[];
+  fig_id?: string;
+  error?: string | null;
+  caption?: string | null;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -97,7 +107,14 @@ function CaptionSourceBadge({ source }: { source?: string }) {
   );
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * 统一请求封装：所有端点都走文献路由（`/api/literature/...`）。
+ *
+ * `opts.silent`（v2.0.2）：不自己弹 toast，只把后端 detail 作为 Error.message 抛出 ——
+ * 「AI 识别全部」逐张调用时用它把失败原因收进批次汇总，而不是一张失败弹一次 toast。
+ */
+async function request<T>(path: string, init?: RequestInit,
+                          opts?: { silent?: boolean }): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${BASE}${path}`, {
@@ -107,35 +124,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init,
     });
   } catch {
-    toast.error('无法连接后端服务，请确认服务已启动');
-    throw new Error('backend-unavailable');
-  }
-  if (!res.ok) {
-    let message = `请求失败（${res.status}）`;
-    try {
-      const data = await res.json();
-      if (typeof data?.detail === 'string') message = data.detail;
-    } catch {
-      /* 非 JSON */
-    }
-    toast.error(message);
+    const message = '无法连接后端服务，请确认服务已启动';
+    if (!opts?.silent) toast.error(message);
     throw new Error(message);
   }
-  return (await res.json()) as T;
-}
-
-/** 视觉标注端点专用请求（文献库路由；错误 detail 直接 toast，如"未启用视觉"） */
-async function requestLibrary<T>(path: string, init?: RequestInit): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(`${LIB_BASE}${path}`, {
-      headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
-      ...init,
-    });
-  } catch {
-    toast.error('无法连接后端服务，请确认服务已启动');
-    throw new Error('backend-unavailable');
-  }
   if (!res.ok) {
     let message = `请求失败（${res.status}）`;
     try {
@@ -144,7 +136,7 @@ async function requestLibrary<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* 非 JSON */
     }
-    toast.error(message);
+    if (!opts?.silent) toast.error(message);
     throw new Error(message);
   }
   return (await res.json()) as T;
@@ -191,9 +183,15 @@ export function LiteratureFiguresPanel({
   const [visionAvailable, setVisionAvailable] = useState(false);
   /** v2.0.1：正在识别的单张图 id（该卡片显示 loading） */
   const [captioningId, setCaptioningId] = useState<string | null>(null);
-  /** v2.0.1：批量识别中（无取消能力 → 期间按钮 disabled，并显示已耗时） */
-  const [batchBusy, setBatchBusy] = useState(false);
+  /**
+   * v2.0.2：批量逐张识别进度（total / finished / 失败原因…，见 figureCaptionQueue.ts）。
+   * null = 不在批量中；非 null 即批量进行中（按钮显示「第 i / n 张」+「取消」）。
+   */
+  const [batchRun, setBatchRun] = useState<CaptionRun | null>(null);
   const [batchElapsed, setBatchElapsed] = useState(0);
+  /** v2.0.2：取消标记 —— 点击「取消」后**当前张跑完即停**，已完成的标注保留（不回滚） */
+  const cancelRef = useRef(false);
+  const batchBusy = batchRun !== null;
 
   useEffect(() => {
     request<{ vision_status?: { available?: boolean } }>('/llm-settings')
@@ -333,54 +331,83 @@ export function LiteratureFiguresPanel({
     }
   };
 
-  /** v2.0.1：单张 AI 识别（视觉标注）——成功刷新该图，失败显示后端给的中文原因 */
-  const captionOne = async (fig: FigureMeta) => {
+  /**
+   * v2.0.1：单张 AI 识别（视觉标注）——成功刷新该图，失败如实显示后端给的中文原因。
+   * v2.0.2：端点归位到 `/api/literature/figures/{fig_id}/caption`（与文献图片其它端点同前缀）。
+   * `silent=true`（批量逐张调用）时不自己弹 toast，把原因回给调用方汇总成一条提示。
+   */
+  const captionOne = async (
+    fig: FigureMeta,
+    silent = false,
+  ): Promise<{ ok: boolean; error?: string | null }> => {
     setCaptioningId(fig.fig_id);
     try {
-      const data = await requestLibrary<{
-        ok: boolean;
-        error?: string | null;
-        caption?: string | null;
-      }>(`/figures/${encodeURIComponent(fig.fig_id)}/caption`, { method: 'POST' });
+      const data = await request<SingleCaptionResult>(
+        `/figures/${encodeURIComponent(fig.fig_id)}/caption`,
+        { method: 'POST' },
+        // 一律静默：失败原因由本函数按模式决定「立刻 toast」还是「交给批次汇总」，
+        // 避免同一次失败弹两条提示
+        { silent: true });
       if (!data.ok) {
-        toast.error(data.error || '视觉识别失败（未写入标注）');
-        return;
+        const reason = data.error || '视觉识别失败（未写入标注）';
+        if (!silent) toast.error(reason);
+        return { ok: false, error: reason };
       }
-      toast.success(`已写入视觉标注：${(data.caption ?? '').slice(0, 50)}`);
-      await refreshFigures(paperId);
-    } catch {
-      /* 已 toast（含 409 未启用 / 404 图不存在） */
+      if (!silent) {
+        toast.success(`已写入视觉标注：${(data.caption ?? '').slice(0, 50)}`);
+        await refreshFigures(paperId);
+      }
+      return { ok: true };
+    } catch (err) {
+      // 409 未启用视觉 / 404 图不存在 / 断网：request 已把中文 detail 放进 Error.message
+      const reason = err instanceof Error ? err.message : String(err);
+      if (!silent) toast.error(reason);
+      return { ok: false, error: reason };
     } finally {
       setCaptioningId(null);
     }
   };
 
-  /** v2.0.1：批量 AI 识别（后端按 page 顺序、跳过已有视觉/人工标注；单张失败不影响其余） */
-  const captionAll = async () => {
-    if (!paperId) return;
-    setBatchBusy(true);
-    try {
-      const data = await requestLibrary<BatchCaptionResult>(
-        `/papers/${encodeURIComponent(paperId)}/figures/caption`,
-        { method: 'POST', body: JSON.stringify({ limit: BATCH_LIMIT }) });
-      const parts = [`成功 ${data.captioned} 张`];
-      if (data.skipped) parts.push(`跳过 ${data.skipped} 张（已有标注）`);
-      if (data.failed) parts.push(`失败 ${data.failed} 张`);
-      if (data.captioned > 0) {
-        toast.success(`AI 识别完成：${parts.join('，')}`);
-      } else if (data.failed > 0) {
-        toast.error(`AI 识别失败：${data.errors?.[0]?.error ?? '未知原因'}`);
-      } else {
-        toast.info(`没有需要识别的图：${parts.join('，')}`);
-      }
-      if (data.failed > 0 && data.captioned > 0) {
-        toast.warning(`有 ${data.failed} 张未识别成功：${data.errors?.[0]?.error ?? ''}`);
-      }
-      await refreshFigures(paperId);
-    } catch {
-      /* 已 toast */
-    } finally {
-      setBatchBusy(false);
+  /**
+   * v2.0.2：「AI 识别全部」改为**逐张**调单图端点（不再一次性 POST 批量端点）。
+   *
+   * - 只处理没有视觉/人工标注的图（`caption_source ∈ {vision, user}` 跳过，与后端批量端点
+   *   同一口径）；默认不重做，`force` 保留为可选参数（`planCaptionRun`）；
+   * - 每完成一张就刷新画廊并显示「第 i / n 张」，完成后汇总 toast（成功/跳过/失败 + 原因）；
+   * - 「取消」→ `cancelRef` 置真：当前张跑完即停，**已完成的标注保留、不回滚**；
+   * - 单张失败只累计原因，**不中断整批**。
+   */
+  const captionAll = async (force = false) => {
+    if (!paperId || batchBusy) return;
+    const plan = planCaptionRun(figures, { force, limit: BATCH_LIMIT });
+    if (plan.todo.length === 0) {
+      toast.info(captionNothingToDoMessage(plan.run));
+      return;
+    }
+    cancelRef.current = false;
+    setBatchRun(plan.run);
+    const run = await runCaptionQueue<FigureMeta>(figures, {
+      force,
+      limit: BATCH_LIMIT,
+      shouldCancel: () => cancelRef.current,
+      caption: async (fig) => {
+        const out = await captionOne(fig, true);
+        return { fig_id: fig.fig_id, ok: out.ok, error: out.error ?? null };
+      },
+      onProgress: async (progress) => {
+        setBatchRun(progress);
+        await refreshFigures(paperId);   // 每完成一张刷新该图（新图注/徽标立即显示）
+      },
+    });
+    setBatchRun(null);
+    if (run.cancelled) {
+      toast.info(captionCancelledSummary(run));
+    } else if (run.failed === 0) {
+      toast.success(captionRunSummary(run));
+    } else if (run.succeeded === 0) {
+      toast.error(captionRunSummary(run));
+    } else {
+      toast.warning(captionRunSummary(run));
     }
   };
 
@@ -468,7 +495,8 @@ export function LiteratureFiguresPanel({
                 <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
                 上传图谱
               </Button>
-              {/* v2.0.1：AI 识别全部（仅在视觉读图可用时显示；批量中无取消能力 → disabled） */}
+              {/* v2.0.1：AI 识别全部（仅在视觉读图可用时显示）
+                  v2.0.2：逐张调用单图端点 → 显示「第 i / n 张」并可**取消** */}
               {visionAvailable && (
                 <Button
                   size="sm"
@@ -482,7 +510,23 @@ export function LiteratureFiguresPanel({
                   ) : (
                     <Sparkles className="mr-1.5 h-3.5 w-3.5" />
                   )}
-                  {batchBusy ? `AI 识别中… ${batchElapsed}s` : 'AI 识别全部'}
+                  {batchBusy && batchRun
+                    ? `AI 识别中… ${captionProgressLabel(batchRun)} · ${batchElapsed}s`
+                    : 'AI 识别全部'}
+                </Button>
+              )}
+              {visionAvailable && batchBusy && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive"
+                  title="停止处理后续图片：已完成的标注保留（不回滚）"
+                  onClick={() => {
+                    cancelRef.current = true;
+                  }}
+                >
+                  <Ban className="mr-1.5 h-3.5 w-3.5" />
+                  取消
                 </Button>
               )}
             </div>
