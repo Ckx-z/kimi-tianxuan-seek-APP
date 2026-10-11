@@ -18,6 +18,12 @@ import {
 
 const BASE = '/api/literature';
 
+/** v2.20：本机视觉模型（Ollama）默认参数 —— 本地为主力，云端为补充 */
+const LOCAL_VISION = {
+  model: 'qwen3-vl:4b',
+  base_url: 'http://127.0.0.1:11434/v1',
+};
+
 interface Settings {
   enabled: boolean;
   base_url: string;
@@ -284,13 +290,39 @@ export function LiteratureLlmSettingsCard({ offline }: { offline: boolean }) {
             <>
               <div className="space-y-1.5">
                 <Label htmlFor="lit-vision-model">视觉模型名</Label>
-                <Input
-                  id="lit-vision-model"
-                  value={settings.vision_model}
-                  onChange={(e) => setSettings((s) => (s ? { ...s, vision_model: e.target.value } : s))}
-                  placeholder="如 qwen-vl-max / gpt-4o / gemini-2.0-flash"
-                  disabled={offline}
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="lit-vision-model"
+                    value={settings.vision_model}
+                    onChange={(e) => setSettings((s) => (s ? { ...s, vision_model: e.target.value } : s))}
+                    placeholder="如 qwen3-vl:4b / qwen-vl-max / gpt-4o"
+                    disabled={offline}
+                  />
+                  {/* v2.20：本机视觉模型（Ollama）一键预置 —— 本地为主力、云端为补充 */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 whitespace-nowrap"
+                    disabled={offline}
+                    title="填入本机 Ollama 视觉模型（需先安装 Ollama 并 ollama pull qwen3-vl:4b）"
+                    onClick={() => {
+                      setNewVisionKey('ollama');   // Ollama 本地服务忽略 key，但留空会回退解析 LLM 的 key
+                      setSettings((s) => (s ? {
+                        ...s,
+                        vision_enabled: true,
+                        vision_model: LOCAL_VISION.model,
+                        vision_base_url: LOCAL_VISION.base_url,
+                      } : s));
+                    }}
+                  >
+                    用本机模型
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  本机模型 = Ollama（默认 {LOCAL_VISION.model}，端点 {LOCAL_VISION.base_url}，Key 任意）：
+                  数据不出本机、免费；首次调用需加载模型（约 10-60 秒），之后每张约 6-20 秒。
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="lit-vision-base">视觉模型端点（留空用上面的解析端点）</Label>
