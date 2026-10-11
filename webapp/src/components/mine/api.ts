@@ -94,10 +94,36 @@ export interface DftSnapshot {
   gap_ev?: { a?: number | null; b?: number | null; complex?: number | null };
   dipole_debye?: { a?: number | null; b?: number | null; complex?: number | null };
   date?: string;
+  /** 计算模式：dimer（缺省）| pair（任意双分子） */
+  mode?: string;
+  /** 计算后端：xtb（缺省）| psi4 */
+  backend?: string;
   [key: string]: unknown;
 }
 
-/** DFT 分条记录（dft_entries 数组条目；POST /favorites/{id}/dft-entries 追加） */
+/** DFT 记录的条件字段（条件指纹 condition_key 的输入；同指纹=同一条记录） */
+export interface DftEntryConditions {
+  mode?: string;
+  backend?: string;
+  method?: string;
+  optimize?: boolean;
+  a_smiles?: string;
+  b_smiles?: string;
+  x_type?: string;
+  solvent_id?: string;
+  ald2_smiles?: string;
+  amine2_smiles?: string;
+  custom_smiles?: string;
+  x_smiles?: string;
+  dimer_smiles?: string;
+  n_samples?: number;
+  with_props?: boolean;
+  /** 复合物初猜 xyz 的 sha1（不落全文） */
+  complex_xyz_hash?: string;
+  [key: string]: unknown;
+}
+
+/** DFT 分条记录（dft_entries 数组条目；POST /favorites/{id}/dft-entries 保存） */
 export interface DftEntryItem {
   job_id?: string;
   x_type?: string;
@@ -109,9 +135,23 @@ export interface DftEntryItem {
   method?: string;
   /** 计算后端：xtb（缺省）| psi4（真 DFT 精度档） */
   backend?: string;
+  /** 计算模式：dimer（缺省）| pair（任意双分子） */
+  mode?: string;
+  /** 条件指纹（稳定序列化 + sha1）：相同视为同一条记录 */
+  condition_key?: string;
+  /** 同组标号：A、B、C…（同条件指纹内按创建顺序，删除不重排） */
+  label?: string;
+  /** 条件字段快照（指纹输入，后端补齐） */
+  conditions?: DftEntryConditions;
   e_bind_kcal?: number;
   e_bind_kj?: number;
   created_at?: string;
+  /** 失败记录的错误原因（后端任务失败/中断时写入） */
+  error?: string;
+  /** 失败原因别名（历史写法兼容，判定失败时一并检查） */
+  error_message?: string;
+  fail_reason?: string;
+  err?: string;
   [key: string]: unknown;
 }
 
@@ -131,6 +171,10 @@ export interface FavoriteItem {
   dft_snapshot?: DftSnapshot | null;
   references?: ReferenceItem[];
   experiment_record_ids?: string[];
+  /** 档案卡类型（后端按 DFT 记录派生）：cof_monomer_group | dft_pair */
+  archive_type?: string;
+  /** 与 dft_entries 等长的派生标号数组（旧数据无 label 时后端读取期派生） */
+  dft_labels?: string[];
 }
 
 /** 收藏夹（favorite_folders.json 结构，列表接口附带收藏数） */
@@ -259,13 +303,40 @@ export async function copyFavorite(id: string, folderId: string): Promise<Favori
   });
 }
 
-/** 追加 DFT 条目到收藏（返回完整收藏） */
+/** 保存一条 DFT 条目到收藏（后端按条件指纹去重/标号，返回完整收藏） */
 export async function appendDftEntry(id: string, entry: DftEntryItem): Promise<FavoriteItem> {
   return request<FavoriteItem>(`/favorites/${encodeURIComponent(id)}/dft-entries`, {
     method: 'POST',
     body: JSON.stringify(entry),
   });
 }
+
+/** 删除一条 DFT 记录（entryIndex 为 dft_entries 的 0 基序号；标号不重排） */
+export async function deleteDftEntry(id: string, entryIndex: number): Promise<FavoriteItem> {
+  return request<FavoriteItem>(
+    `/favorites/${encodeURIComponent(id)}/dft-entries/${entryIndex}`,
+    { method: 'DELETE' },
+  );
+}
+
+/** 档案卡单体信息编辑：改名称 / 手动补充 CAS（仅这两项元数据可改） */
+export async function updateMonomerMeta(
+  id: string,
+  patches: { aldehyde?: { name?: string; cas?: string }; amine?: { name?: string; cas?: string } },
+): Promise<FavoriteItem> {
+  return request<FavoriteItem>(`/favorites/${encodeURIComponent(id)}/monomer-meta`, {
+    method: 'PATCH',
+    body: JSON.stringify(patches),
+  });
+}
+
+/**
+ * 条件指纹（condition_key）由**后端**统一计算（favorites/store.py
+ * `_condition_key`）：16 个条件字段稳定序列化后 sha1 摘要，任务里缺的字段
+ * 由后端按 job_id 从 DFT 任务补齐。前端保存记录时只需把条件字段一并发给
+ * 后端（见 DftEntryItem.conditions / mode / backend），不做本地复算——
+ * 避免两处口径漂移导致"同一次计算被记成两条"。
+ */
 
 /** 从 content-disposition 解析下载文件名（优先 RFC 5987 filename*，中文名） */
 function parseDownloadFilename(disposition: string | null, fallback: string): string {

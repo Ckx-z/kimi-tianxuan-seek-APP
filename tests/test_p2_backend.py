@@ -63,6 +63,9 @@ class TestAddFavorite:
             "dft_entries",
             "references",
             "experiment_record_ids",
+            # v2.2.0 档案卡：响应层派生字段（标号数组 + 卡片类型），不落盘
+            "dft_labels",
+            "archive_type",
         }
         assert fav["id"].startswith("fav_")
         # 未指定收藏夹 → 自动归兜底夹；DFT 快照预留字段默认 None、条目空列表

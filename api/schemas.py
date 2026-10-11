@@ -44,6 +44,21 @@ class FavoriteUpdate(BaseModel):
     notes: str | None = None
     dft_snapshot: dict | None = None
 
+class MonomerMetaPatch(BaseModel):
+    """单体元数据局部更新（档案卡可编辑项）：只允许改名称 / 手动补充 CAS。
+
+    计算产物（SMILES、打分结果、DFT 结果）不可经此修改；缺省字段表示不改
+    该项，显式空串表示清空。
+    """
+    name: str | None = Field(None, max_length=200, description="单体名称（可改）")
+    cas: str | None = Field(None, max_length=64,
+                            description="CAS 号（可手动补充，可留空）")
+
+class FavoriteMonomerMetaUpdate(BaseModel):
+    """档案卡单体信息编辑请求：醛/胺各自的名称与 CAS（至少一项）。"""
+    aldehyde: MonomerMetaPatch | None = None
+    amine: MonomerMetaPatch | None = None
+
 class FavoriteCopy(BaseModel):
     """复制收藏到目标收藏夹。"""
     folder_id: str = Field(..., description="目标收藏夹 id（必须已存在）")

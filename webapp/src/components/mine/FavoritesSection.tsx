@@ -10,9 +10,8 @@
  * - 删除收藏经 AlertDialog 确认后调用 DELETE /api/favorites/{id}
  * - 响应式：Dialog 限高 + 固定头部 + 内部滚动；窄屏下结构图/性质卡/表格自动换行、横向滚动
  */
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { useNavigate } from 'react-router';
-import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil, Atom, FolderInput, CopyPlus, ExternalLink } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { Trash2, BookOpen, FlaskConical, ChevronRight, FolderPlus, Pencil, FolderInput, CopyPlus, ExternalLink, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { doiUrl, openExternal } from '@/lib/external';
 import { Card, CardContent } from '@/components/ui/card';
@@ -54,13 +53,18 @@ import {
   renameFolder,
   deleteFolder,
   updateFavorite,
+  updateMonomerMeta,
   copyFavorite,
   type DftEntryItem,
+  type DftSnapshot,
   type FavoriteItem,
   type FolderItem,
+  type MonomerInfo,
   type PredictionSnapshot,
   type ReferenceItem,
 } from './api';
+// 档案卡 DFT 计算记录区（标号/失败删除/跳转；独立子组件便于维护）
+import { DftRecordsSection, entryMode, entryFailed } from './FavoriteDftRecords';
 // 实验记录类型/接口与详情对话框复用记录页组件（单一类型口径，嵌套放大共用）
 import {
   listRecords,
@@ -97,35 +101,6 @@ function eBindKj(entry: { e_bind_kj?: number | null; e_bind_kcal?: number | null
   return null;
 }
 
-/** 结合能主+次显示（kJ/mol 大字 + kcal/mol 小字灰色），digits 控制小数位 */
-function EBindText({
-  entry,
-  mainClass = 'text-lg',
-}: {
-  entry: { e_bind_kj?: number | null; e_bind_kcal?: number | null };
-  mainClass?: string;
-}) {
-  const kj = eBindKj(entry);
-  if (kj === null) return null;
-  const bound = kj < 0;
-  return (
-    <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
-      <span
-        className={`font-bold tabular-nums ${mainClass} ${
-          bound ? 'text-success' : 'text-destructive'
-        }`}
-      >
-        {kj.toFixed(1)} kJ/mol
-      </span>
-      {typeof entry.e_bind_kcal === 'number' && (
-        <span className="text-xs tabular-nums text-muted-foreground">
-          （{entry.e_bind_kcal.toFixed(2)} kcal/mol）
-        </span>
-      )}
-    </span>
-  );
-}
-
 /** 预测分徽章（金色系） */
 function ScoreBadge({ fav }: { fav: FavoriteItem }) {
   const score = fav.latest_prediction?.score;
@@ -143,35 +118,47 @@ function ScoreBadge({ fav }: { fav: FavoriteItem }) {
   );
 }
 
-/** DFT 方法档位中文标签 */
-function dftMethodLabel(method?: string): string {
-  if (method === 'gfn2') return 'GFN2-xTB（精确）';
-  if (method === 'gfnff') return 'GFN-FF 力场（快速）';
-  if (method === 'wb97xd3bj_svp') return 'ωB97X-D3BJ/def2-SVP（Psi4 真 DFT）';
-  return method || '未知方法';
-}
-
-/** DFT 徽章：以 dft_entries 最新一条为准（dft_snapshot 兜底）；结合能 kJ/mol 主显示 */
+/**
+ * 卡片徽章：以 dft_entries 里最近一条**成功**记录为准（旧 dft_snapshot 兜底）。
+ * 全部记录都失败/未算完时不冒充「已计算」，改为提示条数（失败记录可在
+ * 详情里删除）。
+ */
 function DftBadge({ fav }: { fav: FavoriteItem }) {
   const entries = fav.dft_entries ?? [];
-  const latest = entries.length > 0 ? entries[entries.length - 1] : fav.dft_snapshot;
+  const okEntries = entries.filter((e) => !entryFailed(e));
+  const latestOk = okEntries.length > 0 ? okEntries[okEntries.length - 1] : null;
+  const latest: DftEntryItem | DftSnapshot | null =
+    latestOk ?? (fav.dft_snapshot || null);
   const kj = latest ? eBindKj(latest) : null;
+  const failedCount = entries.length - okEntries.length;
   if (latest && kj !== null) {
     return (
       <Badge
         variant="outline"
         className="cursor-pointer border-gold/60 bg-gold-muted text-gold-foreground"
-        title="点击查看 DFT 计算结果"
+        title="点击查看 DFT 计算记录"
       >
         <span className="tabular-nums font-mono">结合能 {kj.toFixed(1)}</span> kJ/mol
         {entries.length > 1 ? `（${entries.length} 条）` : ''}
+        {failedCount > 0 ? `｜失败 ${failedCount}` : ''}
       </Badge>
     );
   }
-  if (latest) {
+  if (entries.length > 0) {
+    return (
+      <Badge
+        variant="outline"
+        className="cursor-pointer border-destructive/40 text-destructive"
+        title="DFT 记录均未得到结合能（失败/已取消），可在详情里删除"
+      >
+        DFT 未成功（{entries.length} 条）
+      </Badge>
+    );
+  }
+  if (fav.dft_snapshot) {
     return (
       <Badge variant="outline" className="border-primary/40 text-primary">
-        DFT 已计算{entries.length > 1 ? `（${entries.length} 条）` : ''}
+        DFT 已计算
       </Badge>
     );
   }
@@ -290,194 +277,153 @@ interface PropsState {
 }
 const emptyProps: PropsState = { loading: false, error: null, data: null };
 
-/** 二聚体结构图：优先后端预渲染 dimer_svg，否则按 SMILES 走 structure.svg，再兜底文本 */
-function DimerFigure({ entry }: { entry: DftEntryItem }) {
-  // dimer_svg 为后端预渲染可信 SVG（dangerouslySetInnerHTML 无加载错误概念，
-  // 不需要失败回退状态）
-  if (entry.dimer_svg) {
-    return (
-      <div
-        className="mt-1 max-h-32 overflow-hidden rounded-md border border-border bg-white p-1 dark:bg-white/95 [&>svg]:mx-auto [&>svg]:max-h-28"
-        // 后端预渲染的可信 SVG
-        dangerouslySetInnerHTML={{ __html: entry.dimer_svg }}
-      />
-    );
-  }
-  if (entry.dimer_smiles) {
-    return (
-      <>
-        <StructureImg smiles={entry.dimer_smiles} label="缩合二聚体" />
-        <code className="mt-1 block break-all rounded border bg-muted/50 px-2 py-1 font-mono text-[11px] text-muted-foreground">
-          {entry.dimer_smiles}
-        </code>
-      </>
-    );
-  }
-  return <p className="mt-1 text-xs text-muted-foreground">（未保存二聚体信息）</p>;
+/** 档案卡类型：全部 DFT 记录来自 pair 模式 → 双分子 DFT 计算特殊档案卡 */
+function isPairArchive(fav: FavoriteItem): boolean {
+  if (fav.archive_type === 'dft_pair') return true;
+  const entries = fav.dft_entries ?? [];
+  return entries.length > 0 && entries.every((e) => entryMode(e) === 'pair');
 }
 
-/** 单条 DFT 记录卡片（dft_entries 条目） */
-function DftEntryCard({ entry, index }: { entry: DftEntryItem; index: number }) {
-  const time = formatDateTime(entry.created_at);
+/**
+ * 单体信息卡（档案卡可编辑项）：名称与 CAS 号可直接编辑保存。
+ * SMILES 与打分/DFT 结果等计算产物只读展示，不提供编辑入口。
+ */
+function MonomerMetaCard({
+  label,
+  monomer,
+  favId,
+  onSaved,
+}: {
+  label: string;
+  monomer: MonomerInfo;
+  favId: string;
+  onSaved: (fav: FavoriteItem) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(monomer.name ?? '');
+  const [cas, setCas] = useState(monomer.cas ?? '');
+  const [saving, setSaving] = useState(false);
+
+  // 外部数据刷新（如保存后父级回写、切换到别的收藏）时同步草稿
+  useEffect(() => {
+    setName(monomer.name ?? '');
+    setCas(monomer.cas ?? '');
+    setEditing(false);
+  }, [favId, monomer.name, monomer.cas]);
+
+  const field = label.startsWith('醛') ? 'aldehyde' : 'amine';
+
+  async function save() {
+    setSaving(true);
+    try {
+      const updated = await updateMonomerMeta(favId, {
+        [field]: { name: name.trim(), cas: cas.trim() },
+      });
+      toast.success(`${label}名称/CAS 已保存`);
+      setEditing(false);
+      onSaved(updated);
+    } catch {
+      /* 错误提示已由 api 层弹出 */
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div className="rounded-lg border border-gold/40 bg-gold-muted/40 p-3 text-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">
-          第 {index + 1} 条 · {dftMethodLabel(entry.method)}
-          {time ? ` · ${time}` : ''}
-        </span>
-        <EBindText entry={entry} />
-      </div>
-      <div className="mt-2 grid gap-3 sm:grid-cols-2">
-        <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">缩合二聚体</div>
-          <DimerFigure entry={entry} />
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">
-            X 物质{entry.x_description ? `（${entry.x_description}）` : ''}
+    <div className="min-w-0 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs text-muted-foreground">{label}</div>
+        {!editing ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-primary"
+            title="修改名称 / 手动补充 CAS 号（SMILES 等计算结果不可改）"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil className="h-3 w-3" />
+          </Button>
+        ) : (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-xs text-primary"
+              disabled={saving}
+              title="保存名称与 CAS"
+              onClick={() => void save()}
+            >
+              <Check className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-xs text-muted-foreground"
+              disabled={saving}
+              title="取消编辑"
+              onClick={() => {
+                setName(monomer.name ?? '');
+                setCas(monomer.cas ?? '');
+                setEditing(false);
+              }}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
           </div>
-          {entry.x_smiles ? (
-            <>
-              <StructureImg smiles={entry.x_smiles} label="X 物质" />
-              <code className="mt-1 block break-all rounded border bg-muted/50 px-2 py-1 font-mono text-[11px] text-muted-foreground">
-                {entry.x_smiles}
-              </code>
-            </>
-          ) : (
-            <p className="mt-1 text-xs text-muted-foreground">（未保存 X SMILES）</p>
-          )}
-        </div>
+        )}
       </div>
+
+      {editing ? (
+        <div className="mt-1.5 space-y-1.5">
+          <Input
+            value={name}
+            maxLength={120}
+            placeholder="单体名称（可改）"
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void save();
+            }}
+          />
+          <Input
+            value={cas}
+            maxLength={40}
+            placeholder="CAS 号（可手动补充，如 3435-24-5）"
+            onChange={(e) => setCas(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void save();
+            }}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            仅名称与 CAS 可改；SMILES / 打分 / DFT 结果不会被修改。
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="mt-1 break-words font-medium text-foreground">
+            {monomer.name || '—'}
+          </div>
+          <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
+            {monomer.smiles || '—'}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            CAS: {monomer.cas || '（未填写，点右上角铅笔补充）'}
+          </div>
+        </>
+      )}
+      <StructureImg smiles={monomer.smiles} label={label} />
     </div>
   );
 }
 
-/**
- * DFT 计算记录（详情弹窗内）：分条展示 dft_entries（二聚体结构图 / X 物质 /
- * 结合能 kJ/mol 主显示 / 方法 / 时间）。
- * 旧收藏只有 dft_snapshot 的按单条显示并标「旧版口径」徽章。
- * 底部按钮：「继续计算其他物质」「重新计算」均跳转 DFT 页并预填该组单体。
- */
-function DftSummarySection({ fav, onRecalc }: { fav: FavoriteItem; onRecalc: () => void }) {
-  const navigate = useNavigate();
-  const entries = fav.dft_entries ?? [];
-  const snap = fav.dft_snapshot;
-  if (entries.length === 0 && !snap) return null;
-
-  /** 跳转 DFT 页并预填两个单体 SMILES/名称（from=favorite 标记来源） */
-  const handleJump = () => {
-    const params = new URLSearchParams();
-    if (fav.aldehyde?.smiles) params.set('a', fav.aldehyde.smiles);
-    if (fav.amine?.smiles) params.set('b', fav.amine.smiles);
-    if (fav.aldehyde?.name) params.set('an', fav.aldehyde.name);
-    if (fav.amine?.name) params.set('bn', fav.amine.name);
-    params.set('from', 'favorite');
-    onRecalc();
-    navigate(`/toolbox/dft?${params.toString()}`);
-  };
-
-  return (
-    <section>
-      <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <Atom className="h-4 w-4 text-gold" /> DFT 计算记录
-        {entries.length > 1 && (
-          <Badge variant="secondary" className="ml-1">{entries.length} 条</Badge>
-        )}
-      </h3>
-
-      {entries.length > 0 ? (
-        /* 新口径：分条列表 */
-        <div className="space-y-3">
-          {entries.map((entry, i) => (
-            <DftEntryCard key={entry.job_id ?? i} entry={entry} index={i} />
-          ))}
-        </div>
-      ) : snap ? (
-        /* 旧收藏：仅 dft_snapshot，按单条显示并标「旧版口径」 */
-        <div className="rounded-lg border border-gold/40 bg-gold-muted/40 p-3 text-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              {dftMethodLabel(snap.method)}
-              {snap.date ? ` · ${formatDateTime(snap.date)}` : ''}
-            </span>
-            <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className="border-warning/30 text-warning"
-                title="该收藏保存于 DFT 分条记录上线前，仅有一条快照"
-              >
-                旧版口径
-              </Badge>
-              <EBindText entry={snap} />
-            </div>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-            <span>
-              HOMO-LUMO 能隙（复合物）：
-              <span className="tabular-nums text-foreground">
-                {typeof snap.gap_ev?.complex === 'number' ? `${snap.gap_ev.complex.toFixed(2)} eV` : '—'}
-              </span>
-            </span>
-            <span>
-              偶极矩（复合物）：
-              <span className="tabular-nums text-foreground">
-                {typeof snap.dipole_debye?.complex === 'number'
-                  ? `${snap.dipole_debye.complex.toFixed(2)} Debye`
-                  : '—'}
-              </span>
-            </span>
-          </div>
-          {snap.dimer_smiles ? (
-            <div className="mt-2 space-y-1.5">
-              <div className="text-xs text-muted-foreground">
-                计算对象：缩合二聚体
-                {snap.x_description ? ` 与 X（${snap.x_description}）` : ''}
-              </div>
-              <code className="block break-all rounded border bg-muted/50 px-2 py-1 font-mono text-[11px]">
-                {snap.dimer_smiles}
-              </code>
-              <StructureImg smiles={snap.dimer_smiles} label="缩合二聚体" />
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-warning">
-              旧版计算口径（两单体结合能）：DFT 2.0 起计算对象为缩合二聚体与 X，
-              可点下方「重新计算」获取新口径结果。
-            </p>
-          )}
-        </div>
-      ) : null}
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleJump}
-          disabled={!fav.aldehyde?.smiles || !fav.amine?.smiles}
-          title="跳转 DFT 计算页并预填该组合单体，可选择其他 X 物质继续计算"
-        >
-          继续计算其他物质
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleJump}
-          disabled={!fav.aldehyde?.smiles || !fav.amine?.smiles}
-          title="跳转 DFT 计算页并预填该组合单体"
-        >
-          重新计算
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          半经验结果仅供相对比较，精确能量请在 DFT 页导出输入文件复算。
-        </span>
-      </div>
-    </section>
-  );
-}
 
 /**
  * 收藏详情 Dialog（与查询打分页结果内容一致：分数/OOD/结构图/性质卡/方案卡）
  * 内嵌「该组实验记录」列表：点击记录行 → 嵌套放大记录详情（带返回）。
+ *
+ * v220 档案卡分两类（由 DFT 记录模式派生）：
+ * - COF 单体组档案卡：单体信息 / 打分结果 / 单体性质 / 实验方案卡 /
+ *   参考文献 / 该组实验记录 / DFT 计算记录；
+ * - 双分子 DFT 计算特殊档案卡：单体信息 + DFT 计算记录（其余区块照常展示）。
  */
 function FavoriteDetailDialog({
   fav,
@@ -488,7 +434,7 @@ function FavoriteDetailDialog({
   fav: FavoriteItem | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  /** 一键打分后收藏快照已更新（父级同步详情与列表） */
+  /** 一键打分 / 编辑元数据 / 删除 DFT 记录后快照已更新（父级同步详情与列表） */
   onFavUpdated?: (fav: FavoriteItem) => void;
 }) {
   const [records, setRecords] = useState<RecordItem[]>([]);
@@ -504,11 +450,23 @@ function FavoriteDetailDialog({
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templateId, setTemplateId] = useState('');
 
-  // 打开时拉取：实验记录 + 性质卡×2 + 方案卡模板/方案卡（与查询页联动口径一致）
+  // 本次打开已重新拉取的收藏 id：避免每次父级回写（打分/编辑元数据/删记录）
+  // 都整块重拉一遍性质卡与方案卡；切换收藏或重新打开时再拉最新 DFT 记录。
+  const fetchedIdRef = useRef<string | null>(null);
+
+  // 打开时拉取：收藏最新快照 + 实验记录 + 性质卡×2 + 方案卡模板/方案卡
   useEffect(() => {
     if (!open || !fav) return;
     let cancelled = false;
     setNestedRec(null);
+    if (fetchedIdRef.current !== fav.id) {
+      fetchedIdRef.current = fav.id;
+      fetchFavorite(fav.id)
+        .then((fresh) => !cancelled && onFavUpdated?.(fresh))
+        .catch(() => {
+          /* 拉取失败则用列表里的快照渲染 */
+        });
+    }
     setRecLoading(true);
     listRecords(fav.id)
       .then((list) => !cancelled && setRecords(list))
@@ -604,6 +562,7 @@ function FavoriteDetailDialog({
 
   if (!fav) return null;
   const result = snapshotToResult(fav.latest_prediction);
+  const pairArchive = isPairArchive(fav);
 
   return (
     <>
@@ -613,32 +572,46 @@ function FavoriteDetailDialog({
             <DialogTitle className="text-left text-lg leading-snug text-gradient-royal">
               {fav.aldehyde?.name || '未知醛'} × {fav.amine?.name || '未知胺'}
             </DialogTitle>
-            <DialogDescription className="text-left">
-              收藏编号 {fav.id} · 创建于 {formatDateTime(fav.created_at) || '未知时间'}
+            <DialogDescription className="flex flex-wrap items-center gap-2 text-left">
+              <Badge
+                variant="outline"
+                className={pairArchive ? 'border-primary/50 text-primary' : 'border-gold/60 text-gold-foreground'}
+                title={
+                  pairArchive
+                    ? '双分子 DFT 计算特殊档案卡（来源：任意双分子模式的计算记录）'
+                    : 'COF 单体组档案卡（醛胺缩合体系）'
+                }
+              >
+                {pairArchive ? '双分子 DFT 计算档案卡' : 'COF 单体组档案卡'}
+              </Badge>
+              <span>
+                收藏编号 {fav.id} · 创建于 {formatDateTime(fav.created_at) || '未知时间'}
+              </span>
             </DialogDescription>
           </DialogHeader>
 
           <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4">
-            {/* 单体信息（含 2D 结构图） */}
+            {/* 单体信息（名称与 CAS 可编辑；SMILES/计算产物只读） */}
             <section>
-              <h3 className="mb-2 text-sm font-semibold text-foreground">单体信息</h3>
+              <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                单体信息
+                <span className="text-xs font-normal text-muted-foreground">
+                  （名称与 CAS 可编辑，点右上角铅笔）
+                </span>
+              </h3>
               <div className="grid gap-3 sm:grid-cols-2">
-                {(
-                  [
-                    ['醛单体', fav.aldehyde],
-                    ['胺单体', fav.amine],
-                  ] as const
-                ).map(([label, m]) => (
-                  <div key={label} className="min-w-0 rounded-lg border border-border bg-muted/40 p-3 text-sm">
-                    <div className="text-xs text-muted-foreground">{label}</div>
-                    <div className="mt-1 break-words font-medium text-foreground">{m?.name || '—'}</div>
-                    <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
-                      {m?.smiles || '—'}
-                    </div>
-                    {m?.cas && <div className="mt-1 text-xs text-muted-foreground">CAS: {m.cas}</div>}
-                    <StructureImg smiles={m?.smiles} label={label} />
-                  </div>
-                ))}
+                <MonomerMetaCard
+                  label={pairArchive ? '分子 A' : '醛单体'}
+                  monomer={fav.aldehyde ?? {}}
+                  favId={fav.id}
+                  onSaved={(updated) => onFavUpdated?.(updated)}
+                />
+                <MonomerMetaCard
+                  label={pairArchive ? '分子 B' : '胺单体'}
+                  monomer={fav.amine ?? {}}
+                  favId={fav.id}
+                  onSaved={(updated) => onFavUpdated?.(updated)}
+                />
               </div>
               {fav.notes && (
                 <p className="mt-2 break-words rounded-lg bg-gold-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -667,9 +640,6 @@ function FavoriteDetailDialog({
                 </div>
               )}
             </section>
-
-            {/* DFT 计算结果摘要（有 dft_snapshot 时展示；「重新计算」跳 DFT 页预填单体） */}
-            <DftSummarySection fav={fav} onRecalc={() => onOpenChange(false)} />
 
             {/* 单体性质卡（复用查询页 MonomerPropsCard：RDKit facts + LLM 解读） */}
             <section>
@@ -793,6 +763,9 @@ function FavoriteDetailDialog({
                 </p>
               )}
             </section>
+
+            {/* DFT 计算记录（放在「该组实验记录」下方）：标号/失败删除/跳转 */}
+            <DftRecordsSection fav={fav} onFavUpdated={(updated) => onFavUpdated?.(updated)} />
           </div>
         </DialogContent>
       </Dialog>
@@ -1208,15 +1181,17 @@ export function FavoritesSection({
         </div>
       </div>
 
-      {/* 详情 Dialog */}
+      {/* 详情 Dialog：打开时重新拉取该收藏最新快照（DFT 记录与标号可能已更新） */}
       <FavoriteDetailDialog
         fav={detail}
         open={detail !== null}
-        onOpenChange={(v) => !v && setDetail(null)}
-        onFavUpdated={(updated) => {
-          setDetail(updated);
-          onChanged();
+        onOpenChange={(v) => {
+          if (!v) {
+            setDetail(null);
+            onChanged();
+          }
         }}
+        onFavUpdated={(updated) => setDetail(updated)}
       />
 
       {/* 移动 / 复制收藏：选择目标收藏夹（排除当前所在夹） */}

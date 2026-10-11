@@ -1,4 +1,4 @@
-"""P2 收藏夹体系测试：Folder CRUD / 迁移幂等 / 409 重复收藏 / 移夹。
+﻿"""P2 收藏夹体系测试：Folder CRUD / 迁移幂等 / 409 重复收藏 / 移夹。
 
 所有写操作通过 monkeypatch 把 FAVORITES_DIR 指到 tmp_path（收藏夹文件
 favorite_folders.json 由其父目录推导，随之隔离），不污染真实数据目录。
@@ -346,4 +346,7 @@ class TestFavoriteFolderApi:
             "notes": "新备注", "dft_snapshot": {"binding_energy": -1.2}})
         assert r.status_code == 200
         assert r.json()["notes"] == "新备注"
-        assert r.json()["dft_snapshot"] == {"binding_energy": -1.2}
+        # v220 起旧 dft_snapshot 路径会同步包成 dft_entries 首条（带标号 A）
+        snap = r.json()["dft_snapshot"]
+        assert snap["binding_energy"] == -1.2
+        assert snap["label"] == "A"

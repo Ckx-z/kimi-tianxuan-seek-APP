@@ -1,4 +1,4 @@
-"""收藏复制（POST /{fav_id}/copy）与 DFT 条目列表化（dft_entries）测试。
+﻿"""收藏复制（POST /{fav_id}/copy）与 DFT 条目列表化（dft_entries）测试。
 
 覆盖：复制成功/目标夹不存在/原收藏不存在；dft-entries 追加（补 created_at、
 累积分条）；旧 dft_snapshot 幂等迁移与 GET 响应回填；PATCH dft_snapshot
@@ -179,11 +179,31 @@ class TestDftEntriesMigration:
         assert fav["dft_entries"] == [snapshot]
         # 旧前端读 dft_snapshot 仍拿到这条快照
         assert fav["dft_snapshot"] == snapshot
-        # 落盘：snapshot 置 None，entries 持久化
+        # 派生标号走响应字段 dft_labels（v220 起：读取不改写条目内容）
+        assert fav["dft_labels"] == ["A"]
+        # v220 起读取不再改写磁盘（迁移搬到写路径）：磁盘原样保留旧快照，
+        # dft_snapshot/`dft_entries` 内容都不因 GET 变化
+        on_disk = json.loads(
+            (fav_dir / f"{fid}.json").read_text(encoding="utf-8"))
+        assert on_disk["dft_snapshot"] == snapshot
+        assert on_disk["dft_entries"] == []
+
+    def test_legacy_snapshot_moved_into_entries_on_first_write(self, fav_dir):
+        """v220：旧快照在新结构下的搬运发生在**首次写入**时（幂等）。"""
+        snapshot = {"job_id": "old1", "e_bind_kcal": -2.0}
+        fid = self._write_legacy_fav(fav_dir, snapshot)
+        r = client.post(f"/api/favorites/{fid}/dft-entries",
+                        json={"job_id": "j2", "e_bind_kcal": -5.0,
+                              "conditions": {"method": "gfn2"}})
+        assert r.status_code == 200
+        body = r.json()
+        # 旧快照搬进 dft_entries 首位，新记录顺延标号 B
+        assert [e["job_id"] for e in body["dft_entries"]] == ["old1", "j2"]
+        assert [e.get("label") for e in body["dft_entries"]] == ["A", "B"]
         on_disk = json.loads(
             (fav_dir / f"{fid}.json").read_text(encoding="utf-8"))
         assert on_disk["dft_snapshot"] is None
-        assert on_disk["dft_entries"] == [snapshot]
+        assert [e["job_id"] for e in on_disk["dft_entries"]] == ["old1", "j2"]
 
     def test_migration_idempotent(self, fav_dir):
         snapshot = {"job_id": "old1"}
@@ -195,8 +215,10 @@ class TestDftEntriesMigration:
         fav_store.list_favorites()
         second = json.loads(
             (fav_dir / f"{fid}.json").read_text(encoding="utf-8"))
-        assert first == second  # 重复读取不重复包快照
-        assert second["dft_entries"] == [snapshot]
+        assert first == second  # 重复读取不重复包装/不改写
+        # 磁盘上仍是旧形态（读取期只做响应层包装）
+        assert second["dft_entries"] == []
+        assert second["dft_snapshot"] == snapshot
 
     def test_empty_snapshot_migrates_to_empty_entries(self, fav_dir):
         fid = self._write_legacy_fav(fav_dir, None)
@@ -230,8 +252,13 @@ class TestDftEntriesMigration:
                          json={"dft_snapshot": {"binding_energy": -1.2}})
         assert r.status_code == 200
         body = r.json()
-        assert body["dft_snapshot"] == {"binding_energy": -1.2}
-        assert body["dft_entries"] == [{"binding_energy": -1.2}]
+        # 响应条目等同原快照 + v220 的标号（新写入口径）
+        assert len(body["dft_entries"]) == 1
+        wrapped = body["dft_entries"][0]
+        assert wrapped["binding_energy"] == -1.2
+        assert wrapped["label"] == "A"
+        # 响应 dft_snapshot 回填为最新一条（即同一条目）
+        assert body["dft_snapshot"] == wrapped
 
     def test_patch_dft_snapshot_not_wrapped_when_entries_exist(self, fav_dir):
         fid = _create_favorite()["id"]

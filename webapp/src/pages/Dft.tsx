@@ -730,7 +730,7 @@ export default function Dft() {
     };
   }, [result]);
 
-  /** 追加本次 DFT 结果到已收藏组合的 dft_entries */
+  /** 追加本次 DFT 结果到已收藏组合的 dft_entries（后端按条件指纹去重+标号） */
   const handleAppendDftEntry = async () => {
     if (!result) return;
     const targetId = result.favorite?.id || pairFavorite?.id;
@@ -742,6 +742,7 @@ export default function Dft() {
     try {
       await appendDftEntry(targetId, {
         job_id: currentJobId ?? undefined,
+        mode: result.mode ?? (isPair ? 'pair' : 'dimer'),
         x_type: result.x_type ?? undefined,
         x_smiles: result.x_smiles,
         x_description: result.x_description,
@@ -751,8 +752,24 @@ export default function Dft() {
         e_bind_kcal: result.e_bind_kcal,
         e_bind_kj: result.e_bind_kj,
         created_at: new Date().toISOString(),
+        // 条件字段：后端据此算 condition_key（相同条件更新同一条，不同条件新增）
+        conditions: {
+          mode: result.mode ?? (isPair ? 'pair' : 'dimer'),
+          backend: result.backend ?? 'xtb',
+          method: result.method,
+          a_smiles: result.smiles_a,
+          b_smiles: result.smiles_b,
+          x_type: result.x_type ?? undefined,
+          x_smiles: result.x_smiles || undefined,
+          dimer_smiles: result.dimer_smiles ?? undefined,
+          solvent_id: result.x_request?.solvent_id ?? undefined,
+          ald2_smiles: result.x_request?.ald2_smiles ?? undefined,
+          amine2_smiles: result.x_request?.amine2_smiles ?? undefined,
+          custom_smiles: result.x_request?.custom_smiles ?? undefined,
+          with_props: isPsi4 ? withProps : undefined,
+        },
       });
-      toast.success('已追加到收藏的 DFT 记录');
+      toast.success('已保存到收藏的 DFT 记录（条件相同则更新原记录）');
       setResult({ ...result, favorite: { ...(result.favorite ?? { id: targetId }), id: targetId, has_dft: true } });
     } catch {
       /* 错误提示已由 api 层弹出 */
@@ -803,6 +820,81 @@ export default function Dft() {
   const fav = result?.favorite;
   /** 追加 DFT 记录的目标收藏 id（后端联动 result.favorite 或前端双序匹配） */
   const appendTargetId = fav?.id || pairFavorite?.id;
+  /** 从收藏档案卡「点击某条 DFT 记录」跳入的受限任务 id（?job=…） */
+  const urlJobId = searchParams.get('job');
+
+  /**
+   * URL 带 ?job=<job_id> 时（收藏 DFT 记录点击跳转）：拉取该任务并就地展示
+   * 完整结果（含几何/能隙/偶极/输入导出），表单同步为该任务参数。
+   * - done → 展示 result；failed/interrupted/cancelled → 展示中文失败原因；
+   * - pending/running → 续跑轮询；
+   * - 任务不存在（服务重启后注册表清空）→ 提示并按 URL 单体保留表单。
+   */
+  useEffect(() => {
+    if (!urlJobId) return;
+    let cancelled = false;
+    setError(null);
+    setCancelled(false);
+    fetchDftJob(urlJobId)
+      .then((job) => {
+        if (cancelled) return;
+        setMode(job.mode ?? 'dimer');
+        setBackend(job.backend ?? 'xtb');
+        if (job.input) {
+          if (job.input.ald_smiles) setMonoA({ smiles: job.input.ald_smiles, name: '' });
+          if (job.input.amine_smiles) setMonoB({ smiles: job.input.amine_smiles, name: '' });
+          if (job.input.x_type) setXType(job.input.x_type);
+          if (job.input.solvent_id) setSolventId(job.input.solvent_id);
+          if (job.input.ald2_smiles) setMonoA2({ smiles: job.input.ald2_smiles, name: '' });
+          if (job.input.amine2_smiles) setMonoB2({ smiles: job.input.amine2_smiles, name: '' });
+          if (job.input.custom_smiles) setCustomSmiles(job.input.custom_smiles);
+        }
+        if ((job.backend ?? 'xtb') === 'psi4') {
+          if (job.method === 'wb97xd3bj_svp' || job.method === 'b3lyp_631gdp'
+              || job.method === 'wb97xd3bj_svp_quick') {
+            setPsi4Method(job.method);
+          }
+        } else if (job.method === 'gfnff' || job.method === 'gfn2') {
+          setMethod(job.method);
+        }
+        if (job.status === 'done' && job.result) {
+          setResult(job.result);
+          setCurrentJobId(job.job_id);
+          setRunning(false);
+          setProgressHint('');
+          toast.info('已打开该次 DFT 计算的完整结果（来自收藏记录）');
+        } else if (job.status === 'failed' || job.status === 'interrupted') {
+          setResult(null);
+          setCurrentJobId(null);
+          setRunning(false);
+          setError(job.error || (job.status === 'failed'
+            ? '计算失败（未知原因）'
+            : '该任务已中断（服务重启），参数已恢复，可重新提交'));
+        } else if (job.status === 'cancelled') {
+          setResult(null);
+          setCurrentJobId(null);
+          setRunning(false);
+          setProgressHint('任务已取消');
+          setCancelled(true);
+        } else {
+          setResult(null);
+          setCurrentJobId(job.job_id);
+          setRunning(true);
+          setProgressHint(job.progress_hint || '恢复该计算任务…');
+          setProgressPercent(job.progress_percent ?? 0);
+          startPolling(job.job_id);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        toast.info('该次计算的任务记录已失效（服务重启后不保留），已按该组单体预填，可重新提交');
+      });
+    return () => {
+      cancelled = true;
+    };
+    // 仅在带 ?job= 进入时执行一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlJobId]);
 
   /** 同组合另一后端的最近一次成功结果（精度档/快速档并排对比用） */
   const compareResult = (() => {
