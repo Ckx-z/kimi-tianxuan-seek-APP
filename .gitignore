@@ -151,3 +151,6 @@ data/research/
 # 科研知识库运行时数据（v1.9.0：侧车图/向量/结构化条目，用户数据）
 data/graphrag_user/
 data/literature/
+
+# 测试生成物（tests/test_app_pipeline.py 写出），不入库
+reports/test_report.docx
