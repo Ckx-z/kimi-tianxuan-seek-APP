@@ -32,6 +32,8 @@ const TOOL_LABEL: Record<string, string> = {
   lookup_paper_doi: '文献 DOI 查询',
   /** v2.0.1：文献图视觉读图（P6） */
   view_figure: '文献图读图',
+  /** v2.20：读科研日记（可 @ 实验记录） */
+  read_diary: '读科研日记',
 };
 
 export type ConfirmDecision = 'confirm' | 'cancel';

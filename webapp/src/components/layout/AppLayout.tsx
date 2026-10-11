@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ChevronRight,
   AlertTriangle,
+  NotebookPen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
@@ -44,6 +45,8 @@ function getVersionHandshake(): VersionHandshakeApi | undefined {
 // 主导航项（首页与工具箱分组单独渲染；设置单独放在侧栏底部）
 const NAV_ITEMS = [
   { to: '/records', label: '实验记录', icon: FlaskConical },
+  // v2.2.0：科研日记（Markdown 正文 + @ 实验记录，助手可读）
+  { to: '/diary', label: '科研日记', icon: NotebookPen },
   { to: '/iterate', label: '方案迭代', icon: Lightbulb },
   { to: '/assistant', label: '科研助手', icon: Bot },
   // v1.9.8 R2：文献阅读（对标 Zotero 的阅读流程），置于「我的」之上

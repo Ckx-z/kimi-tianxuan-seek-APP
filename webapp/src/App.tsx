@@ -7,6 +7,7 @@ import Query from '@/pages/Query';
 import Batch from '@/pages/Batch';
 import Dft from '@/pages/Dft';
 import Records from '@/pages/Records';
+import Diary from '@/pages/Diary';
 import Iterate from '@/pages/Iterate';
 import Assistant from '@/pages/Assistant';
 import Reading from '@/pages/Reading';
@@ -27,6 +28,8 @@ export default function App() {
           <Route path="/query" element={<Navigate to="/toolbox/query" replace />} />
           <Route path="/batch" element={<Navigate to="/toolbox/batch" replace />} />
           <Route path="/records" element={<Records />} />
+          {/* v2.2.0：科研日记（Markdown + @ 实验记录） */}
+          <Route path="/diary" element={<Diary />} />
           <Route path="/iterate" element={<Iterate />} />
           <Route path="/assistant" element={<Assistant />} />
           <Route path="/reading" element={<Reading />} />

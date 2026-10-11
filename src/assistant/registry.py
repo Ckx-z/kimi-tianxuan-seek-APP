@@ -16,6 +16,8 @@ import logging
 from .tools.dft import confirm_impact as _dft_impact
 from .tools.dft import query_dft
 from .tools.brief import get_daily_brief
+# v2.2.0：科研日记（只读；正文 + @ 实验记录关联）
+from .tools.diary import read_diary
 from .tools.favorites import list_favorites_tool, manage_favorite, manage_favorite_impact
 from .tools.graphrag import query_graphrag_tool
 from .tools.litgraph import TOOL_SCHEMA as LIT_GRAPH_SCHEMA, lit_graph_tool
@@ -137,6 +139,47 @@ TOOLS: dict = {
                             "description": "是否包含全部时间点（默认 true）"},
                     },
                     "required": ["record_id"],
+                },
+            },
+        },
+    },
+    # v2.2.0：科研日记（读工具，无 confirm —— 只读，绝不写日记）
+    "read_diary": {
+        "handler": lambda args: read_diary(
+            args.get("keyword", ""), args.get("date_from", ""),
+            args.get("date_to", ""), args.get("record_id", ""),
+            args.get("limit") or 0),
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "read_diary",
+                "description": "读用户的「科研日记」（Markdown 正文 + 正文里 @ 的"
+                               "实验记录关联）。可按关键词（日记标题/正文/关联"
+                               "记录的实验编号与单体名）、日期范围、关联的实验"
+                               "记录 ID 检索。用户问「我日记里写了什么、关于某实验"
+                               "记过什么、某天的想法」时先调它。只读工具，不会"
+                               "修改日记；查不到就如实说没有，不要编造。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "keyword": {"type": "string",
+                                    "description": "关键词（空格分隔多个词时为"
+                                                   "「全部命中」；匹配日记标题、正文、"
+                                                   "以及 @ 的实验记录编号/单体名）"},
+                        "date_from": {"type": "string",
+                                      "description": "起始日期 YYYY-MM-DD"
+                                                     "（含当天，可选）"},
+                        "date_to": {"type": "string",
+                                    "description": "结束日期 YYYY-MM-DD"
+                                                   "（含当天，可选）"},
+                        "record_id": {"type": "string",
+                                      "description": "实验记录 ID（如 "
+                                                     "rec_20260902_006），只看 @ 了"
+                                                     "它的日记（可选）"},
+                        "limit": {"type": "integer",
+                                  "description": "最多返回条数（默认 5，上限 20）"},
+                    },
+                    "required": [],
                 },
             },
         },
