@@ -17,7 +17,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import ProcessPanel from './ProcessPanel';
-import { CONDITION_LABELS, OUTCOME_META, experimentTime, pairLabel } from './meta';
+import {
+  CONDITION_LABELS,
+  OUTCOME_META,
+  experimentTime,
+  pairLabel,
+  progressMeta,
+} from './meta';
 import { oodInfo } from '@/lib/format';
 import { exportRecordWord, type RecordItem } from './api';
 
@@ -128,6 +134,13 @@ export default function RecordDetailDialog({
                 <p className="text-sm text-muted-foreground">结果</p>
                 <Badge className={(OUTCOME_META[rec.outcome] ?? OUTCOME_META.failed).className}>
                   {(OUTCOME_META[rec.outcome] ?? OUTCOME_META.failed).label}
+                </Badge>
+              </div>
+              {/* 实验进展（v2.2.0，与草稿/正式状态独立） */}
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground">实验进展</p>
+                <Badge className={progressMeta(rec.progress).className}>
+                  {progressMeta(rec.progress).label}
                 </Badge>
               </div>
               <div>

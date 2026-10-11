@@ -22,7 +22,8 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { createRecord, type FavoriteItem, type FolderItem } from './api';
+import { createRecord, type FavoriteItem, type FolderItem, type RecordProgress } from './api';
+import { PROGRESS_OPTIONS } from './meta';
 
 /** conditions 九键（与后端契约一致） */
 const CONDITION_FIELDS: { key: string; label: string; placeholder: string }[] = [
@@ -69,6 +70,8 @@ export default function RecordForm({ favorites, folders = [], favoriteId, onFavo
   const [experimentNo, setExperimentNo] = useState('');
   const [conditions, setConditions] = useState<Record<string, string>>(EMPTY_CONDITIONS);
   const [outcome, setOutcome] = useState<'film' | 'partial' | 'failed'>('film');
+  /** 实验进展（v2.2.0，三选一互斥，默认「实验进行中」） */
+  const [progress, setProgress] = useState<RecordProgress>('running');
   const [strength, setStrength] = useState('');
   const [operator, setOperator] = useState('');
   const [notes, setNotes] = useState('');
@@ -83,6 +86,7 @@ export default function RecordForm({ favorites, folders = [], favoriteId, onFavo
     setExperimentNo('');
     setConditions(EMPTY_CONDITIONS);
     setOutcome('film');
+    setProgress('running');
     setStrength('');
     setOperator('');
     setNotes('');
@@ -138,6 +142,7 @@ export default function RecordForm({ favorites, folders = [], favoriteId, onFavo
         operator: operator.trim(),
         experiment_no: experimentNo.trim(),
         status: draft ? 'draft' : 'final',
+        progress,
         self_summary: selfSummary.trim(),
         mistakes: mistakes.trim(),
       });
@@ -297,6 +302,25 @@ export default function RecordForm({ favorites, folders = [], favoriteId, onFavo
             <RadioGroupItem value="failed" id="outcome-failed" />
             <Label htmlFor="outcome-failed" className="font-normal">失败</Label>
           </div>
+        </RadioGroup>
+      </div>
+
+      {/* 实验进展三选一（与实验结果独立维度，默认「实验进行中」） */}
+      <div className="space-y-1.5">
+        <Label>实验进展</Label>
+        <RadioGroup
+          value={progress}
+          onValueChange={(v) => setProgress(v as RecordProgress)}
+          className="flex flex-wrap gap-4"
+        >
+          {PROGRESS_OPTIONS.map((opt) => (
+            <div key={opt.value} className="flex items-center gap-1.5">
+              <RadioGroupItem value={opt.value} id={`progress-${opt.value}`} />
+              <Label htmlFor={`progress-${opt.value}`} className="font-normal">
+                {opt.label}
+              </Label>
+            </div>
+          ))}
         </RadioGroup>
       </div>
 

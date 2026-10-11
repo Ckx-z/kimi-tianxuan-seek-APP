@@ -46,6 +46,8 @@ export interface ExperimentRecord {
   experiment_no: string;
   conditions: Record<string, unknown>;
   outcome: Record<string, unknown>;
+  /** v2.2.0 实验进展：running 实验进行中 | finished 实验结束 | xrd_done XRD 已完成 */
+  progress?: 'running' | 'finished' | 'xrd_done';
   /** 录入日期（创建记录当天） */
   date: string;
   /** v1.9.3 派生：实验起始时间（时间线首个时间点；取不到时 = date） */

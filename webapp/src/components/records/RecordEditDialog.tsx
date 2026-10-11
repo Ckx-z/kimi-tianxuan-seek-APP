@@ -23,8 +23,8 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import ProcessPanel from './ProcessPanel';
-import { updateRecord, type RecordItem, type TimelineEntry } from './api';
-import { experimentTime } from './meta';
+import { updateRecord, type RecordItem, type RecordProgress, type TimelineEntry } from './api';
+import { PROGRESS_OPTIONS, experimentTime } from './meta';
 
 /** conditions 九键（与后端契约一致） */
 const CONDITION_FIELDS: { key: string; label: string }[] = [
@@ -52,6 +52,8 @@ export default function RecordEditDialog({ rec, mode, onClose, onSaved }: Record
   const isDraft = (mode ?? (rec.status === 'draft' ? 'draft' : 'final')) === 'draft';
   const [experimentNo, setExperimentNo] = useState(rec.experiment_no || '');
   const [outcome, setOutcome] = useState<string>(rec.outcome || '');
+  /** 实验进展（v2.2.0，三选一互斥，单选；旧记录缺字段回落「实验进行中」） */
+  const [progress, setProgress] = useState<RecordProgress>(rec.progress || 'running');
   const [conditions, setConditions] = useState<Record<string, string>>(() => {
     const base: Record<string, string> = {};
     for (const f of CONDITION_FIELDS) {
@@ -115,6 +117,7 @@ export default function RecordEditDialog({ rec, mode, onClose, onSaved }: Record
         status: finalize ? 'final' : 'draft',
         experiment_no: experimentNo.trim(),
         outcome,
+        progress,
         strength: strength.trim(),
         operator: operator.trim(),
         notes: notes.trim(),
@@ -193,6 +196,25 @@ export default function RecordEditDialog({ rec, mode, onClose, onSaved }: Record
                 <RadioGroupItem value="failed" id="edit-outcome-failed" />
                 <Label htmlFor="edit-outcome-failed" className="font-normal">失败</Label>
               </div>
+            </RadioGroup>
+          </div>
+
+          {/* 实验进展三选一（与实验结果独立维度，单选互斥） */}
+          <div className="space-y-1.5">
+            <Label>实验进展</Label>
+            <RadioGroup
+              value={progress}
+              onValueChange={(v) => setProgress(v as RecordProgress)}
+              className="flex flex-wrap gap-4"
+            >
+              {PROGRESS_OPTIONS.map((opt) => (
+                <div key={opt.value} className="flex items-center gap-1.5">
+                  <RadioGroupItem value={opt.value} id={`edit-progress-${opt.value}`} />
+                  <Label htmlFor={`edit-progress-${opt.value}`} className="font-normal">
+                    {opt.label}
+                  </Label>
+                </div>
+              ))}
             </RadioGroup>
           </div>
 

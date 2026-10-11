@@ -1,7 +1,7 @@
 /**
  * 实验记录共享展示常量（时间线 / 详情对话框 / 收藏详情内嵌列表共用）
  */
-import type { RecordItem } from './api';
+import type { RecordItem, RecordProgress } from './api';
 
 /** conditions 九键中文名 */
 export const CONDITION_LABELS: Record<string, string> = {
@@ -23,6 +23,31 @@ export const OUTCOME_META: Record<string, { label: string; className: string }> 
   failed: { label: '失败', className: 'bg-muted text-muted-foreground' },
   '': { label: '未定', className: 'bg-muted text-muted-foreground' },
 };
+
+/**
+ * 实验进展徽章配置（v2.2.0，与 status 独立的维度，三选一互斥）
+ * 三色区分：进行中蓝（info）/ 已结束绿（success）/ XRD 已完成金（gold）
+ */
+export const PROGRESS_META: Record<string, { label: string; className: string }> = {
+  running: { label: '实验进行中', className: 'bg-info text-info-foreground' },
+  finished: { label: '实验结束', className: 'bg-success text-success-foreground' },
+  xrd_done: { label: 'XRD 已完成', className: 'bg-gold text-gold-foreground' },
+};
+
+/** 进展徽章取值（缺字段/未知取值回落默认「实验进行中」，与后端旧数据兼容一致） */
+export function progressMeta(progress?: string | null): { label: string; className: string } {
+  return PROGRESS_META[String(progress ?? '')] ?? PROGRESS_META.running;
+}
+
+/** 进展下拉/单选项（筛选「全部」与表单三选一共用） */
+export const PROGRESS_OPTIONS: { value: RecordProgress; label: string }[] = [
+  { value: 'running', label: '实验进行中' },
+  { value: 'finished', label: '实验结束' },
+  { value: 'xrd_done', label: 'XRD 已完成' },
+];
+
+/** 进展筛选「全部」哨兵值（shadcn Select 不接受空串 value） */
+export const PROGRESS_FILTER_ALL = '__all__';
 
 /** 单体对显示名 */
 export function pairLabel(rec: Pick<RecordItem, 'aldehyde' | 'amine'>): string {

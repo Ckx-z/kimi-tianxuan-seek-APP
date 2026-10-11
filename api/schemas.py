@@ -89,6 +89,10 @@ class RecordCreate(BaseModel):
     timeline: list[dict] = Field(default_factory=list, description="时间点记录条目")
     self_summary: str = Field("", description="自我总结（草稿也可填）")
     mistakes: str = Field("", description="本人认为的失误（草稿也可填）")
+    progress: str = Field(
+        "running",
+        description="实验进展（与 status 独立，三选一互斥）："
+                    "running 实验进行中（默认）| finished 实验结束 | xrd_done XRD 已完成")
 
 
 class RecordUpdate(BaseModel):
@@ -102,6 +106,9 @@ class RecordUpdate(BaseModel):
     process_notes: str | None = None
     self_summary: str | None = None
     mistakes: str | None = None
+    progress: str | None = Field(
+        None, description="实验进展：running 实验进行中 | finished 实验结束 | "
+                          "xrd_done XRD 已完成（不传则不修改）")
     conditions: dict | None = None
     timeline: list[dict] | None = None
 

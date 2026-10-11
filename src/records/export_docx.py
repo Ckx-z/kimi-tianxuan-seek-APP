@@ -52,6 +52,13 @@ _OUTCOME_LABELS = {
 
 _STATUS_LABELS = {"draft": "草稿", "final": "正式"}
 
+# v2.2.0 实验进展（与 status 独立维度，三选一互斥）
+_PROGRESS_LABELS = {
+    "running": "实验进行中",
+    "finished": "实验结束",
+    "xrd_done": "XRD 已完成",
+}
+
 _OOD_LABELS = {
     "none": "适用域内（无警告）",
     "warning": "警告：接近模型适用域边界，打分可信度降低",
@@ -401,6 +408,9 @@ def _build_record_body(doc: Document, rec: dict, base_level: int = 1) -> None:
     record_id = str(rec.get("record_id") or "")
     experiment_no = str(rec.get("experiment_no") or "").strip()
     status = _STATUS_LABELS.get(str(rec.get("status") or ""), str(rec.get("status") or ""))
+    # v2.2.0：实验进展单列一行（status 行「状态」保持不变）
+    progress = _PROGRESS_LABELS.get(
+        str(rec.get("progress") or ""), str(rec.get("progress") or ""))
     today = datetime.now().astimezone().date().isoformat()
 
     # 基本信息
@@ -416,6 +426,7 @@ def _build_record_body(doc: Document, rec: dict, base_level: int = 1) -> None:
         ("实验编号", experiment_no or "（未填写）"),
         ("记录 ID", record_id),
         ("状态", status or "—"),
+        ("实验进展", progress or "实验进行中"),
         ("实验起始时间", exp_date_txt),
         ("录入日期", str(rec.get("date") or "—")),
         ("实验结果", _OUTCOME_LABELS.get(str(rec.get("outcome") or ""), "未定")),

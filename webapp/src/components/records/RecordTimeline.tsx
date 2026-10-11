@@ -1,10 +1,12 @@
 /**
  * 实验记录时间线（右栏 3/5）
- * - 记录卡列表：日期/单体对/结果徽章（成膜紫/部分金/失败灰）/编号/条件摘要
+ * - 记录卡列表：日期/单体对/结果徽章（成膜紫/部分金/失败灰）/实验进展徽章/
+ *   编号/条件摘要
  * - 预测快照 vs 实际结果对比（有 prediction_snapshot 时）
  * - 每卡操作：草稿「继续编辑」；正式记录「编辑」（全字段整体修改）；
  *   「放大」共享详情 Dialog（内含编辑入口）；「删除」AlertDialog 确认后 DELETE
- * - 顶部：刷新按钮 + 记录数 + 「只看选中收藏」过滤开关
+ * - 顶部：刷新按钮 + 记录数 + 「只看选中收藏」过滤开关 + 实验进展筛选
+ *   （全部/实验进行中/实验结束/XRD 已完成，经后端 progress 参数筛选）
  */
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -22,10 +24,25 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import RecordDetailDialog from './RecordDetailDialog';
 import RecordEditDialog from './RecordEditDialog';
-import { CONDITION_LABELS, OUTCOME_META, experimentTime, pairLabel } from './meta';
+import {
+  CONDITION_LABELS,
+  OUTCOME_META,
+  PROGRESS_FILTER_ALL,
+  PROGRESS_OPTIONS,
+  experimentTime,
+  pairLabel,
+  progressMeta,
+} from './meta';
 import { oodInfo } from '@/lib/format';
 
 /** 时间轴节点配色（与 OUTCOME_META 同语义：成膜实心主色 / 部分成膜金色 / 失败中性） */
@@ -81,6 +98,9 @@ export interface RecordTimelineProps {
   onOnlySelectedChange: (on: boolean) => void;
   /** 当前选中收藏 id（仅用于提示文案） */
   favoriteId: string;
+  /** 实验进展筛选（受控）：全部 / 实验进行中 / 实验结束 / XRD 已完成 */
+  progressFilter: string;
+  onProgressFilterChange: (value: string) => void;
   /** 刷新列表 */
   onRefresh: () => void;
 }
@@ -92,6 +112,8 @@ export default function RecordTimeline({
   onlySelected,
   onOnlySelectedChange,
   favoriteId,
+  progressFilter,
+  onProgressFilterChange,
   onRefresh,
 }: RecordTimelineProps) {
   /** 放大详情的记录 */
@@ -145,6 +167,25 @@ export default function RecordTimeline({
         <h2 className="text-lg font-semibold text-foreground">记录时间线</h2>
         <Badge variant="secondary">{records.length} 条记录</Badge>
         <div className="ml-auto flex items-center gap-3">
+          {/* 实验进展筛选（服务端筛选：/api/records?progress=...） */}
+          <div className="flex items-center gap-2">
+            <Label htmlFor="progress-filter" className="text-sm text-muted-foreground">
+              实验进展
+            </Label>
+            <Select value={progressFilter} onValueChange={onProgressFilterChange}>
+              <SelectTrigger id="progress-filter" className="h-8 w-[136px] text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={PROGRESS_FILTER_ALL}>全部</SelectItem>
+                {PROGRESS_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-center gap-2">
             <Switch
               id="only-selected"
@@ -256,10 +297,16 @@ export default function RecordTimeline({
                       </Button>
                     </div>
                   </div>
-                  {/* 第二行：单体对 + 结果徽章 + 编号 */}
+                  {/* 第二行：单体对 + 结果徽章 + 实验进展徽章 + 编号 */}
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className="font-medium text-foreground">{pairLabel(rec)}</span>
                     <Badge className={meta.className}>{meta.label}</Badge>
+                    <Badge
+                      className={progressMeta(rec.progress).className}
+                      title="实验进展"
+                    >
+                      {progressMeta(rec.progress).label}
+                    </Badge>
                     {isDraft && (
                       <Badge variant="outline" className="border-gold/60 text-gold-foreground">
                         草稿

@@ -119,12 +119,17 @@ export interface TimelineEntry {
   attachments: AttachmentMeta[];
 }
 
+/** 实验进展（v2.2.0，与 status 独立维度，三选一互斥） */
+export type RecordProgress = 'running' | 'finished' | 'xrd_done';
+
 /** 实验记录（后端落盘结构） */
 export interface RecordItem {
   record_id: string;
   experiment_no: string;
   /** 草稿 / 正式记录（旧记录读取时默认 final） */
   status: 'draft' | 'final';
+  /** 实验进展：实验进行中 / 实验结束 / XRD 已完成（旧记录读取时默认 running） */
+  progress: RecordProgress;
   favorite_id: string | null;
   aldehyde: MonomerObj;
   amine: MonomerObj;
@@ -169,6 +174,8 @@ export interface RecordCreateBody {
   experiment_no: string;
   /** draft 草稿暂存（宽松校验）；final 正式（默认，完整校验） */
   status?: 'draft' | 'final';
+  /** 实验进展（不传时后端按「实验进行中」落盘） */
+  progress?: RecordProgress;
   process_notes?: string;
   self_summary?: string;
   mistakes?: string;
@@ -186,6 +193,8 @@ export interface RecordUpdateBody {
   process_notes?: string;
   self_summary?: string;
   mistakes?: string;
+  /** 实验进展（不传则不修改） */
+  progress?: RecordProgress;
   conditions?: Record<string, unknown>;
   timeline?: Partial<TimelineEntry>[];
 }
@@ -204,10 +213,17 @@ export async function listFolders(): Promise<FolderItem[]> {
   return data.folders ?? [];
 }
 
-/** 实验记录列表（可选按收藏过滤） */
-export async function listRecords(favoriteId?: string): Promise<RecordItem[]> {
-  const qs = favoriteId ? `?favorite_id=${encodeURIComponent(favoriteId)}` : '';
-  const data = await request<{ records: RecordItem[] }>(`/records${qs}`);
+/**
+ * 实验记录列表（可选按收藏 / 实验进展过滤）
+ * @param favoriteId 只看该收藏下的记录（留空 = 全部）
+ * @param progress 按实验进展筛选（留空 = 全部）；非法值后端返回 400 并弹中文提示
+ */
+export async function listRecords(favoriteId?: string, progress?: string): Promise<RecordItem[]> {
+  const params = new URLSearchParams();
+  if (favoriteId) params.set('favorite_id', favoriteId);
+  if (progress) params.set('progress', progress);
+  const qs = params.toString();
+  const data = await request<{ records: RecordItem[] }>(`/records${qs ? `?${qs}` : ''}`);
   return data.records ?? [];
 }
 

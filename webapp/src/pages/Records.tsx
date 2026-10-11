@@ -16,6 +16,7 @@ import {
   type FolderItem,
   type RecordItem,
 } from '@/components/records/api';
+import { PROGRESS_FILTER_ALL } from '@/components/records/meta';
 
 export default function Records() {
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
@@ -23,6 +24,8 @@ export default function Records() {
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [favoriteId, setFavoriteId] = useState('');
   const [onlySelected, setOnlySelected] = useState(false);
+  /** 实验进展筛选：PROGRESS_FILTER_ALL 表示全部（其余为 running/finished/xrd_done） */
+  const [progressFilter, setProgressFilter] = useState<string>(PROGRESS_FILTER_ALL);
   const [loading, setLoading] = useState(true);
   const [backendDown, setBackendDown] = useState(false);
 
@@ -41,12 +44,17 @@ export default function Records() {
     }
   }, []);
 
-  /** 加载记录列表（按「只看选中收藏」过滤） */
+  /** 加载记录列表（按「只看选中收藏」+ 实验进展筛选，均为服务端筛选） */
   const loadRecords = useCallback(
-    async (only: boolean, favId: string) => {
+    async (only: boolean, favId: string, progress: string) => {
       setLoading(true);
       try {
-        setRecords(await listRecords(only && favId ? favId : undefined));
+        setRecords(
+          await listRecords(
+            only && favId ? favId : undefined,
+            progress === PROGRESS_FILTER_ALL ? undefined : progress,
+          ),
+        );
         setBackendDown(false);
       } catch (err) {
         setBackendDown(err instanceof BackendUnavailableError);
@@ -61,25 +69,31 @@ export default function Records() {
   /** 初始加载 */
   useEffect(() => {
     void loadFavorites();
-    void loadRecords(false, '');
+    void loadRecords(false, '', PROGRESS_FILTER_ALL);
   }, [loadFavorites, loadRecords]);
 
   /** 刷新：同时重拉收藏与记录 */
   const handleRefresh = useCallback(() => {
     void loadFavorites();
-    void loadRecords(onlySelected, favoriteId);
-  }, [loadFavorites, loadRecords, onlySelected, favoriteId]);
+    void loadRecords(onlySelected, favoriteId, progressFilter);
+  }, [loadFavorites, loadRecords, onlySelected, favoriteId, progressFilter]);
 
   /** 过滤开关切换后重新加载 */
   const handleOnlySelectedChange = (on: boolean) => {
     setOnlySelected(on);
-    void loadRecords(on, favoriteId);
+    void loadRecords(on, favoriteId, progressFilter);
   };
 
   /** 切换收藏：若开启过滤则随之刷新列表 */
   const handleFavoriteChange = (id: string) => {
     setFavoriteId(id);
-    if (onlySelected && id) void loadRecords(true, id);
+    if (onlySelected && id) void loadRecords(true, id, progressFilter);
+  };
+
+  /** 切换实验进展筛选：立即重新加载 */
+  const handleProgressFilterChange = (value: string) => {
+    setProgressFilter(value);
+    void loadRecords(onlySelected, favoriteId, value);
   };
 
   return (
@@ -108,6 +122,8 @@ export default function Records() {
             onlySelected={onlySelected}
             onOnlySelectedChange={handleOnlySelectedChange}
             favoriteId={favoriteId}
+            progressFilter={progressFilter}
+            onProgressFilterChange={handleProgressFilterChange}
             onRefresh={handleRefresh}
           />
         </div>

@@ -31,8 +31,21 @@ def _store():
 
 
 @router.get("")
-def list_records(favorite_id: str | None = None):
-    return {"records": _store().list_records(favorite_id=favorite_id)}
+def list_records(favorite_id: str | None = None, progress: str | None = None):
+    """实验记录列表。
+
+    查询参数：
+    - favorite_id：可选，只看某个收藏下的记录；
+    - progress：可选（v2.2.0），按实验进展筛选 —— running 实验进行中 |
+      finished 实验结束 | xrd_done XRD 已完成；留空 = 不筛选（全部）。
+      非法取值 **返回 400**（不静默忽略，避免前端筛选条件写错时悄悄返回
+      全部记录）：{"detail": "progress（实验进展）必须是 ... 之一，收到: ..."}。
+    """
+    try:
+        return {"records": _store().list_records(
+            favorite_id=favorite_id, progress=progress)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
 
 @router.post("", status_code=201)
@@ -53,7 +66,8 @@ def create_record(req: RecordCreate):
             process_notes=req.process_notes,
             timeline=req.timeline,
             self_summary=req.self_summary,
-            mistakes=req.mistakes)
+            mistakes=req.mistakes,
+            progress=req.progress.strip() or "running")
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     except KeyError as exc:
@@ -72,7 +86,11 @@ def get_record(rec_id: str):
 
 @router.put("/{rec_id}")
 def update_record(rec_id: str, req: RecordUpdate):
-    """草稿继续编辑 / 转正式；正式记录也可更新流程文本与时间线条目。"""
+    """草稿继续编辑 / 转正式；正式记录也可更新流程文本与时间线条目。
+
+    v2.2.0：请求体可带 progress（running | finished | xrd_done，三选一互斥）
+    改进实验进展；不传该字段则不修改（向后兼容）。非法值 → 400。
+    """
     fields = req.model_dump(exclude_none=True)
     if not fields:
         rec = _store().get_record(rec_id)
