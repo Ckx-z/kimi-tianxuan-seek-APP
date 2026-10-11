@@ -1,4 +1,4 @@
-﻿"""收藏夹存储（P2 后端，页③支撑）。
+"""收藏夹存储（P2 后端，页③支撑）。
 
 每条收藏一个 JSON 文件：data/favorites/fav_<YYYYMMDD>_<NNN>.json
 schema 见 docs/APP_REDESIGN_PROPOSAL.md 第 3 节③：
@@ -379,11 +379,24 @@ def _read_file(path: Path) -> dict | None:
         return None
 
 
+#: 只应存在于 GET 响应、**不得落盘**的派生键。
+#: 背景（v2.20 独立验收发现）：`_dft_response_view()` 是"就地注入"派生字段的，
+#: 而写路径都是 `get_favorite()` → 改条目 → `_write(fav)` —— 同一个 dict 对象，
+#: 于是响应里注入的派生值被一起落盘，且是**本次写操作之前**算出的陈旧值：
+#:   · pair 卡追加一条 dimer 记录后：响应 archive_type=cof_monomer_group，磁盘仍是 dft_pair
+#:   · 删掉一条 DFT 记录后：响应 dft_labels=[A,B]，磁盘仍是 [A,B,C]
+#: API 读取路径每次都会重算，所以对接口无影响；但**直接读该 json 的消费者**
+#: （如 src/recommend/generated_plans.py）会看到与 dft_entries 自相矛盾的数据。
+#: 在唯一写边界上剥离，可保证任何调用方都不会把派生值写进磁盘。
+_RESPONSE_ONLY_KEYS = ("dft_labels", "archive_type")
+
+
 def _write(fav: dict) -> dict:
     FAVORITES_DIR.mkdir(parents=True, exist_ok=True)
     path = FAVORITES_DIR / f"{fav['id']}.json"
+    payload = {k: v for k, v in fav.items() if k not in _RESPONSE_ONLY_KEYS}
     path.write_text(
-        json.dumps(fav, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
+        json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
     )
     return fav
 
@@ -716,12 +729,13 @@ def _derived_labels(entries: list[dict], index_offset: int = 0) -> list[str]:
 def _dft_response_view(fav: dict) -> dict:
     """GET 响应兼容旧前端：dft_snapshot 回填为最新一条 dft_entries。
 
-    仅改内存视图不落盘——磁盘上 dft_snapshot 保持原值，旧前端读
-    dft_snapshot 拿到的就是最近一次 DFT 计算，不会炸。
-    另外补两个**派生**字段（同样只存在于响应里，不改写磁盘条目）：
+    在内存视图里补两个**派生**字段：
     - dft_labels：与 dft_entries 等长的标号数组（A/B/C…，见 _derived_labels）；
     - archive_type：档案卡类型（cof_monomer_group | dft_pair）。
 
+    落盘安全：这两个键由 `_RESPONSE_ONLY_KEYS` 在 `_write()` 里被剥离，
+    **任何调用方都不会把它们写进磁盘**（v2.20 独立验收发现过"陈旧派生值落盘"，
+    根因就是这里就地注入 + 写路径复用同一 dict；现已在写边界兜住）。
     注意：不往条目字典里塞 label/mode 等派生键——旧数据（无
     condition_key/label 的历史条目）在响应里保持原样，避免"读一次就变样"。
     """
