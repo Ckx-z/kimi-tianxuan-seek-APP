@@ -388,7 +388,10 @@ export default function DftResultPanel({ result, jobId, compare }: Props) {
       {/* 固定红线提示（学术诚信底线，常驻） */}
       <p className="rounded-lg border border-dashed border-gold/50 bg-gold-muted/40 px-4 py-2 text-xs text-muted-foreground">
         {isPsi4
-          ? '学术诚信提示：Psi4 精度档为团簇模型（二聚体·客体）真 DFT 结果，已做 BSSE 校正；周期性框架级吸附请导出几何/输入文件到超算复算。'
+          ? (result.mode === 'pair'
+            // v2.20：pair 模式没有二聚体/客体之分，措辞按实际模型描述
+            ? '学术诚信提示：Psi4 精度档为双分子团簇真 DFT 结果，已做 BSSE 校正；周期性框架级吸附请导出几何/输入文件到超算复算。'
+            : '学术诚信提示：Psi4 精度档为团簇模型（二聚体·客体）真 DFT 结果，已做 BSSE 校正；周期性框架级吸附请导出几何/输入文件到超算复算。')
           : '学术诚信提示：半经验方法（xTB）结果仅供相对比较，精确能量请切换到 Psi4 精度档或导出输入文件用 DFT 复算。'}
       </p>
     </div>

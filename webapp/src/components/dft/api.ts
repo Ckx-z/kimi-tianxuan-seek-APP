@@ -550,13 +550,37 @@ export async function exportDftInput(
 }
 
 /** 把 DFT 结果快照合并写入已有收藏（PATCH dft_snapshot） */
-export function mergeDftToFavorite(favoriteId: string, result: DftResult) {
-  return requestFavorite(favoriteId, buildDftSnapshot(result));
+export function mergeDftToFavorite(favoriteId: string, result: DftResult, jobId?: string) {
+  return requestFavorite(favoriteId, buildDftSnapshot(result, jobId));
 }
 
-/** 由计算结果构造 dft_snapshot（落盘字段，「我的」页可展示；2.0 起含二聚体与 X） */
-export function buildDftSnapshot(result: DftResult) {
+/** 由计算结果构造 dft_snapshot（落盘字段，「我的」页可展示；2.0 起含二聚体与 X）
+ *
+ * v2.20 补齐（此前缺失导致两个功能不可用）：
+ * - `mode`：pair/任意双分子结果收藏后要判成「双分子 DFT 特殊档案卡」，缺它会被当二聚体；
+ * - `job_id`：档案卡里点击某条记录要跳回 DFT 页看**该次**完整结果（`?job=`），缺它就定位不到；
+ * - `conditions` + `a_smiles`/`b_smiles`：DFT 记录的条件指纹与「单体组+目标分子」标号分组需要。
+ */
+export function buildDftSnapshot(result: DftResult, jobId?: string) {
+  const mode = result.mode ?? 'dimer';
+  const conditions = {
+    mode,
+    backend: result.backend ?? 'xtb',
+    method: result.method,
+    a_smiles: result.smiles_a,
+    b_smiles: result.smiles_b,
+    x_type: result.x_type,
+    x_smiles: result.x_smiles,
+    dimer_smiles: result.dimer_smiles,
+  };
   return {
+    // v2.20：条目定位与分组信息
+    job_id: jobId ?? null,
+    mode,
+    a_smiles: result.smiles_a,
+    b_smiles: result.smiles_b,
+    conditions,
+    // 既有字段（保持原样，老消费方不受影响）
     backend: result.backend ?? 'xtb',
     method: result.method,
     method_label: result.method_label,

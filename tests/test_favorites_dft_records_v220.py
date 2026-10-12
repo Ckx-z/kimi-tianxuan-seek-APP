@@ -62,6 +62,70 @@ def _create_favorite(**kw) -> dict:
     return r.json()
 
 
+class TestPairFavoriteCreation:
+    """v2.20 修复：**pair（任意双分子）结果也能收藏**，并成为双分子 DFT 特殊档案卡。
+
+    背景（用户实测阻塞）：DFT 页此前对 pair 模式禁用收藏按钮 → 特殊档案卡无入口、
+    新功能无法测试。修复后前端放开按钮，并在 dft_snapshot 里带上
+    `mode` / `job_id` / `a_smiles` / `b_smiles` / `conditions`
+    （缺 mode 会被判成二聚体卡；缺 job_id 则点记录跳不回该次结果）。
+
+    本测试直接覆盖后端接受「带 pair 快照的收藏」这条路径（前端就是发这个体）。
+    """
+
+    def test_create_favorite_with_pair_snapshot(self, fav_dir):
+        snap = {
+            "job_id": "dft_pair_demo_1",
+            "mode": "pair",
+            "a_smiles": "CCO",
+            "b_smiles": "Oc1ccccc1",
+            "conditions": {"mode": "pair", "backend": "psi4",
+                           "method": "wb97xd3bj_svp",
+                           "a_smiles": "CCO", "b_smiles": "Oc1ccccc1"},
+            "backend": "psi4", "method": "wb97xd3bj_svp",
+            "e_bind_kcal": -4.88, "e_bind_kj": -20.42,
+            "x_smiles": "Oc1ccccc1", "x_type": "custom",
+        }
+        fav = _create_favorite(aldehyde_smiles="CCO", amine_smiles="Oc1ccccc1",
+                               dft_snapshot=snap)
+        fid = fav["id"]
+
+        body = client.get(f"/api/favorites/{fid}").json()
+        # ① 判成「双分子 DFT 计算特殊档案卡」
+        assert body["archive_type"] == "dft_pair", body.get("archive_type")
+        # ② 旧快照被读成一条 DFT 记录（无需先发生写操作）
+        entries = body["dft_entries"]
+        assert len(entries) == 1
+        entry = entries[0]
+        # ③ mode 与 job_id 都被保住 —— 前者决定卡类型，后者决定"点击记录看该次结果"
+        assert entry["mode"] == "pair"
+        assert entry["job_id"] == "dft_pair_demo_1"
+        assert entry["e_bind_kcal"] == -4.88
+        # ④ 响应里带派生标号（该组第一条 → A）
+        assert body["dft_labels"] == ["A"]
+        # ⑤ 派生字段不落盘（与 bc442c5 的修复一致）
+        disk = json.loads((fav_dir / f"{fid}.json").read_text(encoding="utf-8"))
+        assert "dft_labels" not in disk and "archive_type" not in disk
+
+    def test_pair_favorite_then_append_second_run(self, fav_dir):
+        """同一组双分子再算一次（不同档位）→ 追加成第二条记录，标号 B。"""
+        fid = _create_favorite(
+            aldehyde_smiles="CCO", amine_smiles="Oc1ccccc1",
+            dft_snapshot={"job_id": "run1", "mode": "pair", "method": "gfn2",
+                          "echo": 1}).get("id")
+        body = _post_entry(fid, {
+            "job_id": "run2", "mode": "pair", "method": "wb97xd3bj_svp",
+            "e_bind_kcal": -6.1,
+            "conditions": {"mode": "pair", "backend": "psi4",
+                           "method": "wb97xd3bj_svp",
+                           "a_smiles": "CCO", "b_smiles": "Oc1ccccc1"},
+        })
+        assert body["archive_type"] == "dft_pair"
+        assert len(body["dft_entries"]) == 2
+        # 同组（同单体对 + 同目标分子）→ 续号 B
+        assert body["dft_labels"] == ["A", "B"]
+
+
 def _post_entry(fav_id: str, payload: dict) -> dict:
     r = client.post(f"/api/favorites/{fav_id}/dft-entries", json=payload)
     assert r.status_code == 200, r.text

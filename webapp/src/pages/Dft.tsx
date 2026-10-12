@@ -680,17 +680,20 @@ export default function Dft() {
     if (!result) return;
     setFavoriting(true);
     try {
-      await createFavoriteWithDft({
+      const created = await createFavoriteWithDft({
         aldehyde_smiles: result.smiles_a,
         amine_smiles: result.smiles_b,
         ald_name: monoA.name,
         amine_name: monoB.name,
         folder_id: folderId,
-        dft_snapshot: buildDftSnapshot(result),
+        dft_snapshot: buildDftSnapshot(result, currentJobId || undefined),
       });
       toast.success(`已收藏到「${folderName || '收藏夹1'}」（含 DFT 结果）`);
       setFavDialogOpen(false);
-      setResult({ ...result, favorite: { id: '', has_dft: true } });
+      // v2.20：用创建响应里的**真实 id**（此前置空、靠后续查配对回填），
+      // 否则刚收藏完「追加到收藏的 DFT 记录」按钮不出现、「更新已有收藏」会点到空 id。
+      const createdId = (created as { id?: string } | null)?.id ?? '';
+      setResult({ ...result, favorite: { id: createdId, has_dft: true } });
     } catch (e) {
       setFavDialogOpen(false);
       if (e instanceof DuplicateFavoriteError) {
@@ -787,7 +790,7 @@ export default function Dft() {
     }
     setMerging(true);
     try {
-      await mergeDftToFavorite(targetId, result);
+      await mergeDftToFavorite(targetId, result, currentJobId || undefined);
       toast.success('DFT 结果已合并到已有收藏');
       setMergeTarget(null);
       setResult({ ...result, favorite: { ...(result.favorite ?? { id: targetId }), id: targetId, has_dft: true } });
@@ -1525,17 +1528,8 @@ export default function Dft() {
               </div>
               <DftResultPanel result={result} jobId={currentJobId} compare={compareResult} />
 
-              {/* 收藏联动（pair 模式无单体组归属，禁用） */}
-              {result.mode === 'pair' ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="outline" disabled title="任意双分子模式暂不支持收藏">
-                    ☆ 收藏这组单体（含 DFT 结果）
-                  </Button>
-                  <span className="text-xs text-muted-foreground">
-                    任意双分子模式无醛/胺单体组归属，暂不支持收藏与追加 DFT 记录
-                  </span>
-                </div>
-              ) : (
+              {/* 收藏联动：v2.20 起 pair（任意双分子）也能收藏 ——
+                  收藏后即成为「双分子 DFT 计算特殊档案卡」（含单体信息 + DFT 记录） */}
               <div className="flex flex-wrap items-center gap-2">
                 {fav ? (
                   <>
@@ -1554,12 +1548,18 @@ export default function Dft() {
                   </>
                 ) : pairFavorite ? (
                   <span className="text-xs text-muted-foreground">
-                    该组合已收藏（{pairFavorite.aldehyde?.name || '未知醛'} ×{' '}
-                    {pairFavorite.amine?.name || '未知胺'}）
+                    该组合已收藏（{pairFavorite.aldehyde?.name
+                      || (result.mode === 'pair' ? '分子 A' : '未知醛')} ×{' '}
+                    {pairFavorite.amine?.name
+                      || (result.mode === 'pair' ? '分子 B' : '未知胺')}）
                   </span>
                 ) : (
                   <Button variant="outline" onClick={handleFavorite} disabled={favoriting}>
-                    {favoriting ? '处理中…' : '☆ 收藏这组单体（含 DFT 结果）'}
+                    {favoriting
+                      ? '处理中…'
+                      : result.mode === 'pair'
+                        ? '☆ 收藏这组双分子（含 DFT 结果）'
+                        : '☆ 收藏这组单体（含 DFT 结果）'}
                   </Button>
                 )}
                 {/* 已收藏组合：追加本次结果到收藏的 DFT 分条记录 */}
@@ -1574,7 +1574,6 @@ export default function Dft() {
                   </Button>
                 )}
               </div>
-              )}
 
               {/* 单体性质卡 */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
